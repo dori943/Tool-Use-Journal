@@ -1,0 +1,44 @@
+<!--
+  Vacuum 흡착 EE. robosuite에 진공 그리퍼가 없어 GripperModel 규약
+  (worldbody → base → eef + 표준 site/sensor)을 지키는 커스텀 MJCF.
+  외형: worldbody geom. 흡착: actuator/adhesion.
+-->
+<mujoco model="vacuum_gripper">
+    <worldbody>
+        <body name="vacuum_base" pos="0 0 0">
+            <!-- 힘/토크 센서 프레임 -->
+            <site name="ft_frame" pos="0 0 0" size="0.01" rgba="1 0 0 1" type="sphere" group="1"/>
+            <inertial pos="0 0 0.05" mass="0.3" diaginertia="1e-3 1e-3 1e-3"/>
+
+            <!-- +z: 손목 플랜지에서 대상 쪽. 자루로 컵을 ~11cm 내민다. -->
+            <!-- 자루(시각 전용, 충돌 없음) -->
+            <geom name="vac_mount" type="cylinder" size="0.018 0.05" pos="0 0 0.05"
+                  rgba="0.2 0.2 0.25 1" group="1" contype="0" conaffinity="0"/>
+            <!-- 흡착 컵. 접촉이 필요해서 충돌 ON. 뷰어는 group 0을 숨기므로 시각용 쌍을 둔다. -->
+            <geom name="vac_cup" type="cylinder" size="0.03 0.012" pos="0 0 0.10"
+                  rgba="0.1 0.1 0.1 1" group="0" contype="1" conaffinity="1"
+                  margin="0.01" gap="0.01"/>
+            <geom name="vac_cup_vis" type="cylinder" size="0.03 0.012" pos="0 0 0.10"
+                  rgba="0.1 0.1 0.1 1" group="1" contype="0" conaffinity="0"/>
+
+            <!-- 파지점. 이름은 반드시 eef. z=0.112는 컵 바깥면. -->
+            <body name="eef" pos="0 0 0.112" quat="0.707105 0 0 -0.707105">
+                <site name="grip_site" pos="0 0 0" size="0.01" rgba="1 0 0 0.5" type="sphere" group="1"/>
+                <site name="ee_x" pos="0.1 0 0" size="0.005 .1" quat="0.707105 0 0.707108 0" rgba="1 0 0 0" type="cylinder" group="1"/>
+                <site name="ee_y" pos="0 0.1 0" size="0.005 .1" quat="0.707105 0.707108 0 0" rgba="0 1 0 0" type="cylinder" group="1"/>
+                <site name="ee_z" pos="0 0 0.1" size="0.005 .1" quat="1 0 0 0" rgba="0 0 1 0" type="cylinder" group="1"/>
+                <site name="grip_site_cylinder" pos="0 0 0" size="0.005 10" rgba="0 1 0 0.3" type="cylinder" group="1"/>
+            </body>
+        </body>
+    </worldbody>
+
+    <!-- 흡착. ctrl 0=off ~ 1=최대. 그리퍼 컨트롤러가 액션 [-1,1]을 이 범위로 넣는다. -->
+    <actuator>
+        <adhesion name="vacuum" body="vacuum_base" ctrlrange="0 1" gain="80"/>
+    </actuator>
+
+    <sensor>
+        <force name="force_ee" site="ft_frame"/>
+        <torque name="torque_ee" site="ft_frame"/>
+    </sensor>
+</mujoco>
