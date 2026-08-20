@@ -41,17 +41,13 @@ def surface_rms(points, top_frac=0.12) -> float:
 # ── SiPhy 백엔드 (material / density / mass / E) ──────
 
 class PropertyBackend:
-    def estimate(self, crop_rgb, cls_hint: str) -> dict:
-        """→ {material, density_kgm3, mass_kg|None, youngs_gpa|None, confidence}"""
+    def estimate(self, crop_rgb, cls_hint: str, points_mm=None) -> dict:
+        """→ {material, density_kgm3, mass_kg|None, youngs_gpa|None, confidence}
+        points_mm(선택): 표면 점군 — 부피적분형 백엔드(SiPhy)가 질량 직접 산출에 사용."""
         raise NotImplementedError
 
 
-class SiPhyBackend(PropertyBackend):
-    """★TODO(SiPhy 코드 공개 시 연결 — arXiv 2607.22355, 2026-08 현재 repo 미확인).
-    연결 시: crop 1장 → material(1위 후보)/density/mass(pseudo-voxel)/youngs 매핑."""
-
-    def __init__(self, repo_path: str, ckpt: str | None = None):
-        raise NotImplementedError("SiPhy 공개 코드 미확인 — MockBackend 사용")
+# SiPhyBackend는 siphy_backend.py (공개 코드 이식본) — __init__에서 re-export.
 
 
 class MockBackend(PropertyBackend):
@@ -65,7 +61,7 @@ class MockBackend(PropertyBackend):
         "short_hook":   dict(material="wood", density_kgm3=500, youngs_gpa=10),
     }
 
-    def estimate(self, crop_rgb, cls_hint: str) -> dict:
+    def estimate(self, crop_rgb, cls_hint: str, points_mm=None) -> dict:
         d = dict(self.TABLE.get(cls_hint,
                                 dict(material="unknown", density_kgm3=500, youngs_gpa=None)))
         d.setdefault("mass_kg", None)
@@ -141,16 +137,20 @@ def ground_intrinsic(node: dict, crop_rgb=None, backend: PropertyBackend | None 
     pts = node["_points"]
     dims = pca_dims(pts)
     rms = surface_rms(pts)
-    props = backend.estimate(crop_rgb, node["class"])
+    props = backend.estimate(crop_rgb, node["class"], points_mm=pts)
 
     mass = props.get("mass_kg")
-    if mass is None:                                   # SiPhy 미제공 시 bbox부피×밀도 폴백
+    if mass is None:                                   # 백엔드 미제공 시 bbox부피×밀도 폴백
         vol = float(np.prod(np.asarray(node["bbox_mm"]) / 1000.0))
         mass = round(vol * (np.pi / 4 if dims["cylinder_like"] else 1.0)
                      * props["density_kgm3"], 3)
 
     mu = friction.estimate(props["material"], rms, **friction_hooks)
-    return {"geometry": dims | {"surface_rms_mm": round(rms, 2)},
-            "material": props["material"], "density_kgm3": props["density_kgm3"],
-            "mass_kg": mass, "youngs_gpa": props.get("youngs_gpa"),
-            "mu": mu, "confidence": props.get("confidence")}
+    out = {"geometry": dims | {"surface_rms_mm": round(rms, 2)},
+           "material": props["material"], "density_kgm3": props["density_kgm3"],
+           "mass_kg": mass, "youngs_gpa": props.get("youngs_gpa"),
+           "mu": mu, "confidence": props.get("confidence")}
+    for k in ("mass_range_kg", "materials_topk", "caption"):   # SiPhy 부가 출력 보존
+        if k in props:
+            out[k] = props[k]
+    return out
