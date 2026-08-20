@@ -79,7 +79,9 @@ def decompose(subgoal: dict) -> list[dict]:
     if kind == "sweep_collect":
         r = subgoal["container_id"]
         targets = "{" + ",".join(subgoal["target_ids"]) + "}"
-        g = "G_tool"
+        g = f"G_{sid}_tool"      # 서브골별 그룹. 전역 "G_tool"로 두면 sweep 서브골이
+                                 # 여럿일 때 서로 같은 그룹으로 묶여 threat가 양방향
+                                 # 하드 엣지가 되고 DAG에 사이클이 생긴다.
         d2b = _detail(f"{sid}_d2b", "transport", {"?o": "?tool", "?r": "tool_rest"}, g, "도구를 거치 위치로 운반")
         # 도구 반환은 sweep 완료 후여야 한다. 이 상식을 조건으로 명시해야
         # partial_order가 causal link(d2→d2b)를 유도한다. 안 걸면 DAG가

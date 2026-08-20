@@ -85,6 +85,8 @@ PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 �
 - 도구를 '선택'하지 말라. 후보만 나열한다 (선택은 뒤 모듈이 한다).
 - kind는 relocate(옮기기) 또는 sweep_collect(쓸어 담기) 중 하나.
 - relocate의 target_ids는 1개다. 옮길 물체가 여러 개면 물체당 서브골을 하나씩 만든다.
+- sweep_collect는 반대다. 같은 목적지로 쓸어 담는 대상 전체를 서브골 하나의
+  target_ids에 담는다. 대상별로 쪼개지 않는다 (한 번의 sweep으로 여러 개를 담는 동작이다).
 - sweep_collect에는 도구가 될 만한 노드를 tool_candidate_ids에 반드시 1개 이상 나열한다.
 - goal은 한국어 한 문장으로 쓴다.
 - JSON 배열만 출력한다.
@@ -121,7 +123,24 @@ def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
                             "goal": f"{t}를 {s['container_id']}로 옮긴다"})
         else:
             out.append(s)
-    for i, s in enumerate(out, 1):                  # 분리 후 id 재부여 (중복 방지)
+
+    # sweep_collect는 반대로 합친다. 같은 목적지를 대상별로 쪼개면
+    # 도구를 대상 수만큼 잡았다 놓는 계획이 된다.
+    merged, sweep_by_dst = [], {}
+    for s in out:
+        if s.get("kind") == "sweep_collect" and s.get("container_id") in sweep_by_dst:
+            t = sweep_by_dst[s["container_id"]]
+            t["target_ids"] += [x for x in s["target_ids"] if x not in t["target_ids"]]
+            t["tool_candidate_ids"] += [x for x in s["tool_candidate_ids"]
+                                        if x not in t["tool_candidate_ids"]]
+            t["goal"] = f"대상 {len(t['target_ids'])}개를 {t['container_id']}로 쓸어 담는다"
+            continue
+        if s.get("kind") == "sweep_collect":
+            sweep_by_dst[s["container_id"]] = s
+        merged.append(s)
+    out = merged
+
+    for i, s in enumerate(out, 1):                  # 분리·병합 후 id 재부여 (중복 방지)
         s["subgoal_id"] = f"SG{i}"
     return out
 
