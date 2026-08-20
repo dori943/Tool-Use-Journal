@@ -3,12 +3,12 @@
 
 파이프라인: robosuite 오프스크린 렌더(depth + element seg)
   → 객체별 점군 복원(도희 M0 perception과 같은 방식)
-  → build_m0() → serialize() → outputs/m0/<env>.m0.json
+  → build_m0() → serialize() → output/<task-id>/m0.json (팀 합의 구조)
 
 사용법:
-  python scripts/run_m0_from_env.py c1_1
+  python scripts/run_m0_from_env.py c1_1     # → output/c1-1/m0.json
   python scripts/run_m0_from_env.py c2_1
-  → python scripts/run_m1.py c1_1 --m0-json outputs/m0/c1_1.m0.json
+  → python scripts/run_m1.py c1_1            # output/c1-1/m0.json 자동 사용
 
 주의(실행 환경에서 확인이 필요한 2곳 — 아래 ★):
   ★1 카메라 좌표 보정: MuJoCo 카메라는 -Z를 보므로 CV 핀홀(z-forward)로
@@ -90,12 +90,13 @@ def main():
     # ── 1. depth·seg 취득 (★2 상하 반전 보정) + 카메라 RGB 저장 ──
     depth = np.flipud(CU.get_real_depth_map(env.sim, obs[f"{CAM}_depth"]).squeeze())
     seg = np.flipud(obs[f"{CAM}_segmentation_element"].squeeze())
-    os.makedirs("outputs/m0", exist_ok=True)
+    tdir = os.path.join("output", name.replace("_", "-"))   # 팀 합의: output/<task-id>/
+    os.makedirs(tdir, exist_ok=True)
     try:
         from PIL import Image
         rgb = np.flipud(obs[f"{CAM}_image"])
-        Image.fromarray(rgb.astype(np.uint8)).save(f"outputs/m0/{name}.rgb.png")
-        print(f"[카메라] outputs/m0/{name}.rgb.png 저장 ({CAM} 카메라 장면)")
+        Image.fromarray(rgb.astype(np.uint8)).save(f"{tdir}/m0.rgb.png")
+        print(f"[카메라] {tdir}/m0.rgb.png 저장 ({CAM} 카메라 장면)")
     except Exception as e:                      # 이미지 저장 실패는 파이프라인을 막지 않음
         print(f"[카메라] RGB 저장 실패: {e}")
 
@@ -146,8 +147,7 @@ def main():
                            "points": pts})
 
     m0 = build_m0(frame_objs)
-    os.makedirs("outputs/m0", exist_ok=True)
-    out = f"outputs/m0/{name}.m0.json"
+    out = f"{tdir}/m0.json"
     with open(out, "w", encoding="utf-8") as f:
         json.dump(serialize(m0), f, ensure_ascii=False, indent=2)
     print(f"[{name}] 노드 {len(m0['nodes'])} / 엣지 {len(m0['edges'])}  ->  {out}")

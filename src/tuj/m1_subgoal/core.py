@@ -66,6 +66,9 @@ def decompose(subgoal: dict) -> list[dict]:
     """planning-level 서브골 1개 → 상세 서브골 목록."""
     sid, kind = subgoal["subgoal_id"], subgoal["kind"]
     if kind == "relocate":
+        if len(subgoal["target_ids"]) != 1:       # 조용히 버리는 것 금지 — 러프 단계에서 분리해야 함
+            raise ValueError(f"relocate 서브골 {sid}: target은 1개여야 한다 "
+                             f"(받은 {len(subgoal['target_ids'])}개). rough.validate_subgoals가 분리한다")
         o, r = subgoal["target_ids"][0], subgoal["container_id"]
         g = f"G_{o}"
         return [

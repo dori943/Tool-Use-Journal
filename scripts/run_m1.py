@@ -2,12 +2,16 @@
 """M1 실행기 — 예빈 태스크 2종(C1-T1, C2-T1)에 M1을 돌려 서브골 JSON을 산출.
 
 사용법:
-  python scripts/run_m1.py c1_1              # mock M0 (아래 표 수치) + M2 mock 접지
+  python scripts/run_m1.py c1_1              # output/c1-1/m0.json 있으면 그걸로, 없으면 mock
   python scripts/run_m1.py c2_1
-  python scripts/run_m1.py c1_1 --m0-json path.json   # 실제 M0 serialize() 출력으로 실행
-                                                       # (점군이 없으므로 M2 접지는 생략)
+  python scripts/run_m1.py c1_1 --m0-json path.json   # M0 JSON 경로 직접 지정
+  python scripts/run_m1.py c1_1 --llm        # 서브골 생성을 LLM으로 (OPENAI_API_KEY 필요)
 
-출력: outputs/m1/<task>.m1.json (M1 출력) / <task>.gk.json (서브골별 G_k, M2 mock 값 포함)
+출력: output/<task-id>/m1.json (팀 합의 구조 — 모든 모듈 출력은 output/<task-id>/ 아래)
+      내용: 서브골·부분순서·mutex·M2 질의 사양·invariant
+
+G_k는 여기서 만들지 않는다. G_k 조립은 M2 몫 — M1은 질의 목록(m1_queries)만
+넘기고, M2가 답을 채워 G_k를 조립한다. (0820 합의: M1 아웃풋에서 G_k 제외)
 
 mock M0 수치는 예빈 씬 노션 표 기준의 근사값 — 실제 실행 시 M0가 대체한다.
 """
@@ -21,8 +25,8 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import numpy as np
 
-from tuj.m0_scene.abstraction import build_m0
-from tuj.m1_subgoal.pipeline import run_m1, run_m1_with_m2
+from tuj.m0_scene.abstraction import build_m0, serialize
+from tuj.m1_subgoal.pipeline import run_m1
 from tuj.m1_subgoal.rough import TemplateRough
 
 RNG = np.random.default_rng(0)          # mock 점군 결정론
@@ -75,17 +79,6 @@ def scene_c2_1():
     return task, spec, rough
 
 
-def load_ee_pool():
-    p = os.path.join(os.path.dirname(__file__), "..", "configs", "robot_spec.json")
-    with open(p, encoding="utf-8") as f:
-        cfg = json.load(f)
-    pool = cfg["ee_pool"]
-    for e in pool:                       # 키 정합: ee_conditioned는 seal_rms_tol_mm을 기대
-        if e.get("type") == "vacuum" and "seal_rms_tol_mm" not in e:
-            e["seal_rms_tol_mm"] = e.get("flatness_tol_rms_mm", 1.5)
-    return pool, cfg["reach_mm"]
-
-
 def main():
     name = sys.argv[1] if len(sys.argv) > 1 else "c1_1"
     m0_json = None
@@ -93,37 +86,35 @@ def main():
         m0_json = sys.argv[sys.argv.index("--m0-json") + 1]
     use_llm = "--llm" in sys.argv          # OPENAI_API_KEY 필요. 없으면 Template 경로
 
-    os.makedirs("outputs/m1", exist_ok=True)
+    tdir = os.path.join("output", name.replace("_", "-"))   # c1_1 → output/c1-1/
+    os.makedirs(tdir, exist_ok=True)
+    if not m0_json and os.path.exists(os.path.join(tdir, "m0.json")):
+        m0_json = os.path.join(tdir, "m0.json")             # M0 모듈 출력 자동 사용
 
-    if m0_json:                          # 실제 M0 출력으로 (점군 없음 → M2 생략)
+    if m0_json:                          # 실제 M0 serialize() 출력으로
         with open(m0_json, encoding="utf-8") as f:
             m0s = json.load(f)
         task, _, rough = scene_c1_1() if name == "c1_1" else scene_c2_1()
-        if use_llm:
-            from tuj.m1_subgoal.rough import LLMRough
-            rough = LLMRough()
-        out = run_m1(task, m0s, rough=rough)
-        gks = []
-    else:
+        print(f"[M0] {m0_json} 사용")
+    else:                                # mock M0 (씬 근사 수치)
         task, spec, rough = scene_c1_1() if name == "c1_1" else scene_c2_1()
-        if use_llm:
-            from tuj.m1_subgoal.rough import LLMRough
-            rough = LLMRough()
-        m0 = build_m0(spec_to_objects(spec))
-        ee_pool, reach = load_ee_pool()
-        out, gks = run_m1_with_m2(task, m0, ee_pool, reach, rough=rough)
+        m0s = serialize(build_m0(spec_to_objects(spec)))
+        print("[M0] mock 수치 사용 (실제 M0 JSON 없음)")
+    if use_llm:
+        from tuj.m1_subgoal.rough import LLMRough
+        rough = LLMRough()
 
-    with open(f"outputs/m1/{name}.m1.json", "w", encoding="utf-8") as f:
+    out = run_m1(task, m0s, rough=rough)
+
+    with open(os.path.join(tdir, "m1.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
-    with open(f"outputs/m1/{name}.gk.json", "w", encoding="utf-8") as f:
-        json.dump(gks, f, ensure_ascii=False, indent=2)
 
     s = out["m1_stats"]
     print(f"[{name}] 서브골 {s['n_subgoals']} → 상세 {s['n_details']} | "
           f"DAG 엣지 {s['n_edges']} | mutex {s['n_mutex']} | M2 질의 {s['n_m2_queries']}")
     for e in out["m1_partial_order"]:
         print(f"  {e['from']} -> {e['to']}   ({e['why']})")
-    print(f"-> outputs/m1/{name}.m1.json, {name}.gk.json")
+    print(f"-> {tdir}/m1.json")
 
 
 if __name__ == "__main__":
