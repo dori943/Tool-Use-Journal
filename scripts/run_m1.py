@@ -106,6 +106,20 @@ def main():
 
     out = run_m1(task, m0s, rough=rough)
 
+    # ── M2 응답 반영 (있으면): output/<task-id>/m2.json 자동 또는 --m2-json 경로 ──
+    m2_json = None
+    if "--m2-json" in sys.argv:
+        m2_json = sys.argv[sys.argv.index("--m2-json") + 1]
+    elif os.path.exists(os.path.join(tdir, "m2.json")):
+        m2_json = os.path.join(tdir, "m2.json")
+    if m2_json:
+        from tuj.m1_subgoal.ingest import apply_m2
+        with open(m2_json, encoding="utf-8") as f:
+            raw = json.load(f)
+        responses = raw["responses"] if isinstance(raw, dict) else raw
+        for line in apply_m2(out, responses):
+            print(line)
+
     with open(os.path.join(tdir, "m1.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
 
