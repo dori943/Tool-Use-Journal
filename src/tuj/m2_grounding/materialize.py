@@ -36,6 +36,7 @@ class Materializer:
 
     def query_intrinsic(self, gk: dict, node_id: str, queried_by: str,
                         crop_rgb=None, margin_fn=None) -> dict:
+        """→ {queried_by, node_id, geometry..., material, mass_kg, mu, ...} (M1 응답 스키마)"""
         if node_id not in self._cache:
             hooks = {}
             if margin_fn is not None:                     # 마찰 에스컬레이션 활성화
@@ -50,21 +51,24 @@ class Materializer:
         entry = gk["nodes"].setdefault(node_id, {"queried_by": []})
         entry.update(self._cache[node_id])
         entry["queried_by"].append(queried_by)
-        return self._cache[node_id]
+        return {"queried_by": queried_by, "node_id": node_id} | self._cache[node_id]
 
     def query_relational(self, gk: dict, a_id: str, b_id: str, relation: str,
                          queried_by: str, **kw) -> dict:
+        """→ {queried_by, from, to, value_mm, check, pass} (M1 응답 스키마)"""
         fn = {"distance": relational.center_distance,
               "fits_inside": relational.fits_inside,
               "clearance": relational.depth_clearance}[relation]
-        res = fn(self.nodes[a_id], self.nodes[b_id], **kw)
-        gk["edges"].append(res | {"from": a_id, "to": b_id, "queried_by": queried_by})
+        res = {"queried_by": queried_by, "from": a_id, "to": b_id} \
+            | fn(self.nodes[a_id], self.nodes[b_id], **kw)
+        gk["edges"].append(res)
         self.log(module="m2", event="relational", rel=relation)
         return res
 
     def query_ee(self, gk: dict, node_id: str, ee_pool: list[dict], queried_by: str,
                  reach_mm: float | None = None, crop_rgb=None) -> dict:
-        """EE-conditioned: intrinsic이 없으면 자동 접지(grip_slip margin으로 마찰 게이트 연동)."""
+        """EE-conditioned: intrinsic이 없으면 자동 접지(grip_slip margin으로 마찰 게이트 연동).
+        → {queried_by, node_id, ee: {ee_id: {feasible, margin, reason}}, reachability} (M1 응답 스키마)"""
         node = self.nodes[node_id]
         # grip_slip margin_fn: 가장 빡빡한 파지형 EE 기준으로 μ 민감도 게이트 구성
         grip_ees = [e for e in ee_pool if "grip_force_n" in e]
@@ -87,7 +91,8 @@ class Materializer:
                     {"node": node_id, "ee": eid, "rule": v["reason"], "queried_by": queried_by})
         self.log(module="m2", event="ee", node=node_id,
                  feasible=[k for k, v in verdicts.items() if v["feasible"]])
-        return verdicts
+        return {"queried_by": queried_by, "node_id": node_id, "ee": verdicts,
+                "reachability": entry.get("reachability")}
 
 
 def new_gk(subgoal_id: str) -> dict:
