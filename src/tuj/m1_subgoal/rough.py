@@ -79,13 +79,51 @@ PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 �
 
 규칙:
 - 서브골은 로봇 세부 동작이 아니라 의미 단위 작업이다.
+- 태스크에 명시된 목표만 서브골로 만든다. 태스크에 없는 목표(예: 장애물 치우기,
+  정리하기)를 발명하지 않는다.
 - target_ids / container_id / tool_candidate_ids 에는 위 노드 id만 쓴다.
 - 도구를 '선택'하지 말라. 후보만 나열한다 (선택은 뒤 모듈이 한다).
 - kind는 relocate(옮기기) 또는 sweep_collect(쓸어 담기) 중 하나.
+- relocate의 target_ids는 1개다. 옮길 물체가 여러 개면 물체당 서브골을 하나씩 만든다.
+- sweep_collect에는 도구가 될 만한 노드를 tool_candidate_ids에 반드시 1개 이상 나열한다.
+- goal은 한국어 한 문장으로 쓴다.
 - JSON 배열만 출력한다.
 
 출력 형식:
 [{{"subgoal_id":"SG1","goal":"...","kind":"relocate","target_ids":["..."],"container_id":"...","tool_candidate_ids":[]}}]"""
+
+
+def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
+    """LLM 출력 검문 + 정규화. 프롬프트는 지시, 여기는 검문 — 둘 다 있어야 안전하다.
+
+    검사: 장면에 없는 id / sweep_collect의 빈 도구 후보 → ValueError (호출부가 재시도)
+    정규화: 다중 target relocate를 물체당 서브골로 분리, subgoal_id 재부여
+    """
+    known = set(ids)
+    for s in subs:
+        bad = [x for x in s.get("target_ids", []) if x not in known]
+        cid = s.get("container_id")
+        if cid is not None and cid not in known:
+            bad.append(cid)
+        bad += [x for x in s.get("tool_candidate_ids", []) if x not in known]
+        if bad:
+            raise ValueError(f"장면에 없는 id: {bad}")
+        if s.get("kind") == "sweep_collect" and not s.get("tool_candidate_ids"):
+            raise ValueError("sweep_collect에 tool_candidate_ids가 비었다. 도구 후보를 나열하라")
+
+    out = []
+    for s in subs:
+        s.setdefault("container_id", None)
+        s.setdefault("tool_candidate_ids", [])
+        if s.get("kind") == "relocate" and len(s.get("target_ids", [])) > 1:
+            for t in s["target_ids"]:               # 물체당 서브골로 분리
+                out.append({**s, "target_ids": [t],
+                            "goal": f"{t}를 {s['container_id']}로 옮긴다"})
+        else:
+            out.append(s)
+    for i, s in enumerate(out, 1):                  # 분리 후 id 재부여 (중복 방지)
+        s["subgoal_id"] = f"SG{i}"
+    return out
 
 
 class LLMRough:
@@ -109,12 +147,7 @@ class LLMRough:
             try:
                 t = text[text.find("["): text.rfind("]") + 1]
                 subs = json.loads(t)
-                known = set(ids)
-                for s in subs:
-                    bad = [x for x in s.get("target_ids", []) if x not in known]
-                    if bad:
-                        raise ValueError(f"장면에 없는 id: {bad}")
-                return subs
+                return validate_subgoals(subs, ids)
             except (ValueError, json.JSONDecodeError) as e:
                 err = str(e)
         raise ValueError(f"LLM 러프 분해 2회 실패: {err}")
