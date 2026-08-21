@@ -1,0 +1,100 @@
+{
+  "task": {
+    "instruction": "폭 360 mm, 질량 12 kg의 대형 상자를 직접 파지할 수 있는지 검증하고, 불가능하면 적합한 Tool을 사용해 선반에서 끌어낸 뒤 적재 구역까지 밀어라"
+  },
+  "units": {
+    "length": "mm",
+    "mass": "kg"
+  },
+  "initial_state": {
+    "current_ee": "2F",
+    "rack": {
+      "L": "2F"
+    },
+    "facts": [
+      { "type": "at", "args": ["obj_crate_0", "shelf_bay"], "pass": true },
+      { "type": "direct_lift_infeasible", "args": ["obj_crate_0"], "pass": true },
+      { "type": "pull_path_clear", "args": ["shelf_bay", "staging_lane"], "pass": true },
+      { "type": "push_path_clear", "args": ["staging_lane", "loading_zone"], "pass": true }
+    ],
+    "scene_signature": "heavy-crate-initial"
+  },
+  "subgoals": [
+    {
+      "subgoal_id": "SG_PULL",
+      "description": "상자를 shelf bay에서 staging lane으로 끌어낸다",
+      "action_type": "pull",
+      "group_id": "G_CRATE_MOVE",
+      "target_ids": ["obj_crate_0"],
+      "goal_region_id": "staging_lane",
+      "tool_id": "pull_hook",
+      "preconditions": [
+        { "type": "at", "args": ["obj_crate_0", "shelf_bay"], "pass": true },
+        { "type": "direct_lift_infeasible", "args": ["obj_crate_0"], "pass": true },
+        { "type": "pull_path_clear", "args": ["shelf_bay", "staging_lane"], "pass": true }
+      ],
+      "postconditions": [
+        { "type": "at", "args": ["obj_crate_0", "staging_lane"] },
+        { "type": "accessible_for_push", "args": ["obj_crate_0"] }
+      ],
+      "establish": [
+        { "type": "at", "args": ["obj_crate_0", "staging_lane"] },
+        { "type": "accessible_for_push", "args": ["obj_crate_0"] }
+      ],
+      "destroy": [
+        { "type": "at", "args": ["obj_crate_0", "shelf_bay"] }
+      ],
+      "feasible_ee": ["2F"],
+      "unique_solution": true,
+      "tool_required": true,
+      "tool_selection_source": "planner_a_fixed"
+    },
+    {
+      "subgoal_id": "SG_PUSH",
+      "description": "상자를 staging lane에서 loading zone까지 지면을 따라 민다",
+      "action_type": "push",
+      "group_id": "G_CRATE_MOVE",
+      "target_ids": ["obj_crate_0"],
+      "goal_region_id": "loading_zone",
+      "tool_id": "push_bar",
+      "preconditions": [
+        { "type": "at", "args": ["obj_crate_0", "staging_lane"], "pass": false },
+        { "type": "accessible_for_push", "args": ["obj_crate_0"], "pass": false },
+        { "type": "push_path_clear", "args": ["staging_lane", "loading_zone"], "pass": true }
+      ],
+      "postconditions": [
+        { "type": "in_region", "args": ["obj_crate_0", "loading_zone"] }
+      ],
+      "establish": [
+        { "type": "in_region", "args": ["obj_crate_0", "loading_zone"] }
+      ],
+      "destroy": [
+        { "type": "at", "args": ["obj_crate_0", "staging_lane"] }
+      ],
+      "feasible_ee": ["2F"],
+      "unique_solution": true,
+      "tool_required": true,
+      "tool_selection_source": "planner_a_fixed"
+    }
+  ],
+  "order_constraints": {
+    "edges": [
+      ["SG_PULL", "SG_PUSH"]
+    ],
+    "cycle_detected": false,
+    "unestablishable": [],
+    "n_topological_orders": 1
+  },
+  "log": {
+    "object_evidence": {
+      "obj_crate_0": {
+        "width_mm": 360,
+        "mass_kg": 12.0,
+        "2F_max_opening_mm": 85,
+        "2F_payload_kg": 3.0,
+        "direct_lift_rejection": "mass 12 kg exceeds 2F payload 3 kg",
+        "support_mode": "table_supported_sliding"
+      }
+    }
+  }
+}
