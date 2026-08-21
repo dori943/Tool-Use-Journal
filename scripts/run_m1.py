@@ -2,12 +2,13 @@
 """M1 실행기 — 예빈 태스크 2종(C1-T1, C2-T1)에 M1을 돌려 서브골 JSON을 산출.
 
 사용법:
-  python scripts/run_m1.py c1_1              # output/c1-1/m0.json 있으면 그걸로, 없으면 mock
+  python scripts/run_m1.py c1_1              # output/c1_1/m0.json 있으면 그걸로, 없으면 mock
   python scripts/run_m1.py c2_1
   python scripts/run_m1.py c1_1 --m0-json path.json   # M0 JSON 경로 직접 지정
-  python scripts/run_m1.py c1_1 --llm        # 서브골 생성을 LLM으로 (OPENAI_API_KEY 필요)
 
-출력: output/<task-id>/m1.json (팀 합의 구조 — 모든 모듈 출력은 output/<task-id>/ 아래)
+서브골 생성은 항상 LLM(gpt-4o)이다 → OPENAI_API_KEY 필수.
+
+출력: output/<task>/m1.json (팀 구조 — main의 M0·M2 산출물 폴더 명명과 동일: output/c1_1/)
       내용: 서브골·부분순서·mutex·M2 질의 사양·invariant
 
 G_k는 여기서 만들지 않는다. G_k 조립은 M2 몫 — M1은 질의 목록(m1_queries)만
@@ -27,7 +28,7 @@ import numpy as np
 
 from tuj.m0_scene.abstraction import build_m0, serialize
 from tuj.m1_subgoal.pipeline import run_m1
-from tuj.m1_subgoal.rough import TemplateRough
+from tuj.m1_subgoal.rough import LLMRough
 
 RNG = np.random.default_rng(0)          # mock 점군 결정론
 
@@ -56,7 +57,7 @@ def scene_c1_1():
         ("collection_zone_visual", "collection_zone", [650, 0, 802], [250, 180, 4]),
     ]
     task = "테이블에 흩어진 레고 블록을 수거 영역으로 쓸어 담아라"
-    return task, spec, TemplateRough()
+    return task, spec
 
 
 def scene_c2_1():
@@ -71,12 +72,7 @@ def scene_c2_1():
         ("red_tray", "tray", [680, 200, 818], [250, 180, 35]),
     ]
     task = "사과와 빵은 초록 트레이, 머그는 파랑 트레이, 접시와 숟가락은 빨강 트레이로 옮겨라"
-    rough = TemplateRough(category_map={
-        "apple": "obj_tray_green_tray", "bread": "obj_tray_green_tray",
-        "mug": "obj_tray_blue_tray",
-        "plate": "obj_tray_red_tray", "spoon": "obj_tray_red_tray",
-    })
-    return task, spec, rough
+    return task, spec
 
 
 def main():
@@ -84,9 +80,7 @@ def main():
     m0_json = None
     if "--m0-json" in sys.argv:
         m0_json = sys.argv[sys.argv.index("--m0-json") + 1]
-    use_llm = "--llm" in sys.argv          # OPENAI_API_KEY 필요. 없으면 Template 경로
-
-    tdir = os.path.join("output", name.replace("_", "-"))   # c1_1 → output/c1-1/
+    tdir = os.path.join("output", name)      # output/c1_1/ (main의 M0·M2 폴더와 동일 명명)
     os.makedirs(tdir, exist_ok=True)
     if not m0_json and os.path.exists(os.path.join(tdir, "m0.json")):
         m0_json = os.path.join(tdir, "m0.json")             # M0 모듈 출력 자동 사용
@@ -94,17 +88,14 @@ def main():
     if m0_json:                          # 실제 M0 serialize() 출력으로
         with open(m0_json, encoding="utf-8") as f:
             m0s = json.load(f)
-        task, _, rough = scene_c1_1() if name == "c1_1" else scene_c2_1()
+        task, _ = scene_c1_1() if name == "c1_1" else scene_c2_1()
         print(f"[M0] {m0_json} 사용")
     else:                                # mock M0 (씬 근사 수치)
-        task, spec, rough = scene_c1_1() if name == "c1_1" else scene_c2_1()
+        task, spec = scene_c1_1() if name == "c1_1" else scene_c2_1()
         m0s = serialize(build_m0(spec_to_objects(spec)))
         print("[M0] mock 수치 사용 (실제 M0 JSON 없음)")
-    if use_llm:
-        from tuj.m1_subgoal.rough import LLMRough
-        rough = LLMRough()
 
-    out = run_m1(task, m0s, rough=rough)
+    out = run_m1(task, m0s, rough=LLMRough())   # 서브골 생성은 항상 LLM
 
     # ── M2 응답 반영 (있으면): output/<task-id>/m2.json 자동 또는 --m2-json 경로 ──
     m2_json = None
