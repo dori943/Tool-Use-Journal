@@ -1,7 +1,7 @@
-"""Planner-A contract enforcement without changing its immutable hard DAG.
+"""Task-graph constraint enforcement without changing its immutable hard DAG.
 
 The hard predecessor edges remain in ``validation.py``/``search.py``.  This
-module handles only the choices Planner A intentionally leaves to Task Planner:
+module handles the choices left open by the normalized GK + M1 graph:
 multi-producer open conditions, resource mutexes, and disjunctive threats.
 Symbolic fluent truth is still maintained by ``conditions.py``; it is not used
 to infer a new DAG.
@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from typing import Sequence
 
 from task_planner.conditions import FluentKey
-from task_planner.models import PlannerAConstraints
+from task_planner.models import TaskConstraints
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,12 +25,12 @@ class ConstraintBlocker:
     message: str
 
 
-class PlannerAConstraintEngine:
-    """Evaluate Planner-A choices against one concrete search prefix."""
+class TaskConstraintEngine:
+    """Evaluate task-graph constraints against one concrete search prefix."""
 
     def __init__(
         self,
-        contract: PlannerAConstraints,
+        contract: TaskConstraints,
     ) -> None:
         self.contract = contract
 
@@ -100,10 +100,10 @@ class PlannerAConstraintEngine:
 
 def build_constraint_resolution_trace(
     order: Sequence[str],
-    contract: PlannerAConstraints,
+    contract: TaskConstraints,
     hard_edges: Sequence[tuple[str, str]],
 ) -> list[dict[str, object]]:
-    """Explain how the selected total order satisfies every A contract clause."""
+    """Explain how the selected order satisfies every task-graph clause."""
 
     position = {subgoal_id: index for index, subgoal_id in enumerate(order)}
     trace: list[dict[str, object]] = []

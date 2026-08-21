@@ -1,17 +1,17 @@
-"""Planner-A contract preservation and search-time choice resolution."""
+"""Task-graph constraint preservation and search-time choice resolution."""
 
 from __future__ import annotations
 
-from task_planner.constraints import PlannerAConstraintEngine
+from task_planner.constraints import TaskConstraintEngine
 from task_planner.diagnostics import PlanStatus, ReasonCode
-from task_planner.models import PlannerAConstraints
+from task_planner.models import TaskConstraints
 from task_planner.planner import plan
 
 from conftest import cond, make_request, prop, sg
 
 
 def test_mutex_blocks_second_consumer_until_resource_is_reestablished() -> None:
-    contract = PlannerAConstraints.model_validate(
+    contract = TaskConstraints.model_validate(
         {
             "mutex": [
                 {
@@ -25,7 +25,7 @@ def test_mutex_blocks_second_consumer_until_resource_is_reestablished() -> None:
             ]
         }
     )
-    engine = PlannerAConstraintEngine(contract)
+    engine = TaskConstraintEngine(contract)
 
     blocked = engine.blockers("B", frozenset({"A"}), frozenset())
     allowed = engine.blockers(
@@ -59,7 +59,7 @@ def test_open_condition_selects_a_completed_producer_and_records_trace() -> None
         for item in subgoals
     }
     request = make_request(subgoals, proposals=proposals)
-    request.planner_a.constraints = PlannerAConstraints.model_validate(
+    request.task_graph.constraints = TaskConstraints.model_validate(
         {
             "open_conditions": [
                 {
@@ -122,7 +122,7 @@ def test_disjunctive_threat_is_demoted_after_causal_link() -> None:
         edges=[("A_producer", "B_consumer")],
         proposals=proposals,
     )
-    request.planner_a.constraints = PlannerAConstraints.model_validate(
+    request.task_graph.constraints = TaskConstraints.model_validate(
         {
             "disjunctive_threats": [
                 {
@@ -162,7 +162,7 @@ def test_unknown_contract_reference_is_rejected_before_search() -> None:
     request = make_request(
         [subgoal], proposals={"target": [prop("cand", "target", "A")]}
     )
-    request.planner_a.constraints = PlannerAConstraints.model_validate(
+    request.task_graph.constraints = TaskConstraints.model_validate(
         {
             "open_conditions": [
                 {

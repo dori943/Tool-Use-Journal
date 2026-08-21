@@ -105,8 +105,8 @@ class ValidationOutcome:
 
 def validate_request(request: TaskPlannerRequest) -> ValidationOutcome:
     outcome = ValidationOutcome()
-    planner_a = request.planner_a
-    subgoals = planner_a.subgoals
+    task_graph = request.task_graph
+    subgoals = task_graph.subgoals
     catalog = request.resource_catalog
 
     def reject(scope, code: ReasonCode, message: str, **extra: Any) -> None:
@@ -130,7 +130,7 @@ def validate_request(request: TaskPlannerRequest) -> ValidationOutcome:
     subgoal_ids = [sg.subgoal_id for sg in subgoals]
     id_set = set(subgoal_ids)
 
-    # Planner A's optional-choice contract is validated before search so no
+    # Optional task-graph constraints are validated before search so no
     # mutex/open/threat record can silently refer to a missing node/condition.
     outcome.rejections.extend(_validate_contract_references(request, id_set))
     if outcome.rejections:
@@ -176,7 +176,7 @@ def validate_request(request: TaskPlannerRequest) -> ValidationOutcome:
 
     # Edge parsing.
     try:
-        edges = normalized_edges(planner_a.order_constraints)
+        edges = normalized_edges(task_graph.order_constraints)
     except MalformedEdgeError as exc:
         outcome.status = PlanStatus.INVALID_INPUT
         reject("input", ReasonCode.MALFORMED_EDGE, str(exc))
@@ -198,25 +198,25 @@ def validate_request(request: TaskPlannerRequest) -> ValidationOutcome:
 
     # Cycle: re-detect from actual edges; also honor the input flag.
     has_cycle = detect_cycle(subgoal_ids, edges)
-    if has_cycle or planner_a.order_constraints.cycle_detected:
+    if has_cycle or task_graph.order_constraints.cycle_detected:
         outcome.status = PlanStatus.INFEASIBLE_REDECOMPOSE
         reject(
             "input",
             ReasonCode.CYCLE_DETECTED,
             "precedence cycle detected"
-            + ("" if has_cycle else " (declared by Planner A)"),
+            + ("" if has_cycle else " (declared by M1)"),
         )
         return outcome
 
-    # Unestablishable preconditions -> ask Planner A to redecompose.
-    redecompose_signals = planner_a.constraints.redecompose_signals
-    if planner_a.order_constraints.unestablishable or redecompose_signals:
+    # Unestablishable preconditions require upstream task redecomposition.
+    redecompose_signals = task_graph.constraints.redecompose_signals
+    if task_graph.order_constraints.unestablishable or redecompose_signals:
         outcome.status = PlanStatus.INFEASIBLE_REDECOMPOSE
         reject(
             "input",
             ReasonCode.UNESTABLISHABLE_PRECONDITIONS,
-            "Planner A requested redecomposition: "
-            f"{planner_a.order_constraints.unestablishable or redecompose_signals!r}",
+            "upstream task graph requires redecomposition: "
+            f"{task_graph.order_constraints.unestablishable or redecompose_signals!r}",
         )
         return outcome
 
@@ -243,18 +243,18 @@ def validate_request(request: TaskPlannerRequest) -> ValidationOutcome:
         return outcome
 
     # Initial EE must exist in the catalog.
-    if planner_a.initial_state.current_ee not in catalog.end_effectors:
+    if task_graph.initial_state.current_ee not in catalog.end_effectors:
         outcome.status = PlanStatus.INVALID_INPUT
         reject(
             "input",
             ReasonCode.UNKNOWN_EE,
-            f"initial current_ee {planner_a.initial_state.current_ee!r} not in "
+            f"initial current_ee {task_graph.initial_state.current_ee!r} not in "
             "resource catalog",
         )
         return outcome
 
     # Optional initial held-tool state must describe a coherent catalog entry.
-    init = planner_a.initial_state
+    init = task_graph.initial_state
     if init.held_tool is not None:
         tool = catalog.tools.get(init.held_tool)
         if tool is None:
@@ -325,12 +325,12 @@ def validate_request(request: TaskPlannerRequest) -> ValidationOutcome:
 def _validate_contract_references(
     request: TaskPlannerRequest, id_set: set[str]
 ) -> list[Rejection]:
-    """Validate every typed Planner-A contract reference against the DAG."""
+    """Validate every typed task-constraint reference against the DAG."""
 
-    contract = request.planner_a.constraints
+    contract = request.task_graph.constraints
     condition_id_list = [
         condition.condition_id
-        for subgoal in request.planner_a.subgoals
+        for subgoal in request.task_graph.subgoals
         for condition in (
             *subgoal.preconditions,
             *subgoal.establish,
@@ -351,7 +351,7 @@ def _validate_contract_references(
     )
     if duplicate_condition_ids:
         reject(
-            ReasonCode.INVALID_PLANNER_A_CONTRACT,
+            ReasonCode.INVALID_TASK_CONTRACT,
             f"duplicate condition ids: {duplicate_condition_ids}",
         )
 
@@ -375,7 +375,7 @@ def _validate_contract_references(
         clause = f"mutex[{index}]"
         if item.a == item.b:
             reject(
-                ReasonCode.INVALID_PLANNER_A_CONTRACT,
+                ReasonCode.INVALID_TASK_CONTRACT,
                 f"{clause} cannot relate a subgoal to itself",
                 subgoal_id=item.a,
             )
@@ -389,7 +389,7 @@ def _validate_contract_references(
         clause = f"open_conditions[{index}]"
         if item.subgoal in item.candidates:
             reject(
-                ReasonCode.INVALID_PLANNER_A_CONTRACT,
+                ReasonCode.INVALID_TASK_CONTRACT,
                 f"{clause} cannot use its consumer as a producer",
                 subgoal_id=item.subgoal,
             )
@@ -402,7 +402,7 @@ def _validate_contract_references(
         clause = f"disjunctive_threats[{index}]"
         if item.link[0] == item.link[1] or item.threat in item.link:
             reject(
-                ReasonCode.INVALID_PLANNER_A_CONTRACT,
+                ReasonCode.INVALID_TASK_CONTRACT,
                 f"{clause} requires two distinct link endpoints and a distinct threat",
                 subgoal_id=item.threat,
             )
@@ -419,7 +419,7 @@ def _validate_contract_references(
             require_subgoal(item.subgoal, clause)
             if item.depends_on == item.subgoal:
                 reject(
-                    ReasonCode.INVALID_PLANNER_A_CONTRACT,
+                    ReasonCode.INVALID_TASK_CONTRACT,
                     f"{clause} cannot depend on its own subgoal",
                     subgoal_id=item.subgoal,
                 )

@@ -1,4 +1,4 @@
-"""Pydantic v2 input models: Planner A schema, resource catalog, request/policy."""
+"""Pydantic v2 models for the normalized GK + M1 task graph."""
 
 from __future__ import annotations
 
@@ -20,8 +20,9 @@ class Condition(_AliasedModel):
     """A symbolic (or motion-evaluated) condition.
 
     ``pass`` (aliased to ``pass_``) is the *current judgement* of the condition
-    at Planner-A time. ``pass=False`` does NOT mean a negative precondition; it
-    means the positive fluent does not hold yet and may be established later.
+    in the upstream M1 judgement. ``pass=False`` does NOT mean a negative
+    precondition; it means the positive fluent does not hold yet and may be
+    established later.
     Explicit negative preconditions use ``negated=True``.
     """
 
@@ -33,7 +34,7 @@ class Condition(_AliasedModel):
     check: str | None = None
     pass_: bool | None = Field(default=None, alias="pass")
     eval_by: str | None = None
-    # Current Planner-A observability contract. A concrete subgoal id means
+    # Upstream observability contract. A concrete subgoal id means
     # this condition can only be evaluated after that predecessor completes.
     depends_on: str | None = None
     needs_observation: bool = False
@@ -63,10 +64,10 @@ class Subgoal(_AliasedModel):
     required_wrench: float | None = Field(default=None, ge=0)
     unique_solution: bool = False
     tool_required: bool = False
-    tool_selection_source: Literal[
-        "planner_a_fixed", "upstream_fixed", "not_required"
-    ] = "not_required"
-    feasible_ee_source: Literal["planner_a", "scenario", "request"] = "request"
+    tool_selection_source: Literal["upstream_fixed", "not_required"] = (
+        "not_required"
+    )
+    feasible_ee_source: Literal["gk", "m1", "request"] = "request"
 
     @model_validator(mode="after")
     def _normalize_tool_source(self) -> "Subgoal":
@@ -150,7 +151,7 @@ class ObservationRequest(DeferredConditionContract):
 
 
 class RedecomposeSignal(_ExtensibleModel):
-    """Planner A could not make a valid detailed partial-order contract."""
+    """The upstream task decomposition is not a valid partial-order graph."""
 
     rule: int | str | None = None
     subgoal: str | None = None
@@ -169,8 +170,8 @@ class KGOrderAudit(_ExtensibleModel):
     counts: dict[str, int] = Field(default_factory=dict)
 
 
-class PlannerAConstraints(_ExtensibleModel):
-    """Typed Planner-A -> Planner-B contract beyond the immutable hard DAG."""
+class TaskConstraints(_ExtensibleModel):
+    """Typed constraints attached to the normalized GK + M1 task graph."""
 
     mutex: list[MutexConstraint] = Field(default_factory=list)
     open_conditions: list[OpenConditionConstraint] = Field(default_factory=list)
@@ -207,14 +208,14 @@ class Units(_ExtensibleModel):
     mass: str = "kg"
 
 
-class PlannerAOutput(_ExtensibleModel):
+class TaskGraph(_ExtensibleModel):
 
     task: TaskSpec = Field(default_factory=TaskSpec)
     units: Units = Field(default_factory=Units)
     initial_state: InitialState
     subgoals: list[Subgoal] = Field(default_factory=list)
     order_constraints: OrderConstraints = Field(default_factory=OrderConstraints)
-    constraints: PlannerAConstraints = Field(default_factory=PlannerAConstraints)
+    constraints: TaskConstraints = Field(default_factory=TaskConstraints)
     log: dict[str, Any] = Field(default_factory=dict)
 
 
@@ -368,7 +369,7 @@ class PlanningPolicy(_ExtensibleModel):
 
 class TaskPlannerRequest(_ExtensibleModel):
 
-    planner_a: PlannerAOutput
+    task_graph: TaskGraph
     resource_catalog: ResourceCatalog
     candidate_proposals: dict[str, list[CandidateProposal]] | None = None
     planning_policy: PlanningPolicy = Field(default_factory=PlanningPolicy)

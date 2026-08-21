@@ -18,7 +18,7 @@ from task_planner.conditions import (
     apply_effects,
     symbolic_precondition_unmet,
 )
-from task_planner.constraints import PlannerAConstraintEngine
+from task_planner.constraints import TaskConstraintEngine
 from task_planner.cost import CostVector
 from task_planner.diagnostics import (
     ReasonCode,
@@ -72,7 +72,7 @@ class SearchProblem:
     geometry: GeometryCache
     scene_updater: SceneStateUpdater
     checker_registry: CheckerRegistry
-    constraint_engine: PlannerAConstraintEngine
+    constraint_engine: TaskConstraintEngine
     banned_scene_candidates: frozenset[tuple[str, str]] = frozenset()
     banned_transitions: frozenset[tuple[str, ...]] = frozenset()
 
