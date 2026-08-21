@@ -29,9 +29,23 @@ def run_m1(task: str, m0_serialized: dict, rough=None) -> dict:
         all_queries += build_queries(s, details)
     edges, mutex = partial_order(all_details)
 
+    # 서브골별 객체 선택(object_ids)은 LLMRough 2차 호출이 담당한다 (0821 결정).
+    # 선택 결과가 없는 경로(TemplateRough 테스트)만 질의 기반으로 파생해 채운다.
+    for s in subgoals:
+        if "object_ids" in s:
+            continue
+        picked = []
+        for q in all_queries:
+            if q["subgoal_id"] != s["subgoal_id"]:
+                continue
+            c = q["m2_call"]
+            for n in (c.get("node_id"), c.get("a"), c.get("b")):
+                if n and n not in picked:
+                    picked.append(n)
+        s["object_ids"] = picked
+
     return {
         "task": task,
-        "m1_rough_source": rough.name,
         "m1_subgoals": subgoals,
         "m1_partial_order": edges,
         "m1_mutex": mutex,
