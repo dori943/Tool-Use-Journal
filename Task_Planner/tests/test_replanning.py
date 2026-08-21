@@ -39,7 +39,7 @@ def test_scene_failure_bans_candidate_for_scene_and_switches_candidate() -> None
     execution_state = ExecutionState(
         completed_subgoals=[],
         current_ee="A",
-        facts=list(request.planner_a.initial_state.facts),
+        facts=list(request.task_graph.initial_state.facts),
         scene_signature="initial",
     )
     feedback = FailureFeedback(
@@ -77,7 +77,7 @@ def test_candidate_invalid_is_global_ban() -> None:
     execution_state = ExecutionState(
         completed_subgoals=[],
         current_ee="A",
-        facts=list(request.planner_a.initial_state.facts),
+        facts=list(request.task_graph.initial_state.facts),
     )
     feedback = FailureFeedback(
         failure_type=FailureType.CANDIDATE_INVALID,

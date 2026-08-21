@@ -15,7 +15,7 @@ from typing import Protocol
 
 from task_planner.candidate_provider import Candidate
 from task_planner.conditions import FluentKey
-from task_planner.models import PlannerAOutput, Subgoal
+from task_planner.models import Subgoal, TaskGraph
 
 
 @dataclass(frozen=True, slots=True)
@@ -25,7 +25,7 @@ class SceneState:
 
 
 class SceneStateUpdater(Protocol):
-    def initial_scene(self, planner_a: PlannerAOutput) -> SceneState: ...
+    def initial_scene(self, task_graph: TaskGraph) -> SceneState: ...
 
     def apply_subgoal_effects(
         self,
@@ -39,8 +39,8 @@ class SceneStateUpdater(Protocol):
 class SymbolicSceneUpdater:
     """Signature = hash(sorted completed subgoals + sorted symbolic facts)."""
 
-    def initial_scene(self, planner_a: PlannerAOutput) -> SceneState:
-        signature = planner_a.initial_state.scene_signature or "initial"
+    def initial_scene(self, task_graph: TaskGraph) -> SceneState:
+        signature = task_graph.initial_state.scene_signature or "initial"
         return SceneState(signature=signature, completed=())
 
     def apply_subgoal_effects(

@@ -159,8 +159,8 @@ def test_gk_adapter_normalizes_c1_1_ids_actions_and_conditions() -> None:
         _gk(), _m1(), m0_payload=_m0(), robot_spec_payload=_robot_spec()
     )
 
-    first, sweep = request.planner_a.subgoals
-    assert request.planner_a.log["adapter"] == "gk-m1-v1"
+    first, sweep = request.task_graph.subgoals
+    assert request.task_graph.log["adapter"] == "gk-m1-v1"
     assert first.tool_id == "light_plate"
     assert first.tool_selection_source == "upstream_fixed"
     assert first.goal_region_id is None
@@ -190,7 +190,7 @@ def test_gk_accepts_selected_tool_id_alias() -> None:
         _gk(), m1, m0_payload=_m0(), robot_spec_payload=_robot_spec()
     )
 
-    assert {subgoal.tool_id for subgoal in request.planner_a.subgoals} == {
+    assert {subgoal.tool_id for subgoal in request.task_graph.subgoals} == {
         "light_plate"
     }
 
@@ -248,7 +248,7 @@ def test_gk_rejects_tool_candidates_without_upstream_selection() -> None:
         )
 
 
-def test_gk_cli_path_runs_without_legacy_planner_a_input(tmp_path) -> None:
+def test_gk_cli_path_runs_end_to_end(tmp_path) -> None:
     inputs = {
         "gk": _gk(),
         "m1": _m1(),
@@ -286,6 +286,23 @@ def test_gk_cli_path_runs_without_legacy_planner_a_input(tmp_path) -> None:
         for assignment in payload["selected_plan"]["candidate_assignments"]
     } == {"light_plate"}
     assert "group_tool_assignments" not in payload["selected_plan"]
+
+
+def test_gk_end_to_end_is_deterministic() -> None:
+    first = plan(
+        build_request_from_gk(
+            _gk(), _m1(), m0_payload=_m0(), robot_spec_payload=_robot_spec()
+        )
+    ).model_dump(mode="json")
+    second = plan(
+        build_request_from_gk(
+            _gk(), _m1(), m0_payload=_m0(), robot_spec_payload=_robot_spec()
+        )
+    ).model_dump(mode="json")
+
+    first["search_stats"]["elapsed_ms"] = 0
+    second["search_stats"]["elapsed_ms"] = 0
+    assert first == second
 
 
 def test_gk_without_m1_fails_with_actionable_error() -> None:

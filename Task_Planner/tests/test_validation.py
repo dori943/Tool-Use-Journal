@@ -105,7 +105,7 @@ def test_malformed_edge_rejected() -> None:
         proposals={"S1": []},
         order_kwargs={},
     )
-    request.planner_a.order_constraints.edges = [{"weird": "shape"}]
+    request.task_graph.order_constraints.edges = [{"weird": "shape"}]
     result = plan(request)
     assert result.status is PlanStatus.INVALID_INPUT
     assert ReasonCode.MALFORMED_EDGE in _codes(result)

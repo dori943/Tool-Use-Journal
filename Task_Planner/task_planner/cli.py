@@ -1,9 +1,8 @@
 """Command-line interface.
 
     python -m task_planner.cli plan \
-        --planner-a examples/bottle_plate_planner_a.json \
-        --resources examples/bottle_plate_resources.json \
-        --candidates examples/bottle_plate_candidates.json \
+        --gk output/c1_1/gk.json \
+        --m1 output/c1_1/m1.json \
         --output result.json
 
     python -m task_planner.cli replan \
@@ -26,12 +25,10 @@ from task_planner.models import (
     CandidateProposal,
     ExecutionState,
     FailureFeedback,
-    PlannerAOutput,
     TaskPlannerRequest,
     PlanningPolicy,
     ResourceCatalog,
 )
-from task_planner.planner_a_adapter import build_request_from_current_planner_a
 from task_planner.gk_adapter import build_request_from_gk
 from task_planner.planner import plan
 from task_planner.replanning import replan
@@ -52,13 +49,13 @@ def _build_parser() -> argparse.ArgumentParser:
     sub = parser.add_subparsers(dest="command", required=True)
 
     p_plan = sub.add_parser("plan", help="run the planner")
-    source = p_plan.add_mutually_exclusive_group(required=True)
-    source.add_argument("--planner-a")
-    source.add_argument(
-        "--gk", help="GK JSON (single record or gk_by_subgoal bundle)"
+    p_plan.add_argument(
+        "--gk",
+        required=True,
+        help="GK JSON (single record or gk_by_subgoal bundle)",
     )
     p_plan.add_argument(
-        "--m1", help="M1 action/DAG JSON required by --gk"
+        "--m1", required=True, help="M1 executable action/DAG JSON"
     )
     p_plan.add_argument("--m0", help="optional M0 scene graph for --gk")
     p_plan.add_argument(
@@ -67,11 +64,6 @@ def _build_parser() -> argparse.ArgumentParser:
     p_plan.add_argument(
         "--id-aliases",
         help="optional JSON mapping upstream object IDs to world IDs",
-    )
-    p_plan.add_argument(
-        "--scenario",
-        default=None,
-        help="companion Planner-A scenario for detailed_subgoals outputs",
     )
     p_plan.add_argument("--resources", default=None)
     p_plan.add_argument("--candidates", default=None)
@@ -127,61 +119,29 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if args.resources is not None
                 else None
             )
-            if args.gk is not None:
-                if args.m1 is None:
-                    raise ValueError(
-                        "--gk requires --m1 because GK has no executable "
-                        "action details or partial-order DAG"
-                    )
-                aliases = (
-                    load_json(args.id_aliases)
-                    if args.id_aliases is not None
+            aliases = (
+                load_json(args.id_aliases)
+                if args.id_aliases is not None
+                else None
+            )
+            if aliases is not None and not isinstance(aliases, dict):
+                raise ValueError("--id-aliases must contain a JSON object")
+            request = build_request_from_gk(
+                load_json(args.gk),
+                load_json(args.m1),
+                m0_payload=(
+                    load_json(args.m0) if args.m0 is not None else None
+                ),
+                robot_spec_payload=(
+                    load_json(args.robot_spec)
+                    if args.robot_spec is not None
                     else None
-                )
-                if aliases is not None and not isinstance(aliases, dict):
-                    raise ValueError("--id-aliases must contain a JSON object")
-                request = build_request_from_gk(
-                    load_json(args.gk),
-                    load_json(args.m1),
-                    m0_payload=(
-                        load_json(args.m0) if args.m0 is not None else None
-                    ),
-                    robot_spec_payload=(
-                        load_json(args.robot_spec)
-                        if args.robot_spec is not None
-                        else None
-                    ),
-                    resource_catalog=resources,
-                    candidate_proposals=proposals,
-                    planning_policy=policy,
-                    id_aliases=aliases,
-                )
-            else:
-                planner_raw = load_json(args.planner_a)
-                if "detailed_subgoals" in planner_raw:
-                    if args.scenario is None:
-                        raise ValueError(
-                            "current Planner-A outputs require --scenario because "
-                            "feasible EE sets and robot state are not in the DAG JSON"
-                        )
-                    request = build_request_from_current_planner_a(
-                        planner_raw,
-                        load_json(args.scenario),
-                        resource_catalog=resources,
-                        candidate_proposals=proposals,
-                        planning_policy=policy,
-                    )
-                else:
-                    if resources is None:
-                        raise ValueError(
-                            "normalized Planner-A inputs require --resources"
-                        )
-                    request = TaskPlannerRequest(
-                        planner_a=PlannerAOutput.model_validate(planner_raw),
-                        resource_catalog=resources,
-                        candidate_proposals=proposals,
-                        planning_policy=policy or PlanningPolicy(),
-                    )
+                ),
+                resource_catalog=resources,
+                candidate_proposals=proposals,
+                planning_policy=policy,
+                id_aliases=aliases,
+            )
             return _finish(plan(request), args.output)
         request = TaskPlannerRequest.model_validate(load_json(args.request))
         execution_state = ExecutionState.model_validate(

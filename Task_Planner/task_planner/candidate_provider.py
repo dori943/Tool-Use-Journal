@@ -1,7 +1,7 @@
 """Candidate generation (static proposals + catalog rules) and filtering.
 
 Candidates are normalized ``(subgoal, EE, tool)`` assignments. A tool can be
-fixed by the legacy Planner-A contract or selected from the finite candidates
+fixed by the upstream GK + M1 contract or selected from the finite candidates
 supplied by the GK/M1 adapter. Contact poses remain owned by motion planning.
 """
 

@@ -1,18 +1,17 @@
 # Task Planner
 
-Planner A의 정규화된 출력 또는 `GK + M1`을 입력받아 다음을 하나의 Dijkstra
-검색으로 계획한다.
+`GK + M1`을 필수 입력으로 받아 다음을 하나의 Dijkstra 검색으로 계획한다.
 
 - 실행 가능한 서브골 순서
 - 서브골 또는 group별 End-Effector
 - 앞단에서 확정한 Tool의 집기·반납 시점
 - EE 교체와 terminal cleanup
 
-Planner A와 GK/M1 경로 모두 앞단에서 전달한 `tool_id`를 그대로 고정한다.
-Task Planner는 Tool 후보를 비교하거나 다른 Tool로 대체하지 않는다. GK/M1 입력은
-`tool_id`를 표준 필드로 사용하며 `selected_tool_id`, `selected_tool`도 호환 입력으로
-받는다. `tool_candidate_ids`만 전달되면 입력 오류를 반환한다. 접촉 자세 후보와 작업
-좌표, IK, 충돌, 접근·후퇴 경로는 Motion Planner가 담당한다.
+GK/M1 경로에서 앞단이 전달한 `tool_id`를 그대로 고정한다. Task Planner는 Tool
+후보를 비교하거나 다른 Tool로 대체하지 않는다. M1은 `tool_id`를 표준 필드로
+사용하며 `selected_tool_id`, `selected_tool`도 호환 입력으로 받는다.
+`tool_candidate_ids`만 전달되면 입력 오류를 반환한다. 접촉 자세 후보와 작업 좌표,
+IK, 충돌, 접근·후퇴 경로는 Motion Planner가 담당한다.
 
 ## 최적화 비용
 
@@ -44,7 +43,7 @@ SearchState(
 
 ## 주요 계약
 
-- Planner A의 hard DAG는 추가하거나 삭제하지 않는다.
+- M1의 hard DAG는 추가하거나 삭제하지 않는다.
 - 같은 `group_id`의 모든 서브골은 같은 EE를 사용한다.
 - `tool_id`는 앞단이 고정하며 Task Planner가 선택하거나 대체하지 않는다.
 - `None→A`, `A→None`, `A→B`는 Tool identity 변경 1회다.
@@ -57,7 +56,7 @@ SearchState(
 
 ## 실행
 
-GK 입력 연결:
+GK + M1 입력 연결:
 
 ```bash
 python -m task_planner.cli plan \
@@ -71,26 +70,9 @@ python -m task_planner.cli plan \
 GK에는 action detail과 실행 partial-order가 없으므로 `--m1`은 필수다. `--m0`와
 `--robot-spec`은 scene geometry와 EE payload/capability를 보강하며, 동일 정보가
 `--resources`에 있으면 생략할 수 있다. `obj_<class>_<instance>` 형식 ID는 기본적으로
-`<instance>`로 정규화하고, 예외는 `--id-aliases aliases.json`으로 지정한다.
-
-Planner A 출력과 scenario 연결:
-
-```bash
-python -m task_planner.cli plan \
-  --planner-a ../planner_a/outputs_vlm/t2_2_stack_tower.json \
-  --scenario ../planner_a/scenarios/t2_2_stack_tower.json \
-  --output results/t2_2_stack_tower_task_planner.json
-```
-
-외부 resource와 candidate를 사용하는 예제:
-
-```bash
-python -m task_planner.cli plan \
-  --planner-a examples/heavy_crate_planner_a.json \
-  --resources examples/heavy_crate_resources.json \
-  --candidates examples/heavy_crate_candidates.json \
-  --output examples/heavy_crate_result.json
-```
+`<instance>`로 정규화하고, 예외는 `--id-aliases aliases.json`으로 지정한다. 외부
+resource catalog와 candidate proposal이 필요하면 각각 `--resources`, `--candidates`로
+GK + M1 입력에 보강할 수 있다.
 
 재계획:
 
@@ -131,9 +113,6 @@ action type, 선택적인 `target_pose`가 포함된다. Motion Planner는 다�
 python -m pytest -q
 ```
 
-테스트는 입력 검증, Planner A 제약, GK/M1 변환, ID 정규화, group EE binding,
+테스트는 입력 검증, M1 DAG 제약, GK/M1 변환, ID 정규화, group EE binding,
 고정 Tool 검증, 후보 필터링, Tool/EE 전환, lazy geometry cache, terminal policy, replanning,
 brute-force 대비 Dijkstra 최적성, CLI end-to-end를 포함한다.
-
-관련 연구와 논문 근거는 [`RELATED_WORK.md`](RELATED_WORK.md)와
-[`references.bib`](references.bib)에 정리되어 있다.
