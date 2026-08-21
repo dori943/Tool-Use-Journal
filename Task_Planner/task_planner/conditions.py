@@ -1,9 +1,9 @@
-"""Small symbolic execution-state update used while following Planner A's DAG.
+"""Symbolic execution-state updates for the normalized M1 DAG.
 
 ``condition.check`` strings are never executed with ``eval()``. They are either
 looked up in a :class:`CheckerRegistry` by name or carried as metadata.
 
-This module does not derive, repair, or replace Planner A's ordering contract.
+This module does not derive, repair, or replace the upstream ordering contract.
 Hard/optional ordering is handled by ``validation.py`` and ``constraints.py``;
 the facts here only stop a DAG-valid prefix from using a condition that a
 previous action has consumed.
@@ -51,7 +51,7 @@ def validate_subgoal_effects(subgoal: Subgoal) -> None:
 
 
 def true_facts(conditions: Iterable[Condition]) -> frozenset[FluentKey]:
-    """Normalize conditions whose current Planner-A judgement is true."""
+    """Normalize conditions whose current upstream judgement is true."""
     return frozenset(
         fluent_key(condition) for condition in conditions if condition.pass_ is True
     )

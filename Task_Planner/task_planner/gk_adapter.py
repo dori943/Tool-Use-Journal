@@ -18,8 +18,8 @@ from task_planner.models import (
     InitialState,
     ObjectSpec,
     OrderConstraints,
-    PlannerAOutput,
-    PlannerAConstraints,
+    TaskGraph,
+    TaskConstraints,
     TaskPlannerRequest,
     PlanningPolicy,
     ResourceCatalog,
@@ -27,7 +27,6 @@ from task_planner.models import (
     TaskSpec,
     ToolSpec,
 )
-from task_planner.planner_a_adapter import _merge_resource_catalog
 
 
 _TRUE_STATUSES = frozenset({"sat", "pass", "passed", "true", "feasible"})
@@ -57,7 +56,7 @@ def build_request_from_gk(
     """
 
     aliases = dict(id_aliases or {})
-    planner_input, derived_catalog = adapt_gk_m1_output(
+    task_graph, derived_catalog = adapt_gk_m1_output(
         gk_payload,
         m1_payload,
         m0_payload=m0_payload,
@@ -72,12 +71,12 @@ def build_request_from_gk(
     )
     policy = planning_policy or PlanningPolicy(
         # A GK may omit payload, wrench, or surface information. Preserve the
-        # legacy strict behavior when a complete external catalog is supplied,
+        # strict behavior when a complete external catalog is supplied,
         # but defer genuinely missing derived knowledge to motion validation.
         unknown_feasibility_policy="defer" if uses_derived_only else "reject"
     )
     return TaskPlannerRequest(
-        planner_a=planner_input,
+        task_graph=task_graph,
         resource_catalog=catalog,
         candidate_proposals=candidate_proposals,
         planning_policy=policy,
@@ -91,7 +90,7 @@ def adapt_gk_m1_output(
     m0_payload: Mapping[str, Any] | None = None,
     robot_spec_payload: Mapping[str, Any] | None = None,
     id_aliases: Mapping[str, str] | None = None,
-) -> tuple[PlannerAOutput, ResourceCatalog]:
+) -> tuple[TaskGraph, ResourceCatalog]:
     """Return the normalized planner input and a GK-derived catalog."""
 
     aliases = dict(id_aliases or {})
@@ -220,7 +219,7 @@ def adapt_gk_m1_output(
                     tool_selection_source=(
                         "upstream_fixed" if tool_id is not None else "not_required"
                     ),
-                    feasible_ee_source="request",
+                    feasible_ee_source="gk",
                 )
             )
 
@@ -254,7 +253,7 @@ def adapt_gk_m1_output(
             else str(_mapping(task_text).get("instruction") or "")
         )
     )
-    planner_input = PlannerAOutput(
+    task_graph = TaskGraph(
         task=task,
         initial_state=InitialState(
             current_ee=current_ee,
@@ -264,7 +263,7 @@ def adapt_gk_m1_output(
         ),
         subgoals=subgoals,
         order_constraints=OrderConstraints(edges=edges),
-        constraints=PlannerAConstraints(),
+        constraints=TaskConstraints(),
         log={
             "adapter": "gk-m1-v1",
             "task_id": gk_payload.get("task_id"),
@@ -275,7 +274,57 @@ def adapt_gk_m1_output(
             "m1_stats": deepcopy(m1_payload.get("m1_stats") or {}),
         },
     )
-    return planner_input, catalog
+    return task_graph, catalog
+
+
+def _merge_resource_catalog(
+    derived: ResourceCatalog, supplied: ResourceCatalog
+) -> ResourceCatalog:
+    """Merge GK-derived records with an explicitly supplied catalog.
+
+    Supplied EE and Tool specifications override derived defaults. GK/M0 object
+    fields override supplied defaults only when the upstream artifact actually
+    provides that field.
+    """
+
+    end_effectors = dict(derived.end_effectors)
+    for resource_id, supplied_spec in supplied.end_effectors.items():
+        if resource_id not in end_effectors:
+            end_effectors[resource_id] = supplied_spec
+            continue
+        values = end_effectors[resource_id].model_dump()
+        values.update(
+            supplied_spec.model_dump(include=supplied_spec.model_fields_set)
+        )
+        end_effectors[resource_id] = EndEffectorSpec.model_validate(values)
+
+    tools = dict(derived.tools)
+    for resource_id, supplied_spec in supplied.tools.items():
+        if resource_id not in tools:
+            tools[resource_id] = supplied_spec
+            continue
+        values = tools[resource_id].model_dump()
+        values.update(
+            supplied_spec.model_dump(include=supplied_spec.model_fields_set)
+        )
+        tools[resource_id] = ToolSpec.model_validate(values)
+
+    objects = dict(supplied.objects)
+    for object_id, derived_spec in derived.objects.items():
+        if object_id not in objects:
+            objects[object_id] = derived_spec
+            continue
+        values = objects[object_id].model_dump()
+        values.update(
+            derived_spec.model_dump(include=derived_spec.model_fields_set)
+        )
+        objects[object_id] = ObjectSpec.model_validate(values)
+
+    return ResourceCatalog(
+        end_effectors=end_effectors,
+        tools=tools,
+        objects=objects,
+    )
 
 
 def _gk_records(payload: Mapping[str, Any]) -> list[Mapping[str, Any]]:

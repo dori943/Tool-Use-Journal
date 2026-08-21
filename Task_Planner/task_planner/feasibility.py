@@ -172,7 +172,7 @@ class StaticFeasibilityChecker:
         if tool_spec is not None:
             available_caps.update(tool_spec.capabilities)
 
-        # Planner-A task requirements are checked against the capabilities
+        # Upstream task requirements are checked against the capabilities
         # jointly supplied by the EE and upstream-fixed tool.
         missing_subgoal = set(sg.required_capabilities) - available_caps
         if missing_subgoal:

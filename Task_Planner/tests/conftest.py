@@ -2,27 +2,20 @@
 
 from __future__ import annotations
 
-import json
-from pathlib import Path
 from typing import Any, Iterable
-
-import pytest
 
 from task_planner.models import (
     CandidateProposal,
     Condition,
     InitialState,
     OrderConstraints,
-    PlannerAOutput,
+    TaskGraph,
     TaskPlannerRequest,
     PlanningPolicy,
     ResourceCatalog,
     Subgoal,
     TaskSpec,
 )
-
-EXAMPLES_DIR = Path(__file__).resolve().parent.parent / "examples"
-
 
 def cond(ctype: str, *args: str, **kwargs: Any) -> Condition:
     return Condition(type=ctype, args=list(args), **kwargs)
@@ -81,7 +74,7 @@ def prop(
 
 
 def base_catalog() -> ResourceCatalog:
-    """Two EEs and two Planner-A-selected tools."""
+    """Two EEs and two upstream-selected tools."""
     return ResourceCatalog.model_validate(
         {
             "end_effectors": {
@@ -129,7 +122,7 @@ def make_request(
     initial_kwargs: dict[str, Any] | None = None,
 ) -> TaskPlannerRequest:
     return TaskPlannerRequest(
-        planner_a=PlannerAOutput(
+        task_graph=TaskGraph(
             task=TaskSpec(instruction="test task"),
             initial_state=InitialState(
                 current_ee=initial_ee,
@@ -144,25 +137,4 @@ def make_request(
         resource_catalog=catalog or base_catalog(),
         candidate_proposals=proposals,
         planning_policy=policy or PlanningPolicy(),
-    )
-
-
-@pytest.fixture()
-def example_request() -> TaskPlannerRequest:
-    planner_a = json.loads(
-        (EXAMPLES_DIR / "bottle_plate_planner_a.json").read_text(encoding="utf-8")
-    )
-    resources = json.loads(
-        (EXAMPLES_DIR / "bottle_plate_resources.json").read_text(encoding="utf-8")
-    )
-    candidates = json.loads(
-        (EXAMPLES_DIR / "bottle_plate_candidates.json").read_text(encoding="utf-8")
-    )
-    return TaskPlannerRequest(
-        planner_a=PlannerAOutput.model_validate(planner_a),
-        resource_catalog=ResourceCatalog.model_validate(resources),
-        candidate_proposals={
-            sg_id: [CandidateProposal.model_validate(p) for p in items]
-            for sg_id, items in candidates.items()
-        },
     )

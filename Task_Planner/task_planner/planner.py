@@ -13,7 +13,7 @@ from task_planner.candidate_provider import (
 )
 from task_planner.conditions import CheckerRegistry, initial_facts, true_facts
 from task_planner.constraints import (
-    PlannerAConstraintEngine,
+    TaskConstraintEngine,
     build_constraint_resolution_trace,
 )
 from task_planner.diagnostics import (
@@ -68,9 +68,9 @@ def plan(
     no_goods: "NoGoodSet | None" = None,
     execution_state: ExecutionState | None = None,
 ) -> PlanningResult:
-    planner_a = request.planner_a
+    task_graph = request.task_graph
     policy = request.planning_policy
-    task = planner_a.task.model_dump()
+    task = task_graph.task.model_dump()
     scene_updater = scene_updater or SymbolicSceneUpdater()
     checker_registry = checker_registry or CheckerRegistry()
     geometry = GeometryCache(checker=geometry_checker or AlwaysPassGeometryChecker())
@@ -85,8 +85,8 @@ def plan(
             diagnostics=outcome.diagnostics,
         )
 
-    subgoals = {sg.subgoal_id: sg for sg in planner_a.subgoals}
-    constraint_engine = PlannerAConstraintEngine(planner_a.constraints)
+    subgoals = {sg.subgoal_id: sg for sg in task_graph.subgoals}
+    constraint_engine = TaskConstraintEngine(task_graph.constraints)
 
     # ---- execution-state overrides (replanning) ---------------------------
     completed: frozenset[str] = frozenset()
@@ -125,12 +125,12 @@ def plan(
         facts = true_facts(execution_state.facts)
         scene_signature = (
             execution_state.scene_signature
-            or scene_updater.initial_scene(planner_a).signature
+            or scene_updater.initial_scene(task_graph).signature
         )
         rack_occupancy = (
             execution_state.rack_occupancy
             if execution_state.rack_occupancy is not None
-            else planner_a.initial_state.rack_occupancy
+            else task_graph.initial_state.rack_occupancy
         )
         group_bindings = tuple(
             sorted(getattr(execution_state, "group_ee_bindings", {}).items())
@@ -149,11 +149,11 @@ def plan(
                 ],
             )
     else:
-        init = planner_a.initial_state
+        init = task_graph.initial_state
         current_ee = init.current_ee
         held_tool = init.held_tool
         facts = initial_facts(init)
-        scene_signature = scene_updater.initial_scene(planner_a).signature
+        scene_signature = scene_updater.initial_scene(task_graph).signature
         rack_occupancy = init.rack_occupancy
         group_bindings = ()
 
@@ -339,8 +339,8 @@ def plan(
         search_outcome,
         initial_state,
         search_outcome.best_cost[search_outcome.goal_state],
-        planner_a.constraints,
-        normalized_edges(planner_a.order_constraints),
+        task_graph.constraints,
+        normalized_edges(task_graph.order_constraints),
     )
     return PlanningResult(
         status=PlanStatus.SUCCESS,
@@ -360,7 +360,7 @@ def _validate_execution_state(
 ) -> list[Rejection]:
     """Validate a replanning root before it enters the search graph."""
     rejections: list[Rejection] = []
-    subgoals = {sg.subgoal_id: sg for sg in request.planner_a.subgoals}
+    subgoals = {sg.subgoal_id: sg for sg in request.task_graph.subgoals}
     completed = set(execution_state.completed_subgoals)
     catalog = request.resource_catalog
 

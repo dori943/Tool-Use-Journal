@@ -140,10 +140,10 @@ def test_fixed_tool_continuity_preferred_over_extra_ee_switch() -> None:
 
 
 def _brute_force_best_cost(request: TaskPlannerRequest) -> CostVector | None:
-    planner_a = request.planner_a
-    subgoals = {s.subgoal_id: s for s in planner_a.subgoals}
+    task_graph = request.task_graph
+    subgoals = {s.subgoal_id: s for s in task_graph.subgoals}
     preds = build_predecessor_map(
-        list(subgoals), normalized_edges(planner_a.order_constraints)
+        list(subgoals), normalized_edges(task_graph.order_constraints)
     )
     provider = StaticCandidateProvider(
         request.candidate_proposals or {}, request.resource_catalog
@@ -159,14 +159,14 @@ def _brute_force_best_cost(request: TaskPlannerRequest) -> CostVector | None:
     context = TransitionContext(
         catalog=request.resource_catalog,
         policy=request.planning_policy,
-        initial_ee=planner_a.initial_state.current_ee,
+        initial_ee=task_graph.initial_state.current_ee,
     )
     initial = SearchState(
         completed_subgoals=frozenset(),
-        current_ee=planner_a.initial_state.current_ee,
+        current_ee=task_graph.initial_state.current_ee,
         held_tool=None,
         group_ee_bindings=(),
-        symbolic_facts=initial_facts(planner_a.initial_state),
+        symbolic_facts=initial_facts(task_graph.initial_state),
         scene_signature="brute",
     )
     best: list[CostVector | None] = [None]

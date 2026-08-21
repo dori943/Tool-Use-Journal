@@ -1,6 +1,6 @@
 """Task Planner: search over subgoal order, EE, and resource transitions.
 
-Given a normalized Planner-A contract or GK+M1 artifacts, a single Dijkstra
+Given GK + M1 artifacts, a single Dijkstra
 search over a joint symbolic/resource state space selects subgoal order and
 end-effector while preserving upstream-fixed tools and planning transitions.
 """
@@ -17,20 +17,16 @@ from task_planner.models import (
     GraspSpec,
     InitialState,
     ObjectSpec,
-    PlannerAConstraints,
-    PlannerAOutput,
+    TaskConstraints,
+    TaskGraph,
     TaskPlannerRequest,
     PlanningPolicy,
     ResourceCatalog,
     Subgoal,
     ToolSpec,
 )
-from task_planner.constraints import PlannerAConstraintEngine
+from task_planner.constraints import TaskConstraintEngine
 from task_planner.planner import plan
-from task_planner.planner_a_adapter import (
-    adapt_current_planner_a_output,
-    build_request_from_current_planner_a,
-)
 from task_planner.gk_adapter import adapt_gk_m1_output, build_request_from_gk
 from task_planner.motion_interface import (
     MOTION_COST_UNIT,
@@ -81,10 +77,10 @@ __all__ = [
     "InitialState",
     "NoGoodSet",
     "ObjectSpec",
-    "PlannerAConstraintEngine",
-    "PlannerAConstraints",
+    "TaskConstraintEngine",
+    "TaskConstraints",
     "PlanStatus",
-    "PlannerAOutput",
+    "TaskGraph",
     "TaskPlannerRequest",
     "PlanningPolicy",
     "PlanningResult",
@@ -99,8 +95,6 @@ __all__ = [
     "Subgoal",
     "ToolSpec",
     "plan",
-    "adapt_current_planner_a_output",
-    "build_request_from_current_planner_a",
     "adapt_gk_m1_output",
     "build_request_from_gk",
     "replan",

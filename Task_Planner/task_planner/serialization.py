@@ -67,7 +67,7 @@ class CandidateAssignment(BaseModel):
 
 
 class ConstraintResolution(BaseModel):
-    """How one Planner-A contract clause was handled in the selected order."""
+    """How one task-graph constraint was handled in the selected order."""
 
     constraint_type: str
     constraint_id: str
