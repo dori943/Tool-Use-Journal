@@ -1,0 +1,2322 @@
+{
+  "$defs": {
+    "ArtifactProvenance": {
+      "additionalProperties": false,
+      "description": "Lineage needed to trace a failed execution back to one module run.",
+      "properties": {
+        "artifact_id": {
+          "minLength": 1,
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "artifact_type": {
+          "minLength": 1,
+          "title": "Artifact Type",
+          "type": "string"
+        },
+        "produced_by": {
+          "$ref": "#/$defs/ModuleName"
+        },
+        "invocation_id": {
+          "minLength": 1,
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "input_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Input Artifact Ids",
+          "type": "array"
+        },
+        "attempt": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Attempt",
+          "type": "integer"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "artifact_type",
+        "produced_by",
+        "invocation_id"
+      ],
+      "title": "ArtifactProvenance",
+      "type": "object"
+    },
+    "AttachedObjectTransform": {
+      "additionalProperties": false,
+      "description": "Rigid grasp transform used to move a free-joint object during planning.",
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "free_joint_name": {
+          "minLength": 1,
+          "title": "Free Joint Name",
+          "type": "string"
+        },
+        "reference_kind": {
+          "default": "body",
+          "enum": [
+            "body",
+            "site"
+          ],
+          "title": "Reference Kind",
+          "type": "string"
+        },
+        "reference_name": {
+          "minLength": 1,
+          "title": "Reference Name",
+          "type": "string"
+        },
+        "position_in_reference_m": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position In Reference M",
+          "type": "array"
+        },
+        "orientation_in_reference_xyzw": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Orientation In Reference Xyzw",
+          "type": "array"
+        }
+      },
+      "required": [
+        "object_id",
+        "free_joint_name",
+        "reference_name",
+        "position_in_reference_m",
+        "orientation_in_reference_xyzw"
+      ],
+      "title": "AttachedObjectTransform",
+      "type": "object"
+    },
+    "CollisionContext": {
+      "additionalProperties": false,
+      "description": "Collision model and ACM state active at one trajectory boundary.",
+      "properties": {
+        "context_id": {
+          "minLength": 1,
+          "title": "Context Id",
+          "type": "string"
+        },
+        "scene_state_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Scene State Id"
+        },
+        "active_ee": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Active Ee"
+        },
+        "attached_object_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Attached Object Ids",
+          "type": "array"
+        },
+        "attached_object_transforms": {
+          "items": {
+            "$ref": "#/$defs/AttachedObjectTransform"
+          },
+          "title": "Attached Object Transforms",
+          "type": "array"
+        },
+        "free_object_poses": {
+          "items": {
+            "$ref": "#/$defs/FreeObjectPose"
+          },
+          "title": "Free Object Poses",
+          "type": "array"
+        },
+        "touch_links": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Touch Links",
+          "type": "array"
+        },
+        "kinematic_joint_positions": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "title": "Kinematic Joint Positions",
+          "type": "object"
+        },
+        "allowed_collision_pairs": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Allowed Collision Pairs",
+          "type": "array"
+        },
+        "collision_model_version": {
+          "minLength": 1,
+          "title": "Collision Model Version",
+          "type": "string"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "context_id",
+        "collision_model_version"
+      ],
+      "title": "CollisionContext",
+      "type": "object"
+    },
+    "EventExecutionStatus": {
+      "enum": [
+        "SUCCESS",
+        "FAILED",
+        "SKIPPED"
+      ],
+      "title": "EventExecutionStatus",
+      "type": "string"
+    },
+    "EventType": {
+      "enum": [
+        "GRIPPER_OPEN",
+        "GRIPPER_CLOSE",
+        "SUCTION_ON",
+        "SUCTION_OFF",
+        "ATTACH_OBJECT",
+        "DETACH_OBJECT",
+        "TOOL_LOCK",
+        "TOOL_UNLOCK",
+        "VERIFY_TOOL_LOCK",
+        "VERIFY_TOOL_RELEASE",
+        "WAIT"
+      ],
+      "title": "EventType",
+      "type": "string"
+    },
+    "ExecutedEvent": {
+      "additionalProperties": false,
+      "properties": {
+        "event_id": {
+          "minLength": 1,
+          "title": "Event Id",
+          "type": "string"
+        },
+        "scheduled_time_s": {
+          "minimum": 0,
+          "title": "Scheduled Time S",
+          "type": "number"
+        },
+        "actual_time_s": {
+          "minimum": 0,
+          "title": "Actual Time S",
+          "type": "number"
+        },
+        "status": {
+          "$ref": "#/$defs/EventExecutionStatus"
+        },
+        "message": {
+          "default": "",
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "event_id",
+        "scheduled_time_s",
+        "actual_time_s",
+        "status"
+      ],
+      "title": "ExecutedEvent",
+      "type": "object"
+    },
+    "ExecutionReport": {
+      "additionalProperties": false,
+      "description": "Internal execution record stored for evaluation and failure tracing.",
+      "properties": {
+        "schema_version": {
+          "const": "3.2.0",
+          "default": "3.2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "report_id": {
+          "minLength": 1,
+          "title": "Report Id",
+          "type": "string"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "plan_id": {
+          "minLength": 1,
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ArtifactProvenance"
+        },
+        "status": {
+          "$ref": "#/$defs/ExecutionStatus"
+        },
+        "final_robot_state": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/RobotState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "metrics": {
+          "$ref": "#/$defs/SimulationMetrics"
+        },
+        "executed_events": {
+          "items": {
+            "$ref": "#/$defs/ExecutedEvent"
+          },
+          "title": "Executed Events",
+          "type": "array"
+        },
+        "failure": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/FailureObservation"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "trace_ref": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Trace Ref"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "report_id",
+        "run_id",
+        "plan_id",
+        "provenance",
+        "status",
+        "metrics"
+      ],
+      "title": "ExecutionReport",
+      "type": "object"
+    },
+    "ExecutionStatus": {
+      "enum": [
+        "SUCCESS",
+        "FAILED",
+        "TIMEOUT",
+        "ABORTED"
+      ],
+      "title": "ExecutionStatus",
+      "type": "string"
+    },
+    "FailureObservation": {
+      "additionalProperties": false,
+      "description": "What failed in simulation, before assigning a root cause.",
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "category": {
+          "minLength": 1,
+          "title": "Category",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        },
+        "segment_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Segment Id"
+        },
+        "waypoint_index": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Waypoint Index"
+        },
+        "event_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Event Id"
+        },
+        "expected": {
+          "additionalProperties": true,
+          "title": "Expected",
+          "type": "object"
+        },
+        "observed": {
+          "additionalProperties": true,
+          "title": "Observed",
+          "type": "object"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        }
+      },
+      "required": [
+        "code",
+        "category",
+        "message"
+      ],
+      "title": "FailureObservation",
+      "type": "object"
+    },
+    "FreeObjectPose": {
+      "additionalProperties": false,
+      "description": "World pose override for an object backed by a MuJoCo free joint.",
+      "properties": {
+        "object_id": {
+          "minLength": 1,
+          "title": "Object Id",
+          "type": "string"
+        },
+        "free_joint_name": {
+          "minLength": 1,
+          "title": "Free Joint Name",
+          "type": "string"
+        },
+        "pose": {
+          "$ref": "#/$defs/Pose"
+        }
+      },
+      "required": [
+        "object_id",
+        "free_joint_name",
+        "pose"
+      ],
+      "title": "FreeObjectPose",
+      "type": "object"
+    },
+    "GoalType": {
+      "enum": [
+        "POSE",
+        "JOINT",
+        "PICK",
+        "PLACE",
+        "DOCK",
+        "TOOL_CHANGE",
+        "EE_EXCHANGE"
+      ],
+      "title": "GoalType",
+      "type": "string"
+    },
+    "GraspSpec": {
+      "additionalProperties": true,
+      "description": "Externally generated grasp hypothesis passed through to motion planning.\n\nTask Planner treats ``pose`` and the optional approach/contact payloads as\nopaque data.  It only preserves grasp identity and ownership so that the\nmotion planner can resolve the correct geometry without inspecting ad-hoc\ncandidate metadata.",
+      "properties": {
+        "grasp_id": {
+          "minLength": 1,
+          "title": "Grasp Id",
+          "type": "string"
+        },
+        "owner_kind": {
+          "enum": [
+            "object",
+            "tool",
+            "end_effector"
+          ],
+          "title": "Owner Kind",
+          "type": "string"
+        },
+        "owner_id": {
+          "minLength": 1,
+          "title": "Owner Id",
+          "type": "string"
+        },
+        "pose": {
+          "default": null,
+          "title": "Pose"
+        },
+        "approach_pose": {
+          "default": null,
+          "title": "Approach Pose"
+        },
+        "score": {
+          "anyOf": [
+            {
+              "maximum": 1,
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Score"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Source"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "grasp_id",
+        "owner_kind",
+        "owner_id"
+      ],
+      "title": "GraspSpec",
+      "type": "object"
+    },
+    "GripperMode": {
+      "enum": [
+        "OPEN",
+        "CLOSED",
+        "HOLDING",
+        "UNKNOWN"
+      ],
+      "title": "GripperMode",
+      "type": "string"
+    },
+    "GripperState": {
+      "additionalProperties": false,
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/GripperMode",
+          "default": "UNKNOWN"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command"
+        }
+      },
+      "title": "GripperState",
+      "type": "object"
+    },
+    "InterpolationType": {
+      "enum": [
+        "LINEAR",
+        "CUBIC",
+        "QUINTIC"
+      ],
+      "title": "InterpolationType",
+      "type": "string"
+    },
+    "JointDynamicLimit": {
+      "additionalProperties": false,
+      "properties": {
+        "max_velocity_rad_s": {
+          "exclusiveMinimum": 0,
+          "title": "Max Velocity Rad S",
+          "type": "number"
+        },
+        "max_acceleration_rad_s2": {
+          "exclusiveMinimum": 0,
+          "title": "Max Acceleration Rad S2",
+          "type": "number"
+        },
+        "max_jerk_rad_s3": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Jerk Rad S3"
+        }
+      },
+      "required": [
+        "max_velocity_rad_s",
+        "max_acceleration_rad_s2"
+      ],
+      "title": "JointDynamicLimit",
+      "type": "object"
+    },
+    "KeyframeEventType": {
+      "enum": [
+        "GRIPPER_OPEN",
+        "GRIPPER_CLOSE",
+        "SUCTION_ON",
+        "SUCTION_OFF",
+        "ATTACH_OBJECT",
+        "DETACH_OBJECT",
+        "TOOL_LOCK",
+        "TOOL_UNLOCK",
+        "VERIFY_TOOL_LOCK",
+        "VERIFY_TOOL_RELEASE"
+      ],
+      "title": "KeyframeEventType",
+      "type": "string"
+    },
+    "KeyframePlanArtifact": {
+      "additionalProperties": false,
+      "properties": {
+        "schema_version": {
+          "const": "3.2.0",
+          "default": "3.2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "artifact_id": {
+          "minLength": 1,
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ArtifactProvenance"
+        },
+        "scene_signature": {
+          "minLength": 1,
+          "title": "Scene Signature",
+          "type": "string"
+        },
+        "subgoal_id": {
+          "minLength": 1,
+          "title": "Subgoal Id",
+          "type": "string"
+        },
+        "candidates": {
+          "items": {
+            "$ref": "#/$defs/KeyframePlanCandidate"
+          },
+          "maxItems": 20,
+          "minItems": 1,
+          "title": "Candidates",
+          "type": "array"
+        }
+      },
+      "required": [
+        "artifact_id",
+        "provenance",
+        "scene_signature",
+        "subgoal_id",
+        "candidates"
+      ],
+      "title": "KeyframePlanArtifact",
+      "type": "object"
+    },
+    "KeyframePlanCandidate": {
+      "additionalProperties": false,
+      "description": "A semantically coherent approach strategy, not an independent pose bag.",
+      "properties": {
+        "strategy_id": {
+          "minLength": 1,
+          "title": "Strategy Id",
+          "type": "string"
+        },
+        "keyframes": {
+          "items": {
+            "$ref": "#/$defs/RelativeKeyframeSpec"
+          },
+          "minItems": 2,
+          "title": "Keyframes",
+          "type": "array"
+        },
+        "rationale": {
+          "default": "",
+          "title": "Rationale",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/StrategyGenerationProvenance"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "strategy_id",
+        "keyframes",
+        "provenance"
+      ],
+      "title": "KeyframePlanCandidate",
+      "type": "object"
+    },
+    "KeyframePlannerType": {
+      "enum": [
+        "CARTESIAN",
+        "JOINT",
+        "SAMPLING_BASED"
+      ],
+      "title": "KeyframePlannerType",
+      "type": "string"
+    },
+    "KeyframeType": {
+      "enum": [
+        "PRE_GRASP",
+        "GRASP",
+        "LIFT",
+        "TRANSFER",
+        "PRE_PLACE",
+        "PLACE",
+        "RETREAT",
+        "EE_UNDOCK_STAGING",
+        "EE_PRE_UNDOCK",
+        "EE_UNDOCK",
+        "EE_DOCK_STAGING",
+        "EE_PRE_DOCK",
+        "EE_DOCK",
+        "CUSTOM"
+      ],
+      "title": "KeyframeType",
+      "type": "string"
+    },
+    "ModuleName": {
+      "enum": [
+        "TASK_PLANNER",
+        "GRASP_PLANNER",
+        "MOTION_PLANNER",
+        "SIMULATOR",
+        "CONTROLLER",
+        "SCENE_MODEL",
+        "RECOVERY_ORCHESTRATOR"
+      ],
+      "title": "ModuleName",
+      "type": "string"
+    },
+    "MotionConstraints": {
+      "additionalProperties": false,
+      "properties": {
+        "collision_margin_m": {
+          "default": 0.005,
+          "minimum": 0,
+          "title": "Collision Margin M",
+          "type": "number"
+        },
+        "position_tolerance_m": {
+          "default": 0.005,
+          "exclusiveMinimum": 0,
+          "title": "Position Tolerance M",
+          "type": "number"
+        },
+        "orientation_tolerance_rad": {
+          "default": 0.05,
+          "exclusiveMinimum": 0,
+          "title": "Orientation Tolerance Rad",
+          "type": "number"
+        },
+        "velocity_scaling": {
+          "default": 0.5,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Velocity Scaling",
+          "type": "number"
+        },
+        "acceleration_scaling": {
+          "default": 0.5,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Acceleration Scaling",
+          "type": "number"
+        },
+        "jerk_scaling": {
+          "default": 0.5,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "title": "Jerk Scaling",
+          "type": "number"
+        },
+        "max_cartesian_speed_m_s": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Cartesian Speed M S"
+        },
+        "min_jacobian_singular_value": {
+          "default": 0.0001,
+          "minimum": 0,
+          "title": "Min Jacobian Singular Value",
+          "type": "number"
+        },
+        "max_jacobian_condition_number": {
+          "default": 10000.0,
+          "exclusiveMinimum": 1,
+          "title": "Max Jacobian Condition Number",
+          "type": "number"
+        },
+        "max_joint_path_step_rad": {
+          "default": 0.02,
+          "exclusiveMinimum": 0,
+          "title": "Max Joint Path Step Rad",
+          "type": "number"
+        },
+        "allowed_collision_pairs": {
+          "items": {
+            "maxItems": 2,
+            "minItems": 2,
+            "prefixItems": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "string"
+              }
+            ],
+            "type": "array"
+          },
+          "title": "Allowed Collision Pairs",
+          "type": "array"
+        },
+        "joint_limits": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JointDynamicLimit"
+          },
+          "title": "Joint Limits",
+          "type": "object"
+        }
+      },
+      "title": "MotionConstraints",
+      "type": "object"
+    },
+    "MotionGoal": {
+      "additionalProperties": false,
+      "description": "Grounded goal from Task Planner; no trajectory is supplied here.",
+      "properties": {
+        "goal_type": {
+          "$ref": "#/$defs/GoalType"
+        },
+        "target_pose": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pose"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "target_joint_positions_rad": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Joint Positions Rad"
+        },
+        "target_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Object Id"
+        },
+        "target_region_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Region Id"
+        },
+        "approach_direction": {
+          "anyOf": [
+            {
+              "maxItems": 3,
+              "minItems": 3,
+              "prefixItems": [
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                },
+                {
+                  "type": "number"
+                }
+              ],
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approach Direction"
+        },
+        "approach_distance_m": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Approach Distance M"
+        },
+        "retreat_distance_m": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Retreat Distance M"
+        }
+      },
+      "required": [
+        "goal_type"
+      ],
+      "title": "MotionGoal",
+      "type": "object"
+    },
+    "MotionPlan": {
+      "additionalProperties": false,
+      "description": "Internal executable artifact consumed directly by the simulator.",
+      "properties": {
+        "plan_id": {
+          "minLength": 1,
+          "title": "Plan Id",
+          "type": "string"
+        },
+        "request_id": {
+          "minLength": 1,
+          "title": "Request Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ArtifactProvenance"
+        },
+        "scene_signature": {
+          "minLength": 1,
+          "title": "Scene Signature",
+          "type": "string"
+        },
+        "robot_id": {
+          "minLength": 1,
+          "title": "Robot Id",
+          "type": "string"
+        },
+        "joint_names": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Joint Names",
+          "type": "array"
+        },
+        "duration_s": {
+          "exclusiveMinimum": 0,
+          "title": "Duration S",
+          "type": "number"
+        },
+        "segments": {
+          "items": {
+            "$ref": "#/$defs/TrajectorySegment"
+          },
+          "minItems": 1,
+          "title": "Segments",
+          "type": "array"
+        },
+        "events": {
+          "items": {
+            "$ref": "#/$defs/TrajectoryEvent"
+          },
+          "title": "Events",
+          "type": "array"
+        },
+        "expected_final_state": {
+          "$ref": "#/$defs/RobotState"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "plan_id",
+        "request_id",
+        "provenance",
+        "scene_signature",
+        "robot_id",
+        "joint_names",
+        "duration_s",
+        "segments",
+        "expected_final_state"
+      ],
+      "title": "MotionPlan",
+      "type": "object"
+    },
+    "MotionPlanRequest": {
+      "additionalProperties": false,
+      "description": "One-way Task Planner -> Motion Planner trajectory-generation command.",
+      "properties": {
+        "schema_version": {
+          "const": "3.2.0",
+          "default": "3.2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "request_id": {
+          "minLength": 1,
+          "title": "Request Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ArtifactProvenance"
+        },
+        "world": {
+          "$ref": "#/$defs/WorldSnapshot"
+        },
+        "task": {
+          "$ref": "#/$defs/MotionTask"
+        },
+        "constraints": {
+          "$ref": "#/$defs/MotionConstraints"
+        },
+        "options": {
+          "$ref": "#/$defs/PlannerOptions"
+        }
+      },
+      "required": [
+        "request_id",
+        "provenance",
+        "world",
+        "task"
+      ],
+      "title": "MotionPlanRequest",
+      "type": "object"
+    },
+    "MotionTask": {
+      "additionalProperties": false,
+      "description": "One executable motion task grounded by Task Planner.",
+      "properties": {
+        "task_id": {
+          "minLength": 1,
+          "title": "Task Id",
+          "type": "string"
+        },
+        "subgoal_id": {
+          "minLength": 1,
+          "title": "Subgoal Id",
+          "type": "string"
+        },
+        "action_type": {
+          "minLength": 1,
+          "title": "Action Type",
+          "type": "string"
+        },
+        "ee": {
+          "minLength": 1,
+          "title": "Ee",
+          "type": "string"
+        },
+        "tool": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tool"
+        },
+        "target_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Target Ids",
+          "type": "array"
+        },
+        "grasp": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GraspSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "goal": {
+          "$ref": "#/$defs/MotionGoal"
+        },
+        "allowed_touch_objects": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Allowed Touch Objects",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "task_id",
+        "subgoal_id",
+        "action_type",
+        "ee",
+        "goal"
+      ],
+      "title": "MotionTask",
+      "type": "object"
+    },
+    "PlannerOptions": {
+      "additionalProperties": false,
+      "properties": {
+        "algorithm": {
+          "default": "RRT_CONNECT",
+          "title": "Algorithm",
+          "type": "string"
+        },
+        "allowed_planning_time_s": {
+          "default": 5.0,
+          "exclusiveMinimum": 0,
+          "title": "Allowed Planning Time S",
+          "type": "number"
+        },
+        "max_attempts": {
+          "default": 5,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "simplify_path": {
+          "default": true,
+          "title": "Simplify Path",
+          "type": "boolean"
+        },
+        "time_parameterization_algorithm": {
+          "default": "QUINTIC_STOP",
+          "title": "Time Parameterization Algorithm",
+          "type": "string"
+        },
+        "interpolation_dt_s": {
+          "default": 0.02,
+          "exclusiveMinimum": 0,
+          "title": "Interpolation Dt S",
+          "type": "number"
+        },
+        "cartesian_translation_step_m": {
+          "default": 0.01,
+          "exclusiveMinimum": 0,
+          "title": "Cartesian Translation Step M",
+          "type": "number"
+        },
+        "cartesian_rotation_step_rad": {
+          "default": 0.1,
+          "exclusiveMinimum": 0,
+          "title": "Cartesian Rotation Step Rad",
+          "type": "number"
+        },
+        "rrt_extension_step_rad": {
+          "default": 0.25,
+          "exclusiveMinimum": 0,
+          "title": "Rrt Extension Step Rad",
+          "type": "number"
+        },
+        "rrt_max_iterations": {
+          "default": 2000,
+          "minimum": 1,
+          "title": "Rrt Max Iterations",
+          "type": "integer"
+        },
+        "rrt_goal_bias": {
+          "default": 0.15,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Rrt Goal Bias",
+          "type": "number"
+        },
+        "random_seed": {
+          "default": 0,
+          "title": "Random Seed",
+          "type": "integer"
+        }
+      },
+      "title": "PlannerOptions",
+      "type": "object"
+    },
+    "Pose": {
+      "additionalProperties": false,
+      "description": "Rigid pose in SI units; quaternion order is x, y, z, w.",
+      "properties": {
+        "frame_id": {
+          "minLength": 1,
+          "title": "Frame Id",
+          "type": "string"
+        },
+        "position_m": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Position M",
+          "type": "array"
+        },
+        "orientation_xyzw": {
+          "maxItems": 4,
+          "minItems": 4,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Orientation Xyzw",
+          "type": "array"
+        }
+      },
+      "required": [
+        "frame_id",
+        "position_m",
+        "orientation_xyzw"
+      ],
+      "title": "Pose",
+      "type": "object"
+    },
+    "RecoveryDirective": {
+      "additionalProperties": false,
+      "description": "Recovery Orchestrator command: rerun only the root-cause module.",
+      "properties": {
+        "schema_version": {
+          "const": "3.2.0",
+          "default": "3.2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "directive_id": {
+          "minLength": 1,
+          "title": "Directive Id",
+          "type": "string"
+        },
+        "source_report_id": {
+          "minLength": 1,
+          "title": "Source Report Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ArtifactProvenance"
+        },
+        "root_cause": {
+          "$ref": "#/$defs/RootCause"
+        },
+        "target_module": {
+          "$ref": "#/$defs/ModuleName"
+        },
+        "restart_from_artifact_id": {
+          "minLength": 1,
+          "title": "Restart From Artifact Id",
+          "type": "string"
+        },
+        "invalidated_artifact_ids": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Invalidated Artifact Ids",
+          "type": "array"
+        },
+        "retry_policy": {
+          "$ref": "#/$defs/RetryPolicy"
+        }
+      },
+      "required": [
+        "directive_id",
+        "source_report_id",
+        "provenance",
+        "root_cause",
+        "target_module",
+        "restart_from_artifact_id"
+      ],
+      "title": "RecoveryDirective",
+      "type": "object"
+    },
+    "RelativeKeyframeSpec": {
+      "additionalProperties": false,
+      "description": "Symbolic keyframe resolved deterministically against a scene frame.\n\nA VLM selects a frame, named anchor, approach axis, offset, and roll.  It\nnever emits a world-frame position or a free-form quaternion.",
+      "properties": {
+        "keyframe_id": {
+          "minLength": 1,
+          "title": "Keyframe Id",
+          "type": "string"
+        },
+        "keyframe_type": {
+          "$ref": "#/$defs/KeyframeType"
+        },
+        "frame_ref": {
+          "minLength": 1,
+          "title": "Frame Ref",
+          "type": "string"
+        },
+        "anchor": {
+          "minLength": 1,
+          "title": "Anchor",
+          "type": "string"
+        },
+        "approach_axis_xyz": {
+          "maxItems": 3,
+          "minItems": 3,
+          "prefixItems": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ],
+          "title": "Approach Axis Xyz",
+          "type": "array"
+        },
+        "tool_axis_to_align": {
+          "default": "+z",
+          "enum": [
+            "+z",
+            "-z"
+          ],
+          "title": "Tool Axis To Align",
+          "type": "string"
+        },
+        "offset_along_approach_m": {
+          "default": 0.0,
+          "title": "Offset Along Approach M",
+          "type": "number"
+        },
+        "roll_rad": {
+          "default": 0.0,
+          "title": "Roll Rad",
+          "type": "number"
+        },
+        "planner": {
+          "$ref": "#/$defs/KeyframePlannerType"
+        },
+        "events_after": {
+          "items": {
+            "$ref": "#/$defs/KeyframeEventType"
+          },
+          "title": "Events After",
+          "type": "array"
+        },
+        "collision_context_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Collision Context Id"
+        },
+        "collision_context_after_events_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Collision Context After Events Id"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "keyframe_id",
+        "keyframe_type",
+        "frame_ref",
+        "anchor",
+        "approach_axis_xyz",
+        "planner"
+      ],
+      "title": "RelativeKeyframeSpec",
+      "type": "object"
+    },
+    "RetryPolicy": {
+      "additionalProperties": false,
+      "properties": {
+        "current_attempt": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Current Attempt",
+          "type": "integer"
+        },
+        "max_attempts": {
+          "default": 3,
+          "minimum": 1,
+          "title": "Max Attempts",
+          "type": "integer"
+        },
+        "parameter_overrides": {
+          "additionalProperties": true,
+          "title": "Parameter Overrides",
+          "type": "object"
+        }
+      },
+      "title": "RetryPolicy",
+      "type": "object"
+    },
+    "RobotState": {
+      "additionalProperties": false,
+      "description": "Complete state required to initialize or verify trajectory playback.",
+      "properties": {
+        "robot_id": {
+          "minLength": 1,
+          "title": "Robot Id",
+          "type": "string"
+        },
+        "joint_names": {
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Joint Names",
+          "type": "array"
+        },
+        "joint_positions_rad": {
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1,
+          "title": "Joint Positions Rad",
+          "type": "array"
+        },
+        "joint_velocities_rad_s": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Joint Velocities Rad S"
+        },
+        "eef_pose": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pose"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "gripper": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GripperState"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "attached_object_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Attached Object Id"
+        },
+        "held_tool_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Held Tool Id"
+        }
+      },
+      "required": [
+        "robot_id",
+        "joint_names",
+        "joint_positions_rad"
+      ],
+      "title": "RobotState",
+      "type": "object"
+    },
+    "RootCause": {
+      "additionalProperties": false,
+      "description": "Module invocation selected by causal analysis as the retry boundary.",
+      "properties": {
+        "module": {
+          "$ref": "#/$defs/ModuleName"
+        },
+        "invocation_id": {
+          "minLength": 1,
+          "title": "Invocation Id",
+          "type": "string"
+        },
+        "artifact_id": {
+          "minLength": 1,
+          "title": "Artifact Id",
+          "type": "string"
+        },
+        "cause_code": {
+          "minLength": 1,
+          "title": "Cause Code",
+          "type": "string"
+        },
+        "confidence": {
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Confidence",
+          "type": "number"
+        },
+        "evidence_refs": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Evidence Refs",
+          "type": "array"
+        },
+        "explanation": {
+          "minLength": 1,
+          "title": "Explanation",
+          "type": "string"
+        }
+      },
+      "required": [
+        "module",
+        "invocation_id",
+        "artifact_id",
+        "cause_code",
+        "confidence",
+        "explanation"
+      ],
+      "title": "RootCause",
+      "type": "object"
+    },
+    "SceneRef": {
+      "additionalProperties": false,
+      "description": "Deterministic identity and causal history for the predicted scene.",
+      "properties": {
+        "signature": {
+          "minLength": 1,
+          "title": "Signature",
+          "type": "string"
+        },
+        "completed_subgoals": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Completed Subgoals",
+          "type": "array"
+        },
+        "facts": {
+          "items": {
+            "type": "string"
+          },
+          "title": "Facts",
+          "type": "array"
+        }
+      },
+      "required": [
+        "signature"
+      ],
+      "title": "SceneRef",
+      "type": "object"
+    },
+    "SegmentType": {
+      "enum": [
+        "APPROACH",
+        "GRASP",
+        "LIFT",
+        "TRANSFER",
+        "PLACE",
+        "RETREAT",
+        "TOOL_CHANGE",
+        "EE_EXCHANGE",
+        "EE_DOCK",
+        "EE_UNDOCK",
+        "CUSTOM"
+      ],
+      "title": "SegmentType",
+      "type": "string"
+    },
+    "SimulationConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "physics_timestep_s": {
+          "default": 0.002,
+          "exclusiveMinimum": 0,
+          "title": "Physics Timestep S",
+          "type": "number"
+        },
+        "control_timestep_s": {
+          "default": 0.02,
+          "exclusiveMinimum": 0,
+          "title": "Control Timestep S",
+          "type": "number"
+        },
+        "realtime_factor": {
+          "default": 0.0,
+          "minimum": 0,
+          "title": "Realtime Factor",
+          "type": "number"
+        },
+        "max_duration_s": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Duration S"
+        },
+        "terminate_on_collision": {
+          "default": true,
+          "title": "Terminate On Collision",
+          "type": "boolean"
+        },
+        "render": {
+          "default": false,
+          "title": "Render",
+          "type": "boolean"
+        },
+        "random_seed": {
+          "default": 0,
+          "title": "Random Seed",
+          "type": "integer"
+        }
+      },
+      "title": "SimulationConfig",
+      "type": "object"
+    },
+    "SimulationMetrics": {
+      "additionalProperties": false,
+      "properties": {
+        "executed_duration_s": {
+          "minimum": 0,
+          "title": "Executed Duration S",
+          "type": "number"
+        },
+        "max_joint_tracking_error_rad": {
+          "minimum": 0,
+          "title": "Max Joint Tracking Error Rad",
+          "type": "number"
+        },
+        "max_eef_tracking_error_m": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Eef Tracking Error M"
+        },
+        "collision_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Collision Count",
+          "type": "integer"
+        },
+        "goal_position_error_m": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Position Error M"
+        },
+        "goal_orientation_error_rad": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Goal Orientation Error Rad"
+        }
+      },
+      "required": [
+        "executed_duration_s",
+        "max_joint_tracking_error_rad"
+      ],
+      "title": "SimulationMetrics",
+      "type": "object"
+    },
+    "SimulationRun": {
+      "additionalProperties": false,
+      "description": "Internal command that binds an exact plan to simulator settings.",
+      "properties": {
+        "schema_version": {
+          "const": "3.2.0",
+          "default": "3.2.0",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "run_id": {
+          "minLength": 1,
+          "title": "Run Id",
+          "type": "string"
+        },
+        "provenance": {
+          "$ref": "#/$defs/ArtifactProvenance"
+        },
+        "plan": {
+          "$ref": "#/$defs/MotionPlan"
+        },
+        "config": {
+          "$ref": "#/$defs/SimulationConfig"
+        }
+      },
+      "required": [
+        "run_id",
+        "provenance",
+        "plan"
+      ],
+      "title": "SimulationRun",
+      "type": "object"
+    },
+    "StrategyGenerationProvenance": {
+      "additionalProperties": false,
+      "description": "Identity that freezes a stochastic strategy proposal as an artifact.",
+      "properties": {
+        "generator_kind": {
+          "$ref": "#/$defs/StrategyGeneratorKind"
+        },
+        "generator_id": {
+          "minLength": 1,
+          "title": "Generator Id",
+          "type": "string"
+        },
+        "input_hash": {
+          "minLength": 1,
+          "title": "Input Hash",
+          "type": "string"
+        },
+        "model_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Model Id"
+        },
+        "prompt_hash": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Prompt Hash"
+        },
+        "temperature": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Temperature"
+        },
+        "provider_request_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Provider Request Id"
+        },
+        "attempt_index": {
+          "default": 1,
+          "minimum": 1,
+          "title": "Attempt Index",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "generator_kind",
+        "generator_id",
+        "input_hash"
+      ],
+      "title": "StrategyGenerationProvenance",
+      "type": "object"
+    },
+    "StrategyGeneratorKind": {
+      "enum": [
+        "VLM",
+        "TEMPLATE",
+        "TASK_GEOMETRY"
+      ],
+      "title": "StrategyGeneratorKind",
+      "type": "string"
+    },
+    "TrajectoryEvent": {
+      "additionalProperties": false,
+      "description": "Discrete command synchronized to the trajectory clock.",
+      "properties": {
+        "event_id": {
+          "minLength": 1,
+          "title": "Event Id",
+          "type": "string"
+        },
+        "time_from_start_s": {
+          "minimum": 0,
+          "title": "Time From Start S",
+          "type": "number"
+        },
+        "event_type": {
+          "$ref": "#/$defs/EventType"
+        },
+        "target_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Target Id"
+        },
+        "command": {
+          "anyOf": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "boolean"
+            },
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Command"
+        },
+        "parameters": {
+          "additionalProperties": true,
+          "title": "Parameters",
+          "type": "object"
+        }
+      },
+      "required": [
+        "event_id",
+        "time_from_start_s",
+        "event_type"
+      ],
+      "title": "TrajectoryEvent",
+      "type": "object"
+    },
+    "TrajectoryProcessingStep": {
+      "enum": [
+        "RAW_PATH",
+        "SHORTCUT",
+        "TIME_PARAMETERIZATION",
+        "JERK_SMOOTHING",
+        "FINAL_COLLISION_CHECK",
+        "DYNAMICS_CHECK"
+      ],
+      "title": "TrajectoryProcessingStep",
+      "type": "string"
+    },
+    "TrajectorySegment": {
+      "additionalProperties": false,
+      "description": "Semantically labelled, collision-checked part of the trajectory.",
+      "properties": {
+        "segment_id": {
+          "minLength": 1,
+          "title": "Segment Id",
+          "type": "string"
+        },
+        "segment_type": {
+          "$ref": "#/$defs/SegmentType"
+        },
+        "start_time_s": {
+          "minimum": 0,
+          "title": "Start Time S",
+          "type": "number"
+        },
+        "end_time_s": {
+          "exclusiveMinimum": 0,
+          "title": "End Time S",
+          "type": "number"
+        },
+        "interpolation": {
+          "$ref": "#/$defs/InterpolationType",
+          "default": "CUBIC"
+        },
+        "waypoints": {
+          "items": {
+            "$ref": "#/$defs/TrajectoryWaypoint"
+          },
+          "minItems": 2,
+          "title": "Waypoints",
+          "type": "array"
+        },
+        "collision_checked": {
+          "title": "Collision Checked",
+          "type": "boolean"
+        },
+        "min_clearance_m": {
+          "anyOf": [
+            {
+              "minimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Min Clearance M"
+        },
+        "collision_context_before": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CollisionContext"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "collision_context_after": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/CollisionContext"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "processing_steps": {
+          "items": {
+            "$ref": "#/$defs/TrajectoryProcessingStep"
+          },
+          "title": "Processing Steps",
+          "type": "array"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "segment_id",
+        "segment_type",
+        "start_time_s",
+        "end_time_s",
+        "waypoints",
+        "collision_checked"
+      ],
+      "title": "TrajectorySegment",
+      "type": "object"
+    },
+    "TrajectoryWaypoint": {
+      "additionalProperties": false,
+      "description": "One time-parameterized robot command sample.",
+      "properties": {
+        "time_from_start_s": {
+          "minimum": 0,
+          "title": "Time From Start S",
+          "type": "number"
+        },
+        "joint_positions_rad": {
+          "items": {
+            "type": "number"
+          },
+          "minItems": 1,
+          "title": "Joint Positions Rad",
+          "type": "array"
+        },
+        "joint_velocities_rad_s": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Joint Velocities Rad S"
+        },
+        "joint_accelerations_rad_s2": {
+          "anyOf": [
+            {
+              "items": {
+                "type": "number"
+              },
+              "type": "array"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Joint Accelerations Rad S2"
+        },
+        "eef_pose": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Pose"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "time_from_start_s",
+        "joint_positions_rad"
+      ],
+      "title": "TrajectoryWaypoint",
+      "type": "object"
+    },
+    "WorldSnapshot": {
+      "additionalProperties": false,
+      "description": "Atomic world and robot state used as the planning start state.",
+      "properties": {
+        "scene": {
+          "$ref": "#/$defs/SceneRef"
+        },
+        "robot_state": {
+          "$ref": "#/$defs/RobotState"
+        },
+        "objects": {
+          "additionalProperties": true,
+          "title": "Objects",
+          "type": "object"
+        },
+        "obstacles": {
+          "items": {},
+          "title": "Obstacles",
+          "type": "array"
+        },
+        "rack": {
+          "additionalProperties": true,
+          "title": "Rack",
+          "type": "object"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "scene",
+        "robot_state"
+      ],
+      "title": "WorldSnapshot",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.local/ee-motion-planner/motion-planner-3.2.0.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "anyOf": [
+    {
+      "$ref": "#/$defs/KeyframePlanArtifact"
+    },
+    {
+      "$ref": "#/$defs/MotionPlanRequest"
+    },
+    {
+      "$ref": "#/$defs/MotionPlan"
+    },
+    {
+      "$ref": "#/$defs/SimulationRun"
+    },
+    {
+      "$ref": "#/$defs/ExecutionReport"
+    },
+    {
+      "$ref": "#/$defs/RecoveryDirective"
+    }
+  ],
+  "description": "One-way Task Planner task commands, internal trajectory artifacts, simulation execution reports, artifact lineage, and localized module retry directives. No result is returned to Task Planner.",
+  "title": "EE Motion Planner Direct Execution Contract",
+  "x-contract-roots": [
+    "KeyframePlanArtifact",
+    "MotionPlanRequest",
+    "MotionPlan",
+    "SimulationRun",
+    "ExecutionReport",
+    "RecoveryDirective"
+  ],
+  "x-operations": {
+    "freeze_keyframe_candidates": {
+      "input": "MotionPlanRequest",
+      "emits": "KeyframePlanArtifact",
+      "visibility": "internal"
+    },
+    "generate_trajectory": {
+      "input": "MotionPlanRequest",
+      "emits": "MotionPlan",
+      "visibility": "internal"
+    },
+    "execute_simulation": {
+      "input": "SimulationRun",
+      "emits": "ExecutionReport",
+      "visibility": "internal"
+    },
+    "recover_failure": {
+      "input": "ExecutionReport",
+      "emits": "RecoveryDirective",
+      "visibility": "internal"
+    }
+  },
+  "x-result-routing": {
+    "return_to_task_planner": false,
+    "success": "archive ExecutionReport and continue pipeline",
+    "failure": "trace artifact lineage and rerun root-cause module"
+  },
+  "x-schema-version": "3.2.0",
+  "x-units": {
+    "position": "metre",
+    "orientation": "quaternion_xyzw or radian",
+    "joint_position": "radian",
+    "joint_velocity": "radian/second",
+    "joint_acceleration": "radian/second^2",
+    "joint_jerk": "radian/second^3",
+    "time": "second"
+  }
+}
