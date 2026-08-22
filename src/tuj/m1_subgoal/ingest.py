@@ -110,6 +110,34 @@ def apply_m2(m1_out: dict, responses: list[dict]) -> list[str]:
                     line += f"  [미회신 노드: {', '.join(missing)}]"
                 logs.append(line)
 
+    # 도구 확정 (0821 확정: 객체 선택은 M1이 완결한다 — M2 측정값을 근거로
+    # 어느 물체를 도구로 쓸지까지 M1이 정한다. M3는 EE 선택·순서 최적화만)
+    for s in m1_out["m1_subgoals"]:
+        cands = s.get("tool_candidate_ids", [])
+        if not cands:
+            continue
+        scored = []
+        for c in cands:
+            info = view.get(c, {})
+            ee = info.get("ee") or {}
+            feasible = [k for k, x in ee.items() if x.get("feasible")]
+            reach = info.get("reachability") or {}
+            if ee and not feasible:
+                continue                      # 어떤 EE로도 못 잡는 후보는 탈락
+            if reach.get("reachable") is False:
+                continue                      # 팔이 안 닿는 후보 탈락
+            scored.append((len(feasible), float(reach.get("margin_mm") or 0.0), c, feasible))
+        if not scored:
+            logs.append(f"  [도구 확정] {s['subgoal_id']}: 통과한 후보 없음")
+            continue
+        scored.sort(reverse=True)             # 사용 가능 EE 수 최대 → 리치 여유 최대
+        n_ee, margin, chosen, _ = scored[0]
+        s["selected_tool_id"] = chosen
+        s["selection_evidence"] = [{"node": c2, "feasible_ees": f2, "reach_margin_mm": m2}
+                                   for (n2, m2, c2, f2) in scored]
+        logs.append(f"  [도구 확정] {s['subgoal_id']}: {chosen} 선택 "
+                    f"(사용 가능 EE {n_ee}종, 리치 여유 {margin}mm)")
+
     m1_out["m1_stats"]["m2_predicates"] = n_sat
     total = sum(n_sat.values())
     logs.insert(0, f"[M2 반영] 응답 {len(responses)}건 수신, m2 술어 {total}건 판정: "
