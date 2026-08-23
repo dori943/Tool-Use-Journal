@@ -24,6 +24,7 @@ class Materializer:
         """m0: m0_scene.build_m0() 결과. remeasure_fn/probe_fn: 에스컬레이션 훅
         (remeasure_fn(node_id)→(material,rms) | probe_fn(node_id)→(track_mm, dt))."""
         self.nodes = {n["id"]: n for n in m0["nodes"]}
+        self.edges = list(m0.get("edges", []))         # coarse 관계 (top_exposed/clear 판정 근거)
         self.backend = backend or MockBackend()
         self.friction = friction or FrictionHead()
         self.log = logger or (lambda **kw: None)
@@ -43,7 +44,9 @@ class Materializer:
                 hooks = dict(
                     margin_fn=margin_fn, eps=self.eps,
                     remeasure_fn=(lambda: self.remeasure_fn(node_id)) if self.remeasure_fn else None,
-                    probe_fn=(lambda: self.probe_fn(node_id)) if self.probe_fn else None)
+                    # TODO(M4): probe_push 프리미티브 완성 시 주석 해제 (2단 마찰 프로브)
+                    # probe_fn=(lambda: self.probe_fn(node_id)) if self.probe_fn else None,
+                    probe_fn=None)
             self._cache[node_id] = ground_intrinsic(
                 self.nodes[node_id], crop_rgb, self.backend, self.friction, **hooks)
             self.log(module="m2", event="intrinsic", node=node_id,
@@ -58,7 +61,8 @@ class Materializer:
         """→ {queried_by, from, to, value_mm, check, pass} (M1 응답 스키마)"""
         fn = {"distance": relational.center_distance,
               "fits_inside": relational.fits_inside,
-              "clearance": relational.depth_clearance}[relation]
+              "clearance": relational.depth_clearance,
+              "gap": relational.gap}[relation]
         res = {"queried_by": queried_by, "from": a_id, "to": b_id} \
             | fn(self.nodes[a_id], self.nodes[b_id], **kw)
         gk["edges"].append(res)
@@ -93,6 +97,37 @@ class Materializer:
                  feasible=[k for k, v in verdicts.items() if v["feasible"]])
         return {"queried_by": queried_by, "node_id": node_id, "ee": verdicts,
                 "reachability": entry.get("reachability")}
+
+    # ── 단항 술어 2종 (Tier-1 엣지 산술 — VLM 0회) ──────
+
+    def query_top_exposed(self, gk: dict, node_id: str, queried_by: str) -> dict:
+        """상면 노출 여부: 다른 객체가 on/inside로 위를 점유하면 False."""
+        blockers = [e["from"] for e in self.edges
+                    if e.get("to") == node_id and e.get("type") in ("on", "inside")]
+        res = {"queried_by": queried_by, "node_id": node_id, "type": "top_exposed",
+               "value": not blockers, "blockers": blockers, "pass": not blockers}
+        entry = gk["nodes"].setdefault(node_id, {"queried_by": []})
+        entry.setdefault("predicates", {})["top_exposed"] = {
+            "value": res["value"], "blockers": blockers, "queried_by": queried_by}
+        entry["queried_by"].append(queried_by)
+        self.log(module="m2", event="predicate", pred="top_exposed", node=node_id)
+        return res
+
+    def query_clear(self, gk: dict, region_id: str, queried_by: str) -> dict:
+        """영역 비움 여부: on/inside/overlaps로 영역을 점유한 객체가 없으면 True."""
+        occupants = sorted({e["from"] for e in self.edges
+                            if e.get("to") == region_id
+                            and e.get("type") in ("on", "inside", "overlaps")}
+                           | {e["to"] for e in self.edges
+                              if e.get("from") == region_id and e.get("type") == "overlaps"})
+        res = {"queried_by": queried_by, "node_id": region_id, "type": "clear",
+               "value": not occupants, "occupants": occupants, "pass": not occupants}
+        entry = gk["nodes"].setdefault(region_id, {"queried_by": []})
+        entry.setdefault("predicates", {})["clear"] = {
+            "value": res["value"], "occupants": occupants, "queried_by": queried_by}
+        entry["queried_by"].append(queried_by)
+        self.log(module="m2", event="predicate", pred="clear", node=region_id)
+        return res
 
 
 def new_gk(subgoal_id: str) -> dict:

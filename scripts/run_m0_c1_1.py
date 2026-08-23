@@ -55,7 +55,9 @@ def class_of(inst: str) -> str | None:
         return "bottle"
     if inst == "collection_zone_visual":
         return "zone"
-    return None                                       # 로봇·랙·암 등은 제외
+    if "rack" in inst.lower():
+        return "rack"                                 # tool_rest 별칭 해결용 (fits/clear 대상)
+    return None                                       # 로봇·암 등은 제외
 
 
 def save_crops(rgb, seg, name_of_id, node_ids, out_dir, min_box=8):
