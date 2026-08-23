@@ -66,6 +66,67 @@ def crop_of(node_id):
     return p if p.exists() else None
 
 
+# ── 술어 → m2_call 컴파일 (m1_queries가 안 실은 eval_by:m2 술어 보충) ──
+# head별 질의 종류. relational은 (relation, 이항) / 나머지는 단항.
+HEAD_MAP = {
+    "reachable":    ("ee", None),          # 도달성은 ee 응답의 reachability
+    "ee_usable":    ("ee", None),
+    "tool_sweepable": ("ee", None),
+    "top_exposed":  ("top_exposed", None),
+    "clear":        ("clear", None),
+    "fits":         ("relational", "fits_inside"),
+    "gap":          ("relational", "gap"),
+    "distance":     ("relational", "distance"),
+    "clearance":    ("relational", "clearance"),
+}
+NEEDS_COMPILE = (None, "not_queried", "unknown", "unanswered")
+
+
+def compile_predicates(m1, ids, aliases):
+    """details의 eval_by:m2 술어 중 미질의/미해결 → 질의 목록으로 컴파일."""
+    def resolve(tok, sg):
+        tok = tok.strip()
+        if tok.startswith("obj_"):
+            return [tok] if tok in ids else []
+        if tok.startswith("?"):                        # ?tool 등 도구 변수 → 후보 전개
+            return [t for t in sg.get("tool_candidate_ids", []) if t in ids]
+        return aliases.get(tok, [])                    # tool_rest 등 영역 별칭
+
+    out = []
+    for sg in m1.get("m1_subgoals", []):
+        for d in sg.get("details", []):
+            for p in d.get("pre", []) + d.get("establish", []):
+                if p.get("eval_by") != "m2" or p.get("status", None) not in NEEDS_COMPILE:
+                    continue
+                head = p.get("head")
+                if head not in HEAD_MAP:
+                    out.append({"subgoal_id": sg["subgoal_id"], "queried_by": p["id"],
+                                "kind": "error", "error": f"no mapping for head: {head}"})
+                    continue
+                kind, relation = HEAD_MAP[head]
+                args = [a for a in p["expr"].split("(", 1)[-1].rstrip(")").split(",")
+                        if not a.strip().startswith("{")]       # 집합 인자는 제외
+                targets = [resolve(a, sg) for a in args] or [[]]
+                base = {"subgoal_id": sg["subgoal_id"], "queried_by": p["id"], "kind": kind}
+                if kind == "relational":
+                    a_list, b_list = (targets + [[]])[:2]
+                    for a in a_list:
+                        for b in b_list:
+                            out.append(base | {"a": a, "b": b, "relation": relation})
+                    if not (a_list and b_list):
+                        out.append(base | {"kind": "error",
+                                           "error": f"unresolved args in {p['expr']!r} "
+                                                    f"(별칭/노드 미해결 — m0 추적 대상 확인)"})
+                else:
+                    nodes = targets[-1] if head == "ee_usable" else targets[0]  # ee_usable(?EE,?tool)
+                    for n in nodes:
+                        out.append(base | {"node_id": n})
+                    if not nodes:
+                        out.append(base | {"kind": "error",
+                                           "error": f"unresolved args in {p['expr']!r}"})
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--backend", choices=["mock", "siphy"], default="mock")
@@ -103,7 +164,30 @@ def main():
         queries = [{"subgoal_id": q.get("subgoal_id", "SG"),
                     "queried_by": q["queried_by"], **q["m2_call"]}
                    for q in m1["m1_queries"]]
-        print(f"[M2] m1.json 로드: task={m1.get('task', '?')!r} queries={len(queries)}")
+        # 영역 별칭: tool_rest → m0의 rack 노드 (없으면 미해결 error 응답)
+        aliases = {"tool_rest": [i for i in ids if "rack" in i.lower()]}
+        compiled = compile_predicates(m1, ids, aliases)
+        key = lambda q: (q["queried_by"], q["kind"],
+                         q.get("node_id") or (q.get("a"), q.get("b")))
+        already = {key(q) for q in queries}
+        compiled = [q for q in compiled if key(q) not in already]
+        for q in compiled:
+            print(f"  [compile] {q['queried_by']} -> {q['kind']}"
+                  f"({q.get('node_id') or (q.get('a'), q.get('b')) or q.get('error')})")
+        queries += compiled
+        # lint: object_ids ↔ 질의 일관성
+        for sg in m1.get("m1_subgoals", []):
+            sel = set(sg.get("object_ids", []))
+            asked = {q.get("node_id") for q in queries if q["subgoal_id"] == sg["subgoal_id"]} \
+                  | {x for q in queries if q["subgoal_id"] == sg["subgoal_id"]
+                     for x in (q.get("a"), q.get("b")) if x}
+            if asked - sel - {None}:
+                print(f"  [lint] {sg['subgoal_id']}: object_ids 밖 질의 {sorted(asked - sel - {None})}")
+            never = sel - asked - set(sg.get("target_ids", []))
+            if never:
+                print(f"  [lint] {sg['subgoal_id']}: 선택됐지만 질의 0건 {sorted(never)}")
+        print(f"[M2] m1.json 로드: task={m1.get('task', '?')!r} "
+              f"queries={len(queries)} (컴파일 보충 {len(compiled)}건)")
     else:
         def find(sub):
             return next((i for i in ids if sub in i), None)
@@ -130,6 +214,13 @@ def main():
                 b = q.get("b") or q.get("b_id") or q.get("to")
                 r = mat.query_relational(gk, a, b, q.get("relation", "distance"),
                                          queried_by=qid, **q.get("kw", {}))
+            elif kind == "top_exposed":
+                r = mat.query_top_exposed(gk, q["node_id"], queried_by=qid)
+            elif kind == "clear":
+                r = mat.query_clear(gk, q["node_id"], queried_by=qid)
+            elif kind == "error":                      # 컴파일 미해결 → 응답으로 전달
+                r = {"queried_by": qid, "error": q["error"]}
+                print(f"  [warn] {qid}: {q['error']}")
             else:
                 r = {"queried_by": qid, "error": f"unsupported kind: {kind}"}
                 print(f"  [warn] {r['error']}")
