@@ -20,9 +20,9 @@ from .intrinsic import FrictionHead, MockBackend, ground_intrinsic
 class Materializer:
     def __init__(self, m0: dict, backend=None, friction: FrictionHead | None = None,
                  logger=None, eps_margin: float = 0.1,
-                 remeasure_fn=None, probe_fn=None):
-        """m0: m0_scene.build_m0() 결과. remeasure_fn/probe_fn: 에스컬레이션 훅
-        (remeasure_fn(node_id)→(material,rms) | probe_fn(node_id)→(track_mm, dt))."""
+                 remeasure_fn=None, probe_fn=None, memory=None):
+        """m0: m0_scene.build_m0() 결과. memory: PropertyMemory (선택) —
+        지속 메모리 hit 시 VLM 콜 스킵, 신규만 접지. remeasure_fn/probe_fn: 에스컬레이션 훅."""
         self.nodes = {n["id"]: n for n in m0["nodes"]}
         self.edges = list(m0.get("edges", []))         # coarse 관계 (top_exposed/clear 판정 근거)
         self.backend = backend or MockBackend()
@@ -31,7 +31,16 @@ class Materializer:
         self.eps = eps_margin
         self.remeasure_fn = remeasure_fn
         self.probe_fn = probe_fn
+        self.memory = memory
         self._cache: dict[str, dict] = {}
+        if memory is not None:                         # 씬 노드에 해당하는 엔트리 preload
+            for nid in self.nodes:
+                hit = memory.lookup(nid)
+                if hit is not None:
+                    self._cache[nid] = hit
+                    self.log(module="m2", event="memory_hit", node=nid,
+                             stage=max(int(hit.get("mass_stage", 0)),
+                                       int(hit.get("mu", {}).get("stage", 0))))
 
     # ── 질의 3종 (M1의 술어가 부름) ─────────────────────
 

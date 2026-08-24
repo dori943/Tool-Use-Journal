@@ -1,9 +1,9 @@
 """M0 산출물 + m1.json(M1 질의 요청)으로 M2 실행 → gk_<SG>.json, m2.json.
 
-배치: Tool-Use-Journal/scripts/run_m2_c1_1.py
-선행: python scripts/run_m0_c1_1.py             (m0 산출물 생성)
-실행: python scripts/run_m2_c1_1.py                      # mock 백엔드 (오프라인)
-      python scripts/run_m2_c1_1.py --backend siphy      # SiPhy 이식 백엔드 (VLM 1콜/객체)
+배치: Tool-Use-Journal/scripts/run_m2_c2_1.py
+선행: python scripts/run_m0_c2_1.py             (m0 산출물 생성)
+실행: python scripts/run_m2_c2_1.py                      # mock 백엔드 (오프라인)
+      python scripts/run_m2_c2_1.py --backend siphy      # SiPhy 이식 백엔드 (VLM 1콜/객체)
 
 입력: output/<task>/m1.json — M1 출력. "m1_queries" 리스트를 실행:
   {"m1_queries": [{"subgoal_id": "SG1", "queried_by": "SG1_d1_p2",
@@ -36,18 +36,21 @@ for p in (str(ROOT), str(ROOT / "src")):
 
 from tuj.m2_grounding import Materializer, MockBackend, PropertyMemory, SiPhyBackend, new_gk
 
-TASK = "c1_1"
+TASK = "c2_1"
 OUT = ROOT / "output" / TASK   # 모듈 공용 출력 (m0.json, gk_*.json 등 전부 여기)
 
 
-class C1Backend(MockBackend):
-    """C1-1 클래스용 mock 물성 (SiPhy 연결 전 배관 검증용)."""
+class C2Backend(MockBackend):
+    """C2-1 클래스용 mock 물성 (SiPhy 연결 전 배관 검증용)."""
     TABLE = dict(MockBackend.TABLE)
     TABLE.update({
+        "apple":  dict(material="organic", density_kgm3=850, youngs_gpa=None),
+        "bread":  dict(material="organic", density_kgm3=250, youngs_gpa=None),
+        "mug":    dict(material="ceramic", density_kgm3=2400, youngs_gpa=70),
         "plate":  dict(material="plastic", density_kgm3=950, youngs_gpa=2.0),
-        "block":  dict(material="plastic", density_kgm3=500, youngs_gpa=2.0),
-        "bottle": dict(material="glass", density_kgm3=2500, youngs_gpa=70),
-        "zone":   dict(material="unknown", density_kgm3=0, youngs_gpa=None),
+        "spoon":  dict(material="metal",   density_kgm3=7800, youngs_gpa=200),
+        "tray":   dict(material="plastic", density_kgm3=950, youngs_gpa=2.0),
+        "rack":   dict(material="metal",   density_kgm3=7800, youngs_gpa=200),
     })
 
 
@@ -136,7 +139,7 @@ def main():
     args = ap.parse_args()
 
     if not (OUT / "m0.json").exists():
-        sys.exit("[err] m0.json 없음 — 먼저 scripts/run_m0_c1_1.py 실행")
+        sys.exit("[err] m0.json 없음 — 먼저 scripts/run_m0_c2_1.py 실행")
     m0 = load_m0()
     print(f"[M2] m0 로드: nodes={len(m0['nodes'])} edges={len(m0['edges'])} "
           f"backend={args.backend}")
@@ -144,7 +147,7 @@ def main():
     if args.backend == "siphy":
         backend = SiPhyBackend(model=args.model, repo_root=ROOT, verbose=True)
     else:
-        backend = C1Backend()
+        backend = C2Backend()
 
     # ── robot_spec 로드 + 필드명 정규화 (vac seal 허용치) ──
     spec = json.loads((ROOT / "configs" / "robot_spec.json").read_text(encoding="utf-8"))
