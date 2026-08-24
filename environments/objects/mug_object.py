@@ -11,6 +11,7 @@ from tempfile import NamedTemporaryFile
 import xml.etree.ElementTree as ET
 
 from robosuite.models.objects import MujocoXMLObject
+from environments.objects.xml_asset import xml_material_gt
 
 
 ENVIRONMENTS_DIR = (
@@ -148,3 +149,7 @@ class MugObject(MujocoXMLObject):
     @property
     def intended_ee(self) -> str:
         return "2F"
+
+    @property
+    def material_gt(self) -> str:
+        return xml_material_gt(MUG_ASSET_DIR)

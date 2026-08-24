@@ -87,7 +87,7 @@ ROBOT_SPEC_PATH = (
 
 
 # 로봇은 -X. 앞줄 트레이(녹/파/빨), 뒷줄 물체.
-TRAY_X = -0.27
+TRAY_X = -0.43
 
 TRAY_Y_OFFSET = 0.2
 
@@ -108,12 +108,12 @@ RED_TRAY_POS = (
     TRAY_X,
     TRAY_SPACING + TRAY_Y_OFFSET,
 )
-OBJECT_X = 0.15
+OBJECT_X = -0.04
 OBJECT_Y_OFFSET = 0.10
 
 APPLE_POS = (
     OBJECT_X,
-    -0.30 + OBJECT_Y_OFFSET,
+    -0.28 + OBJECT_Y_OFFSET,
 )
 
 BREAD_POS = (
@@ -123,17 +123,17 @@ BREAD_POS = (
 
 MUG_POS = (
     OBJECT_X,
-    0.10 + OBJECT_Y_OFFSET,
+    0.08 + OBJECT_Y_OFFSET,
 )
 
 PLATE_POS = (
     OBJECT_X,
-    0.30 + OBJECT_Y_OFFSET,
+    0.25 + OBJECT_Y_OFFSET,
 )
 
 SPOON_POS = (
     OBJECT_X,
-    0.50 + OBJECT_Y_OFFSET,
+    0.38 + OBJECT_Y_OFFSET,
 )
 
 
@@ -141,7 +141,7 @@ APPLE_ROTATION = 0.0
 BREAD_ROTATION = 0.0
 MUG_ROTATION = 0.0
 PLATE_ROTATION = 0.0
-SPOON_ROTATION = 0.0
+SPOON_ROTATION = -np.pi / 2.0
 
 
 
@@ -409,6 +409,7 @@ class C2_1_ObjectSorting(ManipulationEnv):
 
         self.plate = PlateObject(
             name="plate",
+            xml_name="model_c2.xml",
         )
 
 
@@ -946,6 +947,13 @@ scale=TRAY_SCALE,
                 category
             ]
         )
+
+    def get_evaluation_material_gt(self):
+        """평가 전용 GT. 관측 및 LLM/M2 입력 경로에서는 호출하지 않는다."""
+        return {
+            obj.name: obj.material_gt
+            for obj in self.target_objects
+        }
 
 
     

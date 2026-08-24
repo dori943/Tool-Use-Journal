@@ -10,3 +10,25 @@ __all__ = [
     "C1_1_LegoSweep",
     "C2_1_ObjectSorting",
 ]
+
+# RoboCasa는 별도 환경에 설치될 수 있으므로 soft-import 한다.
+try:
+    from environments.kitchen_base import KitchenBase
+except ImportError:
+    KitchenBase = None  # type: ignore[misc, assignment]
+else:
+    __all__.append("KitchenBase")
+
+try:
+    from environments.c1_2_dough_flatten import C1_2_DoughFlatten
+except ImportError:
+    C1_2_DoughFlatten = None  # type: ignore[misc, assignment]
+else:
+    __all__.append("C1_2_DoughFlatten")
+
+try:
+    from environments.c2_2_sandwich_assembly import C2_2_SandwichAssembly
+except ImportError:
+    C2_2_SandwichAssembly = None  # type: ignore[misc, assignment]
+else:
+    __all__.append("C2_2_SandwichAssembly")
