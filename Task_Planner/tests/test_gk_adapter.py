@@ -2,13 +2,16 @@
 
 from __future__ import annotations
 
+from copy import deepcopy
 import json
+from pathlib import Path
 
 import pytest
 
 from task_planner.cli import main
 from task_planner.diagnostics import PlanStatus, ReasonCode
 from task_planner.gk_adapter import build_request_from_gk
+from task_planner.models import Condition, InitialState
 from task_planner.planner import plan
 
 
@@ -149,9 +152,43 @@ def _m0() -> dict:
 def _robot_spec() -> dict:
     return {
         "current_ee": "2F",
+        "held_tool": None,
+        "hand_empty": True,
         # Real Tool-Use-Journal robot_spec.json stores ee_pool as a list.
-        "ee_pool": [{"ee_id": "2F", "payload_kg": 1.0}],
+        "ee_pool": [
+            {
+                "ee_id": "2F",
+                "payload_kg": 1.0,
+                "home_slot": "ee-slot-2f",
+            }
+        ],
     }
+
+
+def _bundle_gk_and_scene_m1() -> tuple[dict, dict]:
+    """Mirror the attached gk_bundle + scene-graph M1 contract."""
+
+    gk = deepcopy(_gk())
+    rough = deepcopy(_m1()["m1_subgoals"][0])
+    record = gk["gk_by_subgoal"][0]
+    record.update(
+        {
+            "task": "레고 블록을 수거 영역으로 쓸어 담아라",
+            "kind": rough["kind"],
+            "roles": {
+                "target": rough["target_ids"],
+                "container": rough["container_id"],
+                "tool_candidates": [
+                    "obj_plate_light_plate",
+                    "obj_plate_heavy_plate",
+                ],
+                "selected_tool": rough["tool_id"],
+            },
+            "details": rough["details"],
+            "partial_order": _m1()["m1_partial_order"],
+        }
+    )
+    return gk, _m0()
 
 
 def test_gk_adapter_normalizes_c1_1_ids_actions_and_conditions() -> None:
@@ -179,6 +216,63 @@ def test_gk_adapter_normalizes_c1_1_ids_actions_and_conditions() -> None:
     assert request.resource_catalog.tools["light_plate"].mass == 0.2
     assert "heavy_plate" not in request.resource_catalog.tools
     assert request.resource_catalog.end_effectors["2F"].payload == 1.0
+
+
+def test_gk_bundle_uses_selected_tool_and_m1_scene_graph() -> None:
+    gk, scene_m1 = _bundle_gk_and_scene_m1()
+    gk["gk_by_subgoal"][0]["details"][0]["establish"] = [
+        "holding(?tool)"
+    ]
+    gk["gk_by_subgoal"][0]["details"][0]["destroy"] = ["hand_empty"]
+
+    request = build_request_from_gk(
+        gk,
+        scene_m1,
+        robot_spec_payload=_robot_spec(),
+    )
+    result = plan(request)
+
+    assert request.task_graph.log["adapter"] == "gk-bundle+m1-scene-v1"
+    assert request.task_graph.task.instruction == (
+        "레고 블록을 수거 영역으로 쓸어 담아라"
+    )
+    assert request.resource_catalog.objects["block_0"].bbox_mm == (
+        20.0,
+        20.0,
+        10.0,
+    )
+    assert result.status is PlanStatus.SUCCESS
+    assert result.selected_plan is not None
+    assert request.task_graph.subgoals[0].establish[0].type == "holding"
+    assert request.task_graph.subgoals[0].destroy[0].type == "hand_empty"
+    assert {
+        assignment.tool
+        for assignment in result.selected_plan.candidate_assignments
+    } == {"light_plate"}
+
+
+def test_repository_c1_1_bundle_selects_forwarded_light_plate() -> None:
+    repository = Path(__file__).resolve().parents[2]
+    output = repository / "output" / "c1_1"
+
+    request = build_request_from_gk(
+        json.loads((output / "gk_bundle.json").read_text(encoding="utf-8")),
+        json.loads((output / "m1.json").read_text(encoding="utf-8")),
+        robot_spec_payload=json.loads(
+            (repository / "configs" / "robot_spec.json").read_text(
+                encoding="utf-8"
+            )
+        ),
+    )
+    result = plan(request)
+
+    assert result.status is PlanStatus.SUCCESS
+    assert result.selected_plan is not None
+    assignments = result.selected_plan.candidate_assignments
+    assert {assignment.tool for assignment in assignments} == {"light_plate"}
+    sweeps = [item for item in assignments if item.action_type == "tool_act"]
+    assert len(sweeps) == 3
+    assert len({target for item in sweeps for target in item.target_ids}) == 12
 
 
 def test_gk_accepts_selected_tool_id_alias() -> None:
@@ -305,6 +399,46 @@ def test_gk_end_to_end_is_deterministic() -> None:
     assert first == second
 
 
+def test_gk_requires_explicit_initial_robot_state() -> None:
+    robot_spec = _robot_spec()
+    robot_spec.pop("current_ee")
+
+    with pytest.raises(ValueError, match="initial current_ee is missing"):
+        build_request_from_gk(
+            _gk(), _m1(), m0_payload=_m0(), robot_spec_payload=robot_spec
+        )
+
+
+def test_gk_accepts_normalized_initial_state_override() -> None:
+    robot_spec = _robot_spec()
+    robot_spec.pop("current_ee")
+    robot_spec.pop("hand_empty")
+    initial_state = InitialState(
+        current_ee="2F",
+        rack={"ee-slot-2f": "2F"},
+        held_tool=None,
+        facts=[
+            Condition(
+                cond_id="initial-hand-empty",
+                type="hand_empty",
+                args=[],
+                pass_=True,
+                eval_by="robot_state",
+            )
+        ],
+    )
+
+    request = build_request_from_gk(
+        _gk(),
+        _m1(),
+        m0_payload=_m0(),
+        robot_spec_payload=robot_spec,
+        initial_state=initial_state,
+    )
+
+    assert request.task_graph.initial_state == initial_state
+
+
 def test_gk_without_m1_fails_with_actionable_error() -> None:
-    with pytest.raises(ValueError, match="GK alone has no executable action"):
+    with pytest.raises(ValueError, match="no executable details"):
         build_request_from_gk(_gk(), {})

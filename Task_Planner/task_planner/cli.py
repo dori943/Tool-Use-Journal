@@ -1,7 +1,7 @@
 """Command-line interface.
 
     python -m task_planner.cli plan \
-        --gk output/c1_1/gk.json \
+        --gk output/c1_1/gk_bundle.json \
         --m1 output/c1_1/m1.json \
         --output result.json
 
@@ -25,6 +25,7 @@ from task_planner.models import (
     CandidateProposal,
     ExecutionState,
     FailureFeedback,
+    InitialState,
     TaskPlannerRequest,
     PlanningPolicy,
     ResourceCatalog,
@@ -55,7 +56,9 @@ def _build_parser() -> argparse.ArgumentParser:
         help="GK JSON (single record or gk_by_subgoal bundle)",
     )
     p_plan.add_argument(
-        "--m1", required=True, help="M1 executable action/DAG JSON"
+        "--m1",
+        required=True,
+        help="M1 scene graph JSON or legacy executable action/DAG JSON",
     )
     p_plan.add_argument("--m0", help="optional M0 scene graph for --gk")
     p_plan.add_argument(
@@ -64,6 +67,13 @@ def _build_parser() -> argparse.ArgumentParser:
     p_plan.add_argument(
         "--id-aliases",
         help="optional JSON mapping upstream object IDs to world IDs",
+    )
+    p_plan.add_argument(
+        "--initial-state",
+        help=(
+            "optional normalized InitialState JSON; overrides robot_spec "
+            "current_ee, held_tool, rack occupancy, and facts"
+        ),
     )
     p_plan.add_argument("--resources", default=None)
     p_plan.add_argument("--candidates", default=None)
@@ -126,6 +136,11 @@ def main(argv: Sequence[str] | None = None) -> int:
             )
             if aliases is not None and not isinstance(aliases, dict):
                 raise ValueError("--id-aliases must contain a JSON object")
+            initial_state = (
+                InitialState.model_validate(load_json(args.initial_state))
+                if args.initial_state is not None
+                else None
+            )
             request = build_request_from_gk(
                 load_json(args.gk),
                 load_json(args.m1),
@@ -141,6 +156,7 @@ def main(argv: Sequence[str] | None = None) -> int:
                 candidate_proposals=proposals,
                 planning_policy=policy,
                 id_aliases=aliases,
+                initial_state=initial_state,
             )
             return _finish(plan(request), args.output)
         request = TaskPlannerRequest.model_validate(load_json(args.request))

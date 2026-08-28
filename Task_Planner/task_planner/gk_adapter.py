@@ -1,8 +1,9 @@
-"""Normalize GK + M1/M0/robot-spec artifacts into a Task-Planner request.
+"""Normalize GK bundle + M1 scene/legacy artifacts into a planner request.
 
-GK owns physical/object knowledge and per-EE feasibility. M1 still owns the
-executable detailed actions and their causal partial order; GK alone cannot be
-sent to motion planning because it contains no action bindings or effects.
+The current upstream contract places executable details, ordering, and the
+selected tool in each ``gk_by_subgoal`` record while M1 provides the scene
+``nodes``/``edges``.  The legacy contract, where M1 owns ``m1_subgoals``, is
+kept for compatibility.
 """
 
 from __future__ import annotations
@@ -45,14 +46,14 @@ def build_request_from_gk(
     candidate_proposals: dict[str, list[CandidateProposal]] | None = None,
     planning_policy: PlanningPolicy | None = None,
     id_aliases: Mapping[str, str] | None = None,
+    initial_state: InitialState | None = None,
 ) -> TaskPlannerRequest:
     """Build a complete request from the upstream GK family of artifacts.
 
-    ``m1_payload`` is required because it carries executable action details
-    and the upstream-selected ``tool_id`` for tool-using subgoals.
-    ``m0_payload`` enriches scene objects and ``robot_spec_payload`` enriches
-    payload/capability data; both are optional when the same data is supplied
-    through an external ``resource_catalog``.
+    In the current contract, GK carries executable action details and the
+    upstream-selected tool while M1 carries scene objects.  Legacy
+    ``m1_subgoals`` input remains supported. ``m0_payload`` can explicitly
+    override the scene source, and ``robot_spec_payload`` enriches EE data.
     """
 
     aliases = dict(id_aliases or {})
@@ -62,6 +63,7 @@ def build_request_from_gk(
         m0_payload=m0_payload,
         robot_spec_payload=robot_spec_payload,
         id_aliases=aliases,
+        initial_state=initial_state,
     )
     uses_derived_only = resource_catalog is None
     catalog = (
@@ -90,23 +92,21 @@ def adapt_gk_m1_output(
     m0_payload: Mapping[str, Any] | None = None,
     robot_spec_payload: Mapping[str, Any] | None = None,
     id_aliases: Mapping[str, str] | None = None,
+    initial_state: InitialState | None = None,
 ) -> tuple[TaskGraph, ResourceCatalog]:
     """Return the normalized planner input and a GK-derived catalog."""
 
     aliases = dict(id_aliases or {})
     gk_records = _gk_records(gk_payload)
-    rough_subgoals = m1_payload.get("m1_subgoals")
-    if not isinstance(rough_subgoals, list) or not rough_subgoals:
-        raise ValueError(
-            "GK input requires companion M1 JSON with non-empty "
-            "m1_subgoals; GK alone has no executable action details"
-        )
+    rough_subgoals, raw_partial_order, contract = _executable_contract(
+        gk_records, m1_payload
+    )
 
     nodes, raw_to_canonical = _collect_gk_nodes(gk_records, aliases)
     catalog = _derive_catalog(
         nodes,
         rough_subgoals,
-        m0_payload or {},
+        _scene_payload(m1_payload, m0_payload),
         robot_spec_payload or {},
         aliases,
         raw_to_canonical,
@@ -125,17 +125,19 @@ def adapt_gk_m1_output(
 
     for rough_raw in rough_subgoals:
         rough = _mapping(rough_raw)
-        rough_id = _required_string(rough, "subgoal_id", "M1 rough subgoal")
+        rough_id = _required_string(rough, "subgoal_id", "upstream subgoal")
         rough_ids.add(rough_id)
         details = rough.get("details")
         if not isinstance(details, list) or not details:
-            raise ValueError(f"M1 subgoal {rough_id!r} has no action details")
+            raise ValueError(
+                f"upstream subgoal {rough_id!r} has no action details"
+            )
 
         tool_id = _selected_tool_id(
             rough,
             aliases,
             raw_to_canonical,
-            context=f"M1 subgoal {rough_id!r}",
+            context=f"upstream subgoal {rough_id!r}",
         )
         rough_targets = [
             _canonical_id(item, aliases, raw_to_canonical)
@@ -150,9 +152,9 @@ def adapt_gk_m1_output(
 
         for detail_raw in details:
             detail = _mapping(detail_raw)
-            detail_id = _required_string(detail, "detail_id", "M1 detail")
+            detail_id = _required_string(detail, "detail_id", "upstream detail")
             if detail_id in detail_ids:
-                raise ValueError(f"duplicate M1 detail_id {detail_id!r}")
+                raise ValueError(f"duplicate upstream detail_id {detail_id!r}")
             detail_ids.add(detail_id)
             group_id = str(detail.get("group_id") or f"G_{rough_id}")
             raw_action = str(detail.get("action_type") or "") or None
@@ -206,7 +208,7 @@ def adapt_gk_m1_output(
                     group_id=group_id,
                     source_kg_subgoal_id=rough_id,
                     source_binding=deepcopy(binding),
-                    condition_source="gk+m1",
+                    condition_source=contract,
                     target_ids=target_ids,
                     goal_region_id=goal_region_id,
                     tool_id=tool_id,
@@ -227,25 +229,23 @@ def adapt_gk_m1_output(
     missing_gk = sorted(rough_ids - gk_ids)
     if missing_gk:
         raise ValueError(
-            f"M1 subgoals have no matching GK record: {missing_gk}"
+            f"upstream subgoals have no matching GK record: {missing_gk}"
         )
 
-    edges = _normalize_partial_order(
-        m1_payload.get("m1_partial_order") or [], detail_ids
+    edges = _normalize_partial_order(raw_partial_order, detail_ids)
+    normalized_initial_state = _initial_state(
+        robot_spec_payload or {},
+        catalog,
+        initial_conditions,
+        explicit=initial_state,
     )
-    current_ee = _current_ee(robot_spec_payload or {}, all_ees)
-    # M1's hand_empty condition often has no status because it is an M1
-    # invariant, not an M2 query. Seed it explicitly for an empty initial hand.
-    hand_empty = Condition(
-        cond_id="GK_INIT_hand_empty",
-        type="hand_empty",
-        args=[],
-        pass_=True,
-        eval_by="m1",
-    )
-    initial_conditions.setdefault(("hand_empty", ()), hand_empty)
 
     task_text = m1_payload.get("task")
+    if task_text is None:
+        task_text = next(
+            (record.get("task") for record in gk_records if record.get("task")),
+            None,
+        )
     task = TaskSpec(
         instruction=(
             task_text
@@ -255,17 +255,12 @@ def adapt_gk_m1_output(
     )
     task_graph = TaskGraph(
         task=task,
-        initial_state=InitialState(
-            current_ee=current_ee,
-            rack={f"slot-{ee}": ee for ee in all_ees},
-            facts=list(initial_conditions.values()),
-            held_tool=None,
-        ),
+        initial_state=normalized_initial_state,
         subgoals=subgoals,
         order_constraints=OrderConstraints(edges=edges),
         constraints=TaskConstraints(),
         log={
-            "adapter": "gk-m1-v1",
+            "adapter": contract,
             "task_id": gk_payload.get("task_id"),
             "gk_proposed_order": deepcopy(
                 gk_payload.get("proposed_order") or []
@@ -275,6 +270,68 @@ def adapt_gk_m1_output(
         },
     )
     return task_graph, catalog
+
+
+def _executable_contract(
+    gk_records: list[Mapping[str, Any]],
+    m1_payload: Mapping[str, Any],
+) -> tuple[list[dict[str, Any]], list[Any], str]:
+    """Locate executable subgoals without inventing an upstream selection."""
+
+    legacy = m1_payload.get("m1_subgoals")
+    if isinstance(legacy, list) and legacy:
+        return (
+            [deepcopy(dict(_mapping(item))) for item in legacy],
+            list(m1_payload.get("m1_partial_order") or []),
+            "gk-m1-v1",
+        )
+
+    if not all(isinstance(record.get("details"), list) for record in gk_records):
+        raise ValueError(
+            "GK bundle has no executable details and companion M1 JSON has "
+            "no non-empty m1_subgoals"
+        )
+
+    rough_subgoals: list[dict[str, Any]] = []
+    partial_order: list[Any] = []
+    for record in gk_records:
+        rough = deepcopy(dict(record))
+        roles = _mapping(record.get("roles"))
+        if not any(
+            rough.get(field) is not None
+            for field in ("tool_id", "selected_tool_id", "selected_tool")
+        ) and roles.get("selected_tool") is not None:
+            rough["selected_tool"] = roles["selected_tool"]
+        if (
+            not rough.get("tool_candidate_ids")
+            and roles.get("tool_candidates")
+        ):
+            rough["tool_candidate_ids"] = deepcopy(roles["tool_candidates"])
+        if not rough.get("target_ids") and roles.get("target"):
+            rough["target_ids"] = deepcopy(roles["target"])
+        if (
+            rough.get("container_id") is None
+            and roles.get("container") is not None
+        ):
+            rough["container_id"] = roles["container"]
+        rough_subgoals.append(rough)
+        raw_edges = record.get("partial_order") or []
+        if not isinstance(raw_edges, list):
+            raise ValueError(
+                f"GK subgoal {record.get('subgoal_id')!r} partial_order "
+                "must be a list"
+            )
+        partial_order.extend(deepcopy(raw_edges))
+    return rough_subgoals, partial_order, "gk-bundle+m1-scene-v1"
+
+
+def _scene_payload(
+    m1_payload: Mapping[str, Any],
+    m0_payload: Mapping[str, Any] | None,
+) -> Mapping[str, Any]:
+    if m0_payload is not None:
+        return m0_payload
+    return m1_payload if isinstance(m1_payload.get("nodes"), list) else {}
 
 
 def _merge_resource_catalog(
@@ -571,7 +628,11 @@ def _condition_from_m1(
     aliases: Mapping[str, str],
     raw_to_canonical: dict[str, str],
 ) -> Condition:
-    record = _mapping(raw)
+    record: Mapping[str, Any]
+    if isinstance(raw, str):
+        record = {"expr": raw}
+    else:
+        record = _mapping(raw)
     expr = record.get("expr") if isinstance(record.get("expr"), str) else ""
     head = record.get("head")
     condition_type = str(head) if isinstance(head, str) and head else ""
@@ -784,6 +845,105 @@ def _robot_ee_records(robot_spec: Mapping[str, Any]) -> dict[str, Any]:
     return {}
 
 
+def _initial_state(
+    robot_spec: Mapping[str, Any],
+    catalog: ResourceCatalog,
+    initial_conditions: Mapping[tuple[str, tuple[str, ...]], Condition],
+    *,
+    explicit: InitialState | None,
+) -> InitialState:
+    """Build initial state without guessing a robot or resource identity."""
+
+    if explicit is not None:
+        facts = {
+            (condition.type, tuple(condition.args)): condition
+            for condition in initial_conditions.values()
+        }
+        facts.update(
+            {
+                (condition.type, tuple(condition.args)): condition
+                for condition in explicit.facts
+            }
+        )
+        return explicit.model_copy(
+            deep=True,
+            update={"facts": list(facts.values())},
+        )
+
+    all_ees = sorted(catalog.end_effectors)
+    current_ee = _current_ee(robot_spec, all_ees)
+    state_record = _mapping(robot_spec.get("robot_state"))
+    nested_robot = _mapping(robot_spec.get("robot"))
+    sources = (state_record, robot_spec, nested_robot)
+
+    held_tool: str | None = None
+    for source in sources:
+        if "held_tool" not in source:
+            continue
+        value = source["held_tool"]
+        if value is not None and not isinstance(value, str):
+            raise ValueError("initial held_tool must be a string or null")
+        held_tool = value
+        break
+
+    facts = dict(initial_conditions)
+    hand_empty_value: bool | None = None
+    for source in sources:
+        value = source.get("hand_empty")
+        if value is None:
+            continue
+        if not isinstance(value, bool):
+            raise ValueError("initial hand_empty must be a boolean")
+        hand_empty_value = value
+        break
+    if hand_empty_value is None and ("hand_empty", ()) not in facts:
+        raise ValueError(
+            "initial hand state is missing; set robot_spec.hand_empty or "
+            "provide --initial-state facts"
+        )
+    if hand_empty_value is True:
+        facts.setdefault(
+            ("hand_empty", ()),
+            Condition(
+                cond_id="GK_INIT_hand_empty",
+                type="hand_empty",
+                args=[],
+                pass_=True,
+                eval_by="robot_state",
+            ),
+        )
+    elif hand_empty_value is False:
+        facts.pop(("hand_empty", ()), None)
+
+    rack = {
+        spec.home_slot: ee
+        for ee, spec in sorted(catalog.end_effectors.items())
+        if spec.home_slot
+    }
+    raw_occupancy = next(
+        (
+            source.get("rack_occupancy")
+            for source in sources
+            if source.get("rack_occupancy") is not None
+        ),
+        None,
+    )
+    if raw_occupancy is not None and not isinstance(raw_occupancy, Mapping):
+        raise ValueError("initial rack_occupancy must be a JSON object")
+    rack_occupancy = (
+        {str(slot): str(value) for slot, value in raw_occupancy.items()}
+        if isinstance(raw_occupancy, Mapping)
+        else None
+    )
+    return InitialState(
+        current_ee=current_ee,
+        rack=rack,
+        facts=list(facts.values()),
+        held_tool=held_tool,
+        rack_occupancy=rack_occupancy,
+    )
+
+
 def _current_ee(robot_spec: Mapping[str, Any], all_ees: list[str]) -> str:
     candidates = [
         robot_spec.get("current_ee"),
@@ -791,9 +951,19 @@ def _current_ee(robot_spec: Mapping[str, Any], all_ees: list[str]) -> str:
         _mapping(robot_spec.get("robot")).get("current_ee"),
     ]
     for value in candidates:
-        if isinstance(value, str) and value in all_ees:
-            return value
-    return all_ees[0]
+        if value is None:
+            continue
+        if not isinstance(value, str):
+            raise ValueError("initial current_ee must be a string")
+        if value not in all_ees:
+            raise ValueError(
+                f"initial current_ee {value!r} is not in the EE catalog {all_ees!r}"
+            )
+        return value
+    raise ValueError(
+        "initial current_ee is missing; set robot_spec.current_ee or provide "
+        "--initial-state"
+    )
 
 
 def _is_feasible(record: Any) -> bool:
