@@ -44,6 +44,10 @@ def main() -> int:
     parser.add_argument("--camera", default="agentview")
     parser.add_argument("--width", type=int, default=640)
     parser.add_argument("--height", type=int, default=640)
+    parser.add_argument("--controller-kp", type=float, default=50.0)
+    parser.add_argument(
+        "--controller-damping-ratio", type=float, default=1.0
+    )
     args = parser.parse_args()
 
     if args.realtime_factor <= 0.0:
@@ -59,6 +63,8 @@ def main() -> int:
         args.env,
         active_ee=args.active_ee,
         seed=args.seed,
+        joint_position_kp=args.controller_kp,
+        joint_position_damping_ratio=args.controller_damping_ratio,
         ignore_done=True,
         use_camera_obs=False,
         has_renderer=not record_video,

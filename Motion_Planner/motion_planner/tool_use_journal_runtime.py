@@ -84,13 +84,32 @@ class CollisionProbe(Protocol):
     ) -> Any: ...
 
 
-def tool_use_journal_joint_position_controller_config() -> dict[str, Any]:
+def tool_use_journal_joint_position_controller_config(
+    *,
+    kp: float = 50.0,
+    damping_ratio: float = 1.0,
+) -> dict[str, Any]:
     """Return the robosuite config required by the controller-backed player.
 
     The target environments normally use an OSC pose controller.  MotionPlan
     contains joint-space trajectories, so replay uses absolute joint targets
     and leaves the environment-specific GRIP controller in place.
     """
+
+    if (
+        isinstance(kp, bool)
+        or not isinstance(kp, (int, float))
+        or not math.isfinite(float(kp))
+        or not 0.0 < float(kp) <= 300.0
+    ):
+        raise ValueError("kp must be finite and within (0, 300]")
+    if (
+        isinstance(damping_ratio, bool)
+        or not isinstance(damping_ratio, (int, float))
+        or not math.isfinite(float(damping_ratio))
+        or not 0.0 < float(damping_ratio) <= 10.0
+    ):
+        raise ValueError("damping_ratio must be finite and within (0, 10]")
 
     from robosuite.controllers import load_composite_controller_config
 
@@ -108,8 +127,8 @@ def tool_use_journal_joint_position_controller_config() -> dict[str, Any]:
         "input_min": -2.0 * math.pi,
         "output_max": 0.05,
         "output_min": -0.05,
-        "kp": 50,
-        "damping_ratio": 1,
+        "kp": float(kp),
+        "damping_ratio": float(damping_ratio),
         "impedance_mode": "fixed",
         "kp_limits": [0, 300],
         "damping_ratio_limits": [0, 10],
@@ -524,6 +543,8 @@ class ToolUseJournalEERuntime:
         active_ee: str | None,
         seed: int = 0,
         control_timestep_s: float = 0.02,
+        joint_position_kp: float = 50.0,
+        joint_position_damping_ratio: float = 1.0,
         source_revision: str = TOOL_USE_JOURNAL_TESTED_REVISION,
         **suite_make_kwargs: Any,
     ) -> "ToolUseJournalEERuntime":
@@ -543,7 +564,10 @@ class ToolUseJournalEERuntime:
             )
         options = dict(suite_make_kwargs)
         options["controller_configs"] = (
-            tool_use_journal_joint_position_controller_config()
+            tool_use_journal_joint_position_controller_config(
+                kp=joint_position_kp,
+                damping_ratio=joint_position_damping_ratio,
+            )
         )
         options["control_freq"] = control_freq
         return cls.from_repository(
