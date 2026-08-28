@@ -1,5 +1,24 @@
 # Task Planner
 
+## 빠른 시작
+
+저장소 루트에서 Python 3.11 이상 가상환경을 만든 뒤 editable package로 설치한다.
+이렇게 설치하면 작업 디렉터리나 `PYTHONPATH`를 따로 맞추지 않아도 CLI와 테스트가
+동일하게 동작한다.
+
+```bash
+python -m venv .venv
+python -m pip install --upgrade pip
+python -m pip install -e "Task_Planner[test]"
+python -m pytest Task_Planner/tests -q
+```
+
+Windows PowerShell에서 가상환경을 활성화하려면 다음 명령을 먼저 실행한다.
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
 `GK + M1`을 필수 입력으로 받아 다음을 하나의 Dijkstra 검색으로 계획한다.
 
 - 실행 가능한 서브골 순서
@@ -7,11 +26,11 @@
 - 앞단에서 확정한 Tool의 집기·반납 시점
 - EE 교체와 terminal cleanup
 
-GK/M1 경로에서 앞단이 전달한 `tool_id`를 그대로 고정한다. Task Planner는 Tool
-후보를 비교하거나 다른 Tool로 대체하지 않는다. M1은 `tool_id`를 표준 필드로
-사용하며 `selected_tool_id`, `selected_tool`도 호환 입력으로 받는다.
-`tool_candidate_ids`만 전달되면 입력 오류를 반환한다. 접촉 자세 후보와 작업 좌표,
-IK, 충돌, 접근·후퇴 경로는 Motion Planner가 담당한다.
+현재 GK bundle 경로에서는 각 `gk_by_subgoal[].roles.selected_tool`을 그대로
+고정한다. Task Planner는 Tool 후보를 비교하거나 다른 Tool로 대체하지 않는다.
+기존 M1 action/DAG 형식의 `tool_id`, `selected_tool_id`, `selected_tool`도 호환
+입력으로 받는다. 후보 목록만 있고 선택값이 없으면 입력 오류를 반환한다. 접촉 자세
+후보와 작업 좌표, IK, 충돌, 접근·후퇴 경로는 Motion Planner가 담당한다.
 
 ## 최적화 비용
 
@@ -60,19 +79,39 @@ GK + M1 입력 연결:
 
 ```bash
 python -m task_planner.cli plan \
-  --gk output/c1_1/gk.json \
+  --gk output/c1_1/gk_bundle.json \
   --m1 output/c1_1/m1.json \
-  --m0 output/c1_1/m0.json \
-  --robot-spec robot_spec.json \
-  --output results/c1_1_task_planner.json
+  --robot-spec configs/robot_spec.json \
+  --output output/c1_1/task_planner.json
 ```
 
-GK에는 action detail과 실행 partial-order가 없으므로 `--m1`은 필수다. `--m0`와
-`--robot-spec`은 scene geometry와 EE payload/capability를 보강하며, 동일 정보가
-`--resources`에 있으면 생략할 수 있다. `obj_<class>_<instance>` 형식 ID는 기본적으로
-`<instance>`로 정규화하고, 예외는 `--id-aliases aliases.json`으로 지정한다. 외부
-resource catalog와 candidate proposal이 필요하면 각각 `--resources`, `--candidates`로
-GK + M1 입력에 보강할 수 있다.
+현재 입력 계약에서 `gk_bundle.json`은 action detail, partial-order, Tool 후보와
+앞단에서 확정한 `roles.selected_tool`을 제공하고, `m1.json`은 scene의 `nodes/edges`를
+제공한다. 이전 `m1_subgoals` 형식도 계속 지원하며, scene graph가 별도 파일이면
+`--m0`로 명시할 수 있다. `--robot-spec`은 EE payload/capability를 보강한다.
+`obj_<class>_<instance>` 형식 ID는 기본적으로 `<instance>`로 정규화하고, 예외는
+`--id-aliases aliases.json`으로 지정한다. 외부 resource catalog와 candidate
+proposal은 각각 `--resources`, `--candidates`로 보강할 수 있다.
+
+### 초기 로봇 상태
+
+`configs/robot_spec.json`에는 최소한 `current_ee`와 `hand_empty`를 명시해야 한다.
+현재 Tool 또는 rack 점유 상태가 있으면 `held_tool`, `rack_occupancy`도 함께 전달한다.
+Task Planner는 누락된 `current_ee`를 EE 목록의 첫 항목으로 추정하지 않는다.
+
+로봇 사양과 실행 상태를 별도로 관리할 때는 정규화된 상태 파일을 사용한다.
+
+```bash
+python -m task_planner.cli plan \
+  --gk output/c1_1/gk_bundle.json \
+  --m1 output/c1_1/m1.json \
+  --robot-spec configs/robot_spec.json \
+  --initial-state Task_Planner/examples/initial_state.json \
+  --output output/c1_1/task_planner.json
+```
+
+`--initial-state`는 `InitialState` 스키마를 그대로 사용하며 robot spec의 초기 상태보다
+우선한다. 예시는 `Task_Planner/examples/initial_state.json`에 있다.
 
 재계획:
 
@@ -110,7 +149,7 @@ action type, 선택적인 `target_pose`가 포함된다. Motion Planner는 다�
 ## 테스트
 
 ```bash
-python -m pytest -q
+python -m pytest Task_Planner/tests -q
 ```
 
 테스트는 입력 검증, M1 DAG 제약, GK/M1 변환, ID 정규화, group EE binding,
