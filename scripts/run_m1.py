@@ -95,7 +95,8 @@ def main():
         m0s = serialize(build_m0(spec_to_objects(spec)))
         print("[M0] mock 수치 사용 (실제 M0 JSON 없음)")
 
-    out = run_m1(task, m0s, rough=LLMRough())   # 서브골 생성은 항상 LLM
+    rough = LLMRough()                          # 서브골 생성은 항상 LLM
+    out = run_m1(task, m0s, rough=rough)
 
     # ── M2 응답 반영 (있으면): output/<task-id>/m2.json 자동 또는 --m2-json 경로 ──
     m2_json = None
@@ -104,11 +105,14 @@ def main():
     elif os.path.exists(os.path.join(tdir, "m2.json")):
         m2_json = os.path.join(tdir, "m2.json")
     if m2_json:
-        from tuj.m1_subgoal.ingest import apply_m2
+        from tuj.m1_subgoal.ingest import apply_m2, update_confidence
         with open(m2_json, encoding="utf-8") as f:
             raw = json.load(f)
         responses = raw["responses"] if isinstance(raw, dict) else raw
         for line in apply_m2(out, responses):
+            print(line)
+        # 측정 반영 후 자기보고 신뢰도 갱신 (LLM 3차 호출)
+        for line in update_confidence(out, rough._client, rough.model):
             print(line)
 
     with open(os.path.join(tdir, "m1.json"), "w", encoding="utf-8") as f:

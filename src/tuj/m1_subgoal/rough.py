@@ -92,10 +92,13 @@ PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 �
   target_ids에 담는다. 대상별로 쪼개지 않는다 (한 번의 sweep으로 여러 개를 담는 동작이다).
 - 도구는 여기서 다루지 않는다. 도구 선별은 다음 단계(객체 선택)가 한다.
 - goal은 한국어 한 문장으로 쓴다.
+- confidence: 이 서브골 분해가 옳다는 확신을 0.0~1.0으로 매긴다. 지금은 물체의
+  질량·재질·파지 가능 여부 등 측정값이 없는 상태다. 근거 없이 후하게 주지 말 것.
+  (0.9 이상 = 거의 확실 / 0.7 = 대체로 확신 / 0.5 = 반반 / 0.3 = 실패 가능성 높음)
 - JSON 배열만 출력한다.
 
 출력 형식:
-[{{"subgoal_id":"SG1","goal":"...","kind":"relocate","target_ids":["..."],"container_id":"..."}}]"""
+[{{"subgoal_id":"SG1","goal":"...","kind":"relocate","target_ids":["..."],"container_id":"...","confidence":0.0}}]"""
 
 
 PROMPT_SELECT = """너는 로봇 계획의 객체 선택 단계다. 각 서브골에 대해, 장면 노드 중
@@ -116,10 +119,21 @@ PROMPT_SELECT = """너는 로봇 계획의 객체 선택 단계다. 각 서브�
   후보는 복수 가능하며 어느 것을 쓸지 최종 선택은 뒤 모듈이 측정값을 보고 한다.
 - kind가 relocate면 대상과 목적지를 object_ids에 담는다 (들어가는지 판정에 필요).
 - 위 장면 노드 id만 쓴다. reason에 선택 이유를 한국어 한 문장으로 쓴다.
+- confidence: 이 객체 선택이 옳다는 확신을 0.0~1.0으로 매긴다. 지금은 물체의
+  질량·재질·파지 가능 여부 등 측정값이 없는 상태다. 근거 없이 후하게 주지 말 것.
+  (0.9 이상 = 거의 확실 / 0.7 = 대체로 확신 / 0.5 = 반반 / 0.3 = 실패 가능성 높음)
+- uncertain_about: 지금 가장 불확실한 요소 1~2개를 구체적으로 적는다.
 - JSON 배열만 출력한다.
 
 출력 형식:
-[{{"subgoal_id":"SG1","object_ids":["..."],"tool_candidate_ids":[],"reason":"..."}}]"""
+[{{"subgoal_id":"SG1","object_ids":["..."],"tool_candidate_ids":[],"reason":"...",
+  "confidence":0.0,"uncertain_about":["..."]}}]"""
+
+
+def _check_conf(v, where: str):
+    """자기보고 신뢰도 검문 — 0.0~1.0 숫자여야 한다."""
+    if not isinstance(v, (int, float)) or isinstance(v, bool) or not 0.0 <= v <= 1.0:
+        raise ValueError(f"{where}: confidence가 0~1 숫자가 아님 ({v!r})")
 
 
 def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
@@ -137,6 +151,7 @@ def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
         bad += [x for x in s.get("tool_candidate_ids", []) if x not in known]
         if bad:
             raise ValueError(f"장면에 없는 id: {bad}")
+        _check_conf(s.get("confidence"), f"{s.get('subgoal_id')} 분해")
 
     out = []
     for s in subs:
@@ -184,6 +199,7 @@ def validate_selection(sel: list[dict], subgoals: list[dict], ids: list[str]) ->
                          if t not in e.get("object_ids", [])]
         if missing_tools:
             raise ValueError(f"{sid}: 도구 후보 {missing_tools}는 object_ids에도 포함하라")
+        _check_conf(e.get("confidence"), f"{sid} 객체 선택")
         by_id[sid] = e
     for s in subgoals:
         e = by_id.get(s["subgoal_id"])
@@ -246,4 +262,10 @@ class LLMRough:
             s["object_ids"] = e["object_ids"]
             s["tool_candidate_ids"] = e.get("tool_candidate_ids", [])
             s["selection_reason"] = e.get("reason", "")
+            # 생성 시점 자기보고 신뢰도 (측정값 없는 상태). M2 반영 후 갱신은 ingest가 채운다.
+            s["confidence"] = {
+                "before": {"decomposition": s.pop("confidence", None),
+                           "object_selection": e.get("confidence"),
+                           "uncertain_about": e.get("uncertain_about", [])},
+            }
         return subgoals
