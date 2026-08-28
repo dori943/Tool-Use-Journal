@@ -389,13 +389,32 @@ def test_runtime_grasp_attach_tracks_hand_and_blocks_tool_exchange() -> None:
 
 
 def test_controller_config_uses_absolute_joint_targets() -> None:
-    config = tool_use_journal_joint_position_controller_config()
+    config = tool_use_journal_joint_position_controller_config(
+        kp=75.0,
+        damping_ratio=0.8,
+    )
     arm = config["body_parts"]["right"]
 
     assert arm["type"] == "JOINT_POSITION"
     assert arm["input_type"] == "absolute"
+    assert arm["kp"] == 75.0
+    assert arm["damping_ratio"] == 0.8
     assert arm["gripper"]["type"] == "GRIP"
     assert ToolUseJournalControllerTrajectoryPlayer._CONTROLLER_TRACKING is True
+
+
+@pytest.mark.parametrize(
+    ("kwargs", "message"),
+    [
+        ({"kp": 0.0}, "kp must be finite"),
+        ({"damping_ratio": 0.0}, "damping_ratio must be finite"),
+    ],
+)
+def test_controller_config_rejects_invalid_gains(
+    kwargs: dict[str, float], message: str
+) -> None:
+    with pytest.raises(ValueError, match=message):
+        tool_use_journal_joint_position_controller_config(**kwargs)
 
 
 def test_breakable_weld_can_require_opposed_finger_contacts() -> None:

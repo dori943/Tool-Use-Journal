@@ -41,11 +41,20 @@ def _selected_resources(payload: dict[str, Any]) -> tuple[str, str]:
     selected = payload.get("selected_plan")
     if not isinstance(selected, dict):
         raise ValueError("Task Planner result has no selected_plan")
-    ee_values = list((selected.get("group_ee_assignments") or {}).values())
-    tool_values = list((selected.get("group_tool_assignments") or {}).values())
-    if len(set(ee_values)) != 1 or len(set(tool_values)) != 1:
+    assignments = selected.get("candidate_assignments")
+    if not isinstance(assignments, list) or not assignments:
+        raise ValueError("Task Planner selected_plan has no candidate_assignments")
+    ee_values = {
+        item.get("ee") for item in assignments if isinstance(item, dict)
+    }
+    tool_values = {
+        item.get("tool")
+        for item in assignments
+        if isinstance(item, dict) and item.get("tool")
+    }
+    if None in ee_values or len(ee_values) != 1 or len(tool_values) != 1:
         raise ValueError("preview requires exactly one selected EE and tool")
-    return str(ee_values[0]), str(tool_values[0])
+    return str(next(iter(ee_values))), str(next(iter(tool_values)))
 
 
 def _gk_mass(repository: Path, selected_tool: str) -> float | None:

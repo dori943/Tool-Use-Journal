@@ -1,5 +1,82 @@
 # Motion Planner
 
+## 빠른 시작
+
+Python 3.11 이상 가상환경에서 Task Planner를 먼저 설치한 다음 Motion Planner를
+editable package로 설치한다. 두 모듈이 한 checkout에 있는 경우 저장소 루트에서
+다음 명령을 실행한다.
+
+```bash
+python -m venv .venv
+python -m pip install --upgrade pip
+python -m pip install -e "Task_Planner[test]"
+python -m pip install -e "Motion_Planner[test,vlm]"
+python -m pytest Task_Planner/tests Motion_Planner/tests -q
+```
+
+Windows PowerShell에서 가상환경을 활성화하려면 다음 명령을 먼저 실행한다.
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+M3와 M4 feature branch를 병렬로 검토할 때는 별도 worktree를 사용한다. 이 방식이면
+M4의 `task-planner` 의존성을 PyPI나 임의의 로컬 경로에 의존하지 않고 설치할 수 있다.
+
+```bash
+git fetch origin feature/dain-m3 feature/dain-m4
+git worktree add ../tuj-m3 origin/feature/dain-m3
+git worktree add ../tuj-m4 origin/feature/dain-m4
+python -m pip install -e "../tuj-m3/Task_Planner[test]"
+python -m pip install -e "../tuj-m4/Motion_Planner[test,vlm]"
+python -m pytest ../tuj-m3/Task_Planner/tests ../tuj-m4/Motion_Planner/tests -q
+```
+
+OpenAI keyframe 기능을 사용하지 않으면 두 번째 설치 명령에서 `vlm` extra를 빼도 된다.
+
+### C1_1 end-to-end 실행
+
+위의 `tuj-m3`, `tuj-m4` worktree를 만든 위치에서 먼저 M3 결과를 생성한다.
+
+```bash
+python -m task_planner.cli plan \
+  --gk ../tuj-m3/output/c1_1/gk_bundle.json \
+  --m1 ../tuj-m3/output/c1_1/m1.json \
+  --robot-spec ../tuj-m3/configs/robot_spec.json \
+  --output ../tuj-m3/output/c1_1/task_planner.json
+```
+
+이 입력에서는 GK bundle의 `roles.selected_tool`인 `light_plate`가 M3
+`candidate_assignments`를 거쳐 M4까지 그대로 전달된다. 세 개로 분할된 sweep도 각각의
+target 목록과 실행 순서를 유지한 채 차례대로 motion plan으로 변환된다.
+
+그다음 OpenAI API key를 환경변수로 전달하고 M4를 실행한다. key는 파일이나 생성
+artifact에 기록되지 않는다.
+
+먼저 network 요청이나 시뮬레이터 실행 없이 M3→M4 입력 계약을 확인할 수 있다.
+
+```bash
+python ../tuj-m4/Motion_Planner/examples/c1_1_openai_motion_run.py \
+  ../tuj-m4 \
+  --task-planner ../tuj-m3/output/c1_1/task_planner.json \
+  --output-dir ../tuj-m4/artifacts/c1_1 \
+  --validate-input-only
+```
+
+```bash
+export OPENAI_API_KEY="<project-api-key>"
+python ../tuj-m4/Motion_Planner/examples/c1_1_openai_motion_run.py \
+  ../tuj-m4 \
+  --task-planner ../tuj-m3/output/c1_1/task_planner.json \
+  --output-dir ../tuj-m4/artifacts/c1_1 \
+  --controller-kp 50 \
+  --controller-damping-ratio 1
+```
+
+PowerShell에서는 `export` 대신 `$env:OPENAI_API_KEY = "<project-api-key>"`를 쓴다.
+처음에는 `--stop-after-pick`을 추가하면 전체 sweep 전에 설치와 물리 grasp까지만
+짧게 검증할 수 있다.
+
 ## 목표
 
 Task Planner가 생성한 grounded task를 받아 **충돌 없는 시간축 궤적을 생성**하고,
@@ -439,6 +516,8 @@ runtime = ToolUseJournalEERuntime.from_repository_for_controller(
     active_ee="vac",
     seed=0,
     control_timestep_s=simulation_run.config.control_timestep_s,
+    joint_position_kp=50.0,
+    joint_position_damping_ratio=1.0,
 )
 report = ToolUseJournalControllerTrajectoryPlayer(runtime).execute(
     simulation_run
@@ -509,8 +588,9 @@ detach는 현재 world pose와 velocity를 보존한 채 weld force를 제거한
 
 ```bash
 python Motion_Planner/examples/tool_use_journal_ee_runtime_smoke.py \
-  C:\path\to\Tool-Use-Journal \
-  --env C2_1_ObjectSorting --from-ee 2F --to-ee vac --controller
+  . \
+  --env C2_1_ObjectSorting --from-ee 2F --to-ee vac --controller \
+  --controller-kp 50 --controller-damping-ratio 1
 ```
 
 `C1_1_LegoSweep`와 `C2_1_ObjectSorting`은 `reward()`를 구현하지 않아 public
