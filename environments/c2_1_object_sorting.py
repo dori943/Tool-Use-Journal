@@ -1,9 +1,9 @@
 """C2-1 다물체 분류 환경.
 
 테이블 위 물체를 지정 트레이로 옮긴다.
-음식→초록, 음료 용기→파랑, 식기류→빨강.
+모든 물체→파랑.
 
-씬: UR5e, EE 랙(3F/Vacuum/2F), 사과/빵/머그/접시/숟가락, 고정 트레이 3개.
+씬: UR5e, EE 랙(3F/Vacuum/2F), 사과/빵/머그/접시/숟가락, 고정 파란 트레이 1개.
 EE 랙 배치는 C1-1과 같고, 위치는 고정이다.
 
 """
@@ -86,34 +86,22 @@ ROBOT_SPEC_PATH = (
 )
 
 
-# 로봇은 -X. 앞줄 트레이(녹/파/빨), 뒷줄 물체.
-TRAY_X = -0.27
+# 로봇은 -X. 앞줄 파란 트레이, 뒷줄 물체.
+TRAY_X = -0.43
 
 TRAY_Y_OFFSET = 0.2
-
-TRAY_SPACING = 0.3
-
-
-GREEN_TRAY_POS = (
-    TRAY_X,
-    -TRAY_SPACING + TRAY_Y_OFFSET,
-)
 
 BLUE_TRAY_POS = (
     TRAY_X,
     TRAY_Y_OFFSET,
 )
 
-RED_TRAY_POS = (
-    TRAY_X,
-    TRAY_SPACING + TRAY_Y_OFFSET,
-)
-OBJECT_X = 0.15
+OBJECT_X = -0.04
 OBJECT_Y_OFFSET = 0.10
 
 APPLE_POS = (
     OBJECT_X,
-    -0.30 + OBJECT_Y_OFFSET,
+    -0.28 + OBJECT_Y_OFFSET,
 )
 
 BREAD_POS = (
@@ -123,17 +111,17 @@ BREAD_POS = (
 
 MUG_POS = (
     OBJECT_X,
-    0.10 + OBJECT_Y_OFFSET,
+    0.08 + OBJECT_Y_OFFSET,
 )
 
 PLATE_POS = (
     OBJECT_X,
-    0.30 + OBJECT_Y_OFFSET,
+    0.25 + OBJECT_Y_OFFSET,
 )
 
 SPOON_POS = (
     OBJECT_X,
-    0.50 + OBJECT_Y_OFFSET,
+    0.38 + OBJECT_Y_OFFSET,
 )
 
 
@@ -141,16 +129,9 @@ APPLE_ROTATION = 0.0
 BREAD_ROTATION = 0.0
 MUG_ROTATION = 0.0
 PLATE_ROTATION = 0.0
-SPOON_ROTATION = 0.0
+SPOON_ROTATION = -np.pi / 2.0
 
 
-
-GREEN_TRAY_RGBA = [
-    0.15,
-    0.80,
-    0.25,
-    0.40,
-]
 
 BLUE_TRAY_RGBA = [
     0.15,
@@ -159,18 +140,10 @@ BLUE_TRAY_RGBA = [
     0.40,
 ]
 
-RED_TRAY_RGBA = [
-    0.90,
-    0.20,
-    0.20,
-    0.40,
-]
-
-
 CATEGORY_TO_TRAY = {
-    "food": "green_tray",
+    "food": "blue_tray",
     "drink_container": "blue_tray",
-    "food_container": "red_tray",
+    "food_container": "blue_tray",
 }
 
 
@@ -409,6 +382,7 @@ class C2_1_ObjectSorting(ManipulationEnv):
 
         self.plate = PlateObject(
             name="plate",
+            xml_name="model_c2.xml",
         )
 
 
@@ -430,20 +404,9 @@ class C2_1_ObjectSorting(ManipulationEnv):
 
 
         TRAY_SCALE = 0.4
-        self.green_tray = TrayObject(
-            name="green_tray",
-scale=TRAY_SCALE,
-            rgba=(
-                GREEN_TRAY_RGBA
-            ),
-
-            joints=None,
-        )
-
-
         self.blue_tray = TrayObject(
             name="blue_tray",
-scale=TRAY_SCALE,
+            scale=TRAY_SCALE,
             rgba=(
                 BLUE_TRAY_RGBA
             ),
@@ -452,21 +415,8 @@ scale=TRAY_SCALE,
         )
 
 
-        self.red_tray = TrayObject(
-            name="red_tray",
-scale=TRAY_SCALE,
-            rgba=(
-                RED_TRAY_RGBA
-            ),
-
-            joints=None,
-        )
-
-
         self.trays = [
-            self.green_tray,
             self.blue_tray,
-            self.red_tray,
         ]
 
 
@@ -518,18 +468,8 @@ scale=TRAY_SCALE,
             tray_configs = [
 
                 (
-                    "GreenTraySampler",
-                    GREEN_TRAY_POS,
-                ),
-
-                (
                     "BlueTraySampler",
                     BLUE_TRAY_POS,
-                ),
-
-                (
-                    "RedTraySampler",
-                    RED_TRAY_POS,
                 ),
             ]
 
@@ -555,7 +495,7 @@ scale=TRAY_SCALE,
                             position[1],
                         ],
 
-                        rotation=np.pi / 2.0,
+                        rotation=np.pi,
 
                         rotation_axis="z",
 
@@ -763,20 +703,8 @@ scale=TRAY_SCALE,
 
 
         self.placement_initializer.add_objects_to_sampler(
-            "GreenTraySampler",
-            self.green_tray,
-        )
-
-
-        self.placement_initializer.add_objects_to_sampler(
             "BlueTraySampler",
             self.blue_tray,
-        )
-
-
-        self.placement_initializer.add_objects_to_sampler(
-            "RedTraySampler",
-            self.red_tray,
         )
 
 
@@ -946,6 +874,13 @@ scale=TRAY_SCALE,
                 category
             ]
         )
+
+    def get_evaluation_material_gt(self):
+        """평가 전용 GT. 관측 및 LLM/M2 입력 경로에서는 호출하지 않는다."""
+        return {
+            obj.name: obj.material_gt
+            for obj in self.target_objects
+        }
 
 
     
