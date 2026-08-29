@@ -95,30 +95,70 @@ def main():
         m0s = serialize(build_m0(spec_to_objects(spec)))
         print("[M0] mock 수치 사용 (실제 M0 JSON 없음)")
 
-    rough = LLMRough()                          # 서브골 생성은 항상 LLM
-    out = run_m1(task, m0s, rough=rough)
-
-    # ── M2 응답 반영 (있으면): output/<task-id>/m2.json 자동 또는 --m2-json 경로 ──
+    # ── M2 응답 경로 결정: output/<task-id>/m2.json 자동 또는 --m2-json 경로 ──
     m2_json = None
     if "--m2-json" in sys.argv:
         m2_json = sys.argv[sys.argv.index("--m2-json") + 1]
     elif os.path.exists(os.path.join(tdir, "m2.json")):
         m2_json = os.path.join(tdir, "m2.json")
+
+    # ── 0828 안전장치(사전): 직전 왕복이 이미 완료된 세트면 덮어쓰지 않는다 ──
+    # 분할된 m1.json과 그 자식 질의에 대한 m2.json이 짝으로 남아 있을 때 run_m1을
+    # 또 돌리면, 새 분해(부모 id)와 자식 응답이 매칭되지 않아 분할이 풀린 계획으로
+    # 덮어써진다. 왕복의 마지막은 항상 run_m2다.
+    prev_path = os.path.join(tdir, "m1.json")
+    if m2_json and os.path.exists(prev_path):
+        with open(prev_path, encoding="utf-8") as f:
+            prev = json.load(f)
+        with open(m2_json, encoding="utf-8") as f:
+            raw0 = json.load(f)
+        prev_q = {q["queried_by"] for q in prev.get("m1_queries", [])}
+        resp_q = {r.get("queried_by")
+                  for r in (raw0["responses"] if isinstance(raw0, dict) else raw0)
+                  if r.get("queried_by")}
+        if prev.get("m1_stats", {}).get("n_split_subgoals") and resp_q and resp_q <= prev_q:
+            sys.exit("[중단] 분할 완료된 m1.json과 m2.json이 이미 짝이 맞는 최종 세트입니다.\n"
+                     "  여기서 run_m1을 다시 돌리면 분할이 풀린 계획으로 덮어써집니다.\n"
+                     "  다음 단계로 진행하거나, 처음부터 다시 돌리려면 m1.json을 지운 뒤 실행하십시오.")
+
+    rough = LLMRough()                          # 서브골 생성은 항상 LLM
+    out = run_m1(task, m0s, rough=rough)
+
     if m2_json:
         from tuj.m1_subgoal.ingest import apply_m2, update_confidence
         with open(m2_json, encoding="utf-8") as f:
             raw = json.load(f)
         responses = raw["responses"] if isinstance(raw, dict) else raw
+        # ── 0828 안전장치(사후): 응답이 이번 분해의 질의와 하나도 안 맞으면 중단 ──
+        qids = {q["queried_by"] for q in out["m1_queries"]}
+        rids = {r.get("queried_by") for r in responses if r.get("queried_by")}
+        if rids and not (qids & rids):
+            sys.exit("[중단] m2.json 응답이 이번 분해의 질의와 하나도 매칭되지 않습니다.\n"
+                     "  run_m2 -> run_m1 -> run_m2 왕복 순서를 확인하십시오. (m1.json 미변경)")
         for line in apply_m2(out, responses):
             print(line)
         # 측정 반영 후 자기보고 신뢰도 갱신 (LLM 3차 호출)
-        for line in update_confidence(out, rough._client, rough.model):
+        for line in update_confidence(out, rough._client, rough.model,
+                                      usage_acc=rough.usage):
+            print(line)
+        out["m1_stats"]["llm_usage"] = rough.usage
+        # 0828: batch 응답의 partition대로 서브골 분할 (확보/반환은 한 번만 생성)
+        from tuj.m1_subgoal.regroup import split_after_m2
+        for line in split_after_m2(out):
             print(line)
 
     with open(os.path.join(tdir, "m1.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
 
     s = out["m1_stats"]
+    usage = s.get("llm_usage") or {}
+    if usage:
+        total = sum(e["tokens"] for e in usage.values())
+        tsec = sum(e.get("seconds", 0.0) for e in usage.values())
+        parts = " / ".join(
+            f"{k} {e['tokens']}tok({e['calls']}회, {e.get('seconds', 0):.1f}s)"
+            for k, e in usage.items())
+        print(f"  [M1 tokens] {parts} | 합계 {total}tok, {tsec:.1f}s")
     print(f"[{name}] 서브골 {s['n_subgoals']} → 상세 {s['n_details']} | "
           f"DAG 엣지 {s['n_edges']} | mutex {s['n_mutex']} | M2 질의 {s['n_m2_queries']}")
     for e in out["m1_partial_order"]:

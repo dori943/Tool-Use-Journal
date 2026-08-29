@@ -9,7 +9,8 @@
   reachable       reachability.reachable
   top_exposed     응답에 판정 필드 없음 → unknown (M2에 필드 추가 논의 항목)
   ee_usable       ee 판정 중 feasible=true 존재 여부
-  tool_sweepable  ee 대체 판정(잠정) — sweep 적합성 질의 종류는 M2와 협의 중
+  batch_feasible  batch 응답(0828 신규)의 feasible — 그룹 동시 처리 가능 여부
+  act_space_clear swept_space 응답(0828 신규)의 clear — 실행 공간 확보 여부
   fits / clear    relational 응답의 pass
 """
 from __future__ import annotations
@@ -28,8 +29,14 @@ def _node_view(responses: list[dict]) -> dict:
     return view
 
 
-def _judge(head: str, nodes: list[str], view: dict, rels: list[dict]):
-    """술어 1건 판정 → (status, evidence). evidence는 후보 노드별 근거."""
+def _judge(head: str, nodes: list[str], view: dict, rels: list[dict],
+           require_all: bool = False):
+    """술어 1건 판정 → (status, evidence). evidence는 노드별 근거.
+
+    require_all=False: tool 후보 의미론 — 후보 중 하나라도 되면 sat (기존).
+    require_all=True:  그룹 원소 의미론 — 전원이어야 sat, 하나라도 안 되면 unsat
+                       (0828 — relocate 다중 target의 원소들은 전부 옮겨야 하므로).
+    """
     ev = []
     if head in ("fits", "clear"):
         if not rels:
@@ -49,12 +56,11 @@ def _judge(head: str, nodes: list[str], view: dict, rels: list[dict]):
         elif head == "top_exposed":
             v = info.get("top_exposed")          # 현재 M2 응답에 없음 → None
             ev.append({"node": n, "top_exposed": v})
-        elif head in ("ee_usable", "tool_sweepable"):
+        elif head == "ee_usable":
             ee = info.get("ee")
             v = any(x.get("feasible") for x in ee.values()) if ee else None
             ev.append({"node": n,
-                       "feasible_ees": [k for k, x in (ee or {}).items() if x.get("feasible")],
-                       "proxy": head == "tool_sweepable"})
+                       "feasible_ees": [k for k, x in (ee or {}).items() if x.get("feasible")]})
         else:
             v = None
             ev.append({"node": n})
@@ -62,9 +68,38 @@ def _judge(head: str, nodes: list[str], view: dict, rels: list[dict]):
 
     if all(v is None for v in verdicts):
         return "unknown", ev
+    if require_all:                             # 그룹 원소: 전원 충족이어야 sat
+        if any(v is False for v in verdicts):
+            return "unsat", ev
+        if all(v for v in verdicts):
+            return "sat", ev
+        return "unknown", ev                    # 일부 미판정
     if any(v for v in verdicts):
         return "sat", ev                        # 후보 중 하나라도 가능하면 계획은 유효
     return "unsat", ev
+
+
+def _judge_group(head: str, rs: list[dict]):
+    """batch / swept_space 응답(0828 신규) 판정. 액션 주체(actor) 후보별 응답 리스트를 받는다.
+
+    후보 중 하나라도 가능하면 sat (EE-agnostic 원칙과 동일 — 최종 선택은 도구 확정이 한다).
+    batch가 unsat이어도 응답의 partition이 있으면 regroup이 그 구성대로 서브골을 나눈다.
+    """
+    ev, ok = [], []
+    for r in rs:
+        if head == "batch_feasible":
+            v = r.get("feasible")
+            ev.append({"actor": r.get("actor"), "feasible": v,
+                       "binding_check": r.get("binding_check"),
+                       "partition": r.get("partition")})
+        else:
+            v = r.get("clear")
+            ev.append({"actor": r.get("actor"), "clear": v,
+                       "margin_mm": r.get("margin_mm"), "blockers": r.get("blockers")})
+        ok.append(v)
+    if all(v is None for v in ok):
+        return "unknown", ev
+    return ("sat" if any(ok) else "unsat"), ev
 
 
 PROMPT_UPDATE = """너는 이 로봇 계획을 만든 계획자다. 계획을 세울 때는 측정값이 없어서
@@ -117,7 +152,8 @@ def _summarize_for_subgoal(s: dict) -> str:
     return "\n".join(parts)
 
 
-def update_confidence(m1_out: dict, client, model: str = "gpt-4o") -> list[str]:
+def update_confidence(m1_out: dict, client, model: str = "gpt-4o",
+                      usage_acc: dict | None = None) -> list[str]:
     """M2 반영 후 자기보고 신뢰도 갱신 (LLM 3차 호출).
 
     apply_m2()로 판정·도구 확정이 끝난 뒤 호출한다. 서브골마다
@@ -135,8 +171,14 @@ def update_confidence(m1_out: dict, client, model: str = "gpt-4o") -> list[str]:
         err = None
         for attempt in (1, 2):
             msg = prompt if attempt == 1 else prompt + f"\n\n이전 출력 문제: {err}. JSON 객체만."
+            import time as _time
+            t0 = _time.monotonic()
             r = client.chat.completions.create(
                 model=model, temperature=0, messages=[{"role": "user", "content": msg}])
+            if usage_acc is not None:
+                from .rough import track_usage
+                track_usage(usage_acc, "confidence_update", r,
+                            seconds=_time.monotonic() - t0)
             text = r.choices[0].message.content.strip()
             try:
                 obj = json.loads(text[text.find("{"): text.rfind("}") + 1])
@@ -174,6 +216,9 @@ def apply_m2(m1_out: dict, responses: list[dict]) -> list[str]:
     q_nodes: dict[str, list[str]] = {}
     for q in m1_out.get("m1_queries", []):
         c = q["m2_call"]
+        if c.get("kind") in ("batch", "swept_space"):   # 0828 신규 — 노드 대신 그룹 대상
+            q_nodes.setdefault(q["queried_by"], [])
+            continue
         n = c.get("node_id") or c.get("a")
         if n:
             q_nodes.setdefault(q["queried_by"], [])
@@ -194,8 +239,13 @@ def apply_m2(m1_out: dict, responses: list[dict]) -> list[str]:
                     status, ev = "not_queried", []
                 elif not rs:
                     status, ev = "unanswered", []
+                elif p["head"] in ("batch_feasible", "act_space_clear"):
+                    status, ev = _judge_group(p["head"], rs)
                 else:
-                    status, ev = _judge(p["head"], nodes, view, rels)
+                    # tool 후보가 있는 서브골(sweep류)은 any, 없는 서브골(relocate
+                    # 그룹)은 원소 전원 충족 의미론 (0828)
+                    status, ev = _judge(p["head"], nodes, view, rels,
+                                        require_all=not s.get("tool_candidate_ids"))
                 p["status"], p["evidence"] = status, ev
                 n_sat[status] += 1
                 missing = [n for n in nodes if n not in answered_nodes]
@@ -210,6 +260,13 @@ def apply_m2(m1_out: dict, responses: list[dict]) -> list[str]:
 
     # 도구 확정 (0821 확정: 객체 선택은 M1이 완결한다 — M2 측정값을 근거로
     # 어느 물체를 도구로 쓸지까지 M1이 정한다. M3는 EE 선택·순서 최적화만)
+    # 0828: batch 응답(그룹 동시 처리)을 후보 객체별로 모은다 — 확정 기준에 동시처리 용량 추가
+    batch_by: dict[str, dict] = {}
+    for r in responses:
+        a = r.get("actor")
+        if r.get("kind") == "batch" and isinstance(a, dict) and a.get("type") == "object":
+            batch_by.setdefault(r.get("subgoal_id"), {})[a.get("id")] = r
+
     for s in m1_out["m1_subgoals"]:
         cands = s.get("tool_candidate_ids", [])
         if not cands:
@@ -224,17 +281,28 @@ def apply_m2(m1_out: dict, responses: list[dict]) -> list[str]:
                 continue                      # 어떤 EE로도 못 잡는 후보는 탈락
             if reach.get("reachable") is False:
                 continue                      # 팔이 안 닿는 후보 탈락
-            scored.append((len(feasible), float(reach.get("margin_mm") or 0.0), c, feasible))
+            b = batch_by.get(s["subgoal_id"], {}).get(c)
+            part = b.get("partition") if b else None
+            # 필요한 액션 횟수(그룹 수)가 적을수록 우선. batch 응답이 없으면 최하위
+            # (batch 질의가 아예 없던 기존 실행에서는 전원이 같아 순위 변화 없음)
+            batch_rank = -len(part) if part else float("-inf")
+            scored.append((len(feasible), batch_rank,
+                           float(reach.get("margin_mm") or 0.0), c, feasible, part))
         if not scored:
             logs.append(f"  [도구 확정] {s['subgoal_id']}: 통과한 후보 없음")
             continue
-        scored.sort(reverse=True)             # 사용 가능 EE 수 최대 → 리치 여유 최대
-        n_ee, margin, chosen, _ = scored[0]
+        scored.sort(reverse=True)   # EE 수 최대 → 액션 횟수 최소 → 리치 여유 최대 (0828 개정)
+        n_ee, batch_rank, margin, chosen, _, part = scored[0]
         s["selected_tool_id"] = chosen
-        s["selection_evidence"] = [{"node": c2, "feasible_ees": f2, "reach_margin_mm": m2}
-                                   for (n2, m2, c2, f2) in scored]
+        if part and len(part) > 1:
+            s["partition_plan"] = part        # regroup이 이 구성대로 서브골을 나눈다
+        s["selection_evidence"] = [
+            {"node": c2, "feasible_ees": f2, "reach_margin_mm": m2,
+             "batch_groups": (len(p2) if p2 else None)}
+            for (n2, br2, m2, c2, f2, p2) in scored]
         logs.append(f"  [도구 확정] {s['subgoal_id']}: {chosen} 선택 "
-                    f"(사용 가능 EE {n_ee}종, 리치 여유 {margin}mm)")
+                    f"(사용 가능 EE {n_ee}종, 리치 여유 {margin}mm"
+                    + (f", 필요 액션 {len(part)}회" if part else "") + ")")
 
     m1_out["m1_stats"]["m2_predicates"] = n_sat
     total = sum(n_sat.values())
