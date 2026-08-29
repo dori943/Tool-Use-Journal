@@ -2,10 +2,19 @@
 
 도구를 골라 흩어진 레고형 블록 12개를 수집 구역으로 쓸어 넣는다.
 
-씬: UR5e, EE 랙(3F/Vacuum/2F), 블록 12개, 가벼운/무거운 접시, 병(distractor), 수집 구역.
-EE 랙과 도구 영역은 떨어져 있고, 수집 구역은 로봇과 블록 사이에 있다.
-두 접시는 형상·마찰이 같고 질량만 다르다(0.20kg / 0.80kg).
+씬:
+- UR5e
+- EE 랙 (3F / Vacuum / 2F)
+- 레고 블록 12개
+- Plate
+- 국자 / 포크 / 가위
+- 병
+- 수집 구역
 
+EE 랙과 도구 영역은 떨어져 있고,
+수집 구역은 로봇과 블록 사이에 있다.
+
+Plate 질량은 0.20 kg이다.
 """
 
 from __future__ import annotations
@@ -27,12 +36,31 @@ from robosuite.utils.placement_samplers import (
 )
 
 from environments.ee_rack import add_ee_rack
-from environments.objects import BottleObject, PlateObject
+from environments.objects import (
+    BottleObject,
+    ForkObject,
+    LadleObject,
+    PlateObject,
+    ScissorsObject,
+)
 
+
+# ============================================================
+# 기본 설정
+# ============================================================
 
 NUM_BLOCKS = 12
 
-# BoxObject는 half extent. 전체 크기 20 × 20 × 12 mm, 밀도 500 kg/m³ → 질량 ≈ 0.0024 kg
+
+# BoxObject는 half extent.
+# 전체 크기:
+# 20 × 20 × 12 mm
+#
+# 밀도:
+# 500 kg/m³
+#
+# 질량:
+# 약 0.0024 kg
 BLOCK_HALF_SIZE = [
     0.01,
     0.01,
@@ -41,28 +69,59 @@ BLOCK_HALF_SIZE = [
 
 BLOCK_DENSITY = 500.0
 
-# 같은 접시 메시. 형상은 그대로 두고 컴파일된 질량만 다르게 둔다.
-LIGHT_PLATE_MASS = 0.20
-HEAVY_PLATE_MASS = 0.80
 
-# MuJoCo friction: (sliding, torsional, rolling). 두 접시 동일 → 질량만 차별 요인.
+# ============================================================
+# 레고 랜덤 배치 영역
+# ============================================================
+#
+# 기존:
+# X = 0.12 ~ 0.16
+# Y = -0.10 ~ 0.10
+#
+# 12개를 non-overlap으로 놓기에는 너무 좁아서
+# RandomizationError가 발생할 수 있으므로 약간 확대.
+#
+# 여전히 로봇에서 먼 쪽의 제한된 영역에만 생성된다.
+# ============================================================
+
+BLOCK_SPAWN_X_RANGE = (
+    0.12,
+    0.22,
+)
+
+BLOCK_SPAWN_Y_RANGE = (
+    -0.15,
+    0.15,
+)
+
+
+# ============================================================
+# Plate 물리 속성
+# ============================================================
+
+PLATE_MASS = 0.20
+
+
+# MuJoCo friction:
+# (sliding, torsional, rolling)
 PLATE_FRICTION = (
     0.8,
     0.005,
     0.0001,
 )
 
-# EE 선택용 추론 메타데이터. MuJoCo가 해석하지 않는다.
-# VacuumGripper flatness_tol_rms_mm=1.5 → 두 접시 모두 평탄도 통과.
-# payload: 가벼움 0.20kg 통과, 무거움 0.80kg 실패(한도 0.50kg).
+
+# ============================================================
+# EE 선택용 물리 메타데이터
+# ============================================================
+
 TOOL_PHYSICAL_METADATA = {
 
-    "light_plate": {
+    "plate": {
         "object_type": "sweep_tool",
-        "material": "rigid_plastic",
         "surface": "flat",
         "flatness_rms_mm": 0.5,
-        "mass_kg": LIGHT_PLATE_MASS,
+        "mass_kg": PLATE_MASS,
         "friction": PLATE_FRICTION,
         "full_size_mm": [
             181.8,
@@ -71,32 +130,64 @@ TOOL_PHYSICAL_METADATA = {
         ],
     },
 
-    "heavy_plate": {
+    "ladle": {
         "object_type": "sweep_tool",
-        "material": "rigid_plastic",
-        "surface": "flat",
-        "flatness_rms_mm": 0.5,
-        "mass_kg": HEAVY_PLATE_MASS,
-        "friction": PLATE_FRICTION,
         "full_size_mm": [
-            181.8,
-            181.8,
-            11.1,
+            63.5,
+            208.1,
+            110.2,
+        ],
+    },
+
+    "scissors": {
+        "object_type": "sweep_tool",
+        "full_size_mm": [
+            81.1,
+            179.2,
+            11.8,
+        ],
+    },
+
+    "fork": {
+        "object_type": "sweep_tool",
+        "full_size_mm": [
+            35.7,
+            219.5,
+            26.4,
         ],
     },
 }
 
 
-# 수집 구역 전체 크기 250 × 180 mm. 로봇과 블록 사이.
+# ============================================================
+# 수집 구역
+# ============================================================
+#
+# robot base = x -0.68
+# tools      = x -0.45
+# zone       = x -0.25
+# lego       = x +0.12 ~ +0.22
+#
+# 즉:
+#
+# Robot → Tools → Collection Zone → Lego
+#
+# ============================================================
+
 COLLECTION_ZONE_SIZE = (
     0.25,
     0.18,
 )
 
 COLLECTION_ZONE_CENTER = (
-    -0.02,
+    -0.15,
     0.0,
 )
+
+
+# ============================================================
+# 테이블
+# ============================================================
 
 DEFAULT_TABLE_FULL_SIZE = (
     1.30,
@@ -114,10 +205,19 @@ TABLE_OFFSET = np.array(
 )
 
 
+# ============================================================
+# 로봇
+# ============================================================
+
 ROBOT_BASE_X = -0.68
 
 
+# ============================================================
+# EE Rack
+# ============================================================
+
 EE_RACK_LAYOUT = {
+
     "3F": (
         -0.330000,
         -0.606218,
@@ -135,14 +235,63 @@ EE_RACK_LAYOUT = {
 }
 
 
-TOOL_X = -0.3
+# ============================================================
+# 도구 및 distractor 배치
+# ============================================================
+#
+# 기존 -0.30보다 robot 쪽으로 당기되,
+# -0.60처럼 테이블 가장자리에 너무 붙지 않도록 -0.45 사용.
+# ============================================================
 
-LIGHT_PLATE_Y = -0.10
+TOOL_X = -0.4
 
-HEAVY_PLATE_Y = 0.17
+
+# ------------------------------------------------------------
+# Plate
+# ------------------------------------------------------------
+
+PLATE_Y = -0.10
+
+
+# ------------------------------------------------------------
+# Ladle
+# ------------------------------------------------------------
+
+LADLE_X = TOOL_X
+LADLE_Y = 0.08
+
+
+# ------------------------------------------------------------
+# Fork
+# ------------------------------------------------------------
+
+FORK_X = TOOL_X
+FORK_Y = 0.20
+
+
+# ------------------------------------------------------------
+# Scissors
+# ------------------------------------------------------------
+
+SCISSORS_X = TOOL_X
+SCISSORS_Y = 0.30
+
+
+# 기존 90도 방향에서 180도 뒤집기
+# 90 + 180 = 270도
+UTENSIL_ROTATION = 3 * np.pi / 2.0
+
+
+# ------------------------------------------------------------
+# Bottle
+# ------------------------------------------------------------
 
 BOTTLE_Y = 0.39
 
+
+# ============================================================
+# Robot Spec
+# ============================================================
 
 ROBOT_SPEC_PATH = (
     Path(__file__).resolve().parents[1]
@@ -150,6 +299,10 @@ ROBOT_SPEC_PATH = (
     / "robot_spec.json"
 )
 
+
+# ============================================================
+# 레고 색상
+# ============================================================
 
 BLOCK_COLORS = [
     [0.85, 0.15, 0.15, 1.0],
@@ -162,7 +315,7 @@ BLOCK_COLORS = [
 
 
 class C1_1_LegoSweep(ManipulationEnv):
-    """레고 블록 12개를 수집 구역으로 넣는 씬. 물리 속성과 도구 메타데이터만 구성한다."""
+    """레고 블록 12개를 수집 구역으로 넣는 C1-1 씬."""
 
     def __init__(
         self,
@@ -176,7 +329,6 @@ class C1_1_LegoSweep(ManipulationEnv):
         table_friction=(1.0, 5e-3, 1e-4),
         use_camera_obs=True,
         use_object_obs=True,
-   
         placement_initializer=None,
         has_renderer=False,
         has_offscreen_renderer=True,
@@ -202,31 +354,24 @@ class C1_1_LegoSweep(ManipulationEnv):
     ):
 
         self.table_full_size = table_full_size
-
         self.table_friction = table_friction
-
         self.table_offset = TABLE_OFFSET.copy()
 
+        # ----------------------------------------------------
+        # Robot spec
+        # ----------------------------------------------------
 
         with ROBOT_SPEC_PATH.open(
             encoding="utf-8"
         ) as spec_file:
-
             self.robot_spec = json.load(
                 spec_file
             )
 
-
-      
-
         self.ee_catalog = {
             entry["ee_id"]: dict(entry)
-            for entry
-            in self.robot_spec[
-                "ee_pool"
-            ]
+            for entry in self.robot_spec["ee_pool"]
         }
-
 
         self.tool_physical_metadata = {
             tool_name: dict(metadata)
@@ -234,15 +379,15 @@ class C1_1_LegoSweep(ManipulationEnv):
             in TOOL_PHYSICAL_METADATA.items()
         }
 
-
-        self.use_object_obs = (
-            use_object_obs
-        )
+        self.use_object_obs = use_object_obs
 
         self.placement_initializer = (
             placement_initializer
         )
 
+        # ----------------------------------------------------
+        # Collection zone
+        # ----------------------------------------------------
 
         zone_center = (
             collection_zone_center
@@ -250,28 +395,25 @@ class C1_1_LegoSweep(ManipulationEnv):
             else COLLECTION_ZONE_CENTER
         )
 
-
         zone_size = (
             collection_zone_size
             if collection_zone_size is not None
             else COLLECTION_ZONE_SIZE
         )
 
-
         self.collection_zone_center = np.array(
             zone_center,
             dtype=float,
         )
-
 
         self.collection_zone_size = np.array(
             zone_size,
             dtype=float,
         )
 
-
-   
-
+        # ----------------------------------------------------
+        # Parent
+        # ----------------------------------------------------
 
         super().__init__(
             robots=robots,
@@ -302,7 +444,9 @@ class C1_1_LegoSweep(ManipulationEnv):
             seed=seed,
         )
 
-
+    # ========================================================
+    # Model
+    # ========================================================
 
     def _load_model(
         self,
@@ -310,6 +454,9 @@ class C1_1_LegoSweep(ManipulationEnv):
 
         super()._load_model()
 
+        # ----------------------------------------------------
+        # Robot 위치
+        # ----------------------------------------------------
 
         self.robots[
             0
@@ -321,13 +468,15 @@ class C1_1_LegoSweep(ManipulationEnv):
             )
         )
 
+        # ----------------------------------------------------
+        # Arena
+        # ----------------------------------------------------
 
         mujoco_arena = TableArena(
             table_full_size=self.table_full_size,
             table_friction=self.table_friction,
             table_offset=self.table_offset,
         )
-
 
         mujoco_arena.set_origin(
             [
@@ -337,37 +486,31 @@ class C1_1_LegoSweep(ManipulationEnv):
             ]
         )
 
+        # ----------------------------------------------------
+        # EE Rack
+        # ----------------------------------------------------
 
         rack_info = add_ee_rack(
             arena=mujoco_arena,
             table_offset=self.table_offset,
             rack_layout=EE_RACK_LAYOUT,
-            ee_pool=self.robot_spec[
-                "ee_pool"
-            ],
+            ee_pool=self.robot_spec["ee_pool"],
         )
 
-
-        for ee_id, info in (
-            rack_info.items()
-        ):
-
+        for ee_id, info in rack_info.items():
             self.ee_catalog[
                 ee_id
             ].update(
                 info
             )
 
+        self.ee_rack_info = rack_info
 
-        self.ee_rack_info = (
-            rack_info
-        )
-
+        # ----------------------------------------------------
+        # Lego blocks
+        # ----------------------------------------------------
 
         self.blocks = []
-
-   
-
 
         for i in range(
             NUM_BLOCKS
@@ -377,40 +520,47 @@ class C1_1_LegoSweep(ManipulationEnv):
                 f"block_{i}"
             )
 
-
             block = BoxObject(
                 name=name,
-
                 size_min=BLOCK_HALF_SIZE,
-
                 size_max=BLOCK_HALF_SIZE,
-
                 rgba=BLOCK_COLORS[
-                    i % len(
-                        BLOCK_COLORS
-                    )
+                    i % len(BLOCK_COLORS)
                 ],
-
                 density=BLOCK_DENSITY,
             )
-
 
             self.blocks.append(
                 block
             )
 
+        # ----------------------------------------------------
+        # Plate
+        # ----------------------------------------------------
 
-
-
-        self.light_plate = PlateObject(
-            name="light_plate",
+        self.plate = PlateObject(
+            name="plate",
         )
 
+        # ----------------------------------------------------
+        # Utensils
+        # ----------------------------------------------------
 
-        self.heavy_plate = PlateObject(
-            name="heavy_plate",
+        self.ladle = LadleObject(
+            name="ladle",
         )
 
+        self.fork = ForkObject(
+            name="fork",
+        )
+
+        self.scissors = ScissorsObject(
+            name="scissors",
+        )
+
+        # ----------------------------------------------------
+        # Bottle
+        # ----------------------------------------------------
 
         self.bottle_distractor = (
             BottleObject(
@@ -418,21 +568,19 @@ class C1_1_LegoSweep(ManipulationEnv):
             )
         )
 
+        # ----------------------------------------------------
+        # Collection zone
+        # ----------------------------------------------------
 
         zone_half_x = (
-            self.collection_zone_size[
-                0
-            ]
+            self.collection_zone_size[0]
             / 2.0
         )
 
         zone_half_y = (
-            self.collection_zone_size[
-                1
-            ]
+            self.collection_zone_size[1]
             / 2.0
         )
-
 
         self.collection_zone_visual = (
             BoxObject(
@@ -463,19 +611,26 @@ class C1_1_LegoSweep(ManipulationEnv):
             )
         )
 
+        # ----------------------------------------------------
+        # Placement initializer
+        # ----------------------------------------------------
 
         self._setup_placement_initializer()
 
+        # ----------------------------------------------------
+        # Mujoco objects
+        # ----------------------------------------------------
 
         collision_objects = (
             self.blocks
             + [
-                self.light_plate,
-                self.heavy_plate,
+                self.plate,
+                self.ladle,
+                self.fork,
+                self.scissors,
                 self.bottle_distractor,
             ]
         )
-
 
         all_objects = (
             collision_objects
@@ -483,7 +638,6 @@ class C1_1_LegoSweep(ManipulationEnv):
                 self.collection_zone_visual
             ]
         )
-
 
         self.model = ManipulationTask(
             mujoco_arena=mujoco_arena,
@@ -497,6 +651,9 @@ class C1_1_LegoSweep(ManipulationEnv):
             mujoco_objects=all_objects,
         )
 
+    # ========================================================
+    # Placement
+    # ========================================================
 
     def _setup_placement_initializer(
         self,
@@ -511,37 +668,33 @@ class C1_1_LegoSweep(ManipulationEnv):
                 self.collection_zone_center
             )
 
-
             self.placement_initializer = (
                 SequentialCompositeSampler(
-                    name=(
-                        "C1_1_"
-                        "PlacementInitializer"
-                    )
+                    name="C1_1_PlacementInitializer"
                 )
             )
 
+            # =================================================
+            # Blocks
+            # =================================================
 
             self.placement_initializer.append_sampler(
-
                 sampler=UniformRandomSampler(
-
                     name="BlockSampler",
 
-                    x_range=[
-                        0.13,
-                        0.28,
-                    ],
+                    x_range=list(
+                        BLOCK_SPAWN_X_RANGE
+                    ),
 
-                    y_range=[
-                        -0.34,
-                        0.34,
-                    ],
+                    y_range=list(
+                        BLOCK_SPAWN_Y_RANGE
+                    ),
 
                     rotation=None,
 
                     rotation_axis="z",
 
+                    # 레고는 서로 겹치면 안 됨
                     ensure_object_boundary_in_range=True,
 
                     ensure_valid_placement=True,
@@ -554,12 +707,13 @@ class C1_1_LegoSweep(ManipulationEnv):
                 )
             )
 
+            # =================================================
+            # Plate
+            # =================================================
 
             self.placement_initializer.append_sampler(
-
                 sampler=UniformRandomSampler(
-
-                    name="LightPlateSampler",
+                    name="PlateSampler",
 
                     x_range=[
                         TOOL_X,
@@ -567,8 +721,8 @@ class C1_1_LegoSweep(ManipulationEnv):
                     ],
 
                     y_range=[
-                        LIGHT_PLATE_Y,
-                        LIGHT_PLATE_Y,
+                        PLATE_Y,
+                        PLATE_Y,
                     ],
 
                     rotation=0.0,
@@ -577,7 +731,8 @@ class C1_1_LegoSweep(ManipulationEnv):
 
                     ensure_object_boundary_in_range=False,
 
-                    ensure_valid_placement=True,
+                    # 고정 배치이므로 sampler 충돌 검사 비활성화
+                    ensure_valid_placement=False,
 
                     reference_pos=self.table_offset,
 
@@ -587,30 +742,31 @@ class C1_1_LegoSweep(ManipulationEnv):
                 )
             )
 
+            # =================================================
+            # Ladle
+            # =================================================
 
             self.placement_initializer.append_sampler(
-
                 sampler=UniformRandomSampler(
-
-                    name="HeavyPlateSampler",
+                    name="LadleSampler",
 
                     x_range=[
-                        TOOL_X,
-                        TOOL_X,
+                        LADLE_X,
+                        LADLE_X,
                     ],
 
                     y_range=[
-                        HEAVY_PLATE_Y,
-                        HEAVY_PLATE_Y,
+                        LADLE_Y,
+                        LADLE_Y,
                     ],
 
-                    rotation=0.0,
+                    rotation=UTENSIL_ROTATION,
 
                     rotation_axis="z",
 
                     ensure_object_boundary_in_range=False,
 
-                    ensure_valid_placement=True,
+                    ensure_valid_placement=False,
 
                     reference_pos=self.table_offset,
 
@@ -620,11 +776,80 @@ class C1_1_LegoSweep(ManipulationEnv):
                 )
             )
 
+            # =================================================
+            # Fork
+            # =================================================
 
             self.placement_initializer.append_sampler(
-
                 sampler=UniformRandomSampler(
+                    name="ForkSampler",
 
+                    x_range=[
+                        FORK_X,
+                        FORK_X,
+                    ],
+
+                    y_range=[
+                        FORK_Y,
+                        FORK_Y,
+                    ],
+
+                    rotation=UTENSIL_ROTATION,
+
+                    rotation_axis="z",
+
+                    ensure_object_boundary_in_range=False,
+
+                    ensure_valid_placement=False,
+
+                    reference_pos=self.table_offset,
+
+                    z_offset=0.0,
+
+                    rng=self.rng,
+                )
+            )
+
+            # =================================================
+            # Scissors
+            # =================================================
+
+            self.placement_initializer.append_sampler(
+                sampler=UniformRandomSampler(
+                    name="ScissorsSampler",
+
+                    x_range=[
+                        SCISSORS_X,
+                        SCISSORS_X,
+                    ],
+
+                    y_range=[
+                        SCISSORS_Y,
+                        SCISSORS_Y,
+                    ],
+
+                    rotation=UTENSIL_ROTATION,
+
+                    rotation_axis="z",
+
+                    ensure_object_boundary_in_range=False,
+
+                    ensure_valid_placement=False,
+
+                    reference_pos=self.table_offset,
+
+                    z_offset=0.0,
+
+                    rng=self.rng,
+                )
+            )
+
+            # =================================================
+            # Bottle
+            # =================================================
+
+            self.placement_initializer.append_sampler(
+                sampler=UniformRandomSampler(
                     name="BottleSampler",
 
                     x_range=[
@@ -643,7 +868,7 @@ class C1_1_LegoSweep(ManipulationEnv):
 
                     ensure_object_boundary_in_range=False,
 
-                    ensure_valid_placement=True,
+                    ensure_valid_placement=False,
 
                     reference_pos=self.table_offset,
 
@@ -653,11 +878,12 @@ class C1_1_LegoSweep(ManipulationEnv):
                 )
             )
 
+            # =================================================
+            # Collection zone
+            # =================================================
 
             self.placement_initializer.append_sampler(
-
                 sampler=UniformRandomSampler(
-
                     name="CollectionZoneSampler",
 
                     x_range=[
@@ -686,39 +912,54 @@ class C1_1_LegoSweep(ManipulationEnv):
                 )
             )
 
+        # ----------------------------------------------------
+        # Sampler reset
+        # ----------------------------------------------------
 
         self.placement_initializer.reset()
 
+        # ----------------------------------------------------
+        # Object 등록
+        # ----------------------------------------------------
 
         self.placement_initializer.add_objects_to_sampler(
             "BlockSampler",
             self.blocks,
         )
 
-
         self.placement_initializer.add_objects_to_sampler(
-            "LightPlateSampler",
-            self.light_plate,
+            "PlateSampler",
+            self.plate,
         )
 
-
         self.placement_initializer.add_objects_to_sampler(
-            "HeavyPlateSampler",
-            self.heavy_plate,
+            "LadleSampler",
+            self.ladle,
         )
 
+        self.placement_initializer.add_objects_to_sampler(
+            "ForkSampler",
+            self.fork,
+        )
+
+        self.placement_initializer.add_objects_to_sampler(
+            "ScissorsSampler",
+            self.scissors,
+        )
 
         self.placement_initializer.add_objects_to_sampler(
             "BottleSampler",
             self.bottle_distractor,
         )
 
-
         self.placement_initializer.add_objects_to_sampler(
             "CollectionZoneSampler",
             self.collection_zone_visual,
         )
 
+    # ========================================================
+    # References
+    # ========================================================
 
     def _setup_references(
         self,
@@ -731,8 +972,10 @@ class C1_1_LegoSweep(ManipulationEnv):
         all_objects = (
             self.blocks
             + [
-                self.light_plate,
-                self.heavy_plate,
+                self.plate,
+                self.ladle,
+                self.fork,
+                self.scissors,
                 self.bottle_distractor,
                 self.collection_zone_visual,
             ]
@@ -754,16 +997,15 @@ class C1_1_LegoSweep(ManipulationEnv):
             )
         )
 
+        # Plate mass
         self._set_object_mass(
-            self.light_plate,
-            LIGHT_PLATE_MASS,
+            self.plate,
+            PLATE_MASS,
         )
 
-        self._set_object_mass(
-            self.heavy_plate,
-            HEAVY_PLATE_MASS,
-        )
-
+    # ========================================================
+    # Mass setting
+    # ========================================================
 
     def _set_object_mass(
         self,
@@ -771,43 +1013,92 @@ class C1_1_LegoSweep(ManipulationEnv):
         target_mass,
     ):
         """컴파일된 body 서브트리 질량을 target_mass에 맞춰 스케일한다."""
-        root_body_id = self.obj_body_id[obj.name]
+
+        root_body_id = (
+            self.obj_body_id[
+                obj.name
+            ]
+        )
+
         model = self.sim.model
 
         body_ids = []
         current_mass = 0.0
 
-        for body_id in range(model.nbody):
+        for body_id in range(
+            model.nbody
+        ):
+
             current = body_id
+
             while current != 0:
+
                 if current == root_body_id:
-                    body_ids.append(body_id)
-                    current_mass += float(model.body_mass[body_id])
+
+                    body_ids.append(
+                        body_id
+                    )
+
+                    current_mass += float(
+                        model.body_mass[
+                            body_id
+                        ]
+                    )
+
                     break
-                current = int(model.body_parentid[current])
+
+                current = int(
+                    model.body_parentid[
+                        current
+                    ]
+                )
 
         if current_mass <= 0.0:
+
             raise RuntimeError(
-                f"Cannot set mass for {obj.name}: compiled mass is 0."
+                f"Cannot set mass for {obj.name}: "
+                "compiled mass is 0."
             )
 
-        scale = float(target_mass) / current_mass
+        scale = (
+            float(target_mass)
+            / current_mass
+        )
 
         for body_id in body_ids:
-            model.body_mass[body_id] = (
-                float(model.body_mass[body_id]) * scale
-            )
-            model.body_inertia[body_id] = (
-                np.asarray(model.body_inertia[body_id], dtype=float)
+
+            model.body_mass[
+                body_id
+            ] = (
+                float(
+                    model.body_mass[
+                        body_id
+                    ]
+                )
                 * scale
             )
 
+            model.body_inertia[
+                body_id
+            ] = (
+                np.asarray(
+                    model.body_inertia[
+                        body_id
+                    ],
+                    dtype=float,
+                )
+                * scale
+            )
+
+    # ========================================================
+    # Tool metadata
+    # ========================================================
 
     def get_tool_physical_metadata(
         self,
         tool_name,
     ):
-        """스윕 도구의 물리/추론 메타데이터를 반환한다."""
+        """스윕 도구의 물리 / 추론 메타데이터를 반환한다."""
 
         if (
             tool_name
@@ -818,13 +1109,31 @@ class C1_1_LegoSweep(ManipulationEnv):
                 f"Unknown sweep tool: {tool_name}"
             )
 
-
         return dict(
             self.tool_physical_metadata[
                 tool_name
             ]
         )
 
+    def get_evaluation_material_gt(self):
+        """평가 전용 GT. 관측 및 LLM/M2 입력 경로에서는 호출하지 않는다."""
+
+        objects = (
+            self.plate,
+            self.ladle,
+            self.fork,
+            self.scissors,
+            self.bottle_distractor,
+        )
+
+        return {
+            obj.name: obj.material_gt
+            for obj in objects
+        }
+
+    # ========================================================
+    # Reset
+    # ========================================================
 
     def _reset_internal(
         self,
@@ -832,30 +1141,23 @@ class C1_1_LegoSweep(ManipulationEnv):
 
         super()._reset_internal()
 
-
-        if not (
-            self.deterministic_reset
-        ):
+        if not self.deterministic_reset:
 
             object_placements = (
                 self.placement_initializer.sample()
             )
 
-
             for (
                 obj_pos,
                 obj_quat,
                 obj,
-            ) in (
-                object_placements.values()
-            ):
+            ) in object_placements.values():
 
+                # --------------------------------------------
+                # Visual object
+                # --------------------------------------------
 
-                # 시각 전용은 joint가 없어 body pose를 직접 쓴다.
-                if (
-                    "visual"
-                    in obj.name.lower()
-                ):
+                if "visual" in obj.name.lower():
 
                     body_id = (
                         self.obj_body_id[
@@ -863,25 +1165,21 @@ class C1_1_LegoSweep(ManipulationEnv):
                         ]
                     )
 
-
                     self.sim.model.body_pos[
                         body_id
-                    ] = (
-                        obj_pos
-                    )
-
+                    ] = obj_pos
 
                     self.sim.model.body_quat[
                         body_id
-                    ] = (
-                        obj_quat
-                    )
+                    ] = obj_quat
 
+                # --------------------------------------------
+                # Physical object
+                # --------------------------------------------
 
                 else:
 
                     self.sim.data.set_joint_qpos(
-
                         obj.joints[0],
 
                         np.concatenate(
@@ -897,8 +1195,4 @@ class C1_1_LegoSweep(ManipulationEnv):
                         ),
                     )
 
-
             self.sim.forward()
-
-
- 

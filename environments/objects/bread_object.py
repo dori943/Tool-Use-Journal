@@ -9,6 +9,7 @@ from environments.objects.xml_asset import (
     make_resolved_object_xml,
     xml_bbox_full_size_m,
     xml_default_scale,
+    xml_material_gt,
 )
 
 BREAD_ASSET_DIR = OBJECTS_ASSET_DIR / "bread"
@@ -42,3 +43,7 @@ class BreadObject(MujocoXMLObject):
     @property
     def semantic_category(self) -> str:
         return "food"
+
+    @property
+    def material_gt(self) -> str:
+        return xml_material_gt(BREAD_ASSET_DIR)
