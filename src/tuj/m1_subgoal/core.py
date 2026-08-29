@@ -15,26 +15,31 @@
 
 술어 eval_by (누가 판정하나 — M5 역추적의 근거):
   m1     계획 상태만으로 판정 (hand_empty, holding, above, in)
-  m2     측정 필요 → m1_queries로 나감 (reachable, fits, clear, ee_usable, tool_sweepable)
+  m2     측정 필요 → m1_queries로 나감 (reachable, fits, clear, ee_usable,
+         batch_feasible, act_space_clear — 뒤 2종은 0828 신규: 그룹 동시 처리·실행 공간)
   motion 실행해봐야 앎 — 계획 시점 미결정으로 유보 (path_clear)
 """
 from __future__ import annotations
 
+import json
+
 # action_type 템플릿: (사전조건, establish, destroy). ?o=대상, ?r=목적지, ?t=도구
 TEMPLATES = {
-    "acquire": (["reachable(?o)", "top_exposed(?o)", "ee_usable(?EE, ?o)", "hand_empty"],
+    "acquire": (["reachable(?o)", "top_exposed(?o)", "ee_usable(?EE, ?o)",
+                 "batch_feasible(?EE, ?o)", "hand_empty"],
                 ["holding(?o)"], ["hand_empty"]),
-    "transport": (["holding(?o)", "path_clear(?o, ?r)"],
+    "transport": (["holding(?o)", "act_space_clear(?EE, ?o, ?r)", "path_clear(?o, ?r)"],
                   ["above(?o, ?r)"], []),
     "place": (["holding(?o)", "above(?o, ?r)", "fits(?o, ?r)", "clear(?r)"],
               ["in(?o, ?r)", "hand_empty"], ["holding(?o)", "above(?o, ?r)"]),
-    "tool_act:sweep": (["holding(?t)", "tool_sweepable(?t, ?targets)", "path_clear(?t, ?r)"],
+    "tool_act:sweep": (["holding(?t)", "batch_feasible(?t, ?targets)",
+                        "act_space_clear(?t, ?targets, ?r)", "path_clear(?t, ?r)"],
                        ["in(?targets, ?r)"], []),
 }
 
 EVAL_BY = {"hand_empty": "m1", "holding": "m1", "above": "m1", "in": "m1",
            "reachable": "m2", "top_exposed": "m2", "fits": "m2", "clear": "m2",
-           "ee_usable": "m2", "tool_sweepable": "m2",
+           "ee_usable": "m2", "batch_feasible": "m2", "act_space_clear": "m2",
            "path_clear": "motion"}
 
 
@@ -67,11 +72,11 @@ def decompose(subgoal: dict) -> list[dict]:
     """planning-level 서브골 1개 → 상세 서브골 목록."""
     sid, kind = subgoal["subgoal_id"], subgoal["kind"]
     if kind == "relocate":
-        if len(subgoal["target_ids"]) != 1:       # 조용히 버리는 것 금지 — 러프 단계에서 분리해야 함
-            raise ValueError(f"relocate 서브골 {sid}: target은 1개여야 한다 "
-                             f"(받은 {len(subgoal['target_ids'])}개). rough.validate_subgoals가 분리한다")
-        o, r = subgoal["target_ids"][0], subgoal["container_id"]
-        g = f"G_{o}"
+        ts = subgoal["target_ids"]
+        # 0828: 다중 target 허용 — 몇 그룹으로 나눌지는 측정(batch 질의) 후 regroup이 정한다
+        o = ts[0] if len(ts) == 1 else "{" + ",".join(ts) + "}"
+        r = subgoal["container_id"]
+        g = f"G_{sid}"
         return [
             _detail(f"{sid}_d1", "acquire", {"?o": o}, g, f"{o} 확보"),
             _detail(f"{sid}_d2", "transport", {"?o": o, "?r": r}, g, f"{o}를 {r}로 운반"),
@@ -161,6 +166,16 @@ def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
     return uniq, mutex
 
 
+def _set_members(v) -> list[str]:
+    """"{a,b,c}" 집합 표기 → 원소 리스트. 단일 id는 1원소 리스트."""
+    if v is None:
+        return []
+    v = str(v)
+    if v.startswith("{") and v.endswith("}"):
+        return [x for x in v[1:-1].split(",") if x]
+    return [v]
+
+
 def build_queries(subgoal: dict, details: list[dict]) -> list[dict]:
     """eval_by == m2 인 술어 인스턴스 → Materializer 호출 사양.
 
@@ -177,13 +192,14 @@ def build_queries(subgoal: dict, details: list[dict]) -> list[dict]:
             head = p["head"]
             if head in ("reachable", "top_exposed"):
                 oid = b.get("?o")
-                targets = tool_ids if oid == "?tool" else [oid]
+                # 집합 표기 "{a,b}"는 원소별로 펼쳐 질의 (0828 — C2_1에서 발견)
+                targets = tool_ids if oid == "?tool" else _set_members(oid)
                 for t in targets:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
                               "m2_call": {"kind": "intrinsic", "node_id": t}})
             elif head == "ee_usable":
                 oid = b.get("?o")
-                targets = tool_ids if oid == "?tool" else [oid]
+                targets = tool_ids if oid == "?tool" else _set_members(oid)
                 for t in targets:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
                               "m2_call": {"kind": "ee", "node_id": t}})
@@ -192,17 +208,38 @@ def build_queries(subgoal: dict, details: list[dict]) -> list[dict]:
                 if oid in (None, "?tool") or rid in (None, "tool_rest"):
                     continue                       # 도구 거치 위치는 측정 대상 아님
                 rel = "fits_inside" if head == "fits" else "clearance"
-                q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                          "m2_call": {"kind": "relational", "a": oid, "b": rid,
-                                      "relation": rel}})
-            elif head == "tool_sweepable":
-                for t in tool_ids:
+                for t in _set_members(oid):          # 집합이면 원소별 관계 질의
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                              "m2_call": {"kind": "ee", "node_id": t}})
+                              "m2_call": {"kind": "relational", "a": t, "b": rid,
+                                          "relation": rel}})
+            elif head in ("batch_feasible", "act_space_clear"):
+                # 0828 신규 질의. 물체 1개짜리는 묶기 판정이 필요 없어 질의를 내지 않는다
+                # (not_queried — tool_rest와 같은 취급). 액션 주체(actor):
+                # 객체를 쓰는 서브골이면 후보 객체마다 1회, 아니면 EE 풀 기준 1회.
+                members = _set_members(b.get("?targets") or b.get("?o"))
+                if "?tool" in members:
+                    continue
+                # 물체 1개면 묶기 판정 불필요 → 질의 생략 (not_queried).
+                # 단 분할된 자식 서브골은 1개여도 발행한다 — 측정 모듈이 서브골별
+                # 서브그래프를 질의 기준으로 조립하므로, 재검증 겸 자기 몫을 남긴다.
+                if len(members) < 2 and "split_from" not in subgoal:
+                    continue
+                actors = ([{"type": "object", "id": t} for t in tool_ids]
+                          if tool_ids else [{"type": "ee_pool"}])
+                call = {"kind": "batch" if head == "batch_feasible" else "swept_space",
+                        "action_type": subgoal["kind"], "member_ids": members}
+                if head == "act_space_clear":
+                    rid = b.get("?r")
+                    if rid in (None, "tool_rest"):
+                        continue
+                    call["to"] = rid
+                for a in actors:
+                    q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
+                              "m2_call": {**call, "actor": a}})
     # 동일 호출 중복 제거 (같은 노드 intrinsic 2회 등 — M2 캐시가 있지만 명세도 깨끗하게)
     seen, uniq = set(), []
     for x in q:
-        k = (x["queried_by"], tuple(sorted(x["m2_call"].items())))
+        k = (x["queried_by"], json.dumps(x["m2_call"], sort_keys=True, ensure_ascii=False))
         if k not in seen:
             seen.add(k)
             uniq.append(x)
@@ -214,8 +251,10 @@ def invariants_for(subgoals: list[dict]) -> list[dict]:
     inv = []
     for s in subgoals:
         if s["kind"] == "relocate":
-            inv.append({"id": f"INV_{s['subgoal_id']}",
-                        "expr": f"in({s['target_ids'][0]}, {s['container_id']})",
+            ts = s["target_ids"]
+            expr = (f"in({ts[0]}, {s['container_id']})" if len(ts) == 1
+                    else f"all_in({{{','.join(ts)}}}, {s['container_id']})")
+            inv.append({"id": f"INV_{s['subgoal_id']}", "expr": expr,
                         "check_at": "final"})
         elif s["kind"] == "sweep_collect":
             inv.append({"id": f"INV_{s['subgoal_id']}",
