@@ -9,6 +9,7 @@ from environments.objects.xml_asset import (
     make_resolved_object_xml,
     xml_bbox_full_size_m,
     xml_default_scale,
+    xml_material_gt,
 )
 
 PLATE_ASSET_DIR = OBJECTS_ASSET_DIR / "plate"
@@ -20,15 +21,25 @@ DEFAULT_PLATE_SCALE = xml_default_scale(PLATE_ASSET_DIR)
 class PlateObject(MujocoXMLObject):
     """Objaverse 접시. 충돌 geom은 model.xml의 convex 32개."""
 
-    def __init__(self, name: str = "plate", scale: float | None = None):
+    def __init__(
+        self,
+        name: str = "plate",
+        scale: float | None = None,
+        xml_name: str = "model.xml",
+    ):
         applied_scale = DEFAULT_PLATE_SCALE if scale is None else float(scale)
-        bbox = xml_bbox_full_size_m(PLATE_ASSET_DIR)
+        bbox = xml_bbox_full_size_m(PLATE_ASSET_DIR, xml_name=xml_name)
         scale_ratio = applied_scale / DEFAULT_PLATE_SCALE if DEFAULT_PLATE_SCALE else 1.0
         self.applied_scale = applied_scale
         self.bbox_full_size_m = tuple(v * scale_ratio for v in bbox)
+        self.xml_name = xml_name
 
         super().__init__(
-            fname=make_resolved_object_xml(PLATE_ASSET_DIR, scale=scale),
+            fname=make_resolved_object_xml(
+                PLATE_ASSET_DIR,
+                xml_name=xml_name,
+                scale=scale,
+            ),
             name=name,
             joints="default",
             obj_type="all",
@@ -42,3 +53,7 @@ class PlateObject(MujocoXMLObject):
     @property
     def semantic_category(self) -> str:
         return "dish"
+
+    @property
+    def material_gt(self) -> str:
+        return xml_material_gt(PLATE_ASSET_DIR, xml_name=self.xml_name)
