@@ -81,7 +81,9 @@ def _xy_overlap(a, b):
     return ov
 
 def _on(a, b):
-    return abs(_iv(a, 2)[0] - _iv(b, 2)[1]) < ON_TOL_MM
+    """a가 b 위에: a 바닥 ≈ b 상단, 그리고 a 중심이 b 중심보다 위 (얇은 객체 양방향 오발화 방지)."""
+    return (abs(_iv(a, 2)[0] - _iv(b, 2)[1]) < ON_TOL_MM
+            and a["center_mm"][2] > b["center_mm"][2])
 
 def _inside(a, b):
     xy_in = all(_iv(b, k)[0] <= _iv(a, k)[0] and _iv(a, k)[1] <= _iv(b, k)[1] for k in range(2))
