@@ -69,3 +69,43 @@ def opening_pass(passer: dict, opening_height_mm: float, pass_height_mm: float) 
     return {"type": "opening_pass", "value_mm": round(v, 1),
             "check": f"opening_{opening_height_mm} - pass_height_{pass_height_mm}",
             "pass": bool(v > 0)}
+
+
+# ── 0828 신규 (프로토타입, 수빈 작성 — push 전 협의) ────────────────────────
+# batch / swept_space 질의용 집합 산술. 기존 함수들과 같은 bbox 산술, VLM 0회.
+def group_extent(nodes: list[dict]) -> dict:
+    """물체 집합이 xy 평면에서 차지하는 최대 폭 (bbox 경계 기준) — batch 질의의 demand."""
+    spans = []
+    for ax in (0, 1):
+        lo = min(n["center_mm"][ax] - n["bbox_mm"][ax] / 2 for n in nodes)
+        hi = max(n["center_mm"][ax] + n["bbox_mm"][ax] / 2 for n in nodes)
+        spans.append(hi - lo)
+    v = max(spans)
+    return {"type": "group_extent", "value_mm": round(v, 1),
+            "check": f"max_xy_span_of_{len(nodes)}_nodes", "pass": True}
+
+
+def corridor_blockers(members: list[dict], to_node: dict, width_mm: float,
+                      others: list[dict]) -> dict:
+    """시작(집합 중심)→목적지 직선 통로(폭 width_mm)와 겹치는 노드 — swept_space 질의용.
+    정밀 궤적이 아니라 bbox 산술 근사다. 실제로 어느 수준까지 계산할지는 협의 항목.
+    """
+    s = np.mean([np.asarray(n["center_mm"][:2], float) for n in members], axis=0)
+    e = np.asarray(to_node["center_mm"][:2], float)
+    d = e - s
+    length = float(np.linalg.norm(d)) or 1.0
+    u = d / length
+    blockers = []
+    for n in others:
+        p = np.asarray(n["center_mm"][:2], float) - s
+        along = float(p @ u)
+        if not 0.0 <= along <= length:
+            continue
+        perp = abs(float(-p[0] * u[1] + p[1] * u[0]))
+        r = max(n["bbox_mm"][0], n["bbox_mm"][1]) / 2
+        overlap = (width_mm / 2 + r) - perp
+        if overlap > 0:
+            blockers.append({"node_id": n["id"], "overlap_mm": round(overlap, 1)})
+    margin = round(-max((b["overlap_mm"] for b in blockers), default=-width_mm / 2), 1)
+    return {"type": "swept_space", "clear": not blockers,
+            "margin_mm": margin, "blockers": blockers}

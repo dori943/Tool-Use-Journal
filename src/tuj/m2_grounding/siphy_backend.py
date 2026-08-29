@@ -16,6 +16,10 @@
     carving bound로 부피 상한              →  bbox 부피 상한 (단일 뷰라 카빙 불가)
     × correction_factor 0.6                →  동일 (mass.json 기본값)
 
+top-1 확정 게이트 (우리 추가): gap = probs[top1] − probs[top2] > TOP1_GAP 이면
+  재료 분포를 top-1에 원-핫 확정 → density·mass·μ 상류가 top-1 재료 값으로 일관.
+  gap 작으면 SiPhy 원 철학(재료 확정 안 함, 분포 가중평균) 유지.
+
 API 키: OPENAI_API_KEY 환경변수 또는 레포 루트 my_api_key.py (SiPhy 관례 동일).
 """
 from __future__ import annotations
@@ -34,6 +38,7 @@ from .intrinsic import PropertyBackend
 CORRECTION_FACTOR = 0.60
 K_MATERIALS = 5
 MAX_TRIES = 3        # gpt_wrapper의 재시도 (원본 10 → 우리 예산에 맞게 축소)
+TOP1_GAP = 0.15      # top-1과 top-2 확률차가 이 이상이면 top-1 확정 (분포 → 원-핫)
 
 # 원본 프롬프트 3종(PRED_CAND_MATS_DENSITY_SYS_MSG_4V + PRED_THICKNESS_SYS_MSG +
 # PRED_CAND_MATS_YOUNG_MODULUS_SYS_MSG + BLIP-2 0-10 confidence)을 1콜 JSON으로 병합.
@@ -125,6 +130,18 @@ def shell_mass_integral(points_mm, probs, dens, thick_cm, correction=CORRECTION_
             "cell_size_mm": round(s * 1000.0, 2), "volume_bounded": bounded}
 
 
+def _effective_probs(probs: np.ndarray, gap_threshold: float = TOP1_GAP):
+    """top-1 gap이 임계 이상이면 원-핫 확정, 아니면 원 분포 유지.
+    → (probs_used, top_idx, gap, committed_top1)  committed는 M1/로깅용 플래그."""
+    order = np.argsort(-probs)
+    top, second = int(order[0]), int(order[1]) if len(order) > 1 else int(order[0])
+    gap = float(probs[top] - probs[second])
+    if gap > gap_threshold:
+        p = np.zeros_like(probs); p[top] = 1.0
+        return p, top, gap, True
+    return probs, top, gap, False
+
+
 class SiPhyBackend(PropertyBackend):
     """crop RGB 1장 → material/density/mass/E (+ 재료 후보 분포).
 
@@ -180,25 +197,29 @@ class SiPhyBackend(PropertyBackend):
         mats = prop["materials"]
 
         conf = np.array([m["confidence"] for m in mats], dtype=np.float64)
-        probs = conf / conf.sum() if conf.sum() > 0 else np.full(len(mats), 1 / len(mats))
+        probs_raw = conf / conf.sum() if conf.sum() > 0 else np.full(len(mats), 1 / len(mats))
+        # top-1 gap 게이트: gap > 임계면 원-핫 확정, 아니면 분포 유지 (원 SiPhy 철학)
+        probs, top, gap, committed = _effective_probs(probs_raw)
+
         dens = np.array([m["density"] for m in mats])            # (K,2)
         thick = np.array([m["thickness_cm"] for m in mats])      # (K,2)
         youngs = np.array([m["youngs_gpa"] for m in mats])       # (K,2)
-        top = int(np.argmax(probs))
 
         out = {
             "material": mats[top]["name"],
-            "density_kgm3": round(float(probs @ dens.mean(axis=1)), 1),
-            "youngs_gpa": round(float(probs @ youngs.mean(axis=1)), 2),
+            "density_kgm3": round(float(probs @ dens.mean(axis=1)), 1),   # committed면 top-1 밀도
+            "youngs_gpa": round(float(probs @ youngs.mean(axis=1)), 2),   # committed면 top-1 E
             "mass_kg": None,
-            "confidence": round(float(probs[top]), 3),
+            "confidence": round(float(probs_raw[top]), 3),
+            "material_committed": committed,                     # True면 top-1 확정 사용
+            "top1_gap": round(gap, 3),                           # 게이트 판단 근거
             "caption": prop["caption"],
-            "materials_topk": [
+            "materials_topk": [                                  # 원 분포 (원-핫 여부와 무관하게 보존)
                 {"name": m["name"], "prob": round(float(p), 3),
                  "density_kgm3": list(m["density"]), "thickness_cm": list(m["thickness_cm"])}
-                for m, p in zip(mats, probs)],
+                for m, p in zip(mats, probs_raw)],
         }
-        if points_mm is not None and len(points_mm) >= 3:        # SiPhy 부피적분
+        if points_mm is not None and len(points_mm) >= 3:        # SiPhy 부피적분 (동일 probs 사용)
             out.update(shell_mass_integral(points_mm, probs, dens, thick))
         return out
 
