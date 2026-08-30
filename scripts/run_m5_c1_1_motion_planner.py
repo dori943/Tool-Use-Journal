@@ -20,14 +20,14 @@ SOURCE_ROOT = REPOSITORY / "src"
 MOTION_RUNNER = (
     SOURCE_ROOT
     / "tuj"
-    / "m4_motion"
+    / "m5_motion"
     / "examples"
     / "c1_1_openai_motion_run.py"
 )
 DEFAULT_MOTION_PROFILE = (
     SOURCE_ROOT
     / "tuj"
-    / "m4_motion"
+    / "m5_motion"
     / "examples"
     / "c1_1_physical_grasp_profile.json"
 )

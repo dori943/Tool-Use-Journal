@@ -1,321 +1,169 @@
 # -*- coding: utf-8 -*-
-"""M2 실행기 — M0 산출물 + m1.json으로 M2 접지 → gk_<SG>.json, m2.json 산출.
+"""M2 실행기 — 예빈 태스크 2종(C1-T1, C2-T1)에 M2을 돌려 서브골 JSON을 산출.
 
 사용법:
-  python scripts/run_m2.py c1_1                       # 기본: SiPhy 백엔드 (VLM 1콜/객체)
-  python scripts/run_m2.py c1_1 --backend mock        # 배관 검증용 mock (물성값은 MockBackend 기본표)
+  python scripts/run_m2.py c1_1              # output/c1_1/m1.json 있으면 그걸로, 없으면 mock
   python scripts/run_m2.py c2_1
-선행: python scripts/run_m0.py <task>                 (m0 산출물 생성)
+  python scripts/run_m2.py c1_1 --m1-json path.json   # M1 JSON 경로 직접 지정
 
-입력: output/<task>/m1.json — M1 출력. "m1_queries" 리스트를 실행.
-      m2_call.kind ∈ intrinsic | ee | relational | top_exposed | clear | batch | swept_space
-      queried_by가 술어 id → 응답과 G_k에 각인. m1.json 없으면 내장 데모 폴백.
-출력: output/<task>/m2.json          — M1 응답 {"responses": [{subgoal_id, queried_by, ...}]}
-      output/<task>/gk_<SG>.json     — 서브골별 G_k (M3 입력)
-      output/<task>/m2_intrinsic.json — Tier-2 접지 캐시
+서브골 생성은 항상 LLM(gpt-4o)이다 → OPENAI_API_KEY 필수.
 
-siphy 백엔드: OPENAI_API_KEY 환경변수 또는 레포 루트 my_api_key.py (SiPhy 관례).
+출력: output/<task>/m2.json (팀 구조 — main의 M1·M3 산출물 폴더 명명과 동일: output/c1_1/)
+      내용: 서브골·부분순서·mutex·M3 질의 사양·invariant
+
+G_k는 여기서 만들지 않는다. G_k 조립은 M3 몫 — M2은 질의 목록(m2_queries)만
+넘기고, M3가 답을 채워 G_k를 조립한다. (0820 합의: M2 아웃풋에서 G_k 제외)
+
+mock M1 수치는 예빈 씬 노션 표 기준의 근사값 — 실제 실행 시 M1가 대체한다.
 """
 from __future__ import annotations
 
 import json
 import os
 import sys
-from collections import defaultdict
-from pathlib import Path
+
+sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 import numpy as np
 
-ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT))
-sys.path.insert(0, str(ROOT / "src"))
+from tuj.m1_scene.abstraction import build_m1, serialize
+from tuj.m2_subgoal.pipeline import run_m2
+from tuj.m2_subgoal.rough import LLMRough
 
-from tuj.m2_grounding import Materializer, MockBackend, PropertyMemory, SiPhyBackend, new_gk
-
-
-# ── 술어 → m2_call 컴파일 (m1_queries가 안 실은 eval_by:m2 술어 보충) ──
-HEAD_MAP = {
-    "reachable":      ("ee", None),
-    "ee_usable":      ("ee", None),
-    "tool_sweepable": ("ee", None),
-    "top_exposed":    ("top_exposed", None),
-    "clear":          ("clear", None),
-    "fits":           ("relational", "fits_inside"),
-    "gap":            ("relational", "gap"),
-    "distance":       ("relational", "distance"),
-    "clearance":      ("relational", "clearance"),
-    # 집합형(batch/swept_space): m1_queries가 직접 실어야 함, 컴파일러는 스킵
-    "batch_feasible":  ("__skip__", None),
-    "act_space_clear": ("__skip__", None),
-}
-NEEDS_COMPILE = (None, "not_queried", "unknown", "unanswered")
+RNG = np.random.default_rng(0)          # mock 점군 결정론
 
 
-def load_m0(out):
-    m0 = json.loads((out / "m0.json").read_text(encoding="utf-8"))
-    pts = np.load(out / "m0_points.npz")
-    for n in m0["nodes"]:
-        n["_points"] = pts[n["id"]]
-    return m0
+def box_points(center_mm, size_mm, n=400):
+    c, s = np.asarray(center_mm, float), np.asarray(size_mm, float)
+    return c + (RNG.random((n, 3)) - 0.5) * s
 
 
-def crop_of(out, node_id):
-    p = out / "crops" / f"{node_id}.png"
-    return p if p.exists() else None
+def spec_to_objects(spec):
+    return [{"name": name, "cls": cls, "points": box_points(c, s)}
+            for name, cls, c, s in spec]
 
 
-def compile_predicates(m1, ids, aliases):
-    """details의 eval_by:m2 술어 중 미질의/미해결 → 질의 목록으로 컴파일."""
-    def resolve(tok, sg):
-        tok = tok.strip()
-        if tok.startswith("obj_"):
-            return [tok] if tok in ids else []
-        if tok.startswith("?"):
-            return [t for t in sg.get("tool_candidate_ids", []) if t in ids]
-        return aliases.get(tok, [])
+# ── 씬 스펙: (name, class, center_mm, bbox_mm) — 예빈 env 근사 ──────────────
 
-    out = []
-    for sg in m1.get("m1_subgoals", []):
-        for d in sg.get("details", []):
-            for p in d.get("pre", []) + d.get("establish", []):
-                if p.get("eval_by") != "m2" or p.get("status", None) not in NEEDS_COMPILE:
-                    continue
-                head = p.get("head")
-                if head not in HEAD_MAP:
-                    out.append({"subgoal_id": sg["subgoal_id"], "queried_by": p["id"],
-                                "kind": "error", "error": f"no mapping for head: {head}"})
-                    continue
-                kind, relation = HEAD_MAP[head]
-                if kind == "__skip__":
-                    continue
-                args = [a for a in p["expr"].split("(", 1)[-1].rstrip(")").split(",")
-                        if not a.strip().startswith("{")]
-                targets = [resolve(a, sg) for a in args] or [[]]
-                base = {"subgoal_id": sg["subgoal_id"], "queried_by": p["id"], "kind": kind}
-                if kind == "relational":
-                    a_list, b_list = (targets + [[]])[:2]
-                    for a in a_list:
-                        for b in b_list:
-                            out.append(base | {"a": a, "b": b, "relation": relation})
-                    if not (a_list and b_list):
-                        out.append(base | {"kind": "error",
-                                           "error": f"unresolved args in {p['expr']!r} "
-                                                    f"(별칭/노드 미해결 — m0 추적 대상 확인)"})
-                else:
-                    nodes = targets[-1] if head == "ee_usable" else targets[0]
-                    for n in nodes:
-                        out.append(base | {"node_id": n})
-                    if not nodes:
-                        out.append(base | {"kind": "error",
-                                           "error": f"unresolved args in {p['expr']!r}"})
-    return out
+def scene_c1_1():
+    spec = []
+    for i in range(12):                  # 레고 12개, 테이블 위 분산
+        spec.append((f"block_{i}", "block",
+                     [420 + 30 * (i % 4), -90 + 30 * (i // 4), 810], [20, 20, 12]))
+    spec += [
+        ("light_plate", "plate", [250, 250, 810], [200, 220, 10]),
+        ("heavy_plate", "plate", [250, -250, 810], [200, 220, 10]),
+        ("bottle_distractor", "bottle", [150, 150, 860], [60, 60, 120]),
+        ("collection_zone_visual", "collection_zone", [650, 0, 802], [250, 180, 4]),
+    ]
+    task = "테이블에 흩어진 레고 블록을 수거 영역으로 쓸어 담아라"
+    return task, spec
+
+
+def scene_c2_1():
+    spec = [
+        ("apple", "apple", [420, -150, 840], [75, 75, 75]),
+        ("bread", "bread", [470, -60, 830], [100, 60, 50]),
+        ("mug", "mug", [430, 40, 845], [90, 80, 95]),
+        ("plate", "plate", [500, 140, 808], [200, 200, 15]),
+        ("spoon", "spoon", [380, 210, 805], [150, 30, 10]),
+        ("green_tray", "tray", [680, -200, 818], [250, 180, 35]),
+        ("blue_tray", "tray", [700, 0, 818], [250, 180, 35]),
+        ("red_tray", "tray", [680, 200, 818], [250, 180, 35]),
+    ]
+    task = "사과와 빵은 초록 트레이, 머그는 파랑 트레이, 접시와 숟가락은 빨강 트레이로 옮겨라"
+    return task, spec
 
 
 def main():
-    name = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else "c1_1"
-    args = sys.argv[2:]
-    backend_name = args[args.index("--backend") + 1] if "--backend" in args else "siphy"
-    model = args[args.index("--model") + 1] if "--model" in args else "gpt-4o-mini"
-    memory_path = args[args.index("--memory") + 1] if "--memory" in args else str(ROOT / "output" / "memory.json")
+    name = sys.argv[1] if len(sys.argv) > 1 else "c1_1"
+    m1_json = None
+    if "--m1-json" in sys.argv:
+        m1_json = sys.argv[sys.argv.index("--m1-json") + 1]
+    tdir = os.path.join("output", name)      # output/c1_1/ (main의 M1·M3 폴더와 동일 명명)
+    os.makedirs(tdir, exist_ok=True)
+    if not m1_json and os.path.exists(os.path.join(tdir, "m1.json")):
+        m1_json = os.path.join(tdir, "m1.json")             # M1 모듈 출력 자동 사용
 
-    OUT = ROOT / "output" / name
-    if not (OUT / "m0.json").exists():
-        sys.exit(f"[err] {OUT}/m0.json 없음 — 먼저 python scripts/run_m0.py {name}")
+    if m1_json:                          # 실제 M1 serialize() 출력으로
+        with open(m1_json, encoding="utf-8") as f:
+            m1s = json.load(f)
+        task, _ = scene_c1_1() if name == "c1_1" else scene_c2_1()
+        print(f"[M1] {m1_json} 사용")
+    else:                                # mock M1 (씬 근사 수치)
+        task, spec = scene_c1_1() if name == "c1_1" else scene_c2_1()
+        m1s = serialize(build_m1(spec_to_objects(spec)))
+        print("[M1] mock 수치 사용 (실제 M1 JSON 없음)")
 
-    m0 = load_m0(OUT)
-    print(f"[M2] task={name} m0 로드: nodes={len(m0['nodes'])} edges={len(m0['edges'])} "
-          f"backend={backend_name}")
+    # ── M3 응답 경로 결정: output/<task-id>/m3.json 자동 또는 --m3-json 경로 ──
+    m3_json = None
+    if "--m3-json" in sys.argv:
+        m3_json = sys.argv[sys.argv.index("--m3-json") + 1]
+    elif os.path.exists(os.path.join(tdir, "m3.json")):
+        m3_json = os.path.join(tdir, "m3.json")
 
-    if backend_name == "siphy":
-        backend = SiPhyBackend(model=model, repo_root=ROOT, verbose=True)
-    else:
-        backend = MockBackend()
+    # ── 0828 안전장치(사전): 직전 왕복이 이미 완료된 세트면 덮어쓰지 않는다 ──
+    # 분할된 m2.json과 그 자식 질의에 대한 m3.json이 짝으로 남아 있을 때 run_m2을
+    # 또 돌리면, 새 분해(부모 id)와 자식 응답이 매칭되지 않아 분할이 풀린 계획으로
+    # 덮어써진다. 왕복의 마지막은 항상 run_m3다.
+    prev_path = os.path.join(tdir, "m2.json")
+    if m3_json and os.path.exists(prev_path):
+        with open(prev_path, encoding="utf-8") as f:
+            prev = json.load(f)
+        with open(m3_json, encoding="utf-8") as f:
+            raw0 = json.load(f)
+        prev_q = {q["queried_by"] for q in prev.get("m2_queries", [])}
+        resp_q = {r.get("queried_by")
+                  for r in (raw0["responses"] if isinstance(raw0, dict) else raw0)
+                  if r.get("queried_by")}
+        if prev.get("m2_stats", {}).get("n_split_subgoals") and resp_q and resp_q <= prev_q:
+            sys.exit("[중단] 분할 완료된 m2.json과 m3.json이 이미 짝이 맞는 최종 세트입니다.\n"
+                     "  여기서 run_m2을 다시 돌리면 분할이 풀린 계획으로 덮어써집니다.\n"
+                     "  다음 단계로 진행하거나, 처음부터 다시 돌리려면 m2.json을 지운 뒤 실행하십시오.")
 
-    spec = json.loads((ROOT / "configs" / "robot_spec.json").read_text(encoding="utf-8"))
-    ee_pool = []
-    for e in spec["ee_pool"]:
-        e = dict(e)
-        if "flatness_tol_rms_mm" in e:
-            e["seal_rms_tol_mm"] = e["flatness_tol_rms_mm"]
-        ee_pool.append(e)
+    rough = LLMRough()                          # 서브골 생성은 항상 LLM
+    out = run_m2(task, m1s, rough=rough)
 
-    memory = None if memory_path == "none" else PropertyMemory(memory_path)
-    mat = Materializer(m0, backend=backend, memory=memory,
-                       logger=lambda **kw: print("  [m2]", kw))
-    preloaded = len(mat._cache)
-    if preloaded:
-        print(f"[M2] memory preload: {preloaded}개 객체 hit (VLM 스킵)")
-    ids = {n["id"]: n for n in m0["nodes"]}
+    if m3_json:
+        from tuj.m2_subgoal.ingest import apply_m3, update_confidence
+        with open(m3_json, encoding="utf-8") as f:
+            raw = json.load(f)
+        responses = raw["responses"] if isinstance(raw, dict) else raw
+        # ── 0828 안전장치(사후): 응답이 이번 분해의 질의와 하나도 안 맞으면 중단 ──
+        qids = {q["queried_by"] for q in out["m2_queries"]}
+        rids = {r.get("queried_by") for r in responses if r.get("queried_by")}
+        if rids and not (qids & rids):
+            sys.exit("[중단] m3.json 응답이 이번 분해의 질의와 하나도 매칭되지 않습니다.\n"
+                     "  run_m3 -> run_m2 -> run_m3 왕복 순서를 확인하십시오. (m2.json 미변경)")
+        for line in apply_m3(out, responses):
+            print(line)
+        # 측정 반영 후 자기보고 신뢰도 갱신 (LLM 3차 호출)
+        for line in update_confidence(out, rough._client, rough.model,
+                                      usage_acc=rough.usage):
+            print(line)
+        out["m2_stats"]["llm_usage"] = rough.usage
+        # 0828: batch 응답의 partition대로 서브골 분할 (확보/반환은 한 번만 생성)
+        from tuj.m2_subgoal.regroup import split_after_m3
+        for line in split_after_m3(out):
+            print(line)
 
-    m1_path = OUT / "m1.json"
-    m1 = {}
-    if m1_path.exists():
-        m1 = json.loads(m1_path.read_text(encoding="utf-8"))
-        queries = [{"subgoal_id": q.get("subgoal_id", "SG"),
-                    "queried_by": q["queried_by"], **q["m2_call"]}
-                   for q in m1["m1_queries"]]
-        # 영역 별칭: tool_rest → 랙 몸체(ee_rack)만. 랙에 꽂힌 EE 부품(gripperrack_*)은 제외.
-        aliases = {"tool_rest": [i for i in ids
-                                 if "rack" in i.lower() and "gripperrack" not in i.lower()]}
-        compiled = compile_predicates(m1, ids, aliases)
-        key = lambda q: (q["queried_by"], q.get("node_id") or (q.get("a"), q.get("b")))
-        already = {key(q) for q in queries}
-        compiled = [q for q in compiled if key(q) not in already]
-        for q in compiled:
-            print(f"  [compile] {q['queried_by']} -> {q['kind']}"
-                  f"({q.get('node_id') or (q.get('a'), q.get('b')) or q.get('error')})")
-        queries += compiled
-        for sg in m1.get("m1_subgoals", []):
-            sel = set(sg.get("object_ids", []))
-            asked = {q.get("node_id") for q in queries if q["subgoal_id"] == sg["subgoal_id"]} \
-                  | {x for q in queries if q["subgoal_id"] == sg["subgoal_id"]
-                     for x in (q.get("a"), q.get("b")) if x} \
-                  | {x for q in queries if q["subgoal_id"] == sg["subgoal_id"]
-                     for x in q.get("member_ids", [])}
-            if asked - sel - {None}:
-                print(f"  [lint] {sg['subgoal_id']}: object_ids 밖 질의 {sorted(asked - sel - {None})}")
-            never = sel - asked - set(sg.get("target_ids", []))
-            if never:
-                print(f"  [lint] {sg['subgoal_id']}: 선택됐지만 질의 0건 {sorted(never)}")
-        print(f"[M2] m1.json 로드: task={m1.get('task', '?')!r} "
-              f"queries={len(queries)} (컴파일 보충 {len(compiled)}건)")
-    else:
-        def find(sub):
-            return next((i for i in ids if sub in i), None)
-        light = find("light_plate") or next(iter(ids))
-        queries = [{"subgoal_id": "SG1", "queried_by": "demo_ee", "kind": "ee", "node_id": light}]
-        print("[M2] m1.json 없음 → 내장 데모 질의 사용")
+    with open(os.path.join(tdir, "m2.json"), "w", encoding="utf-8") as f:
+        json.dump(out, f, ensure_ascii=False, indent=2)
 
-    responses = []
-    gk_of = {}
-    for q in queries:
-        gk = gk_of.setdefault(q["subgoal_id"], new_gk(q["subgoal_id"]))
-        qid, kind = q["queried_by"], q["kind"]
-        try:
-            if kind == "ee":
-                r = mat.query_ee(gk, q["node_id"], ee_pool, queried_by=qid,
-                                 reach_mm=spec["reach_mm"], crop_rgb=crop_of(OUT, q["node_id"]))
-            elif kind == "intrinsic":
-                r = mat.query_intrinsic(gk, q["node_id"], queried_by=qid,
-                                        crop_rgb=crop_of(OUT, q["node_id"]))
-            elif kind == "relational":
-                a = q.get("a") or q.get("a_id") or q.get("from")
-                b = q.get("b") or q.get("b_id") or q.get("to")
-                r = mat.query_relational(gk, a, b, q.get("relation", "distance"),
-                                         queried_by=qid, **q.get("kw", {}))
-            elif kind == "top_exposed":
-                r = mat.query_top_exposed(gk, q["node_id"], queried_by=qid)
-            elif kind == "clear":
-                r = mat.query_clear(gk, q["node_id"], queried_by=qid)
-            elif kind in ("batch", "swept_space"):
-                call = {"kind": kind, "action_type": q.get("action_type"),
-                        "actor": q.get("actor"), "member_ids": q.get("member_ids", []),
-                        "to": q.get("to")}
-                fn = mat.query_batch if kind == "batch" else mat.query_swept_space
-                r = fn(gk, call, queried_by=qid)
-            elif kind == "error":
-                r = {"queried_by": qid, "error": q["error"]}
-                print(f"  [warn] {qid}: {q['error']}")
-            else:
-                r = {"queried_by": qid, "error": f"unsupported kind: {kind}"}
-                print(f"  [warn] {r['error']}")
-        except KeyError as e:
-            r = {"queried_by": qid, "node_id": q.get("node_id"),
-                 "error": f"node not in m0: {e}"}
-            print(f"  [warn] {qid}: {r['error']}")
-        responses.append({"subgoal_id": q["subgoal_id"]} | r)
-
-    # 서브골 자기완결 gk 조립
-    subs = {s["subgoal_id"]: s for s in m1.get("m1_subgoals", [])}
-    for sid in subs:
-        gk_of.setdefault(sid, new_gk(sid))
-    extra = defaultdict(lambda: {"batch": [], "swept_space": []})
-    for r0 in responses:
-        if r0.get("kind") in ("batch", "swept_space"):
-            extra[r0.get("subgoal_id")][r0["kind"]].append(r0)
-    gks = list(gk_of.values())
-    for gk in gks:
-        sid = gk["subgoal_id"]
-        s = subs.get(sid)
-        if not s:
-            continue
-        gk["task"] = m1.get("task")
-        gk["goal"] = s.get("goal")
-        gk["subgoal_kind"] = s.get("kind")
-        gk["roles"] = {"target": s.get("target_ids", []),
-                       "container": s.get("container_id"),
-                       "tool_candidates": s.get("tool_candidate_ids", []),
-                       "selected_tool": s.get("selected_tool_id"),
-                       "selection_evidence": s.get("selection_evidence")}
-        gk["details"] = [
-            {"detail_id": d["detail_id"], "action_type": d["action_type"],
-             "binding": d["binding"],
-             "pre": [{k: p[k] for k in ("id", "expr", "eval_by", "status", "evidence")
-                      if k in p} for p in d.get("pre", [])],
-             "establish": [p["expr"] for p in d.get("establish", [])],
-             "destroy": [p["expr"] for p in d.get("destroy", [])]}
-            for d in s.get("details", [])]
-        gk["partial_order"] = [e for e in m1.get("m1_partial_order", [])
-                               if e["from"].startswith(sid + "_")
-                               or e["to"].startswith(sid + "_")]
-        gk["mutex"] = [x for x in m1.get("m1_mutex", [])
-                       if any(any(did.startswith(sid + "_") for did in g)
-                              for g in x.get("groups", []))]
-        gk["invariants"] = [i for i in m1.get("m1_invariants", [])
-                            if i.get("id") == f"INV_{sid}"]
-        gk["batch"] = extra[sid]["batch"]
-        gk["swept_space"] = extra[sid]["swept_space"]
-        if s.get("split_from"):
-            gk["split_from"] = s["split_from"]
-            gk["split_index"] = s.get("split_index")
-    # selected_tool 노드 복제 (얕은 복사 + queried_by 초기화 + replicated_from 태그)
-    for gk in gks:
-        tool = (gk.get("roles") or {}).get("selected_tool")
-        sid = gk["subgoal_id"]
-        if tool and tool not in gk.get("nodes", {}):
-            for other in gks:
-                src = other.get("nodes", {}).get(tool)
-                if src is None or other["subgoal_id"] == sid:
-                    continue
-                clone = dict(src)
-                clone["queried_by"] = []
-                clone["replicated_from"] = other["subgoal_id"]
-                gk["nodes"][tool] = clone
-                break
-
-    def strip(o):
-        if isinstance(o, dict):
-            return {k: strip(v) for k, v in o.items() if not k.startswith("_")}
-        if isinstance(o, list):
-            return [strip(x) for x in o]
-        if isinstance(o, (np.floating, np.integer)):
-            return o.item()
-        return o
-
-    for gk in gks:
-        (OUT / f"gk_{gk['subgoal_id']}.json").write_text(
-            json.dumps(strip(gk), ensure_ascii=False, indent=2), encoding="utf-8")
-    (OUT / "m2.json").write_text(
-        json.dumps({"responses": strip(responses)}, ensure_ascii=False, indent=2),
-        encoding="utf-8")
-    (OUT / "m2_intrinsic.json").write_text(
-        json.dumps(strip(dict(mat._cache)), ensure_ascii=False, indent=2), encoding="utf-8")
-
-    n_t2 = len(mat._cache)
-    if memory is not None:
-        stats = memory.update(mat._cache, source=backend_name)
-        memory.save()
-        print(f"[M2] memory update: new={stats['new']} upgraded={stats['upgraded']} "
-              f"kept={stats['kept']} -> {memory_path}")
-    print(f"\n[{name}] tier-2 접지 {n_t2}/{len(m0['nodes'])} 객체 (lazy, preload {preloaded}건 포함),"
-          f" 응답 {len(responses)}건 -> m2.json, " + ", ".join(f"gk_{g['subgoal_id']}.json" for g in gks))
-    for gk in gks:
-        for nid, entry in gk["nodes"].items():
-            if entry.get("ee"):
-                feas = [k for k, v in entry["ee"].items() if v["feasible"]]
-                print(f"     {nid}: mass_est={entry.get('mass_kg')}kg feasible_ee={feas}"
-                      + (f" [replicated_from={entry['replicated_from']}]" if 'replicated_from' in entry else ""))
-    print(f"[DONE] -> {OUT}")
+    s = out["m2_stats"]
+    usage = s.get("llm_usage") or {}
+    if usage:
+        total = sum(e["tokens"] for e in usage.values())
+        tsec = sum(e.get("seconds", 0.0) for e in usage.values())
+        parts = " / ".join(
+            f"{k} {e['tokens']}tok({e['calls']}회, {e.get('seconds', 0):.1f}s)"
+            for k, e in usage.items())
+        print(f"  [M2 tokens] {parts} | 합계 {total}tok, {tsec:.1f}s")
+    print(f"[{name}] 서브골 {s['n_subgoals']} → 상세 {s['n_details']} | "
+          f"DAG 엣지 {s['n_edges']} | mutex {s['n_mutex']} | M3 질의 {s['n_m3_queries']}")
+    for e in out["m2_partial_order"]:
+        print(f"  {e['from']} -> {e['to']}   ({e['why']})")
+    print(f"-> {tdir}/m2.json")
 
 
 if __name__ == "__main__":

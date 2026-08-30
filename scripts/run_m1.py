@@ -1,169 +1,274 @@
 # -*- coding: utf-8 -*-
-"""M1 실행기 — 예빈 태스크 2종(C1-T1, C2-T1)에 M1을 돌려 서브골 JSON을 산출.
+"""M1 실행기 — 예빈 태스크에서 M1 접지 산출물을 뽑는다.
 
 사용법:
-  python scripts/run_m1.py c1_1              # output/c1_1/m0.json 있으면 그걸로, 없으면 mock
-  python scripts/run_m1.py c2_1
-  python scripts/run_m1.py c1_1 --m0-json path.json   # M0 JSON 경로 직접 지정
+  python scripts/run_m1.py c1_1
+  python scripts/run_m1.py c2_1 --view
 
-서브골 생성은 항상 LLM(gpt-4o)이다 → OPENAI_API_KEY 필수.
+출력: output/<task>/m1.json          — bbox 노드 + coarse 관계 (M2 전달용, VLM 0회)
+      output/<task>/m1_points.npz   — 노드별 점군 (M3 접지 입력)
+      output/<task>/crops/*.png     — 노드별 마스크 크롭 (SiPhy 백엔드 VLM 입력)
+      output/<task>/frame*.png      — 카메라 진단용 프레임
 
-출력: output/<task>/m1.json (팀 구조 — main의 M0·M2 산출물 폴더 명명과 동일: output/c1_1/)
-      내용: 서브골·부분순서·mutex·M2 질의 사양·invariant
-
-G_k는 여기서 만들지 않는다. G_k 조립은 M2 몫 — M1은 질의 목록(m1_queries)만
-넘기고, M2가 답을 채워 G_k를 조립한다. (0820 합의: M1 아웃풋에서 G_k 제외)
-
-mock M0 수치는 예빈 씬 노션 표 기준의 근사값 — 실제 실행 시 M0가 대체한다.
+태스크 추가: 아래 TASKS 딕셔너리에 항목 하나 등록 (env_name / class_of / bound_objects).
+M3는 robosuite 없이 이 출력만으로 실행 가능 → M3 쪽 반복 실험 시 sim 재기동 불필요.
 """
 from __future__ import annotations
 
 import json
 import os
+import re
 import sys
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+from pathlib import Path
 
 import numpy as np
 
-from tuj.m0_scene.abstraction import build_m0, serialize
-from tuj.m1_subgoal.pipeline import run_m1
-from tuj.m1_subgoal.rough import LLMRough
+ROOT = Path(__file__).resolve().parents[1]
+sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 
-RNG = np.random.default_rng(0)          # mock 점군 결정론
+# Windows 렌더링 백엔드 교정 — mujoco/robosuite import 전에 처리해야 유효
+import platform
+if platform.system() == "Windows" and os.environ.get("MUJOCO_GL", "").lower() not in ("", "wgl", "glfw"):
+    print(f"[fix] MUJOCO_GL={os.environ.get('MUJOCO_GL')} -> wgl")
+    os.environ["MUJOCO_GL"] = "wgl"
 
+import robosuite.macros as macros
+macros.IMAGE_CONVENTION = "opencv"                     # 상하반전 방지 (역투영 필수)
 
-def box_points(center_mm, size_mm, n=400):
-    c, s = np.asarray(center_mm, float), np.asarray(size_mm, float)
-    return c + (RNG.random((n, 3)) - 0.5) * s
+import environments  # noqa: F401  (suite.make 등록)
+import robosuite as suite
+from robosuite.utils import camera_utils as CU
 
+from tuj.m1_scene import build_m1, points_from_frame, serialize
 
-def spec_to_objects(spec):
-    return [{"name": name, "cls": cls, "points": box_points(c, s)}
-            for name, cls, c, s in spec]
-
-
-# ── 씬 스펙: (name, class, center_mm, bbox_mm) — 예빈 env 근사 ──────────────
-
-def scene_c1_1():
-    spec = []
-    for i in range(12):                  # 레고 12개, 테이블 위 분산
-        spec.append((f"block_{i}", "block",
-                     [420 + 30 * (i % 4), -90 + 30 * (i // 4), 810], [20, 20, 12]))
-    spec += [
-        ("light_plate", "plate", [250, 250, 810], [200, 220, 10]),
-        ("heavy_plate", "plate", [250, -250, 810], [200, 220, 10]),
-        ("bottle_distractor", "bottle", [150, 150, 860], [60, 60, 120]),
-        ("collection_zone_visual", "collection_zone", [650, 0, 802], [250, 180, 4]),
-    ]
-    task = "테이블에 흩어진 레고 블록을 수거 영역으로 쓸어 담아라"
-    return task, spec
+CAM, H, W = "agentview", 512, 512
+FOVY_OVERRIDE = 60.0        # None이면 씬 기본값(45°)
+AUTO_FIT = True             # True: 추적 객체 전부 프레임에 들어가게 카메라 위치 자동 조정
+AUTO_FIT_MARGIN = 0.85      # 프레임 여백 (85% 안에 맞춤)
 
 
-def scene_c2_1():
-    spec = [
-        ("apple", "apple", [420, -150, 840], [75, 75, 75]),
-        ("bread", "bread", [470, -60, 830], [100, 60, 50]),
-        ("mug", "mug", [430, 40, 845], [90, 80, 95]),
-        ("plate", "plate", [500, 140, 808], [200, 200, 15]),
-        ("spoon", "spoon", [380, 210, 805], [150, 30, 10]),
-        ("green_tray", "tray", [680, -200, 818], [250, 180, 35]),
-        ("blue_tray", "tray", [700, 0, 818], [250, 180, 35]),
-        ("red_tray", "tray", [680, 200, 818], [250, 180, 35]),
-    ]
-    task = "사과와 빵은 초록 트레이, 머그는 파랑 트레이, 접시와 숟가락은 빨강 트레이로 옮겨라"
-    return task, spec
+# ── 태스크별 어댑터 ─────────────────────────────────────────────
+
+_ROBOT_MARKERS = ("ur5e", "mount", "nullgripper", "robotiq", "gripper0", "robot0")
+
+
+def _generic_class_of(inst):
+    """환경 인스턴스 이름에서 클래스를 유추한다 — 환경에 물체가 추가되어도 코드 수정 불필요.
+
+    규칙: 로봇 부속 제외 / rack 포함 -> rack / zone 포함 -> zone /
+          끝의 _숫자 제거(block_0 -> block) / _distractor 제거(bottle_distractor -> bottle).
+    """
+    low = inst.lower()
+    if any(k in low for k in _ROBOT_MARKERS) and "rack" not in low:
+        return None
+    if "rack" in low:                                   return "rack"
+    if "zone" in low:                                   return "zone"
+    base = re.sub(r"_\d+$", "", low)
+    base = re.sub(r"_distractor$", "", base)
+    return base or None
+
+
+def _generic_bound_bodies(env, class_of):
+    """auto-fit 대상: 환경의 물체 목록(obj_body_id)에서 rack/zone 제외 전부."""
+    ids = []
+    for inst, bid in dict(env.obj_body_id).items():
+        cls = class_of(inst)
+        if cls and cls not in ("rack", "zone"):
+            ids.append(int(bid))
+    return ids
+
+
+def _c2_1_class_of(inst):
+    if inst == "apple":  return "apple"
+    if inst == "bread":  return "bread"
+    if inst == "mug":    return "mug"
+    if inst == "plate":  return "plate"
+    if inst == "spoon":  return "spoon"
+    if inst.endswith("_tray"):                          return "tray"
+    if "rack" in inst.lower():                          return "rack"
+    return None
+
+
+TASKS = {
+    "c1_1": dict(env_name="C1_1_LegoSweep",
+                 class_of=_generic_class_of,
+                 bound_objects=lambda env: _generic_bound_bodies(env, _generic_class_of),
+                 extra_geom_names=["collection_zone"]),
+    "c2_1": dict(env_name="C2_1_ObjectSorting",
+                 class_of=_c2_1_class_of,
+                 bound_objects=lambda env: env.target_objects + env.trays,
+                 extra_geom_names=[]),
+    # c1_2, c2_2: 씬 파일(environments/*.py) 추가 시 여기에 한 항목 등록
+}
+
+
+def save_crops(rgb, seg, name_of_id, node_ids, out_dir, min_box=8):
+    """SiPhy mask_material_proposal.py 방식: bbox 크롭 + 마스크 밖 검정 처리."""
+    from PIL import Image
+    out_dir.mkdir(parents=True, exist_ok=True)
+    Hh, Ww = seg.shape
+    for sid, (inst, cls) in name_of_id.items():
+        nid = node_ids.get(inst)
+        if nid is None:
+            continue
+        mask = seg == sid
+        if not mask.any():
+            continue
+        ys, xs = np.nonzero(mask)
+        y0, y1, x0, x1 = ys.min(), ys.max() + 1, xs.min(), xs.max() + 1
+        if x1 - x0 < min_box:
+            cx = (x0 + x1) // 2
+            x0 = max(0, min(cx - min_box // 2, Ww - min_box)); x1 = x0 + min_box
+        if y1 - y0 < min_box:
+            cy = (y0 + y1) // 2
+            y0 = max(0, min(cy - min_box // 2, Hh - min_box)); y1 = y0 + min_box
+        crop = np.array(rgb[y0:y1, x0:x1])
+        crop[~mask[y0:y1, x0:x1]] = 0
+        Image.fromarray(crop).save(out_dir / f"{nid}.png")
+
+
+def object_bound_points(env, spec):
+    """auto-fit 대상 월드 바운드 점 수집."""
+    m, d = env.sim.model, env.sim.data
+    gids = set()
+    for o in spec["bound_objects"](env):
+        root = o if isinstance(o, int) else m.body_name2id(o.root_body)
+        for gid in range(m.ngeom):
+            bid = m.geom_bodyid[gid]
+            while bid not in (0, root):
+                bid = m.body_parentid[bid]
+            if bid == root:
+                gids.add(gid)
+    for gid in range(m.ngeom):
+        nm = m.geom_id2name(gid)
+        if nm and any(k in nm for k in spec["extra_geom_names"]):
+            gids.add(gid)
+    pts = []
+    for gid in gids:
+        c, r = d.geom_xpos[gid], m.geom_rbound[gid]
+        for k in range(3):
+            e = np.zeros(3); e[k] = r
+            pts += [c + e, c - e]
+    return np.asarray(pts)
+
+
+def fit_camera_to_points(env, cid, pts, margin=0.85, iters=12):
+    """시점 방향 고정, 위치만 이동: 좌우·상하 중앙정렬 + 프레임 초과 시 후진/여유 시 전진."""
+    m, d = env.sim.model, env.sim.data
+    R = d.cam_xmat[cid].reshape(3, 3)
+    ty = np.tan(np.radians(float(m.cam_fovy[cid])) / 2)
+    tx = ty * W / H
+    pos = d.cam_xpos[cid].copy()
+    for _ in range(iters):
+        P = (pts - pos) @ R
+        z = np.maximum(-P[:, 2], 1e-3)
+        u, v = P[:, 0] / z, P[:, 1] / z
+        zm = float(z.mean())
+        pos += R[:, 0] * (u.min() + u.max()) / 2 * zm
+        pos += R[:, 1] * (v.min() + v.max()) / 2 * zm
+        P = (pts - pos) @ R
+        z = np.maximum(-P[:, 2], 1e-3)
+        ex = max(np.abs(P[:, 0] / z).max() / (tx * margin),
+                 np.abs(P[:, 1] / z).max() / (ty * margin))
+        pos += R[:, 2] * float(z.mean()) * (ex - 1.0)
+    m.cam_pos[cid] += pos - d.cam_xpos[cid]
+    return pos
 
 
 def main():
-    name = sys.argv[1] if len(sys.argv) > 1 else "c1_1"
-    m0_json = None
-    if "--m0-json" in sys.argv:
-        m0_json = sys.argv[sys.argv.index("--m0-json") + 1]
-    tdir = os.path.join("output", name)      # output/c1_1/ (main의 M0·M2 폴더와 동일 명명)
-    os.makedirs(tdir, exist_ok=True)
-    if not m0_json and os.path.exists(os.path.join(tdir, "m0.json")):
-        m0_json = os.path.join(tdir, "m0.json")             # M0 모듈 출력 자동 사용
+    name = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else "c1_1"
+    view = "--view" in sys.argv
+    if name not in TASKS:
+        sys.exit(f"[err] unknown task {name!r}. 등록된 태스크: {list(TASKS)}")
+    spec = TASKS[name]
+    OUT = ROOT / "output" / name
 
-    if m0_json:                          # 실제 M0 serialize() 출력으로
-        with open(m0_json, encoding="utf-8") as f:
-            m0s = json.load(f)
-        task, _ = scene_c1_1() if name == "c1_1" else scene_c2_1()
-        print(f"[M0] {m0_json} 사용")
-    else:                                # mock M0 (씬 근사 수치)
-        task, spec = scene_c1_1() if name == "c1_1" else scene_c2_1()
-        m0s = serialize(build_m0(spec_to_objects(spec)))
-        print("[M0] mock 수치 사용 (실제 M0 JSON 없음)")
+    env = suite.make(
+        env_name=spec["env_name"], robots="UR5e",
+        use_camera_obs=True, has_offscreen_renderer=True, has_renderer=False,
+        camera_names=CAM, camera_heights=H, camera_widths=W,
+        camera_depths=True, camera_segmentations="instance",
+        render_camera="agentview", ignore_done=True,
+    )
+    obs = env.reset()
 
-    # ── M2 응답 경로 결정: output/<task-id>/m2.json 자동 또는 --m2-json 경로 ──
-    m2_json = None
-    if "--m2-json" in sys.argv:
-        m2_json = sys.argv[sys.argv.index("--m2-json") + 1]
-    elif os.path.exists(os.path.join(tdir, "m2.json")):
-        m2_json = os.path.join(tdir, "m2.json")
+    cid0 = env.sim.model.camera_name2id(CAM)
+    if FOVY_OVERRIDE:
+        print(f"[cam] fovy {env.sim.model.cam_fovy[cid0]:.1f}° -> {FOVY_OVERRIDE:.1f}°")
+        env.sim.model.cam_fovy[cid0] = FOVY_OVERRIDE
+    if AUTO_FIT:
+        env.sim.forward()
+        pos = fit_camera_to_points(env, cid0, object_bound_points(env, spec),
+                                    margin=AUTO_FIT_MARGIN)
+        print(f"[cam] auto-fit -> pos={np.round(pos, 3)} (margin={AUTO_FIT_MARGIN})")
+    if FOVY_OVERRIDE or AUTO_FIT:
+        env.sim.forward()
+        obs = env._get_observations(force_update=True)
 
-    # ── 0828 안전장치(사전): 직전 왕복이 이미 완료된 세트면 덮어쓰지 않는다 ──
-    # 분할된 m1.json과 그 자식 질의에 대한 m2.json이 짝으로 남아 있을 때 run_m1을
-    # 또 돌리면, 새 분해(부모 id)와 자식 응답이 매칭되지 않아 분할이 풀린 계획으로
-    # 덮어써진다. 왕복의 마지막은 항상 run_m2다.
-    prev_path = os.path.join(tdir, "m1.json")
-    if m2_json and os.path.exists(prev_path):
-        with open(prev_path, encoding="utf-8") as f:
-            prev = json.load(f)
-        with open(m2_json, encoding="utf-8") as f:
-            raw0 = json.load(f)
-        prev_q = {q["queried_by"] for q in prev.get("m1_queries", [])}
-        resp_q = {r.get("queried_by")
-                  for r in (raw0["responses"] if isinstance(raw0, dict) else raw0)
-                  if r.get("queried_by")}
-        if prev.get("m1_stats", {}).get("n_split_subgoals") and resp_q and resp_q <= prev_q:
-            sys.exit("[중단] 분할 완료된 m1.json과 m2.json이 이미 짝이 맞는 최종 세트입니다.\n"
-                     "  여기서 run_m1을 다시 돌리면 분할이 풀린 계획으로 덮어써집니다.\n"
-                     "  다음 단계로 진행하거나, 처음부터 다시 돌리려면 m1.json을 지운 뒤 실행하십시오.")
+    K = CU.get_camera_intrinsic_matrix(env.sim, CAM, H, W)
+    T = CU.get_camera_extrinsic_matrix(env.sim, CAM)
+    depth_m = np.asarray(CU.get_real_depth_map(env.sim, obs[f"{CAM}_depth"])).squeeze()
+    seg = np.asarray(obs[f"{CAM}_segmentation_instance"]).squeeze()
+    bp = env.sim.data.get_body_xpos("robot0_base")
+    base_off = (bp[0] * 1000.0, bp[1] * 1000.0, 0.0)
+    print(f"[env] robot base offset (mm): {base_off[:2]}")
 
-    rough = LLMRough()                          # 서브골 생성은 항상 LLM
-    out = run_m1(task, m0s, rough=rough)
+    cid = env.sim.model.camera_name2id(CAM)
+    fovy = float(env.sim.model.cam_fovy[cid])
+    fovx = float(np.degrees(2 * np.arctan(np.tan(np.radians(fovy) / 2) * W / H)))
+    cam_pos = env.sim.data.cam_xpos[cid]
+    print(f"[cam] {CAM}: fovy={fovy:.1f}° fovx={fovx:.1f}° (H{H}×W{W}) "
+          f"pos={np.round(cam_pos, 3)} f={K[0,0]:.1f}px")
 
-    if m2_json:
-        from tuj.m1_subgoal.ingest import apply_m2, update_confidence
-        with open(m2_json, encoding="utf-8") as f:
-            raw = json.load(f)
-        responses = raw["responses"] if isinstance(raw, dict) else raw
-        # ── 0828 안전장치(사후): 응답이 이번 분해의 질의와 하나도 안 맞으면 중단 ──
-        qids = {q["queried_by"] for q in out["m1_queries"]}
-        rids = {r.get("queried_by") for r in responses if r.get("queried_by")}
-        if rids and not (qids & rids):
-            sys.exit("[중단] m2.json 응답이 이번 분해의 질의와 하나도 매칭되지 않습니다.\n"
-                     "  run_m2 -> run_m1 -> run_m2 왕복 순서를 확인하십시오. (m1.json 미변경)")
-        for line in apply_m2(out, responses):
-            print(line)
-        # 측정 반영 후 자기보고 신뢰도 갱신 (LLM 3차 호출)
-        for line in update_confidence(out, rough._client, rough.model,
-                                      usage_acc=rough.usage):
-            print(line)
-        out["m1_stats"]["llm_usage"] = rough.usage
-        # 0828: batch 응답의 partition대로 서브골 분할 (확보/반환은 한 번만 생성)
-        from tuj.m1_subgoal.regroup import split_after_m2
-        for line in split_after_m2(out):
-            print(line)
+    inst_keys = list(env.model.instances_to_ids.keys())
+    name_of_id = {}                                   # seg 픽셀값 = 키 순서 인덱스 + 1
+    for idx, inst in enumerate(inst_keys):
+        cls = spec["class_of"](inst)
+        if cls:
+            name_of_id[idx + 1] = (inst, cls)
+    print(f"[env] instances: {inst_keys}")
+    print(f"[env] tracked: {[v[0] for v in name_of_id.values()]}")
 
-    with open(os.path.join(tdir, "m1.json"), "w", encoding="utf-8") as f:
-        json.dump(out, f, ensure_ascii=False, indent=2)
+    objects = points_from_frame(depth_m, seg, K, T, name_of_id, base_offset_mm=base_off)
+    print(f"[M1] detected {len(objects)}/{len(name_of_id)} tracked instances")
+    for o in objects:
+        print(f"     {o['name']:24s} points={len(o['points'])}")
+    m1 = build_m1(objects)
 
-    s = out["m1_stats"]
-    usage = s.get("llm_usage") or {}
-    if usage:
-        total = sum(e["tokens"] for e in usage.values())
-        tsec = sum(e.get("seconds", 0.0) for e in usage.values())
-        parts = " / ".join(
-            f"{k} {e['tokens']}tok({e['calls']}회, {e.get('seconds', 0):.1f}s)"
-            for k, e in usage.items())
-        print(f"  [M1 tokens] {parts} | 합계 {total}tok, {tsec:.1f}s")
-    print(f"[{name}] 서브골 {s['n_subgoals']} → 상세 {s['n_details']} | "
-          f"DAG 엣지 {s['n_edges']} | mutex {s['n_mutex']} | M2 질의 {s['n_m2_queries']}")
-    for e in out["m1_partial_order"]:
-        print(f"  {e['from']} -> {e['to']}   ({e['why']})")
-    print(f"-> {tdir}/m1.json")
+    OUT.mkdir(parents=True, exist_ok=True)
+    (OUT / "m1.json").write_text(
+        json.dumps(serialize(m1), ensure_ascii=False, indent=2), encoding="utf-8")
+    np.savez_compressed(OUT / "m1_points.npz",
+                        **{n["id"]: n["_points"] for n in m1["nodes"]})
+
+    rgb = np.asarray(obs[f"{CAM}_image"])
+    from PIL import Image
+    Image.fromarray(rgb).save(OUT / "frame.png")
+    ov = rgb.copy()
+    for sid in name_of_id:
+        ov[seg == sid] = (0.5 * ov[seg == sid] + [127, 0, 0]).astype(np.uint8)
+    Image.fromarray(ov).save(OUT / "frame_masks.png")
+    node_ids = {n["id"].split("_", 2)[-1]: n["id"] for n in m1["nodes"]}
+    save_crops(rgb, seg, name_of_id, node_ids, OUT / "crops")
+    print(f"[M1] nodes={len(m1['nodes'])} edges={len(m1['edges'])} "
+          f"crops={len(list((OUT / 'crops').glob('*.png')))}")
+    for e in m1["edges"]:
+        print(f"     {e['type']:9s} {e['from']} -> {e['to']}")
+    print(f"[{name}] -> {OUT}/m1.json, {OUT}/m1_points.npz")
+
+    if view:
+        import time
+        import mujoco
+        import mujoco.viewer
+        print("[view] agentview 고정 시점 뷰어 (창 닫으면 종료)")
+        with mujoco.viewer.launch_passive(env.sim.model._model, env.sim.data._data) as v:
+            v.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
+            v.cam.fixedcamid = cid0
+            while v.is_running():
+                v.sync()
+                time.sleep(0.02)
+    env.close()
 
 
 if __name__ == "__main__":
