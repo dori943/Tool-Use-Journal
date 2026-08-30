@@ -1,94 +1,146 @@
 {
   "subgoal_id": "SG1_s3",
   "nodes": {
-    "obj_rack_ee_rack": {
-      "queried_by": [
-        "SG1_s3_d3_p3"
-      ],
-      "predicates": {
-        "clear": {
-          "value": false,
-          "occupants": [
-            "obj_rack_gripperrack_2F_robotiq_85_adapter_link",
-            "obj_rack_gripperrack_vac_vacuum_base"
-          ],
-          "queried_by": "SG1_s3_d3_p3"
-        }
-      }
-    },
-    "obj_plate_light_plate": {
+    "obj_ladle_ladle": {
       "queried_by": [],
       "geometry": {
-        "length_mm": 178.5,
+        "length_mm": 62.1,
         "diameter_mm": null,
         "extents_mm": [
-          178.5,
-          176.2,
-          9.5
+          62.1,
+          58.4,
+          18.6
         ],
-        "height_z_mm": 9.4,
+        "height_z_mm": 59.4,
         "cylinder_like": false,
-        "surface_rms_mm": 0.3
+        "surface_rms_mm": 1.38
       },
-      "material": "plastic",
-      "density_kgm3": 950,
-      "mass_kg": 0.279,
-      "youngs_gpa": 2.0,
+      "material": "steel",
+      "density_kgm3": 7151.9,
+      "mass_kg": 0.243,
+      "youngs_gpa": 159.07,
       "mu": {
-        "mu": 0.338,
+        "mu": 0.459,
         "stage": 0,
-        "material": "plastic",
-        "rms_mm": 0.3
+        "material": "steel",
+        "rms_mm": 1.38
       },
-      "confidence": 0.85,
+      "confidence": 0.296,
+      "mass_range_kg": [
+        0.079,
+        0.407
+      ],
+      "materials_topk": [
+        {
+          "name": "steel",
+          "prob": 0.296,
+          "density_kgm3": [
+            7850.0,
+            8050.0
+          ],
+          "thickness_cm": [
+            1.0,
+            5.0
+          ]
+        },
+        {
+          "name": "iron",
+          "prob": 0.259,
+          "density_kgm3": [
+            7800.0,
+            7900.0
+          ],
+          "thickness_cm": [
+            1.0,
+            5.0
+          ]
+        },
+        {
+          "name": "aluminum",
+          "prob": 0.185,
+          "density_kgm3": [
+            2600.0,
+            2700.0
+          ],
+          "thickness_cm": [
+            1.0,
+            5.0
+          ]
+        },
+        {
+          "name": "copper",
+          "prob": 0.148,
+          "density_kgm3": [
+            8900.0,
+            9000.0
+          ],
+          "thickness_cm": [
+            1.0,
+            5.0
+          ]
+        },
+        {
+          "name": "bronze",
+          "prob": 0.111,
+          "density_kgm3": [
+            8000.0,
+            9000.0
+          ],
+          "thickness_cm": [
+            1.0,
+            5.0
+          ]
+        }
+      ],
+      "caption": "metallic sphere",
       "ee": {
         "2F": {
           "feasible": true,
-          "margin": 4.721,
+          "margin": 4.757,
           "margin_unit": "kg",
-          "reason": "질량 0.279 vs 페이로드 5.0kg",
+          "reason": "질량 0.243 vs 페이로드 5.0kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 9.5,
+              "value": 18.6,
               "limit": 85.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.279,
+              "value": 0.243,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 4.049,
-              "limit": 140.0,
+              "value": 2.597,
+              "limit": 235.0,
               "pass": true
             }
           ]
         },
         "3F": {
           "feasible": true,
-          "margin": 2.221,
+          "margin": 2.257,
           "margin_unit": "kg",
-          "reason": "질량 0.279 vs 페이로드 2.5kg",
+          "reason": "질량 0.243 vs 페이로드 2.5kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 9.5,
+              "value": 18.6,
               "limit": 140.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.279,
+              "value": 0.243,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 4.049,
+              "value": 2.597,
               "limit": 60.0,
               "pass": true
             }
@@ -96,77 +148,66 @@
         },
         "vac": {
           "feasible": true,
-          "margin": 0.221,
-          "margin_unit": "kg",
-          "reason": "질량 0.279 vs 페이로드 0.5kg",
+          "margin": 0.12,
+          "margin_unit": "mm",
+          "reason": "상면 RMS 1.38 vs 허용 1.5",
           "checks": [
             {
               "rule": "flatness",
-              "value": 0.3,
+              "value": 1.38,
               "limit": 1.5,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.279,
+              "value": 0.243,
               "limit": 0.5,
               "pass": true
             },
             {
               "rule": "seal_contact",
               "value": 30.0,
-              "limit": 176.2,
+              "limit": 58.4,
               "pass": true
             }
           ]
         }
       },
       "reachability": {
-        "distance_mm": 394.5,
+        "distance_mm": 378.5,
         "reach_mm": 850,
         "reachable": true,
-        "margin_mm": 455.5
+        "margin_mm": 471.5
       },
       "replicated_from": "SG1_s1"
     }
   },
-  "edges": [
-    {
-      "queried_by": "SG1_s3_d3_p2",
-      "from": "obj_plate_light_plate",
-      "to": "obj_rack_ee_rack",
-      "type": "fits_inside",
-      "value_mm": 71.2,
-      "check": "opening_245.6 - footprint_174.4",
-      "pass": true
-    }
-  ],
+  "edges": [],
   "flags": {
     "near_threshold": []
   },
   "task": "테이블에 흩어진 레고 블록을 수거 영역으로 쓸어 담아라",
-  "goal": "대상 2개를 obj_zone_collection_zone_visual로 쓸어 담는다 (3/3)",
+  "goal": "대상 1개를 obj_zone_collection_zone_visual로 쓸어 담는다 (3/12)",
   "subgoal_kind": "sweep_collect",
   "roles": {
     "target": [
-      "obj_block_block_2",
-      "obj_block_block_11"
+      "obj_block_block_8"
     ],
     "container": "obj_zone_collection_zone_visual",
     "tool_candidates": [
-      "obj_plate_light_plate"
+      "obj_ladle_ladle"
     ],
-    "selected_tool": "obj_plate_light_plate",
+    "selected_tool": "obj_ladle_ladle",
     "selection_evidence": [
       {
-        "node": "obj_plate_light_plate",
+        "node": "obj_ladle_ladle",
         "feasible_ees": [
           "2F",
           "3F",
           "vac"
         ],
-        "reach_margin_mm": 455.7,
-        "batch_groups": 1
+        "reach_margin_mm": 471.5,
+        "batch_groups": 12
       }
     ]
   },
@@ -176,7 +217,7 @@
       "action_type": "tool_act:sweep",
       "binding": {
         "?t": "?tool",
-        "?targets": "{obj_block_block_2,obj_block_block_11}",
+        "?targets": "{obj_block_block_8}",
         "?r": "obj_zone_collection_zone_visual"
       },
       "pre": [
@@ -187,42 +228,13 @@
         },
         {
           "id": "SG1_s3_d2_p1",
-          "expr": "batch_feasible(?tool, {obj_block_block_2,obj_block_block_11})",
-          "eval_by": "m3",
-          "status": "sat",
-          "evidence": [
-            {
-              "actor": {
-                "type": "object",
-                "id": "obj_plate_light_plate"
-              },
-              "feasible": true,
-              "binding_check": "group_extent_le_tool_width",
-              "partition": [
-                [
-                  "obj_block_block_2",
-                  "obj_block_block_11"
-                ]
-              ]
-            }
-          ]
+          "expr": "batch_feasible(?tool, {obj_block_block_8})",
+          "eval_by": "m3"
         },
         {
           "id": "SG1_s3_d2_p2",
-          "expr": "act_space_clear(?tool, {obj_block_block_2,obj_block_block_11}, obj_zone_collection_zone_visual)",
-          "eval_by": "m3",
-          "status": "sat",
-          "evidence": [
-            {
-              "actor": {
-                "type": "object",
-                "id": "obj_plate_light_plate"
-              },
-              "clear": true,
-              "margin_mm": 86.5,
-              "blockers": []
-            }
-          ]
+          "expr": "act_space_clear(?tool, {obj_block_block_8}, obj_zone_collection_zone_visual)",
+          "eval_by": "m3"
         },
         {
           "id": "SG1_s3_d2_p3",
@@ -231,97 +243,9 @@
         }
       ],
       "establish": [
-        "in({obj_block_block_2,obj_block_block_11}, obj_zone_collection_zone_visual)"
+        "in({obj_block_block_8}, obj_zone_collection_zone_visual)"
       ],
       "destroy": []
-    },
-    {
-      "detail_id": "SG1_s3_d2b",
-      "action_type": "transport",
-      "binding": {
-        "?o": "?tool",
-        "?r": "tool_rest"
-      },
-      "pre": [
-        {
-          "id": "SG1_s3_d2b_p0",
-          "expr": "holding(?tool)",
-          "eval_by": "m2"
-        },
-        {
-          "id": "SG1_s3_d2b_p1",
-          "expr": "act_space_clear(?EE, ?tool, tool_rest)",
-          "eval_by": "m3",
-          "status": "not_queried",
-          "evidence": []
-        },
-        {
-          "id": "SG1_s3_d2b_p2",
-          "expr": "path_clear(?tool, tool_rest)",
-          "eval_by": "motion"
-        },
-        {
-          "id": "SG1_s3_d2b_p3",
-          "expr": "in({obj_block_block_4,obj_block_block_8,obj_block_block_3,obj_block_block_0,obj_block_block_1}, obj_zone_collection_zone_visual)",
-          "eval_by": "m2"
-        },
-        {
-          "id": "SG1_s3_d2b_p4",
-          "expr": "in({obj_block_block_6,obj_block_block_5,obj_block_block_9,obj_block_block_10,obj_block_block_7}, obj_zone_collection_zone_visual)",
-          "eval_by": "m2"
-        },
-        {
-          "id": "SG1_s3_d2b_p5",
-          "expr": "in({obj_block_block_2,obj_block_block_11}, obj_zone_collection_zone_visual)",
-          "eval_by": "m2"
-        }
-      ],
-      "establish": [
-        "above(?tool, tool_rest)"
-      ],
-      "destroy": []
-    },
-    {
-      "detail_id": "SG1_s3_d3",
-      "action_type": "place",
-      "binding": {
-        "?o": "?tool",
-        "?r": "tool_rest"
-      },
-      "pre": [
-        {
-          "id": "SG1_s3_d3_p0",
-          "expr": "holding(?tool)",
-          "eval_by": "m2"
-        },
-        {
-          "id": "SG1_s3_d3_p1",
-          "expr": "above(?tool, tool_rest)",
-          "eval_by": "m2"
-        },
-        {
-          "id": "SG1_s3_d3_p2",
-          "expr": "fits(?tool, tool_rest)",
-          "eval_by": "m3",
-          "status": "not_queried",
-          "evidence": []
-        },
-        {
-          "id": "SG1_s3_d3_p3",
-          "expr": "clear(tool_rest)",
-          "eval_by": "m3",
-          "status": "not_queried",
-          "evidence": []
-        }
-      ],
-      "establish": [
-        "in(?tool, tool_rest)",
-        "hand_empty"
-      ],
-      "destroy": [
-        "holding(?tool)",
-        "above(?tool, tool_rest)"
-      ]
     }
   ],
   "partial_order": [
@@ -331,56 +255,21 @@
       "why": "causal_link: holding(?tool)"
     },
     {
-      "from": "SG1_s1_d1",
-      "to": "SG1_s3_d2b",
-      "why": "causal_link: holding(?tool)"
-    },
-    {
-      "from": "SG1_s1_d2",
-      "to": "SG1_s3_d2b",
-      "why": "causal_link: in({obj_block_block_4,obj_block_block_8,obj_block_block_3,obj_block_block_0,obj_block_block_1}, obj_zone_collection_zone_visual)"
-    },
-    {
-      "from": "SG1_s2_d2",
-      "to": "SG1_s3_d2b",
-      "why": "causal_link: in({obj_block_block_6,obj_block_block_5,obj_block_block_9,obj_block_block_10,obj_block_block_7}, obj_zone_collection_zone_visual)"
+      "from": "SG1_s3_d2",
+      "to": "SG1_s12_d2b",
+      "why": "causal_link: in({obj_block_block_8}, obj_zone_collection_zone_visual)"
     },
     {
       "from": "SG1_s3_d2",
-      "to": "SG1_s3_d2b",
-      "why": "causal_link: in({obj_block_block_2,obj_block_block_11}, obj_zone_collection_zone_visual)"
-    },
-    {
-      "from": "SG1_s1_d1",
-      "to": "SG1_s3_d3",
-      "why": "causal_link: holding(?tool)"
-    },
-    {
-      "from": "SG1_s3_d2b",
-      "to": "SG1_s3_d3",
-      "why": "causal_link: above(?tool, tool_rest)"
-    },
-    {
-      "from": "SG1_s1_d2",
-      "to": "SG1_s3_d3",
-      "why": "threat: SG1_s3_d3가 holding(?tool)를 파괴"
-    },
-    {
-      "from": "SG1_s2_d2",
-      "to": "SG1_s3_d3",
-      "why": "threat: SG1_s3_d3가 holding(?tool)를 파괴"
-    },
-    {
-      "from": "SG1_s3_d2",
-      "to": "SG1_s3_d3",
-      "why": "threat: SG1_s3_d3가 holding(?tool)를 파괴"
+      "to": "SG1_s12_d3",
+      "why": "threat: SG1_s12_d3가 holding(?tool)를 파괴"
     }
   ],
   "mutex": [],
   "invariants": [
     {
       "id": "INV_SG1_s3",
-      "expr": "all_in({obj_block_block_2,obj_block_block_11}, obj_zone_collection_zone_visual)",
+      "expr": "all_in({obj_block_block_8}, obj_zone_collection_zone_visual)",
       "check_at": "final"
     }
   ],
@@ -391,28 +280,12 @@
       "kind": "batch",
       "actor": {
         "type": "object",
-        "id": "obj_plate_light_plate"
+        "id": "obj_ladle_ladle"
       },
-      "feasible": false,
-      "checks": [
-        {
-          "rule": "group_extent_le_tool_width",
-          "capacity": 174.4,
-          "demand": 453.4,
-          "unit": "mm",
-          "margin": -279.0,
-          "pass": false
-        }
-      ],
-      "binding_check": "group_extent_le_tool_width",
-      "partition": [
-        [
-          "obj_block_block_11"
-        ],
-        [
-          "obj_block_block_2"
-        ]
-      ]
+      "feasible": null,
+      "checks": [],
+      "binding_check": null,
+      "partition": null
     }
   ],
   "swept_space": [
@@ -422,34 +295,14 @@
       "kind": "swept_space",
       "actor": {
         "type": "object",
-        "id": "obj_plate_light_plate"
+        "id": "obj_ladle_ladle"
       },
       "clear": false,
-      "margin_mm": -74.3,
+      "margin_mm": -26.0,
       "blockers": [
         {
-          "node_id": "obj_block_block_0",
-          "overlap_mm": 64.3
-        },
-        {
-          "node_id": "obj_block_block_4",
-          "overlap_mm": 52.9
-        },
-        {
-          "node_id": "obj_block_block_6",
-          "overlap_mm": 74.3
-        },
-        {
-          "node_id": "obj_block_block_8",
-          "overlap_mm": 16.2
-        },
-        {
-          "node_id": "obj_block_block_9",
-          "overlap_mm": 50.2
-        },
-        {
-          "node_id": "obj_block_block_10",
-          "overlap_mm": 27.6
+          "node_id": "obj_block_block_7",
+          "overlap_mm": 26.0
         }
       ]
     }
