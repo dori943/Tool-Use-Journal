@@ -23,14 +23,34 @@ def _fmt_floats(values) -> str:
     return " ".join(f"{float(v):.12g}" for v in values)
 
 
+def _local_png_fallback(asset_dir: Path) -> Path | None:
+    """에셋 폴더 안의 첫 번째 PNG (visual/ → textures/ → root)."""
+    for folder in (asset_dir / "visual", asset_dir / "textures", asset_dir):
+        if not folder.is_dir():
+            continue
+        pngs = sorted(folder.glob("*.png"))
+        if pngs:
+            return pngs[0].resolve()
+    return None
+
+
 def _resolve_asset_file(asset_dir: Path, file_attr: str, kind: str) -> Path:
     """texture / mesh 파일을 오브젝트 에셋 디렉터리 기준으로 찾는다.
 
     순서: XML에 적힌 상대경로 → textures/ → visual/ → 파일명만.
+    절대경로(다른 머신 경로)는 basename만 사용한다.
+    texture가 여전히 없으면 동일 에셋의 로컬 PNG로 대체한다.
     """
-    basename = Path(file_attr).name
+    raw = Path(file_attr)
+    # Unix absolute paths from other machines (e.g. /home/...) are not usable.
+    if raw.is_absolute() or file_attr.startswith(("/", "\\")):
+        rel_or_name = raw.name
+    else:
+        rel_or_name = file_attr
+
+    basename = Path(rel_or_name).name
     candidates = [
-        (asset_dir / file_attr.lstrip("/\\")).resolve(),
+        (asset_dir / rel_or_name.lstrip("/\\")).resolve(),
         (asset_dir / "textures" / basename).resolve(),
         (asset_dir / "visual" / basename).resolve(),
         (asset_dir / basename).resolve(),
@@ -39,6 +59,11 @@ def _resolve_asset_file(asset_dir: Path, file_attr: str, kind: str) -> Path:
     for path in candidates:
         if path.exists():
             return path
+
+    if kind == "Texture":
+        fallback = _local_png_fallback(asset_dir)
+        if fallback is not None:
+            return fallback
 
     raise FileNotFoundError(
         f"{kind} not found for '{file_attr}'. Tried:\n"
@@ -162,6 +187,16 @@ def xml_default_scale(asset_dir: Path, xml_name: str = "model.xml") -> float:
     xml_path = asset_dir / xml_name
     root = ET.parse(xml_path).getroot()
     return _current_mesh_scale(root)
+
+
+def xml_material_gt(asset_dir: Path, xml_name: str = "model.xml") -> str:
+    """평가 전용 material GT를 MJCF custom text에서 읽는다."""
+    xml_path = asset_dir / xml_name
+    root = ET.parse(xml_path).getroot()
+    entry = root.find("./custom/text[@name='material_gt']")
+    if entry is None or not entry.get("data"):
+        raise ValueError(f"material_gt not found in {xml_path}")
+    return entry.get("data")
 
 
 def xml_bbox_full_size_m(asset_dir: Path, xml_name: str = "model.xml") -> tuple[float, float, float]:

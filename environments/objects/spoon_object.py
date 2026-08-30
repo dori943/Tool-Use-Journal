@@ -9,6 +9,7 @@ from environments.objects.xml_asset import (
     make_resolved_object_xml,
     xml_bbox_full_size_m,
     xml_default_scale,
+    xml_material_gt,
 )
 
 SPOON_ASSET_DIR = OBJECTS_ASSET_DIR / "spoon"
@@ -50,3 +51,7 @@ class SpoonObject(MujocoXMLObject):
     @property
     def feasible_ees(self) -> list[str]:
         return ["2F"]
+
+    @property
+    def material_gt(self) -> str:
+        return xml_material_gt(SPOON_ASSET_DIR)

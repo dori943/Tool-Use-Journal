@@ -1,0 +1,40 @@
+<?xml version='1.0' encoding='UTF-8'?>
+<mujoco model="model">
+  <option timestep="0.002" gravity="0.0 0.0 -9.81"/>
+  <compiler angle="radian"/>
+  <asset>
+    <mesh file="visuals/Window057.obj" name="Window057_vis"/>
+    <mesh file="visuals/Clear.obj" name="Window057_Clear_vis"/>
+    <texture file="visuals/T_BC001.png" name="tex" type="2d"/>
+    <material name="mat" rgba="1 1 1 1.0" texture="tex" shininess="0.4472135901451111" specular="0.3103448502657381"/>
+    <material name="mat2" rgba="1 1 1 0.20000000298023224" texture="tex" shininess="0.4472135901451111" specular="0.3103448502657381"/>
+  </asset>
+  <default>
+    <default class="visual">
+      <geom conaffinity="0" contype="0" group="1" type="mesh"/>
+    </default>
+    <default class="collision">
+      <geom group="0" rgba="0.5 0 0 0.5" density="1.0" solref="0.004 1" solimp="0.998 0.998 0.001"/>
+    </default>
+    <default class="spawn">
+      <geom group="0" rgba="1 1 1 0.5" contype="0" conaffinity="0"/>
+      <site group="0" rgba="1 1 1 0.5"/>
+    </default>
+    <default class="region">
+      <geom group="1" conaffinity="0" contype="0" rgba="0 1 0 0" mass="0"/>
+    </default>
+  </default>
+  <worldbody>
+    <body>
+      <body name="object">
+        <geom mesh="Window057_vis" type="mesh" solimp="0.998 0.998 0.001" solref="0.001 1" friction="0.95 0.3 0.1" class="visual" material="mat"/>
+        <geom type="box" pos="2.9802322387695312e-08 -1.862645149230957e-08 -4.470348358154297e-08" size="0.6162118911743164 0.020419128239154816 0.4083624482154846" quat="1.0 0.0 0.0 0.0" class="collision"/>
+        <body name="Window057_Clear">
+          <geom mesh="Window057_Clear_vis" type="mesh" solimp="0.998 0.998 0.001" solref="0.001 1" friction="0.95 0.3 0.1" class="visual" material="mat2"/>
+        </body>
+        <geom class="region" name="reg_main" type="box" pos="0.0 -1.955777406692505e-08 -4.470348358154297e-08" size="0.6172118911743164 0.021419128239154817 0.4093624482154846"/>
+      </body>
+    </body>
+  </worldbody>
+  <actuator/>
+</mujoco>
