@@ -14,7 +14,10 @@
   python scripts/run.py c1_1              # output/c1_1/m1.json 있으면 그걸로, 없으면 mock
   python scripts/run.py c2_1
   python scripts/run.py c1_1 --m1-json path.json   # M1 JSON 경로 직접 지정
+<<<<<<< HEAD
   python scripts/run.py c1_1 --start-from m5       # 앞 단계 산출물 재사용, M5 만 다시
+=======
+>>>>>>> 9cc74a9 (feat(scripts): M1~M5 통합 실행기 run.py 추가)
 
 실행 순서 (--no-roundtrip 이면 3~4 생략):
   1) M1 씬 추상화            2) M2 서브골 분해(LLM)
@@ -254,6 +257,7 @@ def stage_m4(task, out, args, gk_paths=None):
     call_main(module, argv, "run_m4_task_planner")
 
 
+<<<<<<< HEAD
 def dump_motion_failure(exc, m5_dir):
     """MotionPlanningPipelineError 가 물고 있는 거절 사유를 펼쳐 보여준다.
 
@@ -327,6 +331,8 @@ def run_m5_runner(module, argv, label, m5_dir):
         sys.exit("\n[중단] M5 모션 계획 실패 — 위 거절 사유를 확인하십시오.")
 
 
+=======
+>>>>>>> 9cc74a9 (feat(scripts): M1~M5 통합 실행기 run.py 추가)
 def stage_m5(task, out, args):
     """M5 모션 계획.
 
@@ -355,7 +361,11 @@ def stage_m5(task, out, args):
         if args.m5_validate_only:
             argv.append("--validate-input-only")
         argv += args.m5_args
+<<<<<<< HEAD
         run_m5_runner(module, argv, "run_m5_c1_1_motion_planner", m5_dir)
+=======
+        call_main(module, argv, "run_m5_c1_1_motion_planner")
+>>>>>>> 9cc74a9 (feat(scripts): M1~M5 통합 실행기 run.py 추가)
     else:
         if not env_name:
             sys.exit(f"[err] {task!r} 의 환경 이름을 모릅니다 — "
@@ -370,7 +380,11 @@ def stage_m5(task, out, args):
         elif args.m5_simulate:
             argv += ["--simulate", args.m5_simulate, "--headless"]
         argv += args.m5_args
+<<<<<<< HEAD
         run_m5_runner(module, argv, "run_m5_motion_planner", m5_dir)
+=======
+        call_main(module, argv, "run_m5_motion_planner")
+>>>>>>> 9cc74a9 (feat(scripts): M1~M5 통합 실행기 run.py 추가)
 
     summary = m5_dir / "m5_summary.json"
     if summary.exists():
@@ -406,8 +420,11 @@ def build_parser():
                    help="M4 초기 상태 JSON (미지정 시 robot_spec 에서 유도)")
     p.add_argument("--no-roundtrip", action="store_true",
                    help="M3→M2 측정 반영 및 서브골 분할 왕복을 생략")
+<<<<<<< HEAD
     p.add_argument("--start-from", choices=STAGES, default=None,
                    help="해당 모듈부터 실행 (앞 단계는 기존 산출물 재사용)")
+=======
+>>>>>>> 9cc74a9 (feat(scripts): M1~M5 통합 실행기 run.py 추가)
     p.add_argument("--stop-after", choices=STAGES, default=None,
                    help="해당 모듈까지만 실행")
     p.add_argument("--skip-m4", action="store_true")
@@ -431,6 +448,7 @@ def main():
     task = args.task
     out = ROOT / "output" / task
     out.mkdir(parents=True, exist_ok=True)
+<<<<<<< HEAD
     start = STAGES.index(args.start_from) if args.start_from else 0
     stop = STAGES.index(args.stop_after) if args.stop_after else len(STAGES) - 1
     if start > stop:
@@ -454,6 +472,20 @@ def main():
         banner("M3  Metric & Physical Grounding")
         gk_paths = stage_m3(task, out, args)
     elif args.no_roundtrip:
+=======
+    stop = STAGES.index(args.stop_after) if args.stop_after else len(STAGES) - 1
+
+    print(f"[run] task={task} seed={args.seed} out={out}")
+    print(f"[run] 단계: {' -> '.join(STAGES[:stop + 1])}"
+          + ("" if not args.no_roundtrip else "  (M2<->M3 왕복 생략)"))
+
+    banner("M1  Scene Abstraction")
+    stage_m1(task, out, args)
+    if stop < 1:
+        return
+
+    if args.no_roundtrip:
+>>>>>>> 9cc74a9 (feat(scripts): M1~M5 통합 실행기 run.py 추가)
         banner("M2  Subgoal Decomposition")
         stage_m2(task, out, args, pass_no=1)
         if stop < 2:
@@ -474,11 +506,19 @@ def main():
     if stop < 3:
         return
 
+<<<<<<< HEAD
     if args.skip_m4 or start > 3:
         print("\n[M4] " + ("--skip-m4 로 생략" if args.skip_m4 else "기존 m4.json 재사용"))
     else:
         banner("M4  Task Planner")
         stage_m4(task, out, args, gk_paths)
+=======
+    if args.skip_m4:
+        print("\n[M4] --skip-m4 로 생략")
+        return
+    banner("M4  Task Planner")
+    stage_m4(task, out, args, gk_paths)
+>>>>>>> 9cc74a9 (feat(scripts): M1~M5 통합 실행기 run.py 추가)
     if stop < 4:
         return
 
