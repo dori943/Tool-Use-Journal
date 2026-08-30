@@ -6,8 +6,8 @@
 =======
 # Tool-Use-Journal — M5 Motion Planner
 
-이 worktree는 최신 M5 Motion Planner 실행 브랜치다. Python 패키지 경로는 기존
-이름을 유지해 `tuj.m4_motion`이다.
+이 worktree는 최신 M5 Motion Planner 실행 브랜치다. Python 패키지 경로는
+`tuj.m5_motion`이다.
 
 ## 바로 확인하기
 
@@ -18,6 +18,7 @@
 python -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+<<<<<<< HEAD
 <<<<<<< HEAD
 python scripts\run_m4_task_planner.py
 ```
@@ -42,6 +43,9 @@ python -m pytest src\tuj\m3_taskplanner\tests -q
 [`src/tuj/m3_taskplanner/README.md`](src/tuj/m3_taskplanner/README.md)를 참고한다.
 =======
 python -m pytest src\tuj\m4_motion\tests -q
+=======
+python -m pytest src\tuj\m5_motion\tests -q
+>>>>>>> c62afe5 (refactor(tuj): 모듈 번호를 하나씩 밀다)
 ```
 
 범용 M5 runner는 특정 Task 경로를 기본값으로 사용하지 않는다. M4 결과와 초기
@@ -136,5 +140,9 @@ python scripts\run_m5_c1_1_motion_planner.py `
 `ATTACH_EE`는 M5에서 `bare-flange → selected EE` 초기 장착 모션으로 처리한다.
 
 상세 구조, collision context, recovery와 전체 C1_1 옵션은
+<<<<<<< HEAD
 [`src/tuj/m4_motion/README.md`](src/tuj/m4_motion/README.md)를 참고한다.
 >>>>>>> 9d4b9d3 (feat(motion-planner): add closed-loop planning and initial EE attach)
+=======
+[`src/tuj/m5_motion/README.md`](src/tuj/m5_motion/README.md)를 참고한다.
+>>>>>>> c62afe5 (refactor(tuj): 모듈 번호를 하나씩 밀다)

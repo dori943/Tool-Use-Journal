@@ -1116,7 +1116,7 @@ class C1_1_LegoSweep(ManipulationEnv):
         )
 
     def get_evaluation_material_gt(self):
-        """평가 전용 GT. 관측 및 LLM/M2 입력 경로에서는 호출하지 않는다."""
+        """평가 전용 GT. 관측 및 LLM/M3 입력 경로에서는 호출하지 않는다."""
 
         objects = (
             self.plate,

@@ -33,10 +33,10 @@ def _parser() -> argparse.ArgumentParser:
         help="GK bundle containing the upstream-selected tool",
     )
     parser.add_argument(
-        "--m1",
+        "--m2",
         type=Path,
-        default=REPOSITORY / "output" / "c1_1" / "m1.json",
-        help="M1 scene graph and subgoal input",
+        default=REPOSITORY / "output" / "c1_1" / "m2.json",
+        help="M2 scene graph and subgoal input",
     )
     parser.add_argument(
         "--robot-spec",
@@ -44,7 +44,7 @@ def _parser() -> argparse.ArgumentParser:
         default=REPOSITORY / "configs" / "robot_spec.json",
         help="robot and end-effector specification",
     )
-    parser.add_argument("--m0", type=Path, help="optional separate M0 scene graph")
+    parser.add_argument("--m1", type=Path, help="optional separate M1 scene graph")
     parser.add_argument(
         "--initial-state",
         type=Path,
@@ -80,11 +80,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     required_inputs = {
         "--gk": _resolved(args.gk),
-        "--m1": _resolved(args.m1),
+        "--m2": _resolved(args.m2),
         "--robot-spec": _resolved(args.robot_spec),
     }
     optional_inputs = {
-        "--m0": args.m0,
+        "--m1": args.m1,
         "--initial-state": args.initial_state,
         "--id-aliases": args.id_aliases,
         "--resources": args.resources,
@@ -114,7 +114,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     if str(SOURCE_ROOT) not in sys.path:
         sys.path.insert(0, str(SOURCE_ROOT))
     try:
-        from tuj.m3_taskplanner.cli import main as task_planner_main
+        from tuj.m4_taskplanner.cli import main as task_planner_main
     except ModuleNotFoundError as exc:
         parser.error(
             f"missing dependency {exc.name!r}; run "
@@ -125,8 +125,8 @@ def main(argv: Sequence[str] | None = None) -> int:
         "plan",
         "--gk",
         str(required_inputs["--gk"]),
-        "--m1",
-        str(required_inputs["--m1"]),
+        "--m2",
+        str(required_inputs["--m2"]),
         "--robot-spec",
         str(required_inputs["--robot-spec"]),
         "--output",
