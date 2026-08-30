@@ -174,7 +174,7 @@ def _bundle_gk_and_scene_m2() -> tuple[dict, dict]:
     record.update(
         {
             "task": "레고 블록을 수거 영역으로 쓸어 담아라",
-            "kind": rough["kind"],
+            "subgoal_kind": rough["kind"],
             "roles": {
                 "target": rough["target_ids"],
                 "container": rough["container_id"],
