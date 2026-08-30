@@ -1,0 +1,4983 @@
+{
+  "status": "SUCCESS",
+  "task": {
+    "instruction": "\ud14c\uc774\ube14\uc5d0 \ud769\uc5b4\uc9c4 \ub808\uace0 \ube14\ub85d\uc744 \uc218\uac70 \uc601\uc5ed\uc73c\ub85c \uc4f8\uc5b4 \ub2f4\uc544\ub77c"
+  },
+  "planner_version": "task-planner-state-space-v3",
+  "optimality_scope": {
+    "candidate_set": "after threshold, top-k, and hard pruning",
+    "search": "lexicographically optimal among retained feasible candidates"
+  },
+  "selected_plan": {
+    "cost_vector": {
+      "ee_switches": 0,
+      "tool_switches": 2,
+      "motion_cost": 20,
+      "execution_cost": 0
+    },
+    "subgoal_order": [
+      "SG1_s1_d1",
+      "SG1_s10_d2",
+      "SG1_s11_d2",
+      "SG1_s12_d2",
+      "SG1_s1_d2",
+      "SG1_s2_d2",
+      "SG1_s3_d2",
+      "SG1_s4_d2",
+      "SG1_s5_d2",
+      "SG1_s6_d2",
+      "SG1_s7_d2",
+      "SG1_s8_d2",
+      "SG1_s9_d2",
+      "SG1_s12_d2b",
+      "SG1_s12_d3"
+    ],
+    "group_ee_assignments": {
+      "G_SG1_tool": "2F"
+    },
+    "candidate_assignments": [
+      {
+        "subgoal_id": "SG1_s1_d1",
+        "candidate_id": "SG1_s1_d1-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "PICK_TOOL",
+        "mode": null,
+        "target_ids": [
+          "ladle"
+        ],
+        "goal_region_id": null,
+        "description": "sweep \uac1d\uccb4 \ud655\ubcf4 (\ubd84\ud560 \uc11c\ube0c\uace8 \uacf5\uc6a9 \u2014 \uccab \uc11c\ube0c\uace8\uc5d0\ub9cc)",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.9114108640174992,
+            "known_min_score": 0.9114108640174992,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.9114108640174992,
+                "required": 0.486,
+                "capacity": 5.0,
+                "margin": 4.514,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "?tool"
+        },
+        "suitability_score": 0.9114108640174992,
+        "suitability": {
+          "overall_suitability": 0.9114108640174992,
+          "known_min_score": 0.9114108640174992,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.9114108640174992,
+              "required": 0.486,
+              "capacity": 5.0,
+              "margin": 4.514,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s10_d2",
+        "candidate_id": "SG1_s10_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_10"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 10/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_10"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s11_d2",
+        "candidate_id": "SG1_s11_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_1"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 11/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_1"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s12_d2",
+        "candidate_id": "SG1_s12_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_11"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 12/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_11"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s1_d2",
+        "candidate_id": "SG1_s1_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_3"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 1/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_3"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s2_d2",
+        "candidate_id": "SG1_s2_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_6"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 2/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_6"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s3_d2",
+        "candidate_id": "SG1_s3_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_8"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 3/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_8"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s4_d2",
+        "candidate_id": "SG1_s4_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_7"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 4/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_7"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s5_d2",
+        "candidate_id": "SG1_s5_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_0"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 5/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_0"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s6_d2",
+        "candidate_id": "SG1_s6_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_9"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 6/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_9"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s7_d2",
+        "candidate_id": "SG1_s7_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_5"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 7/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_5"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s8_d2",
+        "candidate_id": "SG1_s8_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_2"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 8/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_2"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s9_d2",
+        "candidate_id": "SG1_s9_d2-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "tool_act",
+        "mode": "sweep",
+        "target_ids": [
+          "block_4"
+        ],
+        "goal_region_id": "collection_zone_visual",
+        "description": "\uadf8\ub8f9 9/12\uc744 obj_zone_collection_zone_visual\ub85c sweep",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability_deferred": true,
+          "suitability": {
+            "overall_suitability": null,
+            "known_min_score": null,
+            "applicable_component_count": 1,
+            "known_component_count": 0,
+            "unknown_component_count": 1,
+            "unknown_components": [
+              "payload"
+            ],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "UNKNOWN",
+                "details": {
+                  "reason": "object mass is missing"
+                }
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            },
+            "unknown_policy": "defer"
+          }
+        },
+        "source_binding": {
+          "?t": "?tool",
+          "?targets": [
+            "block_4"
+          ],
+          "?r": "collection_zone_visual"
+        },
+        "suitability_score": null,
+        "suitability": {
+          "overall_suitability": null,
+          "known_min_score": null,
+          "applicable_component_count": 1,
+          "known_component_count": 0,
+          "unknown_component_count": 1,
+          "unknown_components": [
+            "payload"
+          ],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "UNKNOWN",
+              "details": {
+                "reason": "object mass is missing"
+              }
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          },
+          "unknown_policy": "defer"
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s12_d2b",
+        "candidate_id": "SG1_s12_d2b-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "transport",
+        "mode": null,
+        "target_ids": [
+          "ladle"
+        ],
+        "goal_region_id": "tool_rest",
+        "description": "\uac1d\uccb4\ub97c \uac70\uce58 \uc704\uce58\ub85c \uc6b4\ubc18 (\ub9c8\uc9c0\ub9c9 \uc11c\ube0c\uace8\uc5d0\ub9cc)",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.9114108640174992,
+            "known_min_score": 0.9114108640174992,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.9114108640174992,
+                "required": 0.486,
+                "capacity": 5.0,
+                "margin": 4.514,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "?tool",
+          "?r": "tool_rest"
+        },
+        "suitability_score": 0.9114108640174992,
+        "suitability": {
+          "overall_suitability": 0.9114108640174992,
+          "known_min_score": 0.9114108640174992,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.9114108640174992,
+              "required": 0.486,
+              "capacity": 5.0,
+              "margin": 4.514,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      },
+      {
+        "subgoal_id": "SG1_s12_d3",
+        "candidate_id": "SG1_s12_d3-auto-2F-ladle",
+        "group_id": "G_SG1_tool",
+        "ee": "2F",
+        "tool": "ladle",
+        "action_type": "RETURN_TOOL",
+        "mode": null,
+        "target_ids": [
+          "ladle"
+        ],
+        "goal_region_id": "tool_rest",
+        "description": "\uac1d\uccb4 \ubc18\ud658 (\ub9c8\uc9c0\ub9c9 \uc11c\ube0c\uace8\uc5d0\ub9cc)",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.9114108640174992,
+            "known_min_score": 0.9114108640174992,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.9114108640174992,
+                "required": 0.486,
+                "capacity": 5.0,
+                "margin": 4.514,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "?tool",
+          "?r": "tool_rest"
+        },
+        "suitability_score": 0.9114108640174992,
+        "suitability": {
+          "overall_suitability": 0.9114108640174992,
+          "known_min_score": 0.9114108640174992,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.9114108640174992,
+              "required": 0.486,
+              "capacity": 5.0,
+              "margin": 4.514,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "upstream_fixed"
+      }
+    ],
+    "steps": [
+      {
+        "step_index": 0,
+        "kind": "transition",
+        "action": "MOVE_TO_EE_RACK",
+        "parameters": {},
+        "subgoal_id": "SG1_s1_d1",
+        "candidate_id": "SG1_s1_d1-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 3
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 1,
+        "kind": "transition",
+        "action": "ATTACH_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s1_d1",
+        "candidate_id": "SG1_s1_d1-auto-2F-ladle",
+        "preconditions": [
+          "docked(2F)"
+        ],
+        "postconditions": [
+          "mounted(2F)"
+        ],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 2,
+        "kind": "transition",
+        "action": "VERIFY_ATTACHMENT",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s1_d1",
+        "candidate_id": "SG1_s1_d1-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 3,
+        "kind": "transition",
+        "action": "MOVE_TO_TOOL_RACK",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s1_d1",
+        "candidate_id": "SG1_s1_d1-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 2
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 4,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.9114108640174992,
+              "known_min_score": 0.9114108640174992,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.9114108640174992,
+                  "required": 0.486,
+                  "capacity": 5.0,
+                  "margin": 4.514,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s1_d1-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s1_d1",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s1_d1",
+        "candidate_id": "SG1_s1_d1-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s1_d1_p0",
+            "type": "reachable",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "reachable(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s1_d1_p1",
+            "type": "top_exposed",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "top_exposed(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s1_d1_p2",
+            "type": "ee_usable",
+            "args": [
+              "?EE",
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "ee_usable(?EE, ?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s1_d1_p3",
+            "type": "batch_feasible",
+            "args": [
+              "?EE",
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?EE, ?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s1_d1_p4",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s1_d1_e0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {
+          "tool_switches": 1
+        },
+        "verification_required": true
+      },
+      {
+        "step_index": 5,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s10_d2",
+        "candidate_id": "SG1_s10_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 6,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s10_d2",
+        "candidate_id": "SG1_s10_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 7,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s10_d2"
+        },
+        "subgoal_id": "SG1_s10_d2",
+        "candidate_id": "SG1_s10_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 8,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s10_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s10_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s10_d2",
+        "candidate_id": "SG1_s10_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s10_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s10_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_10}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_10})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s10_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_10}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_10}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s10_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s10_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_10}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_10}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 9,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s11_d2",
+        "candidate_id": "SG1_s11_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 10,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s11_d2",
+        "candidate_id": "SG1_s11_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 11,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s11_d2"
+        },
+        "subgoal_id": "SG1_s11_d2",
+        "candidate_id": "SG1_s11_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 12,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s11_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s11_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s11_d2",
+        "candidate_id": "SG1_s11_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s11_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s11_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_1}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_1})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s11_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_1}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_1}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s11_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s11_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_1}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_1}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 13,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s12_d2",
+        "candidate_id": "SG1_s12_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 14,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s12_d2",
+        "candidate_id": "SG1_s12_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 15,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s12_d2"
+        },
+        "subgoal_id": "SG1_s12_d2",
+        "candidate_id": "SG1_s12_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 16,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s12_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s12_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s12_d2",
+        "candidate_id": "SG1_s12_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s12_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_11}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_11})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_11}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_11}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s12_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_11}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_11}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 17,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s1_d2",
+        "candidate_id": "SG1_s1_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 18,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s1_d2",
+        "candidate_id": "SG1_s1_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 19,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s1_d2"
+        },
+        "subgoal_id": "SG1_s1_d2",
+        "candidate_id": "SG1_s1_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 20,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s1_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s1_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s1_d2",
+        "candidate_id": "SG1_s1_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s1_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s1_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_3}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_3})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s1_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_3}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_3}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s1_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s1_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_3}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_3}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 21,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s2_d2",
+        "candidate_id": "SG1_s2_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 22,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s2_d2",
+        "candidate_id": "SG1_s2_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 23,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s2_d2"
+        },
+        "subgoal_id": "SG1_s2_d2",
+        "candidate_id": "SG1_s2_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 24,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s2_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s2_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s2_d2",
+        "candidate_id": "SG1_s2_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s2_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s2_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_6}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_6})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s2_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_6}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_6}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s2_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s2_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_6}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_6}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 25,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s3_d2",
+        "candidate_id": "SG1_s3_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 26,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s3_d2",
+        "candidate_id": "SG1_s3_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 27,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s3_d2"
+        },
+        "subgoal_id": "SG1_s3_d2",
+        "candidate_id": "SG1_s3_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 28,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s3_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s3_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s3_d2",
+        "candidate_id": "SG1_s3_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s3_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s3_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_8}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_8})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s3_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_8}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_8}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s3_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s3_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_8}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_8}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 29,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s4_d2",
+        "candidate_id": "SG1_s4_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 30,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s4_d2",
+        "candidate_id": "SG1_s4_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 31,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s4_d2"
+        },
+        "subgoal_id": "SG1_s4_d2",
+        "candidate_id": "SG1_s4_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 32,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s4_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s4_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s4_d2",
+        "candidate_id": "SG1_s4_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s4_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s4_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_7}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_7})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s4_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_7}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_7}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s4_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s4_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_7}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_7}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 33,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s5_d2",
+        "candidate_id": "SG1_s5_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 34,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s5_d2",
+        "candidate_id": "SG1_s5_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 35,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s5_d2"
+        },
+        "subgoal_id": "SG1_s5_d2",
+        "candidate_id": "SG1_s5_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 36,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s5_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s5_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s5_d2",
+        "candidate_id": "SG1_s5_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s5_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s5_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_0}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_0})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s5_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_0}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_0}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s5_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s5_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_0}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_0}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 37,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s6_d2",
+        "candidate_id": "SG1_s6_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 38,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s6_d2",
+        "candidate_id": "SG1_s6_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 39,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s6_d2"
+        },
+        "subgoal_id": "SG1_s6_d2",
+        "candidate_id": "SG1_s6_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 40,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s6_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s6_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s6_d2",
+        "candidate_id": "SG1_s6_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s6_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s6_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_9}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_9})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s6_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_9}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_9}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s6_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s6_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_9}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_9}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 41,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s7_d2",
+        "candidate_id": "SG1_s7_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 42,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s7_d2",
+        "candidate_id": "SG1_s7_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 43,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s7_d2"
+        },
+        "subgoal_id": "SG1_s7_d2",
+        "candidate_id": "SG1_s7_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 44,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s7_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s7_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s7_d2",
+        "candidate_id": "SG1_s7_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s7_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s7_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_5}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_5})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s7_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_5}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_5}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s7_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s7_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_5}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_5}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 45,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s8_d2",
+        "candidate_id": "SG1_s8_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 46,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s8_d2",
+        "candidate_id": "SG1_s8_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 47,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s8_d2"
+        },
+        "subgoal_id": "SG1_s8_d2",
+        "candidate_id": "SG1_s8_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 48,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s8_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s8_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s8_d2",
+        "candidate_id": "SG1_s8_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s8_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s8_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_2}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_2})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s8_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_2}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_2}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s8_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s8_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_2}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_2}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 49,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s9_d2",
+        "candidate_id": "SG1_s9_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 50,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s9_d2",
+        "candidate_id": "SG1_s9_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 51,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s9_d2"
+        },
+        "subgoal_id": "SG1_s9_d2",
+        "candidate_id": "SG1_s9_d2-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 52,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability_deferred": true,
+            "suitability": {
+              "overall_suitability": null,
+              "known_min_score": null,
+              "applicable_component_count": 1,
+              "known_component_count": 0,
+              "unknown_component_count": 1,
+              "unknown_components": [
+                "payload"
+              ],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "UNKNOWN",
+                  "details": {
+                    "reason": "object mass is missing"
+                  }
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              },
+              "unknown_policy": "defer"
+            }
+          },
+          "candidate": "SG1_s9_d2-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s9_d2",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s9_d2",
+        "candidate_id": "SG1_s9_d2-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s9_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s9_d2_p1",
+            "type": "batch_feasible",
+            "args": [
+              "?tool",
+              "{block_4}"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?tool, {obj_block_block_4})",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s9_d2_p2",
+            "type": "act_space_clear",
+            "args": [
+              "?tool",
+              "{block_4}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?tool, {obj_block_block_4}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s9_d2_p3",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s9_d2_e0",
+            "type": "in",
+            "args": [
+              "{block_4}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_4}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 53,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s12_d2b",
+        "candidate_id": "SG1_s12_d2b-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 54,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s12_d2b",
+        "candidate_id": "SG1_s12_d2b-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 55,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s12_d2b"
+        },
+        "subgoal_id": "SG1_s12_d2b",
+        "candidate_id": "SG1_s12_d2b-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 56,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.9114108640174992,
+              "known_min_score": 0.9114108640174992,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.9114108640174992,
+                  "required": 0.486,
+                  "capacity": 5.0,
+                  "margin": 4.514,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s12_d2b-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s12_d2b",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s12_d2b",
+        "candidate_id": "SG1_s12_d2b-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s12_d2b_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p1",
+            "type": "act_space_clear",
+            "args": [
+              "?EE",
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?EE, ?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p2",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p3",
+            "type": "in",
+            "args": [
+              "{block_3}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_3}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p4",
+            "type": "in",
+            "args": [
+              "{block_6}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_6}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p5",
+            "type": "in",
+            "args": [
+              "{block_8}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_8}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p6",
+            "type": "in",
+            "args": [
+              "{block_7}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_7}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p7",
+            "type": "in",
+            "args": [
+              "{block_0}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_0}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p8",
+            "type": "in",
+            "args": [
+              "{block_9}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_9}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p9",
+            "type": "in",
+            "args": [
+              "{block_5}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_5}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p10",
+            "type": "in",
+            "args": [
+              "{block_2}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_2}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p11",
+            "type": "in",
+            "args": [
+              "{block_4}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_4}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p12",
+            "type": "in",
+            "args": [
+              "{block_10}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_10}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p13",
+            "type": "in",
+            "args": [
+              "{block_1}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_1}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d2b_p14",
+            "type": "in",
+            "args": [
+              "{block_11}",
+              "collection_zone_visual"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in({obj_block_block_11}, obj_zone_collection_zone_visual)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s12_d2b_e0",
+            "type": "above",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 57,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s12_d3",
+        "candidate_id": "SG1_s12_d3-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 58,
+        "kind": "transition",
+        "action": "KEEP_TOOL",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s12_d3",
+        "candidate_id": "SG1_s12_d3-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 59,
+        "kind": "transition",
+        "action": "MOVE_TO_TOOL_RACK",
+        "parameters": {
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s12_d3",
+        "candidate_id": "SG1_s12_d3-auto-2F-ladle",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 2
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 60,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.9114108640174992,
+              "known_min_score": 0.9114108640174992,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.9114108640174992,
+                  "required": 0.486,
+                  "capacity": 5.0,
+                  "margin": 4.514,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s12_d3-auto-2F-ladle",
+          "ee": "2F",
+          "subgoal": "SG1_s12_d3",
+          "tool": "ladle"
+        },
+        "subgoal_id": "SG1_s12_d3",
+        "candidate_id": "SG1_s12_d3-auto-2F-ladle",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s12_d3_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d3_p1",
+            "type": "above",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d3_p2",
+            "type": "fits",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "fits(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d3_p3",
+            "type": "clear",
+            "args": [
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "clear(tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s12_d3_e0",
+            "type": "in",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s12_d3_e1",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {
+          "tool_switches": 1
+        },
+        "verification_required": true
+      }
+    ],
+    "ee_blocks": [
+      {
+        "ee": "2F",
+        "step_start": 0,
+        "step_end": 60,
+        "subgoals": [
+          "SG1_s1_d1",
+          "SG1_s10_d2",
+          "SG1_s11_d2",
+          "SG1_s12_d2",
+          "SG1_s1_d2",
+          "SG1_s2_d2",
+          "SG1_s3_d2",
+          "SG1_s4_d2",
+          "SG1_s5_d2",
+          "SG1_s6_d2",
+          "SG1_s7_d2",
+          "SG1_s8_d2",
+          "SG1_s9_d2",
+          "SG1_s12_d2b",
+          "SG1_s12_d3"
+        ],
+        "tool_blocks": [
+          {
+            "tool": null,
+            "step_start": 0,
+            "step_end": 60,
+            "subgoals": [
+              "SG1_s1_d1",
+              "SG1_s10_d2",
+              "SG1_s11_d2",
+              "SG1_s12_d2",
+              "SG1_s1_d2",
+              "SG1_s2_d2",
+              "SG1_s3_d2",
+              "SG1_s4_d2",
+              "SG1_s5_d2",
+              "SG1_s6_d2",
+              "SG1_s7_d2",
+              "SG1_s8_d2",
+              "SG1_s9_d2",
+              "SG1_s12_d2b",
+              "SG1_s12_d3"
+            ]
+          }
+        ]
+      }
+    ],
+    "tool_blocks": [
+      {
+        "tool": null,
+        "step_start": 0,
+        "step_end": 60,
+        "subgoals": [
+          "SG1_s1_d1",
+          "SG1_s10_d2",
+          "SG1_s11_d2",
+          "SG1_s12_d2",
+          "SG1_s1_d2",
+          "SG1_s2_d2",
+          "SG1_s3_d2",
+          "SG1_s4_d2",
+          "SG1_s5_d2",
+          "SG1_s6_d2",
+          "SG1_s7_d2",
+          "SG1_s8_d2",
+          "SG1_s9_d2",
+          "SG1_s12_d2b",
+          "SG1_s12_d3"
+        ],
+        "ee": "2F"
+      }
+    ],
+    "action_counts": {
+      "n_tool_picks": 1,
+      "n_tool_returns": 1,
+      "n_ee_detaches": 0,
+      "n_ee_attaches": 1
+    },
+    "terminal_state": {
+      "current_ee": "2F",
+      "held_tool": null,
+      "completed_subgoals": [
+        "SG1_s10_d2",
+        "SG1_s11_d2",
+        "SG1_s12_d2",
+        "SG1_s12_d2b",
+        "SG1_s12_d3",
+        "SG1_s1_d1",
+        "SG1_s1_d2",
+        "SG1_s2_d2",
+        "SG1_s3_d2",
+        "SG1_s4_d2",
+        "SG1_s5_d2",
+        "SG1_s6_d2",
+        "SG1_s7_d2",
+        "SG1_s8_d2",
+        "SG1_s9_d2"
+      ],
+      "facts": [
+        "hand_empty()",
+        "in(?tool, tool_rest)",
+        "in({block_0}, collection_zone_visual)",
+        "in({block_10}, collection_zone_visual)",
+        "in({block_11}, collection_zone_visual)",
+        "in({block_1}, collection_zone_visual)",
+        "in({block_2}, collection_zone_visual)",
+        "in({block_3}, collection_zone_visual)",
+        "in({block_4}, collection_zone_visual)",
+        "in({block_5}, collection_zone_visual)",
+        "in({block_6}, collection_zone_visual)",
+        "in({block_7}, collection_zone_visual)",
+        "in({block_8}, collection_zone_visual)",
+        "in({block_9}, collection_zone_visual)"
+      ],
+      "scene_signature": "sym-02ca68b31480390d",
+      "rack_occupancy": null
+    },
+    "constraint_trace": [
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s10_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s10_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s10_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s10_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s10_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s10_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s11_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s11_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s11_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s11_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s11_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s11_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s12_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s12_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s12_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s12_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s12_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s12_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s12_d2b->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s12_d2b before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s12_d2b",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s10_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s10_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s10_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s11_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s11_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s11_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s12_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s12_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s12_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s1_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s1_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s1_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s2_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s2_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s2_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s3_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s3_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s3_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s4_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s4_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s4_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s5_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s5_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s5_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s6_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s6_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s6_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s7_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s7_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s7_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s8_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s8_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s8_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s9_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s9_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s9_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s1_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s1_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s2_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s2_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s2_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s2_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s2_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s2_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s3_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s3_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s3_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s3_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s3_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s3_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s4_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s4_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s4_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s4_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s4_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s4_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s5_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s5_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s5_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s5_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s5_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s5_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s6_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s6_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s6_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s6_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s6_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s6_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s7_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s7_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s7_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s7_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s7_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s7_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s8_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s8_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s8_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s8_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s8_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s8_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s9_d2->SG1_s12_d2b",
+        "status": "satisfied",
+        "selected_option": "SG1_s9_d2 before SG1_s12_d2b",
+        "involved_subgoals": [
+          "SG1_s9_d2",
+          "SG1_s12_d2b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s9_d2->SG1_s12_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s9_d2 before SG1_s12_d3",
+        "involved_subgoals": [
+          "SG1_s9_d2",
+          "SG1_s12_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      }
+    ]
+  },
+  "search_stats": {
+    "states_popped": 8196,
+    "states_expanded": 8195,
+    "edges_generated": 49158,
+    "dominated_states_pruned": 40962,
+    "static_candidates_rejected": 3,
+    "lazy_checks_executed": 0,
+    "lazy_cache_hits": 0,
+    "elapsed_ms": 4541
+  },
+  "rejections": [
+    {
+      "scope": "candidate",
+      "reason_code": "SCORE_BELOW_THRESHOLD",
+      "message": "score 0.5070993914807302 < threshold 0.6",
+      "subgoal_id": "SG1_s12_d2b",
+      "candidate_id": "SG1_s12_d2b-auto-vac-ladle",
+      "group_id": null
+    },
+    {
+      "scope": "candidate",
+      "reason_code": "SCORE_BELOW_THRESHOLD",
+      "message": "score 0.5070993914807302 < threshold 0.6",
+      "subgoal_id": "SG1_s12_d3",
+      "candidate_id": "SG1_s12_d3-auto-vac-ladle",
+      "group_id": null
+    },
+    {
+      "scope": "candidate",
+      "reason_code": "SCORE_BELOW_THRESHOLD",
+      "message": "score 0.5070993914807302 < threshold 0.6",
+      "subgoal_id": "SG1_s1_d1",
+      "candidate_id": "SG1_s1_d1-auto-vac-ladle",
+      "group_id": null
+    }
+  ],
+  "diagnostics": {
+    "blocked_subgoals": [],
+    "groups_without_common_ee": [],
+    "unmet_preconditions": [],
+    "constraint_blockers": [],
+    "frontier_exhausted": false,
+    "notes": []
+  },
+  "replan_trace": null
+}
