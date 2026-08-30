@@ -215,7 +215,6 @@ def _goal(
     if target_pose is None:
         target_pose = _object_pose(world, target_ids)
 
-    normalized = action_type.strip().lower()
     explicit_goal = parameters.get("goal_representation", parameters.get("goal_type"))
     if explicit_goal is not None:
         normalized_goal = str(getattr(explicit_goal, "value", explicit_goal)).upper()
@@ -254,11 +253,6 @@ def _goal(
             f"subgoal {assignment.subgoal_id!r} requires a grounded pose, object, "
             "or region target"
         )
-    if any(token in normalized for token in ("pick", "grasp", "acquire")) and assignment.grasp is None:
-        raise SelectedPlanAdapterError(
-            f"PICK subgoal {assignment.subgoal_id!r} requires a structured grasp"
-        )
-
     approach = _float_sequence(
         parameters.get("approach_direction", parameters.get("approach_dir")), 3
     )
@@ -276,6 +270,38 @@ def _goal(
         approach_distance_m=_distance_m(parameters, "approach_distance_m"),
         retreat_distance_m=_distance_m(parameters, "retreat_distance_m"),
     )
+
+
+def _validate_grounding(
+    assignment: CandidateAssignment,
+    world: WorldSnapshot,
+    target_ids: Sequence[str],
+) -> None:
+    unresolved = [target_id for target_id in target_ids if target_id.startswith("?")]
+    if unresolved:
+        raise SelectedPlanAdapterError(
+            f"subgoal {assignment.subgoal_id!r} has unresolved targets {unresolved}"
+        )
+    unknown = [
+        target_id
+        for target_id in target_ids
+        if target_id not in world.objects and target_id not in world.rack
+    ]
+    if unknown:
+        raise SelectedPlanAdapterError(
+            f"subgoal {assignment.subgoal_id!r} targets are absent from the "
+            f"WorldSnapshot: {unknown}"
+        )
+    if assignment.grasp is not None and target_ids:
+        valid_owners = set(target_ids)
+        if assignment.tool is not None:
+            valid_owners.add(assignment.tool)
+        if assignment.grasp.owner_id not in valid_owners:
+            raise SelectedPlanAdapterError(
+                f"subgoal {assignment.subgoal_id!r} grasp owner "
+                f"{assignment.grasp.owner_id!r} does not match targets "
+                f"{sorted(valid_owners)!r}"
+            )
 
 
 def _contact_spec(
@@ -424,6 +450,7 @@ class SelectedPlanMotionRequestAdapter:
                 target = parameters.get("target_object_id")
                 if target:
                     target_ids = [str(target)]
+            _validate_grounding(assignment, world, target_ids)
             goal = _goal(assignment, execution, world, target_ids)
             action_type = _action_type(assignment, execution)
             allowed_touch = _merged_action_parameters(

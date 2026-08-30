@@ -5,8 +5,10 @@ from __future__ import annotations
 import argparse
 import hashlib
 import json
+import math
 import os
 import re
+import time
 from collections.abc import Mapping, Sequence
 from pathlib import Path
 from typing import Any
@@ -16,7 +18,9 @@ from tuj.m3_taskplanner.serialization import SelectedPlan
 from tuj.m4_motion.orchestration import (
     MotionPlanStore,
     SelectedPlanMotionOrchestrator,
+    SelectedPlanPlanningResult,
 )
+from tuj.m4_motion.execution import SimulationArtifactStore
 from tuj.m4_motion.schema import (
     JointDynamicLimit,
     MotionConstraints,
@@ -268,6 +272,287 @@ class ToolUseJournalPlannerPool:
         self._planners.clear()
 
 
+class GenericSimulationVideoRecorder:
+    """Record the runtime's current EE environment at simulated-time cadence."""
+
+    def __init__(
+        self,
+        runtime: Any,
+        path: Path,
+        *,
+        camera: str,
+        width: int,
+        height: int,
+        fps: float,
+    ) -> None:
+        if width <= 0 or height <= 0:
+            raise ValueError("video dimensions must be positive")
+        if not math.isfinite(fps) or fps <= 0.0:
+            raise ValueError("video FPS must be finite and positive")
+        import cv2
+
+        self.runtime = runtime
+        self.path = path.resolve()
+        self.camera = camera
+        self.width = width
+        self.height = height
+        self.fps = fps
+        self._cv2 = cv2
+        self._last_simulation_time_s: float | None = None
+        self._capture_credit = 0.0
+        self.path.parent.mkdir(parents=True, exist_ok=True)
+        self._writer = cv2.VideoWriter(
+            str(self.path),
+            cv2.VideoWriter_fourcc(*"mp4v"),
+            fps,
+            (width, height),
+        )
+        if not self._writer.isOpened():
+            self._writer.release()
+            raise RuntimeError(f"could not open video writer for {self.path}")
+        try:
+            runtime.set_render_callback(self.capture)
+            self._write_frame(runtime.env)
+        except Exception:
+            runtime.set_render_callback(None)
+            self._writer.release()
+            raise
+
+    @staticmethod
+    def _simulation_time(env: Any) -> float:
+        raw_data = getattr(getattr(env, "sim", None), "data", None)
+        raw_time = getattr(raw_data, "time", None)
+        if raw_time is None and raw_data is not None:
+            raw_time = getattr(getattr(raw_data, "_data", None), "time", None)
+        return float(raw_time or 0.0)
+
+    def _write_frame(self, env: Any) -> None:
+        rgb = env.sim.render(
+            camera_name=self.camera,
+            width=self.width,
+            height=self.height,
+        )[::-1]
+        self._writer.write(
+            self._cv2.cvtColor(rgb, self._cv2.COLOR_RGB2BGR)
+        )
+
+    def capture(self, env: Any) -> None:
+        """Capture at the requested FPS even when runtime swaps EE models."""
+
+        current = self._simulation_time(env)
+        previous = self._last_simulation_time_s
+        self._last_simulation_time_s = current
+        if previous is None or current < previous:
+            self._capture_credit = 0.0
+            self._write_frame(env)
+            return
+        self._capture_credit += (current - previous) * self.fps
+        frame_count = int(self._capture_credit + 1e-12)
+        if frame_count <= 0:
+            return
+        self._capture_credit -= frame_count
+        for _ in range(frame_count):
+            self._write_frame(env)
+
+    def hold_final_frame(self, seconds: float) -> None:
+        if seconds <= 0.0:
+            return
+        for _ in range(round(seconds * self.fps)):
+            self._write_frame(self.runtime.env)
+
+    def close(self) -> None:
+        self.runtime.set_render_callback(None)
+        self._writer.release()
+
+
+def _runtime_active_ee(world: WorldSnapshot) -> str | None:
+    raw = world.metadata.get(
+        "physical_active_ee",
+        world.metadata.get("declared_active_ee"),
+    )
+    if raw is None:
+        return None
+    if not isinstance(raw, str):
+        raise GenericMotionRunnerError(
+            "initial world active EE metadata must be a string or null"
+        )
+    return _parse_initial_ee(raw)
+
+
+def _runtime_environment_name(world: WorldSnapshot) -> str:
+    raw = world.metadata.get("environment_name")
+    if not isinstance(raw, str) or not raw:
+        raise GenericMotionRunnerError(
+            "WorldSnapshot.metadata.environment_name is required for simulation"
+        )
+    return raw
+
+
+def _validate_runtime_start(
+    runtime: Any,
+    world: WorldSnapshot,
+    *,
+    joint_tolerance_rad: float = 1e-4,
+) -> None:
+    """Fail closed when a file snapshot cannot be reproduced by env reset."""
+
+    from tuj.m4_motion.tool_use_journal import ToolUseJournalEnvironmentAdapter
+
+    if runtime.active_ee != _runtime_active_ee(world):
+        raise GenericMotionRunnerError(
+            "simulation runtime active EE differs from the initial WorldSnapshot"
+        )
+    observed = ToolUseJournalEnvironmentAdapter(runtime.env).world_snapshot()
+    expected_state = world.robot_state
+    observed_state = observed.robot_state
+    if (
+        expected_state.attached_object_id is not None
+        or expected_state.held_tool_id is not None
+    ):
+        raise GenericMotionRunnerError(
+            "an initial WorldSnapshot with a held or attached object cannot be "
+            "reproduced by a fresh environment reset; start from an empty mount "
+            "or add an explicit acquisition subgoal"
+        )
+    if expected_state.robot_id != observed_state.robot_id:
+        raise GenericMotionRunnerError(
+            "simulation runtime robot_id differs from the initial WorldSnapshot"
+        )
+    observed_positions = dict(
+        zip(
+            observed_state.joint_names,
+            observed_state.joint_positions_rad,
+            strict=True,
+        )
+    )
+    missing = [
+        name for name in expected_state.joint_names if name not in observed_positions
+    ]
+    if missing:
+        raise GenericMotionRunnerError(
+            f"simulation runtime is missing initial joints {missing}"
+        )
+    error = max(
+        (
+            abs(float(expected) - float(observed_positions[name]))
+            for name, expected in zip(
+                expected_state.joint_names,
+                expected_state.joint_positions_rad,
+                strict=True,
+            )
+        ),
+        default=0.0,
+    )
+    if error > joint_tolerance_rad:
+        raise GenericMotionRunnerError(
+            "initial WorldSnapshot cannot be reproduced by the selected "
+            f"environment reset (max joint error {error:.6f} rad). Use "
+            "--environment to capture and execute one deterministic reset."
+        )
+
+
+def execute_planning_result(
+    planning: SelectedPlanPlanningResult,
+    *,
+    repository: Path,
+    initial_world: WorldSnapshot,
+    output_dir: Path,
+    mode: str,
+    seed: int,
+    show_viewer: bool,
+    realtime_factor: float,
+    hold_seconds: float,
+    video: Path | None,
+    camera: str,
+    width: int,
+    height: int,
+    video_fps: float,
+    video_hold_seconds: float,
+) -> Any:
+    """Replay a planned sequence in one state-preserving Tool-Use-Journal runtime."""
+
+    from tuj.m4_motion.tool_use_journal_execution import (
+        ToolUseJournalExecutionAdapter,
+    )
+    from tuj.m4_motion.tool_use_journal_runtime import ToolUseJournalEERuntime
+
+    environment_name = _runtime_environment_name(initial_world)
+    active_ee = _runtime_active_ee(initial_world)
+    record_video = video is not None
+    suite_options = {
+        "ignore_done": True,
+        "use_camera_obs": False,
+        "has_renderer": bool(show_viewer and not record_video),
+        "has_offscreen_renderer": record_video,
+        "render_camera": camera,
+    }
+    if record_video:
+        suite_options.update(
+            {
+                "camera_names": camera,
+                "camera_heights": height,
+                "camera_widths": width,
+            }
+        )
+    if mode == "controller":
+        runtime = ToolUseJournalEERuntime.from_repository_for_controller(
+            repository,
+            environment_name,
+            active_ee=active_ee,
+            seed=seed,
+            **suite_options,
+        )
+    elif mode == "kinematic":
+        runtime = ToolUseJournalEERuntime.from_repository(
+            repository,
+            environment_name,
+            active_ee=active_ee,
+            seed=seed,
+            **suite_options,
+        )
+    else:
+        raise GenericMotionRunnerError(f"unsupported simulation mode {mode!r}")
+
+    recorder: GenericSimulationVideoRecorder | None = None
+    try:
+        _validate_runtime_start(runtime, initial_world)
+        if video is not None:
+            recorder = GenericSimulationVideoRecorder(
+                runtime,
+                video,
+                camera=camera,
+                width=width,
+                height=height,
+                fps=video_fps,
+            )
+        adapter = ToolUseJournalExecutionAdapter.from_repository(
+            runtime,
+            repository,
+            seed=seed,
+            controller=mode == "controller",
+            realtime_factor=realtime_factor,
+            render=show_viewer or record_video,
+        )
+        execution = adapter.execute(
+            planning,
+            store=SimulationArtifactStore(output_dir / "simulation"),
+        )
+        if recorder is not None:
+            recorder.hold_final_frame(video_hold_seconds)
+        elif show_viewer and hold_seconds > 0.0:
+            deadline = time.monotonic() + hold_seconds
+            while time.monotonic() < deadline:
+                runtime.render()
+                time.sleep(0.02)
+        return execution
+    finally:
+        try:
+            if recorder is not None:
+                recorder.close()
+        finally:
+            runtime.close()
+
+
 def _safe_slug(value: str) -> str:
     normalized = re.sub(r"[^A-Za-z0-9._-]+", "-", value).strip("-._")
     return normalized or "task"
@@ -303,6 +588,40 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--validate-input-only", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument(
+        "--simulate",
+        choices=("kinematic", "controller"),
+        help=(
+            "replay all generated MotionPlans in MuJoCo; --video implies "
+            "controller when this option is omitted"
+        ),
+    )
+    parser.add_argument(
+        "--headless",
+        action="store_true",
+        help="run simulation without opening the live MuJoCo viewer",
+    )
+    parser.add_argument(
+        "--realtime-factor",
+        type=float,
+        help="simulation playback speed; defaults to 1 for viewer and 0 otherwise",
+    )
+    parser.add_argument(
+        "--hold-seconds",
+        type=float,
+        default=3.0,
+        help="keep the live viewer open after execution",
+    )
+    parser.add_argument(
+        "--video",
+        type=Path,
+        help="record offscreen simulation to MP4 (implies --simulate controller)",
+    )
+    parser.add_argument("--camera", default="agentview")
+    parser.add_argument("--width", type=int, default=640)
+    parser.add_argument("--height", type=int, default=640)
+    parser.add_argument("--video-fps", type=float, default=20.0)
+    parser.add_argument("--video-hold-seconds", type=float, default=3.0)
     return parser
 
 
@@ -313,6 +632,34 @@ def main(
 ) -> int:
     parser = _parser(repository)
     args = parser.parse_args(argv)
+    if args.realtime_factor is not None and (
+        not math.isfinite(args.realtime_factor) or args.realtime_factor < 0.0
+    ):
+        parser.error("--realtime-factor must be finite and non-negative")
+    if not math.isfinite(args.hold_seconds) or args.hold_seconds < 0.0:
+        parser.error("--hold-seconds must be finite and non-negative")
+    if args.width <= 0 or args.height <= 0:
+        parser.error("--width and --height must be positive")
+    if not math.isfinite(args.video_fps) or args.video_fps <= 0.0:
+        parser.error("--video-fps must be finite and positive")
+    if (
+        not math.isfinite(args.video_hold_seconds)
+        or args.video_hold_seconds < 0.0
+    ):
+        parser.error("--video-hold-seconds must be finite and non-negative")
+    if args.video is not None and args.validate_input_only:
+        parser.error("--video cannot be combined with --validate-input-only")
+    if args.video is not None and args.dry_run:
+        parser.error("--video cannot be combined with --dry-run")
+    simulation_mode = args.simulate or (
+        "controller" if args.video is not None else None
+    )
+    if simulation_mode is not None and args.validate_input_only:
+        parser.error("--simulate cannot be combined with --validate-input-only")
+    if simulation_mode is not None and args.dry_run:
+        parser.error("--simulate cannot be combined with --dry-run")
+    if args.headless and simulation_mode is None:
+        parser.error("--headless requires --simulate")
     task_planner = args.task_planner.expanduser().resolve()
     repository_path = args.repository.expanduser().resolve()
     if not repository_path.is_dir():
@@ -414,11 +761,78 @@ def main(
     summary = {
         **report,
         "status": "SUCCESS",
+        "planning_status": "SUCCESS",
         "planned_request_count": len(result.requests),
         "motion_plan_count": len(result.plans),
         "manifest": str(result.manifest_path) if result.manifest_path else None,
         "final_scene_signature": result.final_world.scene.signature,
     }
+    exit_code = 0
+    if simulation_mode is not None:
+        show_viewer = not args.headless and args.video is None
+        realtime_factor = (
+            args.realtime_factor
+            if args.realtime_factor is not None
+            else (1.0 if show_viewer else 0.0)
+        )
+        video_path = (
+            args.video.expanduser().resolve() if args.video is not None else None
+        )
+        try:
+            execution = execute_planning_result(
+                result,
+                repository=repository_path,
+                initial_world=world,
+                output_dir=output_dir,
+                mode=simulation_mode,
+                seed=args.seed,
+                show_viewer=show_viewer,
+                realtime_factor=realtime_factor,
+                hold_seconds=args.hold_seconds,
+                video=video_path,
+                camera=args.camera,
+                width=args.width,
+                height=args.height,
+                video_fps=args.video_fps,
+                video_hold_seconds=args.video_hold_seconds,
+            )
+        except GenericMotionRunnerError as error:
+            summary.update(
+                {
+                    "status": "SIMULATION_SETUP_FAILED",
+                    "simulation_status": "SIMULATION_SETUP_FAILED",
+                    "simulation_successful": False,
+                    "simulation_mode": simulation_mode,
+                    "simulation_detail": str(error),
+                    "video": str(video_path) if video_path is not None else None,
+                }
+            )
+            exit_code = 2
+        else:
+            summary.update(
+                {
+                    "status": (
+                        "SUCCESS"
+                        if execution.successful
+                        else execution.status.value
+                    ),
+                    "simulation_status": execution.status.value,
+                    "simulation_successful": execution.successful,
+                    "simulation_mode": simulation_mode,
+                    "simulation_run_count": len(execution.runs),
+                    "simulation_report_count": len(execution.reports),
+                    "simulation_manifest": (
+                        str(execution.manifest_path)
+                        if execution.manifest_path is not None
+                        else None
+                    ),
+                    "video": str(video_path) if video_path is not None else None,
+                }
+            )
+            if not execution.successful:
+                summary["simulation_detail"] = execution.detail
+                summary["simulation_failed_index"] = execution.failed_index
+                exit_code = 2
     summary_path = output_dir / "m5_summary.json"
     summary_path.write_text(
         json.dumps(summary, ensure_ascii=False, indent=2),
@@ -426,14 +840,16 @@ def main(
     )
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     print(f"[M5] output: {output_dir}")
-    return 0
+    return exit_code
 
 
 __all__ = [
     "GenericMotionRunnerError",
+    "GenericSimulationVideoRecorder",
     "ToolUseJournalPlannerPool",
     "capture_initial_world",
     "default_constraints",
+    "execute_planning_result",
     "load_selected_plan",
     "load_world",
     "main",

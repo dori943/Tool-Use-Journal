@@ -42,6 +42,7 @@ from tuj.m4_motion.contact_evaluation import (
     GraspRetentionEvaluator,
     RegionContainmentEvaluator,
     SupportStabilityEvaluator,
+    TaskAwareGoalEvaluator,
     ToolClearanceEvaluator,
 )
 from tuj.m4_motion.geometry import RelativePoseResolver
@@ -125,6 +126,7 @@ from tuj.m4_motion.tool_use_journal import (
     ToolUseJournalCompatibilityError,
     ToolUseJournalEnvironmentAdapter,
     make_tool_use_journal_env,
+    registered_tool_use_journal_environments,
 )
 from tuj.m4_motion.tool_affordance import (
     CircularPlateAffordanceProvider,
@@ -252,6 +254,7 @@ __all__ = [
     "SimulationArtifactStore",
     "StaticToolAffordanceProvider",
     "SupportStabilityEvaluator",
+    "TaskAwareGoalEvaluator",
     "TaskRecoveryProfile",
     "selected_plan_to_motion_requests",
     "ToolUseJournalCollisionModelCompiler",
@@ -278,6 +281,7 @@ __all__ = [
     "default_model_path",
     "deterministic_shortcut",
     "make_tool_use_journal_env",
+    "registered_tool_use_journal_environments",
     "order_targets_around_region",
     "push_to_region_geometry",
     "reduced_contact_step_distance",

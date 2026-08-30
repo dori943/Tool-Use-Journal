@@ -75,7 +75,7 @@ def attaches_target(task: Any) -> bool:
     metadata = getattr(task, "metadata", {})
     if isinstance(metadata, Mapping) and "attach_target" in metadata:
         return bool(metadata["attach_target"])
-    return is_acquire_task(task) and task_operation(task) != "PICK_TOOL"
+    return is_acquire_task(task)
 
 
 def detaches_target(task: Any) -> bool:
@@ -84,7 +84,11 @@ def detaches_target(task: Any) -> bool:
     metadata = getattr(task, "metadata", {})
     if isinstance(metadata, Mapping) and "detach_target" in metadata:
         return bool(metadata["detach_target"])
-    return is_release_task(task) and task_operation(task) == "PLACE"
+    return is_release_task(task) and task_operation(task) in {
+        "PLACE",
+        "RETURN_TOOL",
+        "TERMINAL_RETURN_TOOL",
+    }
 
 
 __all__ = [

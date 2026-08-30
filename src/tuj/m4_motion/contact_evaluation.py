@@ -7,9 +7,19 @@ from typing import Any
 
 import numpy as np
 
-from tuj.m4_motion.execution import GoalEvaluation, GoalEvaluationStatus, GoalEvaluator
+from tuj.m4_motion.execution import (
+    GoalEvaluation,
+    GoalEvaluationStatus,
+    GoalEvaluator,
+    GroundedMotionGoalEvaluator,
+)
 from tuj.m4_motion.push_to_region import target_fully_inside_region
 from tuj.m4_motion.schema import ExecutionReport, MotionPlanRequest, WorldSnapshot
+from tuj.m4_motion.task_semantics import (
+    is_acquire_task,
+    is_ee_exchange_task,
+    is_release_task,
+)
 
 
 def _result(
@@ -278,10 +288,47 @@ class CompositeGoalEvaluator:
         )
 
 
+class TaskAwareGoalEvaluator:
+    """Route grounded region/contact work to its physical success predicate.
+
+    Resource transitions (pick, place, tool return, and EE exchange) keep the
+    state-based evaluator. Ordinary contact or transport tasks with a grounded
+    region require every target footprint to be inside that region.
+    """
+
+    def __init__(self, *, joint_tolerance_rad: float = 0.02) -> None:
+        self._state = GroundedMotionGoalEvaluator(
+            joint_tolerance_rad=joint_tolerance_rad
+        )
+        self._region = RegionContainmentEvaluator()
+
+    def evaluate(
+        self,
+        request: MotionPlanRequest,
+        report: ExecutionReport,
+        observed_world: WorldSnapshot | None,
+    ) -> GoalEvaluation:
+        task = request.task
+        is_resource_transition = (
+            is_acquire_task(task)
+            or is_release_task(task)
+            or is_ee_exchange_task(task)
+        )
+        if (
+            not is_resource_transition
+            and task.goal.target_region_id is not None
+            and task.goal.target_region_id in request.world.objects
+            and bool(task.target_ids)
+        ):
+            return self._region.evaluate(request, report, observed_world)
+        return self._state.evaluate(request, report, observed_world)
+
+
 __all__ = [
     "CompositeGoalEvaluator",
     "GraspRetentionEvaluator",
     "RegionContainmentEvaluator",
     "SupportStabilityEvaluator",
+    "TaskAwareGoalEvaluator",
     "ToolClearanceEvaluator",
 ]

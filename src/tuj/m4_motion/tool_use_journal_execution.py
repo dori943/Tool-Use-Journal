@@ -198,6 +198,10 @@ class ToolUseJournalExecutionAdapter:
         return world
 
     def orchestrator(self, **kwargs: Any) -> SelectedPlanSimulationOrchestrator:
+        if "goal_evaluator" not in kwargs:
+            from tuj.m4_motion.contact_evaluation import TaskAwareGoalEvaluator
+
+            kwargs["goal_evaluator"] = TaskAwareGoalEvaluator()
         return SelectedPlanSimulationOrchestrator(
             self.player,
             config=self.config,

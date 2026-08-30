@@ -49,6 +49,20 @@ python -m pip install -r ../tuj-m4/requirements.txt
 `WorldSnapshot`을 명시하거나, 지원되는 Tool-Use-Journal 환경 이름을 넘겨 현재 world를
 캡처한다.
 
+지원 환경은 M5 내부 상수로 관리하지 않는다. 새 환경 모듈을
+`environments/__init__.py`에서 import해 robosuite에 등록하면 runner가 checkout-local
+registry에서 환경 이름을 자동 발견한다. 등록된 환경은 reset 후 다음 공통 계약을
+만족해야 한다.
+
+- UR5e 로봇과 bare-flange 환경 생성
+- `2F`, `3F`, `vac` 각각의 물리 gripper variant 생성
+- 세 EE의 `ee_rack_info`
+- M1/GK ID와 일치하는 `obj_body_id`
+- `model.get_xml()` 및 동일 seed reset 상태 재현
+
+목록 등록은 자동이지만 위 물리 계약은 생략되지 않는다. 계약이 없는 일반 robosuite
+환경은 planning/simulation 전에 명확한 compatibility error로 중단한다.
+
 ```powershell
 # 다른 Task의 입력 계약만 검증
 python scripts\run_m5_motion_planner.py `
@@ -67,6 +81,61 @@ python scripts\run_m5_motion_planner.py `
 `--constraints`와 `--options`는 공통 JSON 또는 subgoal id별 JSON mapping을 받는다.
 생략하면 초기 world의 관절 이름을 기준으로 보수적인 기본 제약을 만든다. 출력 폴더를
 생략하면 `artifacts/<Task 입력 폴더명>/`을 사용한다.
+
+#### M4 입력 grounding 계약
+
+- `target_ids`는 현재 `WorldSnapshot.objects` 또는 `rack`에 존재하는 구체 ID여야
+  한다. `?tool` 같은 미해결 변수와 scene에 없는 ID는 계획 전에 거부한다.
+- M4의 structured `grasp`는 선택 입력이다. 없으면 M5 keyframe provider가 선택된
+  Tool/object와 현재 world에서 접촉 자세 후보를 만든다.
+- `PICK_TOOL`은 Tool object를 물리적으로 attach하고 `attached_object_id`와
+  `held_tool_id`를 함께 갱신한다. `RETURN_TOOL`은 같은 object를 detach하고 두 상태를
+  해제한다. Tool을 든 동안 EE 교체는 허용하지 않는다.
+- 실제 region geometry가 있는 sweep/push는 실행 후 모든 target footprint가 region
+  안에 들어왔는지 판정한다. `tool_rest`처럼 M1의 개념적 위치 이름만 있고 geometry가
+  없는 운반 단계는 M4→M5 predicted world에 보존된 Tool home pose를 사용한다.
+
+계획부터 MuJoCo 실행까지 한 번에 확인하려면 다음 중 하나를 선택한다.
+
+```powershell
+# controller physics와 live viewer (기본 realtime factor 1.0)
+python scripts\run_m5_motion_planner.py `
+  --task-planner C:\tasks\sorting\task_planner.json `
+  --environment C2_1_ObjectSorting `
+  --initial-ee none `
+  --simulate controller
+
+# 빠른 deterministic qpos replay, viewer 없음
+python scripts\run_m5_motion_planner.py `
+  --task-planner C:\tasks\sorting\task_planner.json `
+  --environment C2_1_ObjectSorting `
+  --initial-ee none `
+  --simulate kinematic `
+  --headless
+
+# controller physics를 offscreen MP4로 기록
+python scripts\run_m5_motion_planner.py `
+  --task-planner C:\tasks\sorting\task_planner.json `
+  --environment C2_1_ObjectSorting `
+  --initial-ee none `
+  --video artifacts\sorting\run.mp4
+```
+
+`--video`는 `--simulate controller`를 암시한다. `--realtime-factor`,
+`--hold-seconds`, `--camera`, `--width`, `--height`, `--video-fps`로 재생 및
+렌더링을 조정할 수 있다. 전체 sequence의 run/report/goal 평가는
+`<output-dir>/simulation/`에, 계획·실행 요약은 `m5_summary.json`에 저장된다.
+simulation 실패 또는 목표 검증 실패 시 runner는 종료 코드 2를 반환하며 생성된
+report와 manifest는 그대로 보존한다.
+
+파일로 받은 `--initial-world`는 environment reset과 같은 관절·EE 상태여야 한다.
+일치하지 않으면 잘못된 scene에서 궤적을 재생하지 않고 중단한다. held/attached
+object가 있는 외부 snapshot도 fresh reset으로 재현할 수 없으므로 거부한다. 임의 Task를 바로
+시뮬레이션할 때는 `--environment`를 사용해 계획과 실행이 같은 seed의 deterministic
+reset을 공유하게 하는 것이 가장 안전하다. 범용 evaluator는 grounded Tool 상태,
+pose/joint, 실제 region containment를 판정한다. 그 밖의 scenario-level 성공 조건은
+`UNKNOWN`으로 처리된다. C1 sweep의 검증된 rim grasp, 마찰, closed-loop rollback과
+cleanup 정책까지 필요하면 전용 runner를 사용한다.
 
 ### C1_1 전용 물리 실행
 
