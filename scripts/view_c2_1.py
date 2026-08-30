@@ -16,6 +16,29 @@ if str(ROOT) not in sys.path:
     sys.path.insert(0, str(ROOT))
 
 
+# ============================================================
+# Reachability 설정
+# ============================================================
+
+UR5E_REACH_M = 0.85
+
+
+# ============================================================
+# Utility
+# ============================================================
+
+def _fmt_vec(values) -> str:
+    """벡터를 보기 좋은 문자열로 변환한다."""
+
+    return "[" + ", ".join(
+        f"{float(v):7.3f}"
+        for v in values
+    ) + "]"
+
+
+# ============================================================
+# Mass
+# ============================================================
 
 def get_total_body_mass(
     sim,
@@ -54,6 +77,9 @@ def get_total_body_mass(
     return total_mass
 
 
+# ============================================================
+# Geom
+# ============================================================
 
 def get_object_geom_ids(
     sim,
@@ -96,25 +122,35 @@ def get_object_geom_ids(
     return geom_ids
 
 
+# ============================================================
+# AABB
+# ============================================================
 
 def get_object_world_aabb(
     sim,
     root_body_id,
 ):
-    """실제 geom으로 월드 AABB를 계산한다. sphere/box/cylinder/ellipsoid/capsule/mesh."""
+    """
+    실제 geom으로 월드 AABB를 계산한다.
+
+    지원:
+    - sphere
+    - box
+    - cylinder
+    - ellipsoid
+    - capsule
+    - mesh
+    """
 
     model = sim.model
     data = sim.data
 
-    geom_ids = (
-        get_object_geom_ids(
-            sim,
-            root_body_id,
-        )
+    geom_ids = get_object_geom_ids(
+        sim,
+        root_body_id,
     )
 
     all_points = []
-
 
     for geom_id in geom_ids:
 
@@ -123,7 +159,6 @@ def get_object_world_aabb(
                 geom_id
             ]
         )
-
 
         geom_pos = np.asarray(
             data.geom_xpos[
@@ -142,7 +177,6 @@ def get_object_world_aabb(
             3,
         )
 
-
         geom_size = np.asarray(
             model.geom_size[
                 geom_id
@@ -150,6 +184,9 @@ def get_object_world_aabb(
             dtype=float,
         )
 
+        # ----------------------------------------------------
+        # Mesh
+        # ----------------------------------------------------
 
         if (
             geom_type
@@ -165,7 +202,6 @@ def get_object_world_aabb(
             if mesh_id < 0:
                 continue
 
-
             vert_start = int(
                 model.mesh_vertadr[
                     mesh_id
@@ -178,7 +214,6 @@ def get_object_world_aabb(
                 ]
             )
 
-
             vertices = np.asarray(
                 model.mesh_vert[
                     vert_start:
@@ -187,10 +222,8 @@ def get_object_world_aabb(
                 dtype=float,
             )
 
-
             if len(vertices) == 0:
                 continue
-
 
             world_vertices = (
                 vertices
@@ -198,11 +231,13 @@ def get_object_world_aabb(
                 + geom_pos
             )
 
-
             all_points.append(
                 world_vertices
             )
 
+        # ----------------------------------------------------
+        # Sphere
+        # ----------------------------------------------------
 
         elif (
             geom_type
@@ -210,11 +245,8 @@ def get_object_world_aabb(
         ):
 
             r = float(
-                geom_size[
-                    0
-                ]
+                geom_size[0]
             )
-
 
             local_points = np.array(
                 [
@@ -230,18 +262,19 @@ def get_object_world_aabb(
                 dtype=float,
             )
 
-
             world_points = (
                 local_points
                 @ geom_mat.T
                 + geom_pos
             )
 
-
             all_points.append(
                 world_points
             )
 
+        # ----------------------------------------------------
+        # Box
+        # ----------------------------------------------------
 
         elif (
             geom_type
@@ -260,7 +293,6 @@ def get_object_world_aabb(
                 geom_size[2]
             )
 
-
             local_points = np.array(
                 [
                     [-hx, -hy, -hz],
@@ -275,18 +307,19 @@ def get_object_world_aabb(
                 dtype=float,
             )
 
-
             world_points = (
                 local_points
                 @ geom_mat.T
                 + geom_pos
             )
 
-
             all_points.append(
                 world_points
             )
 
+        # ----------------------------------------------------
+        # Cylinder
+        # ----------------------------------------------------
 
         elif (
             geom_type
@@ -294,17 +327,12 @@ def get_object_world_aabb(
         ):
 
             radius = float(
-                geom_size[
-                    0
-                ]
+                geom_size[0]
             )
 
             half_height = float(
-                geom_size[
-                    1
-                ]
+                geom_size[1]
             )
-
 
             angles = np.linspace(
                 0.0,
@@ -313,9 +341,7 @@ def get_object_world_aabb(
                 endpoint=False,
             )
 
-
             points = []
-
 
             for z in (
                 -half_height,
@@ -327,25 +353,19 @@ def get_object_world_aabb(
                     points.append(
                         [
                             radius
-                            * np.cos(
-                                angle
-                            ),
+                            * np.cos(angle),
 
                             radius
-                            * np.sin(
-                                angle
-                            ),
+                            * np.sin(angle),
 
                             z,
                         ]
                     )
 
-
             local_points = np.asarray(
                 points,
                 dtype=float,
             )
-
 
             world_points = (
                 local_points
@@ -353,11 +373,13 @@ def get_object_world_aabb(
                 + geom_pos
             )
 
-
             all_points.append(
                 world_points
             )
 
+        # ----------------------------------------------------
+        # Ellipsoid
+        # ----------------------------------------------------
 
         elif (
             geom_type
@@ -376,7 +398,6 @@ def get_object_world_aabb(
                 geom_size[2]
             )
 
-
             theta_values = np.linspace(
                 0.0,
                 2.0 * np.pi,
@@ -390,9 +411,7 @@ def get_object_world_aabb(
                 32,
             )
 
-
             points = []
-
 
             for phi in phi_values:
 
@@ -415,7 +434,6 @@ def get_object_world_aabb(
                         * np.sin(phi)
                     )
 
-
                     points.append(
                         [
                             x,
@@ -424,12 +442,10 @@ def get_object_world_aabb(
                         ]
                     )
 
-
             local_points = np.asarray(
                 points,
                 dtype=float,
             )
-
 
             world_points = (
                 local_points
@@ -437,11 +453,13 @@ def get_object_world_aabb(
                 + geom_pos
             )
 
-
             all_points.append(
                 world_points
             )
 
+        # ----------------------------------------------------
+        # Capsule
+        # ----------------------------------------------------
 
         elif (
             geom_type
@@ -449,28 +467,21 @@ def get_object_world_aabb(
         ):
 
             radius = float(
-                geom_size[
-                    0
-                ]
+                geom_size[0]
             )
 
             half_length = float(
-                geom_size[
-                    1
-                ]
+                geom_size[1]
             )
-
 
             extent = np.array(
                 [
                     radius,
                     radius,
-                    half_length
-                    + radius,
+                    half_length + radius,
                 ],
                 dtype=float,
             )
-
 
             local_points = np.array(
                 [
@@ -525,29 +536,24 @@ def get_object_world_aabb(
                 dtype=float,
             )
 
-
             world_points = (
                 local_points
                 @ geom_mat.T
                 + geom_pos
             )
 
-
             all_points.append(
                 world_points
             )
-
 
     if not all_points:
 
         return None
 
-
     points = np.concatenate(
         all_points,
         axis=0,
     )
-
 
     min_xyz = np.min(
         points,
@@ -564,7 +570,6 @@ def get_object_world_aabb(
         - min_xyz
     )
 
-
     return {
         "min_xyz": min_xyz,
         "max_xyz": max_xyz,
@@ -572,11 +577,14 @@ def get_object_world_aabb(
     }
 
 
+# ============================================================
+# Physical specs
+# ============================================================
 
 def print_object_physical_specs(
     env,
 ):
-    """대상 물체의 실제 질량(서브트리)과 크기(월드 AABB)를 출력한다."""
+    """대상 물체의 실제 질량과 크기를 출력한다."""
 
     print()
 
@@ -592,6 +600,9 @@ def print_object_physical_specs(
         "=" * 72
     )
 
+    # --------------------------------------------------------
+    # Target objects
+    # --------------------------------------------------------
 
     for obj in (
         env.target_objects
@@ -603,7 +614,6 @@ def print_object_physical_specs(
             )
         )
 
-
         mass_kg = (
             get_total_body_mass(
                 env.sim,
@@ -611,12 +621,10 @@ def print_object_physical_specs(
             )
         )
 
-
         mass_g = (
             mass_kg
             * 1000.0
         )
-
 
         aabb = (
             get_object_world_aabb(
@@ -624,7 +632,6 @@ def print_object_physical_specs(
                 root_body_id,
             )
         )
-
 
         print()
 
@@ -643,7 +650,6 @@ def print_object_physical_specs(
             f"({mass_g:.2f} g)"
         )
 
-
         if aabb is not None:
 
             size_mm = (
@@ -652,7 +658,6 @@ def print_object_physical_specs(
                 ]
                 * 1000.0
             )
-
 
             print(
                 "  size  : "
@@ -672,91 +677,673 @@ def print_object_physical_specs(
                 "could not calculate"
             )
 
+    print()
+    print("=" * 72)
+
+    # --------------------------------------------------------
+    # Tray specs
+    # --------------------------------------------------------
 
     print()
-
-    print(
-        "=" * 72
-    )
-
-    print()
-
-    print("\n" + "=" * 72)
+    print("=" * 72)
     print("C2-1 TRAY PHYSICAL SPECS")
     print("=" * 72)
 
     for tray in env.trays:
-        body_id = env.obj_body_id[tray.name]
 
-        # 이 tray body에 속한 geom만 모은다.
+        body_id = (
+            env.obj_body_id[
+                tray.name
+            ]
+        )
+
         geom_ids = [
             geom_id
-            for geom_id in range(env.sim.model.ngeom)
-            if env.sim.model.geom_bodyid[geom_id] == body_id
+            for geom_id
+            in range(
+                env.sim.model.ngeom
+            )
+            if (
+                env.sim.model.geom_bodyid[
+                    geom_id
+                ]
+                == body_id
+            )
         ]
 
         if not geom_ids:
-            print(f"\n[TRAY] {tray.name}")
-            print("  size : could not determine")
+
+            print()
+            print(
+                f"[TRAY] {tray.name}"
+            )
+
+            print(
+                "  size : "
+                "could not determine"
+            )
+
             continue
 
-        min_xyz = np.array([np.inf, np.inf, np.inf])
-        max_xyz = np.array([-np.inf, -np.inf, -np.inf])
+        min_xyz = np.array(
+            [
+                np.inf,
+                np.inf,
+                np.inf,
+            ]
+        )
+
+        max_xyz = np.array(
+            [
+                -np.inf,
+                -np.inf,
+                -np.inf,
+            ]
+        )
 
         for geom_id in geom_ids:
-            geom_pos = env.sim.data.geom_xpos[geom_id]
-            geom_mat = env.sim.data.geom_xmat[geom_id].reshape(3, 3)
 
-            geom_type = env.sim.model.geom_type[geom_id]
-            geom_size = env.sim.model.geom_size[geom_id]
+            geom_pos = (
+                env.sim.data.geom_xpos[
+                    geom_id
+                ]
+            )
 
-            # MuJoCo box (type 6)
-            if geom_type == 6:
-                half_size = geom_size[:3]
+            geom_mat = (
+                env.sim.data.geom_xmat[
+                    geom_id
+                ]
+                .reshape(
+                    3,
+                    3,
+                )
+            )
 
-                # 회전을 반영한 월드 AABB half extent
-                world_half = np.abs(geom_mat) @ half_size
+            geom_type = (
+                env.sim.model.geom_type[
+                    geom_id
+                ]
+            )
 
-                geom_min = geom_pos - world_half
-                geom_max = geom_pos + world_half
+            geom_size = (
+                env.sim.model.geom_size[
+                    geom_id
+                ]
+            )
 
-                min_xyz = np.minimum(min_xyz, geom_min)
-                max_xyz = np.maximum(max_xyz, geom_max)
+            if (
+                geom_type
+                == mujoco.mjtGeom.mjGEOM_BOX
+            ):
 
-            # mesh는 이 방식으로 정확한 크기를 구할 수 없다.
+                half_size = (
+                    geom_size[:3]
+                )
 
-        if np.any(np.isinf(min_xyz)):
-            print(f"\n[TRAY] {tray.name}")
-            print("  size : mesh geometry - additional calculation required")
+                world_half = (
+                    np.abs(
+                        geom_mat
+                    )
+                    @ half_size
+                )
+
+                geom_min = (
+                    geom_pos
+                    - world_half
+                )
+
+                geom_max = (
+                    geom_pos
+                    + world_half
+                )
+
+                min_xyz = np.minimum(
+                    min_xyz,
+                    geom_min,
+                )
+
+                max_xyz = np.maximum(
+                    max_xyz,
+                    geom_max,
+                )
+
+        if np.any(
+            np.isinf(
+                min_xyz
+            )
+        ):
+
+            print()
+
+            print(
+                f"[TRAY] {tray.name}"
+            )
+
+            print(
+                "  size : "
+                "mesh geometry - "
+                "additional calculation required"
+            )
+
             continue
 
-        size_m = max_xyz - min_xyz
-        size_mm = size_m * 1000.0
+        size_m = (
+            max_xyz
+            - min_xyz
+        )
 
-        print(f"\n[TRAY] {tray.name}")
-        print(f"  class : {tray.__class__.__name__}")
+        size_mm = (
+            size_m
+            * 1000.0
+        )
+
+        print()
+
+        print(
+            f"[TRAY] {tray.name}"
+        )
+
+        print(
+            f"  class : "
+            f"{tray.__class__.__name__}"
+        )
+
         print(
             f"  size  : "
             f"{size_mm[0]:.2f} × "
             f"{size_mm[1]:.2f} × "
             f"{size_mm[2]:.2f} mm"
         )
-        print("          X × Y × Z")
 
-    print("\n" + "=" * 72)
+        print(
+            "          X × Y × Z"
+        )
+
+    print()
+    print("=" * 72)
+
+
+# ============================================================
+# Position + Reachability
+# ============================================================
+
+def print_positions_and_reachability(
+    env,
+):
+    """
+    C2-1의 위치 및 reachability를 출력한다.
+
+    출력:
+    - robot0_base
+    - target objects
+    - trays
+    - EE rack
+    - individual EEs
+    - robot -> object/tray 거리
+    - robot -> EE 거리
+    """
+
+    print()
+    print("=" * 78)
+
+    print(
+        "C2-1 OBJECT / TRAY / EE "
+        "POSITIONS & REACHABILITY"
+    )
+
+    print("=" * 78)
+
+    # ========================================================
+    # Robot base
+    # ========================================================
+
+    base_id = (
+        env.sim.model.body_name2id(
+            "robot0_base"
+        )
+    )
+
+    base_pos = np.array(
+        env.sim.data.body_xpos[
+            base_id
+        ],
+        dtype=float,
+    )
+
+    base_quat = np.array(
+        env.sim.data.body_xquat[
+            base_id
+        ],
+        dtype=float,
+    )
+
+    print()
+
+    print(
+        "robot0_base"
+    )
+
+    print(
+        "position : "
+        f"{_fmt_vec(base_pos)}"
+    )
+
+    print(
+        "quat_wxyz: "
+        f"{_fmt_vec(base_quat)}"
+    )
+
+    positions = {}
+
+    # ========================================================
+    # Object positions
+    # ========================================================
+
+    print()
+    print("-" * 78)
+    print("OBJECT POSITIONS")
+    print("-" * 78)
+
+    for obj in env.target_objects:
+
+        body_id = (
+            env.sim.model.body_name2id(
+                obj.root_body
+            )
+        )
+
+        pos = np.array(
+            env.sim.data.body_xpos[
+                body_id
+            ],
+            dtype=float,
+        )
+
+        quat = np.array(
+            env.sim.data.body_xquat[
+                body_id
+            ],
+            dtype=float,
+        )
+
+        positions[
+            obj.name
+        ] = pos
+
+        print()
+
+        print(
+            obj.name
+        )
+
+        print(
+            "position : "
+            f"{_fmt_vec(pos)}"
+        )
+
+        print(
+            "quat_wxyz: "
+            f"{_fmt_vec(quat)}"
+        )
+
+    # ========================================================
+    # Tray positions
+    # ========================================================
+
+    print()
+    print("-" * 78)
+    print("TRAY POSITIONS")
+    print("-" * 78)
+
+    for tray in env.trays:
+
+        try:
+
+            body_id = (
+                env.obj_body_id[
+                    tray.name
+                ]
+            )
+
+        except Exception:
+
+            body_id = (
+                env.sim.model.body_name2id(
+                    tray.root_body
+                )
+            )
+
+        pos = np.array(
+            env.sim.data.body_xpos[
+                body_id
+            ],
+            dtype=float,
+        )
+
+        quat = np.array(
+            env.sim.data.body_xquat[
+                body_id
+            ],
+            dtype=float,
+        )
+
+        positions[
+            tray.name
+        ] = pos
+
+        print()
+
+        print(
+            tray.name
+        )
+
+        print(
+            "position : "
+            f"{_fmt_vec(pos)}"
+        )
+
+        print(
+            "quat_wxyz: "
+            f"{_fmt_vec(quat)}"
+        )
+
+    # ========================================================
+    # EE positions
+    # ========================================================
+
+    print()
+    print("-" * 78)
+    print("EE POSITIONS")
+    print("-" * 78)
+
+    ee_positions = {}
+
+    # --------------------------------------------------------
+    # EE rack
+    # --------------------------------------------------------
+
+    try:
+
+        rack_id = (
+            env.sim.model.body_name2id(
+                "ee_rack"
+            )
+        )
+
+        rack_pos = np.array(
+            env.sim.data.body_xpos[
+                rack_id
+            ],
+            dtype=float,
+        )
+
+        rack_quat = np.array(
+            env.sim.data.body_xquat[
+                rack_id
+            ],
+            dtype=float,
+        )
+
+        print()
+
+        print(
+            "ee_rack"
+        )
+
+        print(
+            "position : "
+            f"{_fmt_vec(rack_pos)}"
+        )
+
+        print(
+            "quat_wxyz: "
+            f"{_fmt_vec(rack_quat)}"
+        )
+
+    except Exception:
+
+        print()
+
+        print(
+            "ee_rack: "
+            "body not found"
+        )
+
+    # --------------------------------------------------------
+    # Individual EEs
+    # --------------------------------------------------------
+
+    if (
+        hasattr(
+            env,
+            "ee_rack_info",
+        )
+        and env.ee_rack_info
+    ):
+
+        for (
+            ee_id,
+            info,
+        ) in env.ee_rack_info.items():
+
+            body_name = info.get(
+                "rack_body"
+            )
+
+            if not body_name:
+                continue
+
+            try:
+
+                body_id = (
+                    env.sim.model.body_name2id(
+                        body_name
+                    )
+                )
+
+            except Exception:
+
+                continue
+
+            pos = np.array(
+                env.sim.data.body_xpos[
+                    body_id
+                ],
+                dtype=float,
+            )
+
+            quat = np.array(
+                env.sim.data.body_xquat[
+                    body_id
+                ],
+                dtype=float,
+            )
+
+            label = {
+                "2F": "2F",
+                "3F": "3F",
+                "vac": "Vacuum",
+            }.get(
+                ee_id,
+                ee_id,
+            )
+
+            ee_positions[
+                label
+            ] = pos
+
+            print()
+
+            print(
+                label
+            )
+
+            print(
+                "position : "
+                f"{_fmt_vec(pos)}"
+            )
+
+            print(
+                "quat_wxyz: "
+                f"{_fmt_vec(quat)}"
+            )
+
+    # ========================================================
+    # Object / Tray reachability
+    # ========================================================
+
+    print()
+    print("=" * 78)
+
+    print(
+        "REACHABILITY FROM robot0_base "
+        f"(UR5e XY limit = "
+        f"{UR5E_REACH_M:.2f} m)"
+    )
+
+    print("=" * 78)
+
+    for (
+        name,
+        pos,
+    ) in positions.items():
+
+        delta_xy = (
+            pos[:2]
+            - base_pos[:2]
+        )
+
+        delta_3d = (
+            pos
+            - base_pos
+        )
+
+        dist_xy = float(
+            np.linalg.norm(
+                delta_xy
+            )
+        )
+
+        dist_3d = float(
+            np.linalg.norm(
+                delta_3d
+            )
+        )
+
+        margin = (
+            UR5E_REACH_M
+            - dist_xy
+        )
+
+        flag = (
+            "OK"
+            if dist_xy
+            <= UR5E_REACH_M
+            else "OUT"
+        )
+
+        print(
+            f"{name:22s} "
+            f"xy={dist_xy:.3f} m  "
+            f"3d={dist_3d:.3f} m  "
+            f"margin={margin:+.3f} m  "
+            f"[{flag}]"
+        )
+
+    # ========================================================
+    # EE distances
+    # ========================================================
+
+    if ee_positions:
+
+        print()
+        print("-" * 78)
+        print("EE DISTANCES")
+        print("-" * 78)
+
+        ee_xy_values = []
+
+        for (
+            name,
+            pos,
+        ) in ee_positions.items():
+
+            dist_xy = float(
+                np.linalg.norm(
+                    pos[:2]
+                    - base_pos[:2]
+                )
+            )
+
+            dist_3d = float(
+                np.linalg.norm(
+                    pos
+                    - base_pos
+                )
+            )
+
+            margin = (
+                UR5E_REACH_M
+                - dist_xy
+            )
+
+            flag = (
+                "OK"
+                if dist_xy
+                <= UR5E_REACH_M
+                else "OUT"
+            )
+
+            ee_xy_values.append(
+                dist_xy
+            )
+
+            print(
+                f"{name:22s} "
+                f"xy={dist_xy:.6f} m  "
+                f"3d={dist_3d:.3f} m  "
+                f"margin={margin:+.3f} m  "
+                f"[{flag}]"
+            )
+
+        if ee_xy_values:
+
+            ee_delta = (
+                max(
+                    ee_xy_values
+                )
+                - min(
+                    ee_xy_values
+                )
+            )
+
+            print()
+
+            print(
+                "EE XY max delta = "
+                f"{ee_delta:.6e} m"
+            )
+
+    print()
+    print("=" * 78)
+
+
+# ============================================================
+# Main
+# ============================================================
 
 def main() -> int:
 
-    # 커스텀 환경을 먼저 import해야 C2_1_ObjectSorting이 등록된다.
+    # 커스텀 환경을 먼저 import해야
+    # C2_1_ObjectSorting이 등록된다.
     import environments  # noqa: F401
 
     import robosuite as suite
 
-
     print(
-        "Loading C2_1_ObjectSorting (UR5e)..."
+        "Loading C2_1_ObjectSorting "
+        "(UR5e)..."
     )
-
 
     env = suite.make(
         env_name="C2_1_ObjectSorting",
@@ -772,19 +1359,35 @@ def main() -> int:
         ignore_done=True,
     )
 
+    # ========================================================
+    # Reset
+    # ========================================================
 
     env.reset()
 
+    # ========================================================
+    # Physical specs
+    # ========================================================
 
     print_object_physical_specs(
         env
     )
 
+    # ========================================================
+    # Position / Reachability
+    # ========================================================
+
+    print_positions_and_reachability(
+        env
+    )
+
+    # ========================================================
+    # Viewer
+    # ========================================================
 
     print(
         "Scene ready. Opening MuJoCo viewer..."
     )
-
 
     print(
         "Inspect:"
@@ -811,15 +1414,11 @@ def main() -> int:
         "or press Ctrl+C to exit."
     )
 
-
     env.viewer.update()
-
-
 
     mujoco_viewer = (
         env.viewer.viewer
     )
-
 
     if mujoco_viewer is None:
 
@@ -832,6 +1431,9 @@ def main() -> int:
 
         return 1
 
+    # ========================================================
+    # Camera
+    # ========================================================
 
     cam = (
         mujoco_viewer.cam
@@ -857,6 +1459,9 @@ def main() -> int:
 
     env.viewer.update()
 
+    # ========================================================
+    # Viewer loop
+    # ========================================================
 
     try:
 
@@ -870,26 +1475,26 @@ def main() -> int:
                 0.01
             )
 
-
     except KeyboardInterrupt:
 
         print(
             "\nInterrupted."
         )
 
-
     finally:
 
         env.close()
-
 
     print(
         "Viewer closed. Exiting."
     )
 
-
     return 0
 
+
+# ============================================================
+# Entry point
+# ============================================================
 
 if __name__ == "__main__":
 
