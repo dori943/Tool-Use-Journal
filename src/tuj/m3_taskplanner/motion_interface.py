@@ -80,7 +80,7 @@ class SceneRef:
 class ResourceState:
     """What the arm is carrying when the queried motion begins."""
 
-    current_ee: str
+    current_ee: str | None
     held_tool: str | None = None
     held_object_id: str | None = None
 
@@ -166,7 +166,9 @@ class EEExchangeQuery:
     """
 
     scene: SceneRef
-    from_ee: str
+    # ``None`` represents the initial attachment when the arm starts without
+    # a mounted EE.
+    from_ee: str | None
     to_ee: str
     held_tool: str | None = None
     # slot -> occupant EE id / "empty" / "reserved" / "unknown".
@@ -299,7 +301,7 @@ def build_transition_query(
     scene: "SceneRef | str",
     candidate: Any,
     *,
-    current_ee: str,
+    current_ee: str | None,
     held_tool: str | None,
     held_object_id: str | None = None,
     primitives: tuple[str, ...] = (),

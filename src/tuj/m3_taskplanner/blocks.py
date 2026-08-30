@@ -13,7 +13,7 @@ from tuj.m3_taskplanner.transitions import P
 
 
 def build_blocks(
-    steps: list[dict[str, Any]], initial_ee: str, initial_tool: str | None
+    steps: list[dict[str, Any]], initial_ee: str | None, initial_tool: str | None
 ) -> tuple[list[dict[str, Any]], list[dict[str, Any]]]:
     """Return (ee_blocks, flat tool_blocks) from serialized plan steps."""
     ee_blocks: list[dict[str, Any]] = []
@@ -37,7 +37,7 @@ def build_blocks(
             "tool_blocks": [new_tool_block(start)],
         }
 
-    if steps:
+    if steps and current_ee is not None:
         ee_blocks.append(new_ee_block(0))
 
     for step in steps:
@@ -47,14 +47,21 @@ def build_blocks(
 
         if action in (P.ATTACH_EE, P.TERMINAL_RESTORE_EE):
             current_ee = params.get("to") or params.get("ee") or current_ee
-            ee_blocks.append(new_ee_block(idx))
+            # For the initial attach, include the preceding move-to-rack steps
+            # in the block selected by this ATTACH_EE action.
+            start = 0 if not ee_blocks else idx
+            ee_blocks.append(new_ee_block(start))
         elif action == P.PICK_TOOL:
             current_tool = params.get("tool")
-            ee_blocks[-1]["tool_blocks"].append(new_tool_block(idx))
+            if ee_blocks:
+                ee_blocks[-1]["tool_blocks"].append(new_tool_block(idx))
         elif action in (P.RETURN_TOOL, P.TERMINAL_RETURN_TOOL):
             current_tool = None
-            ee_blocks[-1]["tool_blocks"].append(new_tool_block(idx))
+            if ee_blocks:
+                ee_blocks[-1]["tool_blocks"].append(new_tool_block(idx))
 
+        if not ee_blocks:
+            continue
         block = ee_blocks[-1]
         block["step_end"] = idx
         tool_block = block["tool_blocks"][-1]

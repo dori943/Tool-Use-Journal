@@ -1,8 +1,48 @@
 # Task Planner
 
-M3 모듈 위치는 `src/tuj/m3_taskplanner/`이며, 패키지 경로는 `tuj.m3_taskplanner`다.
+Task Planner(M4) 모듈 위치는 `src/tuj/m3_taskplanner/`이며, 기존 Git 단계명을
+유지한 패키지 경로는 `tuj.m3_taskplanner`다.
 
 ## 빠른 시작
+
+### M4 한 명령 실행
+
+저장소에 포함된 C1_1 입력으로 Task Planner를 바로 실행하려면 저장소 루트에서
+다음 명령을 사용한다. 실행 위치와 관계없이 저장소 기준 경로를 사용하며, 결과 폴더도
+자동으로 만든다.
+
+```bash
+python scripts/run_m4_task_planner.py
+```
+
+기본 입력과 출력은 다음과 같다.
+
+| 구분 | 경로 |
+|---|---|
+| GK bundle | `output/c1_1/gk_bundle.json` |
+| M1 | `output/c1_1/m1.json` |
+| Robot spec | `configs/robot_spec.json` |
+| M5 전달 결과 | `output/c1_1/task_planner.json` |
+
+다른 입력을 사용할 때만 경로를 덮어쓴다. `--output`을 생략하면 GK 입력과 같은
+폴더에 `task_planner.json`을 생성하므로, Task별 입력 폴더를 그대로 넘겨도 C1_1
+출력 폴더에 섞이지 않는다.
+
+```bash
+python scripts/run_m4_task_planner.py \
+  --gk path/to/gk_bundle.json \
+  --m1 path/to/m1.json \
+  --robot-spec path/to/robot_spec.json
+```
+
+다른 위치에 저장해야 할 때만 `--output path/to/task_planner.json`을 추가한다.
+
+이 runner는 Tool 이름을 인자로 받지 않는다. Tool은 항상 GK bundle의
+`roles.selected_tool`에서 읽고 결과의 `candidate_assignments`로 전달한다. M1의
+`?tool` binding도 같은 ID로 치환되므로 `PICK_TOOL`, 작업, 운반, `RETURN_TOOL` 모두
+동일한 구체 Tool ID를 M5에 전달한다. M1에 acquire/place detail이 이미 있으면 이를
+각각 Tool 자원 subgoal로 사용하며 별도의 자동 PICK/RETURN transition을 중복 생성하지
+않는다.
 
 저장소 루트에서 Python 3.11 이상 가상환경을 만든 뒤 의존성을 설치한다.
 
@@ -56,14 +96,16 @@ python -m tuj.m3_taskplanner.cli --help
 ```
 
 우선순위는 EE 교체 최소화, Tool 교체 최소화, 이동 비용, 실행 비용 순서다.
-Terminal Tool 반납과 초기 EE 복원 비용도 포함한다.
+초기 `current_ee`가 `null`이면 첫 EE 장착은 교체로 세지 않고, 첫 EE까지 검색에서
+선택해 전체 작업의 이후 EE 교체 횟수를 최소화한다. Terminal Tool 반납과, 구체적인
+초기 EE가 있을 때의 EE 복원 비용도 포함한다.
 
 ## 검색 상태
 
 ```python
 SearchState(
     completed_subgoals: frozenset[str],
-    current_ee: str,
+    current_ee: str | None,
     held_tool: str | None,
     group_ee_bindings: tuple[tuple[str, str], ...],
     symbolic_facts: frozenset[FluentKey],
@@ -82,6 +124,8 @@ SearchState(
 - `tool_id`는 앞단이 고정하며 Task Planner가 선택하거나 대체하지 않는다.
 - `None→A`, `A→None`, `A→B`는 Tool identity 변경 1회다.
 - Tool을 든 상태에서 EE를 바꿀 때는 `RETURN_TOOL`이 `DETACH_EE`보다 먼저다.
+- 명시적인 `PICK_TOOL`/`RETURN_TOOL` detail은 `EXECUTE_SUBGOAL` 한 번으로 직렬화한다.
+- 모든 `?tool` object binding은 GK의 `roles.selected_tool`로 grounding한다.
 - 입력에 없는 EE, Tool, 작업 pose를 만들어내지 않는다.
 - 작업 pose는 Motion Planner에 opaque 입력으로 전달할 수 있으며 Task Planner는
   이를 생성·해석·선택하지 않는다.
@@ -111,8 +155,13 @@ proposal은 각각 `--resources`, `--candidates`로 보강할 수 있다.
 ### 초기 로봇 상태
 
 `configs/robot_spec.json`에는 최소한 `current_ee`와 `hand_empty`를 명시해야 한다.
+EE가 아직 장착되지 않았다면 `"current_ee": null`로 지정한다. 이 경우 Task Planner는
+가능한 모든 첫 EE를 비교하며, 첫 장착에는 `ATTACH_EE`만 생성하고 EE 교체 횟수는
+증가시키지 않는다. 첫 작업 이후 실제 EE가 바뀔 때만 교체로 계산한다.
+
 현재 Tool 또는 rack 점유 상태가 있으면 `held_tool`, `rack_occupancy`도 함께 전달한다.
-Task Planner는 누락된 `current_ee`를 EE 목록의 첫 항목으로 추정하지 않는다.
+`current_ee`가 `null`이면 `held_tool`도 `null`이어야 한다. Task Planner는
+`current_ee` 필드가 누락됐을 때 EE 목록의 첫 항목을 임의로 추정하지 않는다.
 
 로봇 사양과 실행 상태를 별도로 관리할 때는 정규화된 상태 파일을 사용한다.
 
