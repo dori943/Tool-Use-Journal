@@ -186,7 +186,9 @@ class TaskConstraints(_ExtensibleModel):
 
 class InitialState(_ExtensibleModel):
 
-    current_ee: str
+    # ``None`` means that no end effector is mounted yet.  The first EE is
+    # selected by the planner and attaching it is not counted as an exchange.
+    current_ee: str | None = None
     # slot -> EE id; interpreted as *home slot assignment* per EE, not occupancy.
     rack: dict[str, str] = Field(default_factory=dict)
     facts: list[Condition] = Field(default_factory=list)
@@ -384,7 +386,7 @@ class ExecutionState(_ExtensibleModel):
     """Actual world/robot state at replanning time."""
 
     completed_subgoals: list[str] = Field(default_factory=list)
-    current_ee: str
+    current_ee: str | None = None
     held_tool: str | None = None
     facts: list[Condition] = Field(default_factory=list)
     scene_signature: str | None = None

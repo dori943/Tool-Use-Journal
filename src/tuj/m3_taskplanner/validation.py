@@ -242,8 +242,12 @@ def validate_request(request: TaskPlannerRequest) -> ValidationOutcome:
         outcome.status = PlanStatus.INVALID_INPUT
         return outcome
 
-    # Initial EE must exist in the catalog.
-    if task_graph.initial_state.current_ee not in catalog.end_effectors:
+    # A concrete initial EE must exist in the catalog. ``None`` is a valid
+    # empty-mount state and lets search choose the first EE.
+    if (
+        task_graph.initial_state.current_ee is not None
+        and task_graph.initial_state.current_ee not in catalog.end_effectors
+    ):
         outcome.status = PlanStatus.INVALID_INPUT
         reject(
             "input",
@@ -256,6 +260,14 @@ def validate_request(request: TaskPlannerRequest) -> ValidationOutcome:
     # Optional initial held-tool state must describe a coherent catalog entry.
     init = task_graph.initial_state
     if init.held_tool is not None:
+        if init.current_ee is None:
+            outcome.status = PlanStatus.INVALID_INPUT
+            reject(
+                "input",
+                ReasonCode.EE_TOOL_INCOMPATIBLE,
+                "initial held_tool requires a mounted current_ee",
+            )
+            return outcome
         tool = catalog.tools.get(init.held_tool)
         if tool is None:
             outcome.status = PlanStatus.INVALID_INPUT

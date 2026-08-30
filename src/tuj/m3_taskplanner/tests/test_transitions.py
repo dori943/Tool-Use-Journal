@@ -12,7 +12,7 @@ from conftest import base_catalog
 
 
 def make_state(
-    ee: str = "A",
+    ee: str | None = "A",
     tool: str | None = None,
     *,
     held_object: str | None = None,
@@ -32,16 +32,22 @@ def make_state(
     )
 
 
-def make_candidate(ee: str = "A", tool: str | None = None) -> Candidate:
+def make_candidate(
+    ee: str = "A",
+    tool: str | None = None,
+    *,
+    action_type: str | None = None,
+) -> Candidate:
     return Candidate(
         candidate_id=f"c-{ee}-{tool}",
         subgoal_id="S1",
         ee=ee,
         tool=tool,
+        action_type=action_type,
     )
 
 
-def ctx(initial_ee: str = "A") -> TransitionContext:
+def ctx(initial_ee: str | None = "A") -> TransitionContext:
     return TransitionContext(
         catalog=base_catalog(),
         policy=PlanningPolicy(),
@@ -117,6 +123,38 @@ def test_ee_change_empty_hand() -> None:
     ]
 
 
+def test_initial_ee_attach_has_no_detach_or_exchange_cost() -> None:
+    state = make_state(ee=None)
+    result = build_transition(state, make_candidate(ee="B"), ctx(initial_ee=None))
+
+    assert result.feasible
+    assert actions(result) == [
+        P.MOVE_TO_EE_RACK,
+        P.ATTACH_EE,
+        P.VERIFY_ATTACHMENT,
+        P.MOVE_TO_WORKSPACE,
+        P.EXECUTE_SUBGOAL,
+    ]
+    assert result.cost.ee_switches == 0
+
+
+def test_initial_ee_attach_updates_explicit_rack_occupancy() -> None:
+    state = make_state(ee=None)
+    state = SearchState(
+        completed_subgoals=state.completed_subgoals,
+        current_ee=state.current_ee,
+        held_tool=state.held_tool,
+        group_ee_bindings=state.group_ee_bindings,
+        symbolic_facts=state.symbolic_facts,
+        scene_signature=state.scene_signature,
+        rack_signature=(("SA", "A"), ("SB", "B")),
+    )
+    result = build_transition(state, make_candidate(ee="B"), ctx(initial_ee=None))
+
+    assert result.feasible
+    assert result.next_rack_signature == (("SA", "A"), ("SB", "empty"))
+
+
 def test_object_held_ee_change_infeasible() -> None:
     result = build_transition(
         make_state(held_object="obj1"), make_candidate(ee="B"), ctx()
@@ -143,3 +181,50 @@ def test_object_held_tool_acquisition_infeasible() -> None:
     assert not result.feasible
     assert result.rejection is not None
     assert result.rejection.reason_code is ReasonCode.OBJECT_HELD_TOOL_ACQUIRE
+
+
+def test_explicit_pick_tool_executes_once_without_automatic_pick_transition() -> None:
+    result = build_transition(
+        make_state(tool=None),
+        make_candidate(tool="t1", action_type="PICK_TOOL"),
+        ctx(),
+    )
+
+    assert result.feasible
+    assert actions(result) == [
+        P.KEEP_EE,
+        P.MOVE_TO_TOOL_RACK,
+        P.EXECUTE_SUBGOAL,
+    ]
+    assert result.next_held_tool == "t1"
+    assert result.cost.tool_switches == 1
+
+
+def test_explicit_return_tool_executes_once_without_automatic_return_transition() -> None:
+    result = build_transition(
+        make_state(tool="t1"),
+        make_candidate(tool="t1", action_type="RETURN_TOOL"),
+        ctx(),
+    )
+
+    assert result.feasible
+    assert actions(result) == [
+        P.KEEP_EE,
+        P.KEEP_TOOL,
+        P.MOVE_TO_TOOL_RACK,
+        P.EXECUTE_SUBGOAL,
+    ]
+    assert result.next_held_tool is None
+    assert result.cost.tool_switches == 1
+
+
+def test_explicit_return_rejects_a_tool_that_is_not_held() -> None:
+    result = build_transition(
+        make_state(tool=None),
+        make_candidate(tool="t1", action_type="RETURN_TOOL"),
+        ctx(),
+    )
+
+    assert not result.feasible
+    assert result.rejection is not None
+    assert result.rejection.reason_code is ReasonCode.TOOL_MISMATCH

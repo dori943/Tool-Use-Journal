@@ -53,12 +53,14 @@ class CandidateAssignment(BaseModel):
     ee: str
     tool: str | None = None
     action_type: str | None = None
+    mode: str | None = None
     target_ids: list[str] = Field(default_factory=list)
     goal_region_id: str | None = None
     description: str | None = None
     grasp_id: str | None = None
     grasp: GraspSpec | None = None
     action_parameters: dict[str, Any] = Field(default_factory=dict)
+    source_binding: dict[str, Any] = Field(default_factory=dict)
     suitability_score: float | None = None
     suitability: dict[str, Any] | None = None
     ee_selection_source: str = "task_planner"
