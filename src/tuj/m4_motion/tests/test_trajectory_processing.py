@@ -7,6 +7,8 @@ import pytest
 from tuj.m4_motion.schema import JointDynamicLimit
 from tuj.m4_motion.trajectory_processing import (
     QuinticTimeParameterizer,
+    TrajectoryProcessingError,
+    clamp_joint_limit_roundoff,
     deviation_bounded_shortcut,
     deterministic_shortcut,
     unwrap_joint_path,
@@ -48,6 +50,30 @@ def test_unwrap_joint_path_keeps_pi_boundary_continuous() -> None:
         abs(right[0] - left[0])
         for left, right in zip(unwrapped, unwrapped[1:])
     ) < 0.2
+
+
+def test_unwrap_joint_path_keeps_finite_joint_inside_physical_limits() -> None:
+    limits = ((-2.0 * 3.141592653589793, 2.0 * 3.141592653589793),)
+    path = [(-0.0002,), (-0.001,)]
+
+    unwrapped = unwrap_joint_path(
+        path,
+        start_reference=(-6.28,),
+        joint_limits_rad=limits,
+    )
+
+    assert all(limits[0][0] <= state[0] <= limits[0][1] for state in unwrapped)
+    assert unwrapped[0][0] == pytest.approx(-0.0002)
+
+
+def test_joint_limit_roundoff_is_clamped_but_real_violation_fails() -> None:
+    limits = ((-1.0, 1.0), (-2.0, 2.0))
+
+    assert clamp_joint_limit_roundoff(
+        [(-1.0001, 0.0), (0.0, 2.0001)], limits
+    ) == ((-1.0, 0.0), (0.0, 2.0))
+    with pytest.raises(TrajectoryProcessingError, match="physical limit"):
+        clamp_joint_limit_roundoff([(-1.01, 0.0)], limits)
 
 
 def test_quintic_parameterization_respects_velocity_and_acceleration_limits() -> None:

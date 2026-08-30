@@ -72,6 +72,8 @@ def _selected_plan() -> SelectedPlan:
                 candidate_id="candidate-place",
                 ee="2F",
                 action_type="place",
+                mode="in_region",
+                source_binding={"?target": "part", "?region": "bin"},
                 target_ids=["part"],
                 goal_region_id="bin",
                 action_parameters=place_parameters,
@@ -134,7 +136,8 @@ def test_converts_selected_order_to_grounded_motion_requests() -> None:
         "sg-place",
         "sg-pick",
     ]
-    assert requests[0].task.goal.goal_type is GoalType.PLACE
+    assert requests[0].task.goal.goal_type is GoalType.POSE
+    assert requests[0].task.action_type == "place"
     assert requests[0].task.goal.target_pose is not None
     assert requests[0].task.goal.target_pose.frame_id == "object:bin"
     assert requests[0].task.goal.target_pose.position_m == (0.01, 0.02, 0.03)
@@ -142,9 +145,15 @@ def test_converts_selected_order_to_grounded_motion_requests() -> None:
         math.sqrt(0.5)
     )
     assert requests[0].task.goal.approach_distance_m == pytest.approx(0.04)
+    assert requests[0].task.metadata["mode"] == "in_region"
+    assert requests[0].task.metadata["source_binding"] == {
+        "?target": "part",
+        "?region": "bin",
+    }
     assert requests[0].task.metadata["task_planner_steps"][0]["action"] == "ATTACH_EE"
 
-    assert requests[1].task.goal.goal_type is GoalType.PICK
+    assert requests[1].task.goal.goal_type is GoalType.POSE
+    assert requests[1].task.action_type == "acquire"
     assert requests[1].task.grasp is not None
     assert requests[1].task.grasp.grasp_id == "grasp-1"
     assert requests[1].task.allowed_touch_objects == ["part"]

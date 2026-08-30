@@ -16,7 +16,14 @@ import math
 from pathlib import Path
 from typing import Any, Literal, TypeAlias
 
-from pydantic import BaseModel, ConfigDict, Field, TypeAdapter, model_validator
+from pydantic import (
+    BaseModel,
+    ConfigDict,
+    Field,
+    TypeAdapter,
+    field_validator,
+    model_validator,
+)
 
 from tuj.m3_taskplanner.models import GraspSpec
 
@@ -260,17 +267,28 @@ class KeyframePlanArtifact(_ContractModel):
 
 
 class GoalType(str, enum.Enum):
+    """Representation of the motion target, independent of task semantics."""
+
     POSE = "POSE"
     JOINT = "JOINT"
-    PICK = "PICK"
-    PLACE = "PLACE"
-    DOCK = "DOCK"
-    TOOL_CHANGE = "TOOL_CHANGE"
-    EE_EXCHANGE = "EE_EXCHANGE"
+
+
+_LEGACY_POSE_GOAL_TYPES = {
+    "PICK",
+    "PLACE",
+    "DOCK",
+    "TOOL_CHANGE",
+    "EE_EXCHANGE",
+    "PUSH",
+    "PULL",
+    "SWEEP",
+    "INSERT",
+    "POUR",
+}
 
 
 class MotionGoal(_ContractModel):
-    """Grounded goal from Task Planner; no trajectory is supplied here."""
+    """Grounded geometric target; manipulation meaning lives on MotionTask."""
 
     goal_type: GoalType
     target_pose: Pose | None = None
@@ -281,22 +299,101 @@ class MotionGoal(_ContractModel):
     approach_distance_m: float | None = Field(default=None, gt=0)
     retreat_distance_m: float | None = Field(default=None, gt=0)
 
+    @field_validator("goal_type", mode="before")
+    @classmethod
+    def _migrate_legacy_goal_type(cls, value: object) -> object:
+        """Read v3.2 artifacts without retaining action taxonomy in GoalType."""
+
+        normalized = str(getattr(value, "value", value)).strip().upper()
+        if normalized in _LEGACY_POSE_GOAL_TYPES:
+            return GoalType.POSE
+        return value
+
     @model_validator(mode="after")
     def _validate_goal_target(self) -> "MotionGoal":
         if self.goal_type is GoalType.JOINT:
             if not self.target_joint_positions_rad:
                 raise ValueError("JOINT goal requires target_joint_positions_rad")
-        elif self.goal_type in {
-            GoalType.POSE,
-            GoalType.PLACE,
-            GoalType.DOCK,
-        } and self.target_pose is None:
-            raise ValueError(f"{self.goal_type.value} goal requires target_pose")
+        elif (
+            self.target_pose is None
+            and self.target_object_id is None
+            and self.target_region_id is None
+        ):
+            # Specialized transition providers (for example EE exchange) can
+            # still ground a pose from MotionTask metadata and the world.  The
+            # enclosing MotionTask validator rejects an ungrounded ordinary
+            # action while allowing those explicit transition operations.
+            pass
         if self.approach_direction is not None:
             norm = math.sqrt(sum(v * v for v in self.approach_direction))
             if norm < 1e-9:
                 raise ValueError("approach_direction must be non-zero")
         return self
+
+
+class ContactSurfaceType(str, enum.Enum):
+    """Stable geometric contact categories, not manipulation-action labels."""
+
+    AUTO = "AUTO"
+    BROAD_FACE = "BROAD_FACE"
+    RIM = "RIM"
+    EDGE = "EDGE"
+    POINT = "POINT"
+
+
+class ToolContactPatch(_ContractModel):
+    """A usable tool surface expressed in the tool object's local frame."""
+
+    patch_id: str = Field(min_length=1)
+    tool_id: str = Field(min_length=1)
+    surface_type: ContactSurfaceType
+    position_in_tool_m: tuple[float, float, float]
+    normal_in_tool_xyz: tuple[float, float, float]
+    tangent_in_tool_xyz: tuple[float, float, float] | None = None
+    extent_m: tuple[float, float] | None = None
+    curvature_radius_m: float | None = Field(default=None, gt=0)
+    collision_geometry_refs: list[str] = Field(default_factory=list)
+    supported_primitives: list[str] = Field(default_factory=list)
+    metadata: dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def _validate_patch_frame(self) -> "ToolContactPatch":
+        values = (*self.position_in_tool_m, *self.normal_in_tool_xyz)
+        if not all(math.isfinite(value) for value in values):
+            raise ValueError("contact patch position and normal must be finite")
+        normal = math.sqrt(sum(value * value for value in self.normal_in_tool_xyz))
+        if not math.isclose(normal, 1.0, rel_tol=0.0, abs_tol=1e-3):
+            raise ValueError("contact patch normal must be a unit vector")
+        if self.tangent_in_tool_xyz is not None:
+            tangent = math.sqrt(
+                sum(value * value for value in self.tangent_in_tool_xyz)
+            )
+            if not math.isclose(tangent, 1.0, rel_tol=0.0, abs_tol=1e-3):
+                raise ValueError("contact patch tangent must be a unit vector")
+            dot = sum(
+                left * right
+                for left, right in zip(
+                    self.normal_in_tool_xyz, self.tangent_in_tool_xyz
+                )
+            )
+            if not math.isclose(dot, 0.0, rel_tol=0.0, abs_tol=1e-3):
+                raise ValueError("contact patch tangent must be perpendicular to normal")
+        if self.extent_m is not None and any(value <= 0 for value in self.extent_m):
+            raise ValueError("contact patch extents must be positive")
+        return self
+
+
+class ContactManipulationSpec(_ContractModel):
+    """Grounded contact intent carried alongside an opaque task action label."""
+
+    primitive: str = Field(min_length=1)
+    contact_surface: ContactSurfaceType = ContactSurfaceType.AUTO
+    contact_patch_id: str | None = None
+    path_pattern: str = "AUTO"
+    target_grouping: str = "SINGLE"
+    maintain_contact: bool = False
+    max_contact_force_n: float | None = Field(default=None, gt=0)
+    metadata: dict[str, Any] = Field(default_factory=dict)
 
 
 class MotionTask(_ContractModel):
@@ -310,13 +407,26 @@ class MotionTask(_ContractModel):
     target_ids: list[str] = Field(default_factory=list)
     grasp: GraspSpec | None = None
     goal: MotionGoal
+    contact: ContactManipulationSpec | None = None
     allowed_touch_objects: list[str] = Field(default_factory=list)
     metadata: dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def _validate_pick_grasp(self) -> "MotionTask":
-        if self.goal.goal_type is GoalType.PICK and self.grasp is None:
-            raise ValueError("PICK task requires a structured grasp")
+        from tuj.m4_motion.task_semantics import is_ee_exchange_task
+
+        if self.metadata.get("require_structured_grasp") and self.grasp is None:
+            raise ValueError("task explicitly requires a structured grasp")
+        if (
+            self.goal.goal_type is GoalType.POSE
+            and self.goal.target_pose is None
+            and self.goal.target_object_id is None
+            and self.goal.target_region_id is None
+            and not is_ee_exchange_task(self)
+        ):
+            raise ValueError(
+                "POSE goal requires target_pose, target_object_id, or target_region_id"
+            )
         return self
 
 

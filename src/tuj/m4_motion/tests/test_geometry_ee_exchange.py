@@ -105,6 +105,37 @@ def test_ee_exchange_template_has_explicit_model_transitions() -> None:
     assert all(item.frame_ref.startswith("rack:") for item in candidate.keyframes)
 
 
+def test_initial_ee_attach_starts_bare_and_skips_undock() -> None:
+    generator = EEExchangeTemplateGenerator()
+
+    candidate = generator.generate(
+        _world(),
+        subgoal_id="initial-attach",
+        from_ee=None,
+        to_ee="vacuum",
+    )
+    contexts = generator.build_collision_contexts(
+        from_ee=None,
+        to_ee="vacuum",
+    )
+
+    assert len(candidate.keyframes) == 4
+    assert candidate.keyframes[0].collision_context_id == "bare-flange"
+    assert all(
+        KeyframeEventType.TOOL_UNLOCK not in item.events_after
+        for item in candidate.keyframes
+    )
+    assert any(
+        KeyframeEventType.TOOL_LOCK in item.events_after
+        for item in candidate.keyframes
+    )
+    assert set(contexts) == {
+        "bare-flange",
+        "bare-flange-dock-contact:vacuum",
+        "ee-attached:vacuum",
+    }
+
+
 def test_ee_exchange_contexts_limit_contact_relaxation_to_dock_segments() -> None:
     contexts = EEExchangeTemplateGenerator().build_collision_contexts(
         from_ee="2f",
@@ -146,7 +177,7 @@ def test_routed_provider_uses_template_without_calling_default() -> None:
             action_type="EE_EXCHANGE",
             ee="vacuum",
             target_ids=["2f", "vacuum"],
-            goal=MotionGoal(goal_type=GoalType.EE_EXCHANGE),
+            goal=MotionGoal(goal_type=GoalType.POSE, target_object_id="vacuum"),
             metadata={"from_ee": "2f", "to_ee": "vacuum"},
         ),
     )
@@ -159,3 +190,34 @@ def test_routed_provider_uses_template_without_calling_default() -> None:
         "from_ee": "2f",
         "to_ee": "vacuum",
     }
+
+
+def test_routed_provider_accepts_initial_attach_without_from_ee() -> None:
+    class _Default:
+        def generate(self, request):
+            raise AssertionError("default provider must not handle initial EE attach")
+
+    request = MotionPlanRequest(
+        request_id="attach-request",
+        provenance=ArtifactProvenance(
+            artifact_id="attach-request-artifact",
+            artifact_type="MotionPlanRequest",
+            produced_by=ModuleName.TASK_PLANNER,
+            invocation_id="test",
+        ),
+        world=_world(),
+        task=MotionTask(
+            task_id="attach-task",
+            subgoal_id="attach-subgoal",
+            action_type="EE_ATTACH",
+            ee="vacuum",
+            target_ids=["vacuum"],
+            goal=MotionGoal(goal_type=GoalType.POSE, target_object_id="vacuum"),
+            metadata={"from_ee": None, "to_ee": "vacuum"},
+        ),
+    )
+
+    artifact = RoutedKeyframeStrategyProvider(_Default()).generate(request)
+
+    assert len(artifact.candidates[0].keyframes) == 4
+    assert artifact.candidates[0].metadata["from_ee"] is None

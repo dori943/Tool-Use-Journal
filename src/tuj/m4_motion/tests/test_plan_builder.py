@@ -197,12 +197,59 @@ def test_plan_builder_holds_pose_between_close_and_attach_events() -> None:
         metadata={
             "event_target_id": "obj1",
             "hold_duration_after_s": 0.75,
+            "tracking_settle": {
+                "joint_tolerance_rad": 0.02,
+                "eef_tolerance_m": 0.01,
+                "max_wait_s": 3.0,
+                "required_consecutive_ticks": 5,
+            },
+            "physical_tool_control": {
+                "target_clearance_m": 0.0015,
+                "clearance_tolerance_m": 0.003,
+                "max_table_penetration_m": 0.001,
+                "gain": 4.0,
+                "rate_m_s": 0.03,
+                "max_offset_m": 0.03,
+                "activation_band_m": 0.02,
+                "max_joint_offset_rad": 0.15,
+            },
+            "physical_tool_settle": {
+                "target_position_m": [0.1, 0.2, 0.3],
+                "target_clearance_m": 0.0015,
+                "xy_tolerance_m": 0.015,
+                "clearance_tolerance_m": 0.003,
+                "max_table_penetration_m": 0.001,
+                "max_tool_speed_m_s": 0.02,
+            },
+            "physical_tool_target_position_m": [0.4, 0.5, 0.6],
+            "physical_push_control": {
+                "push_axis_world": [2.0, 0.0, 0.0],
+                "contact_offset_local_m": [0.0, 0.09, 0.0],
+                "block_support_m": 0.01,
+                "contact_penetration_m": 0.001,
+                "max_correction_m": 0.08,
+                "contact_plan_time_scale": 0.5,
+                "reacquire_timeout_s": 8.0,
+                "max_reacquire_attempts": 2,
+                "contact_height_offset_from_block_center_m": 0.0,
+                "contact_height_target_m": 0.806,
+                "block_support_center_z_m": 0.806,
+                "block_support_tolerance_m": 0.001,
+                "contact_height_gain": 2.0,
+                "contact_height_rate_m_s": 0.03,
+                "contact_height_max_offset_m": 0.02,
+                "contact_height_max_downward_offset_m": 0.002,
+            },
             "event_time_offsets_s": {
                 "GRIPPER_CLOSE": 0.0,
                 "ATTACH_OBJECT": 0.75,
             },
+            "event_parameters": {
+                "GRIPPER_CLOSE": {"command": 0.25},
+            },
         },
     )
+
     connected = ConnectedStrategy(
         strategy_id="settled-pick",
         nodes=(_node(grasp, (0.2, 0.1)),),
@@ -253,7 +300,44 @@ def test_plan_builder_holds_pose_between_close_and_attach_events() -> None:
     assert segment.waypoints[-1].joint_positions_rad == (
         segment.waypoints[-2].joint_positions_rad
     )
+    assert segment.metadata["tracking_settle"] == {
+        "joint_tolerance_rad": 0.02,
+        "eef_tolerance_m": 0.01,
+        "max_wait_s": 3.0,
+        "required_consecutive_ticks": 5,
+    }
+    assert segment.metadata["physical_tool_control"]["gain"] == 4.0
+    assert segment.metadata["physical_tool_settle"]["target_position_m"] == [
+        0.1,
+        0.2,
+        0.3,
+    ]
+    assert segment.metadata["physical_tool_target_position_m"] == [
+        0.4,
+        0.5,
+        0.6,
+    ]
+    assert segment.metadata["physical_push_control"] == {
+        "push_axis_world": [1.0, 0.0, 0.0],
+        "contact_offset_local_m": [0.0, 0.09, 0.0],
+        "block_support_m": 0.01,
+        "contact_penetration_m": 0.001,
+        "max_correction_m": 0.08,
+        "contact_plan_time_scale": 0.5,
+        "reacquire_timeout_s": 8.0,
+        "max_reacquire_attempts": 2,
+        "contact_height_offset_from_block_center_m": 0.0,
+        "contact_height_target_m": 0.806,
+        "block_support_center_z_m": 0.806,
+        "block_support_tolerance_m": 0.001,
+        "contact_height_gain": 2.0,
+        "contact_height_rate_m_s": 0.03,
+        "contact_height_max_offset_m": 0.02,
+        "contact_height_max_downward_offset_m": 0.002,
+    }
     assert plan.events[0].event_type is EventType.GRIPPER_CLOSE
+    assert plan.events[0].command == 0.25
+    assert plan.events[0].parameters == {}
     assert plan.events[0].time_from_start_s == motion_end
     assert plan.events[1].event_type is EventType.ATTACH_OBJECT
     assert plan.events[1].time_from_start_s == segment.end_time_s

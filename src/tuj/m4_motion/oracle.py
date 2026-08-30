@@ -150,9 +150,13 @@ class MuJoCoMotionOracle:
         )
 
     def check_ee_exchange(self, query: EEExchangeQuery) -> CheckResult:
-        undock = self._dock_position(query.from_ee)
+        undock = (
+            self._dock_position(query.from_ee)
+            if query.from_ee is not None
+            else None
+        )
         dock = self._dock_position(query.to_ee)
-        if undock is None or dock is None:
+        if dock is None or (query.from_ee is not None and undock is None):
             missing = [
                 ee
                 for ee, position in ((query.from_ee, undock), (query.to_ee, dock))
@@ -165,7 +169,10 @@ class MuJoCoMotionOracle:
             )
         # Both halves of the swap must be reachable: park the worn EE, then
         # collect the new one.
-        for ee, position in ((query.from_ee, undock), (query.to_ee, dock)):
+        rack_moves = [(query.to_ee, dock)]
+        if query.from_ee is not None:
+            rack_moves.insert(0, (query.from_ee, undock))
+        for ee, position in rack_moves:
             result = self._reachable(position, f"rack slot for EE {ee!r}")
             if result.status is not FeasibilityStatus.PASS:
                 return CheckResult(

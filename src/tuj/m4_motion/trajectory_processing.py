@@ -22,8 +22,14 @@ def unwrap_joint_path(
     path: Sequence[Sequence[float]],
     *,
     start_reference: Sequence[float] | None = None,
+    joint_limits_rad: Sequence[tuple[float, float]] | None = None,
 ) -> tuple[JointConfig, ...]:
-    """Choose the continuous 2π-equivalent representation of a joint path."""
+    """Choose the nearest 2π-equivalent representation of a joint path.
+
+    When physical limits are supplied, every selected equivalent remains
+    inside them.  A finite ±2π wrist must not be unwrapped as though it were
+    an unlimited continuous joint.
+    """
 
     states = [np.asarray(state, dtype=float) for state in path]
     if len(states) < 2:
@@ -33,24 +39,118 @@ def unwrap_joint_path(
         raise TrajectoryProcessingError("all path states must use one non-zero DOF")
     if any(not np.all(np.isfinite(state)) for state in states):
         raise TrajectoryProcessingError("path contains non-finite joint values")
+    limits: tuple[tuple[float, float], ...] | None = None
+    if joint_limits_rad is not None:
+        limits = tuple(
+            (float(lower), float(upper))
+            for lower, upper in joint_limits_rad
+        )
+        if len(limits) != shape[0] or any(
+            not math.isfinite(lower)
+            or not math.isfinite(upper)
+            or lower > upper
+            for lower, upper in limits
+        ):
+            raise TrajectoryProcessingError(
+                "joint position limits must match the finite path DOF"
+            )
+
     if start_reference is None:
-        previous = states[0]
+        reference = states[0]
     else:
         reference = np.asarray(start_reference, dtype=float)
         if reference.shape != shape or not np.all(np.isfinite(reference)):
             raise TrajectoryProcessingError(
                 "start_reference must match the finite path DOF"
             )
-        delta = (states[0] - reference + np.pi) % (2.0 * np.pi) - np.pi
-        previous = reference + delta
+
+    def nearest_equivalent(
+        state: np.ndarray, previous: np.ndarray
+    ) -> np.ndarray:
+        if limits is None:
+            delta = (state - previous + np.pi) % (2.0 * np.pi) - np.pi
+            return previous + delta
+        selected = np.empty_like(state)
+        period = 2.0 * np.pi
+        for index, (value, prior, (lower, upper)) in enumerate(
+            zip(state, previous, limits)
+        ):
+            minimum_turn = math.ceil((lower - float(value)) / period - 1e-12)
+            maximum_turn = math.floor((upper - float(value)) / period + 1e-12)
+            if minimum_turn > maximum_turn:
+                raise TrajectoryProcessingError(
+                    f"joint {index} has no 2pi-equivalent value inside its limit"
+                )
+            candidates = tuple(
+                float(value) + period * turn
+                for turn in range(minimum_turn, maximum_turn + 1)
+            )
+            selected[index] = min(
+                candidates,
+                key=lambda candidate: abs(candidate - float(prior)),
+            )
+        return selected
+
+    previous = nearest_equivalent(states[0], reference)
     result = [previous.copy()]
     for state in states[1:]:
-        delta = (state - previous + np.pi) % (2.0 * np.pi) - np.pi
-        previous = previous + delta
+        previous = nearest_equivalent(state, previous)
         result.append(previous.copy())
     return tuple(
         tuple(float(value) for value in state) for state in result
     )
+
+
+def clamp_joint_limit_roundoff(
+    path: Sequence[Sequence[float]],
+    joint_limits_rad: Sequence[tuple[float, float]],
+    *,
+    tolerance_rad: float = 1e-3,
+) -> tuple[JointConfig, ...]:
+    """Clamp only sub-milliradian joint-limit numerical overshoot.
+
+    Dense IK, 2π unwrapping, and floating-point interpolation can place a
+    state microscopically outside a physical joint bound.  Clamping that
+    roundoff is safe; a larger violation still fails closed instead of being
+    hidden as a valid path.
+    """
+
+    if not math.isfinite(tolerance_rad) or tolerance_rad < 0.0:
+        raise TrajectoryProcessingError(
+            "joint-limit roundoff tolerance must be finite and non-negative"
+        )
+    limits = tuple((float(lower), float(upper)) for lower, upper in joint_limits_rad)
+    if not limits or any(
+        not math.isfinite(lower) or not math.isfinite(upper) or lower > upper
+        for lower, upper in limits
+    ):
+        raise TrajectoryProcessingError("joint position limits are invalid")
+    result: list[JointConfig] = []
+    for state_index, state in enumerate(path):
+        values = tuple(float(value) for value in state)
+        if len(values) != len(limits) or not all(math.isfinite(value) for value in values):
+            raise TrajectoryProcessingError(
+                "joint path and position limits must have matching finite DOF"
+            )
+        clamped: list[float] = []
+        for joint_index, (value, (lower, upper)) in enumerate(zip(values, limits)):
+            if value < lower:
+                if lower - value > tolerance_rad:
+                    raise TrajectoryProcessingError(
+                        f"path state {state_index} joint {joint_index} is below "
+                        "its physical limit"
+                    )
+                value = lower
+            elif value > upper:
+                if value - upper > tolerance_rad:
+                    raise TrajectoryProcessingError(
+                        f"path state {state_index} joint {joint_index} is above "
+                        "its physical limit"
+                    )
+                value = upper
+            clamped.append(value)
+        result.append(tuple(clamped))
+    return tuple(result)
 
 
 def deterministic_shortcut(

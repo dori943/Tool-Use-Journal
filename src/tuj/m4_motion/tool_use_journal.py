@@ -61,6 +61,7 @@ TOOL_USE_JOURNAL_TESTED_REVISION = (
     "113f84686d94203dbd90f1836187e351aa0b246d"
 )
 _EXPECTED_EES = frozenset(TOOL_USE_JOURNAL_EE_GRIPPER_TYPES)
+_REFERENCE_ACTIVE_EE = object()
 _PHYSICAL_EE_BY_CLASS = {
     "NullGripper": None,
     "Robotiq85Gripper": "2F",
@@ -1014,8 +1015,44 @@ class ToolUseJournalCollisionModelCompiler:
                 f"unknown EE {active_ee!r}"
             ) from error
 
+    def with_reference_environment(
+        self, reference_env: object
+    ) -> "ToolUseJournalCollisionModelCompiler":
+        """Reuse captured model variants with the current live scene state.
+
+        Constructing the four EE variants is intentionally expensive.  A
+        receding-horizon planner only needs to refresh the common arm and
+        free-object joint states between replans, while the underlying MJCF
+        variants remain unchanged.
+        """
+        reference_adapter = ToolUseJournalEnvironmentAdapter(
+            reference_env, source_revision=self.source_revision
+        )
+        if reference_adapter.environment_name != self.environment_name:
+            raise ToolUseJournalCompatibilityError(
+                "reference environment does not match captured collision "
+                f"models: {reference_adapter.environment_name!r} != "
+                f"{self.environment_name!r}"
+            )
+        reference_joint_names = tuple(
+            str(name) for name in reference_adapter.robot.robot_model.joints
+        )
+        if reference_joint_names != self.joint_names:
+            raise ToolUseJournalCompatibilityError(
+                "reference environment robot joint order does not match "
+                "captured collision models"
+            )
+        return type(self)(
+            self._captures,
+            reference_joint_states=_joint_state_map(
+                reference_adapter.model, reference_adapter.data
+            ),
+            source_revision=self.source_revision,
+            reference_active_ee=reference_adapter.physical_active_ee,
+        )
+
     def build_ee_exchange_contexts(
-        self, *, from_ee: str, to_ee: str
+        self, *, from_ee: str | None, to_ee: str
     ) -> dict[str, CollisionContext]:
         return EEExchangeTemplateGenerator().build_collision_contexts(
             from_ee=from_ee,
@@ -1104,14 +1141,18 @@ class ToolUseJournalCollisionModelCompiler:
         *,
         collision_margin_m: float,
         allowed_collision_pairs: Iterable[tuple[str, str]] = (),
-        default_active_ee: str | None = None,
+        default_active_ee: str | None | object = _REFERENCE_ACTIVE_EE,
         include_all_models: bool = False,
     ) -> MuJoCoCollisionModelRegistry:
         default_ee = (
             self.reference_active_ee
-            if default_active_ee is None
+            if default_active_ee is _REFERENCE_ACTIVE_EE
             else default_active_ee
         )
+        if default_ee is not None and not isinstance(default_ee, str):
+            raise ToolUseJournalCompatibilityError(
+                "default_active_ee must be an EE id or None"
+            )
         required: set[str | None] = {default_ee}
         for context in collision_contexts.values():
             if context.collision_model_version != self.model_version_for(

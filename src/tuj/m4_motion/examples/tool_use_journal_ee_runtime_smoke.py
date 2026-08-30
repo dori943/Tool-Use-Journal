@@ -171,10 +171,6 @@ def main() -> int:
     parser.add_argument("--from-ee", choices=("2F", "3F", "vac"), default="2F")
     parser.add_argument("--to-ee", choices=("2F", "3F", "vac"), default="vac")
     parser.add_argument("--seed", type=int, default=0)
-    parser.add_argument("--controller-kp", type=float, default=50.0)
-    parser.add_argument(
-        "--controller-damping-ratio", type=float, default=1.0
-    )
     parser.add_argument(
         "--controller",
         action="store_true",
@@ -195,20 +191,11 @@ def main() -> int:
         if args.controller
         else ToolUseJournalEERuntime.from_repository
     )
-    controller_options = (
-        {
-            "joint_position_kp": args.controller_kp,
-            "joint_position_damping_ratio": args.controller_damping_ratio,
-        }
-        if args.controller
-        else {}
-    )
     runtime = runtime_factory(
         args.repository,
         args.env,
         active_ee=args.from_ee,
         seed=args.seed,
-        **controller_options,
     )
     try:
         run = _stationary_exchange_run(

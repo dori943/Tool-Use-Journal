@@ -262,11 +262,12 @@ class InterpolatingEdgePlanner:
 
     This remains the direct JOINT connector and a test seam.  Production
     CARTESIAN and SAMPLING_BASED edges use the implementations in
-    ``tuj.m4_motion.path_planning`` through the same protocol.
+    ``motion_planner.path_planning`` through the same protocol.
     """
 
     state_validator: StateValidator
     max_joint_step_rad: float = 0.05
+    wrap_joints: bool = True
 
     def __post_init__(self) -> None:
         if self.max_joint_step_rad <= 0:
@@ -279,7 +280,11 @@ class InterpolatingEdgePlanner:
         source_keyframe: RelativeKeyframeSpec | None,
         target_keyframe: RelativeKeyframeSpec,
     ) -> EdgePlanResult:
-        delta = wrapped_joint_delta(source, target)
+        delta = (
+            wrapped_joint_delta(source, target)
+            if self.wrap_joints
+            else np.asarray(target, dtype=float) - np.asarray(source, dtype=float)
+        )
         steps = max(1, int(math.ceil(float(np.max(np.abs(delta))) / self.max_joint_step_rad)))
         source_values = np.asarray(source, dtype=float)
         path: list[JointConfig] = []
@@ -302,10 +307,27 @@ def filter_ik_solutions(
     state_validator: StateValidator,
 ) -> IKSolutionSet:
     """Prune colliding endpoint states while retaining every valid branch."""
-    valid = tuple(
-        solution
-        for solution in solutions.solutions
-        if state_validator(solution.qpos, keyframe)
+    valid_items: list[IKResult] = []
+    rejection_summaries: list[str] = []
+    check = getattr(state_validator, "check", None)
+    for solution in solutions.solutions:
+        if callable(check):
+            report = check(solution.qpos, keyframe)
+            accepted = bool(report.valid)
+            if not accepted and len(rejection_summaries) < 3:
+                rejection_summaries.append(
+                    f"{solution.branch_id}: {report.failure_code}: "
+                    f"{report.detail}"
+                )
+        else:
+            accepted = bool(state_validator(solution.qpos, keyframe))
+        if accepted:
+            valid_items.append(solution)
+    valid = tuple(valid_items)
+    rejection_detail = (
+        f"; rejected examples: {' | '.join(rejection_summaries)}"
+        if rejection_summaries
+        else ""
     )
     return IKSolutionSet(
         solutions=valid,
@@ -316,5 +338,6 @@ def filter_ik_solutions(
         enumeration_complete=solutions.enumeration_complete,
         detail=(
             f"{len(valid)}/{len(solutions.solutions)} IK branches passed state validity"
+            f"{rejection_detail}"
         ),
     )

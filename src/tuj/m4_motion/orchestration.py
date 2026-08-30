@@ -23,6 +23,7 @@ from tuj.m4_motion.schema import (
     MotionPlanRequest,
     MotionTask,
     PlannerOptions,
+    Pose,
     SceneRef,
     WorldSnapshot,
 )
@@ -32,6 +33,24 @@ from tuj.m4_motion.selected_plan_adapter import (
     SelectedPlanAdapterError,
     SelectedPlanMotionRequestAdapter,
 )
+from tuj.m4_motion.task_semantics import is_ee_exchange_task, is_release_task
+
+
+def _world_target_pose(
+    world: WorldSnapshot,
+    target_id: str,
+    *,
+    rack: bool = False,
+) -> Pose | None:
+    records = world.rack if rack else world.objects
+    record = records.get(target_id)
+    if not isinstance(record, Mapping):
+        return None
+    for key in (("dock_pose", "pose") if rack else ("pose", "dock_pose")):
+        raw = record.get(key)
+        if isinstance(raw, Mapping):
+            return Pose.model_validate(raw)
+    return None
 
 
 class MotionRequestPlanner(Protocol):
@@ -58,7 +77,7 @@ def _safe_name(value: str) -> str:
 
 
 class MotionPlanStore:
-    """Atomically persist finalized plans and one ordered manifest."""
+    """Atomically persist requests, finalized plans, and one ordered manifest."""
 
     def __init__(self, root: str | Path) -> None:
         self.root = Path(root)
@@ -77,12 +96,20 @@ class MotionPlanStore:
         self._atomic_json(path, plan.model_dump_json(indent=2))
         return path.resolve()
 
+    def save_request(self, request: MotionPlanRequest, *, index: int) -> Path:
+        path = self.root / "requests" / (
+            f"{index:04d}-{_safe_name(request.request_id)}.json"
+        )
+        self._atomic_json(path, request.model_dump_json(indent=2))
+        return path.resolve()
+
     def save_manifest(
         self,
         *,
         selected_plan_hash: str,
         requests: Sequence[MotionPlanRequest],
         plans: Sequence[MotionPlan],
+        request_paths: Sequence[Path],
         plan_paths: Sequence[Path],
         final_world: WorldSnapshot,
     ) -> Path:
@@ -90,14 +117,57 @@ class MotionPlanStore:
             "manifest_version": "1.0.0",
             "selected_plan_hash": selected_plan_hash,
             "request_ids": [request.request_id for request in requests],
+            "request_files": [str(path) for path in request_paths],
             "plan_ids": [plan.plan_id for plan in plans],
             "plan_files": [str(path) for path in plan_paths],
             "final_scene_signature": final_world.scene.signature,
             "final_robot_state": final_world.robot_state.model_dump(mode="json"),
+            "final_world": final_world.model_dump(mode="json"),
         }
         path = self.root / "motion-plan-manifest.json"
         self._atomic_json(path, json.dumps(manifest, ensure_ascii=False, indent=2))
         return path.resolve()
+
+    def load_manifest(self, path: str | Path | None = None) -> "SelectedPlanPlanningResult":
+        """Restore the exact request/plan sequence needed for later simulation."""
+
+        manifest_path = (
+            Path(path) if path is not None else self.root / "motion-plan-manifest.json"
+        ).resolve()
+        payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+        if payload.get("manifest_version") != "1.0.0":
+            raise ValueError("unsupported motion plan manifest version")
+        request_files = [Path(value).resolve() for value in payload.get("request_files", [])]
+        plan_files = [Path(value).resolve() for value in payload.get("plan_files", [])]
+        if not request_files or len(request_files) != len(plan_files):
+            raise ValueError("manifest request/plan files are missing or misaligned")
+        requests = tuple(
+            MotionPlanRequest.model_validate_json(file.read_text(encoding="utf-8"))
+            for file in request_files
+        )
+        plans = tuple(
+            MotionPlan.model_validate_json(file.read_text(encoding="utf-8"))
+            for file in plan_files
+        )
+        if [request.request_id for request in requests] != payload.get("request_ids"):
+            raise ValueError("manifest request identities do not match request files")
+        if [plan.plan_id for plan in plans] != payload.get("plan_ids"):
+            raise ValueError("manifest plan identities do not match plan files")
+        for request, plan in zip(requests, plans):
+            if plan.request_id != request.request_id:
+                raise ValueError("manifest contains a plan for a different request")
+        final_world_payload = payload.get("final_world")
+        if final_world_payload is None:
+            raise ValueError("manifest does not contain the final WorldSnapshot")
+        final_world = WorldSnapshot.model_validate(final_world_payload)
+        return SelectedPlanPlanningResult(
+            requests=requests,
+            plans=plans,
+            final_world=final_world,
+            request_paths=tuple(request_files),
+            plan_paths=tuple(plan_files),
+            manifest_path=manifest_path,
+        )
 
 
 @dataclass(frozen=True, slots=True)
@@ -105,6 +175,7 @@ class SelectedPlanPlanningResult:
     requests: tuple[MotionPlanRequest, ...]
     plans: tuple[MotionPlan, ...]
     final_world: WorldSnapshot
+    request_paths: tuple[Path, ...] = ()
     plan_paths: tuple[Path, ...] = ()
     manifest_path: Path | None = None
 
@@ -238,27 +309,38 @@ def _resource_transition_requests(
         from_ee = str(detach.parameters.get("ee") or "")
         to_ee = str(attach.parameters.get("ee") or "")
         exchange_steps = [detach, attach]
+    elif attach is not None:
+        from_ee = ""
+        to_ee = str(attach.parameters.get("ee") or "")
+        exchange_steps = [attach]
     else:
         from_ee = to_ee = ""
         exchange_steps = []
     if exchange_steps:
-        if not from_ee or not to_ee:
+        initial_attach = detach is None and terminal_restore is None
+        if not to_ee or (not initial_attach and not from_ee):
             raise SelectedPlanAdapterError(
-                f"EE exchange before {parent_subgoal_id!r} lacks from/to EE"
+                f"EE transition before {parent_subgoal_id!r} lacks required EE"
             )
         requests.append(
             _transition_request(
                 parent_subgoal_id=parent_subgoal_id,
                 transition_index=len(requests),
-                action_type="EE_EXCHANGE",
+                action_type="EE_ATTACH" if initial_attach else "EE_EXCHANGE",
                 world=world,
                 constraints=constraints,
                 options=options,
                 ee=to_ee,
-                target_ids=[from_ee, to_ee],
-                goal=MotionGoal(goal_type=GoalType.EE_EXCHANGE),
+                target_ids=(
+                    [to_ee] if initial_attach else [from_ee, to_ee]
+                ),
+                goal=MotionGoal(
+                    goal_type=GoalType.POSE,
+                    target_pose=_world_target_pose(world, to_ee, rack=True),
+                    target_object_id=to_ee,
+                ),
                 metadata={
-                    "from_ee": from_ee,
+                    "from_ee": from_ee or None,
                     "to_ee": to_ee,
                     "task_planner_steps": [
                         step.model_dump(mode="json") for step in exchange_steps
@@ -292,7 +374,8 @@ def _resource_transition_requests(
                 ee=to_ee or fallback_ee,
                 target_ids=[str(tool_id)],
                 goal=MotionGoal(
-                    goal_type=GoalType.TOOL_CHANGE,
+                    goal_type=GoalType.POSE,
+                    target_pose=_world_target_pose(world, str(tool_id)),
                     target_object_id=str(tool_id),
                 ),
                 metadata={
@@ -357,7 +440,7 @@ def _predicted_world(
             existing = result.metadata.get("attached_object_transforms")
             if not isinstance(existing, Mapping) or attached_object_id not in existing:
                 result.metadata["attached_object_transforms"] = {}
-    if request.task.goal.goal_type is GoalType.PLACE:
+    if is_release_task(request.task):
         object_id = request.task.goal.target_object_id
         pose = request.task.goal.target_pose
         if object_id and pose is not None:
@@ -368,7 +451,7 @@ def _predicted_world(
     completed = list(result.scene.completed_subgoals)
     if completed_subgoal is not None and completed_subgoal not in completed:
         completed.append(completed_subgoal)
-    if request.task.goal.goal_type is GoalType.EE_EXCHANGE:
+    if is_ee_exchange_task(request.task):
         result.metadata["physical_active_ee"] = request.task.ee
         result.metadata["declared_active_ee"] = request.task.ee
     operation = request.task.metadata.get("operation")
@@ -423,6 +506,7 @@ class SelectedPlanMotionOrchestrator:
         current_world = initial_world.model_copy(deep=True)
         requests: list[MotionPlanRequest] = []
         plans: list[MotionPlan] = []
+        request_paths: list[Path] = []
         paths: list[Path] = []
         selected_options: OptionSource = options or PlannerOptions()
 
@@ -458,6 +542,9 @@ class SelectedPlanMotionOrchestrator:
             requests.append(request)
             plans.append(plan)
             if self._store is not None:
+                request_paths.append(
+                    self._store.save_request(request, index=len(plans) - 1)
+                )
                 paths.append(self._store.save_plan(plan, index=len(plans) - 1))
             current_world = _predicted_world(
                 current_world, request, plan, completed_subgoal=completed
@@ -537,6 +624,7 @@ class SelectedPlanMotionOrchestrator:
                 selected_plan_hash=selected_hash,
                 requests=requests,
                 plans=plans,
+                request_paths=request_paths,
                 plan_paths=paths,
                 final_world=current_world,
             )
@@ -544,6 +632,7 @@ class SelectedPlanMotionOrchestrator:
             requests=tuple(requests),
             plans=tuple(plans),
             final_world=current_world,
+            request_paths=tuple(request_paths),
             plan_paths=tuple(paths),
             manifest_path=manifest,
         )

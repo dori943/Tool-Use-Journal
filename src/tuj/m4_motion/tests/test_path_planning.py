@@ -29,11 +29,15 @@ def _keyframe(planner: KeyframePlannerType) -> RelativeKeyframeSpec:
 
 
 class _PlanarKinematics:
+    def __init__(self):
+        self.seeds = []
+
     def forward_pose_world(self, qpos):
         return (qpos[0], qpos[1], 0.0), (0.0, 0.0, 0.0, 1.0)
 
     def solve_all_ik(self, world_pos, orientation_xyzw, **kwargs):
-        del orientation_xyzw, kwargs
+        del orientation_xyzw
+        self.seeds.append(kwargs.get("seed_qpos"))
         return IKSolutionSet(
             solutions=(
                 IKResult(
@@ -65,8 +69,9 @@ def test_cartesian_planner_follows_straight_pose_samples() -> None:
             }
         },
     )
+    kinematics = _PlanarKinematics()
     planner = CartesianEdgePlanner(
-        _PlanarKinematics(),
+        kinematics,
         world,
         lambda q, keyframe: abs(q[1]) < 1e-9,
         translation_step_m=0.25,
@@ -85,6 +90,72 @@ def test_cartesian_planner_follows_straight_pose_samples() -> None:
     assert result.joint_path[-1] == (1.0, 0.0)
     assert all(abs(q[1]) < 1e-9 for q in result.joint_path)
     assert len(result.joint_path) > 4
+    assert kinematics.seeds
+    assert kinematics.seeds[0] == (0.0, 0.0)
+    assert all(seed is not None for seed in kinematics.seeds)
+
+
+class _ContinuationSensitiveKinematics:
+    """Expose the unsafe global-seed jump that local Cartesian IK must avoid."""
+
+    def forward_pose_world(self, qpos):
+        return (qpos[0], 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)
+
+    def solve_all_ik(self, world_pos, orientation_xyzw, **kwargs):
+        del orientation_xyzw
+        seed = kwargs.get("seed_qpos")
+        nearby = float(world_pos[0]) if seed is not None else float(world_pos[0]) + 4.0
+        return IKSolutionSet(
+            solutions=(
+                IKResult(
+                    solved=True,
+                    qpos=(nearby,),
+                    position_error_m=0.0,
+                    orientation_error_rad=0.0,
+                    branch_id="same-coarse-branch",
+                ),
+            ),
+            enumeration_complete=True,
+        )
+
+
+def test_cartesian_planner_seeds_each_intermediate_ik_from_previous_state() -> None:
+    world = WorldSnapshot(
+        scene=SceneRef(signature="scene"),
+        robot_state=RobotState(
+            robot_id="continuation",
+            joint_names=["x"],
+            joint_positions_rad=[0.0],
+        ),
+        objects={
+            "target": {
+                "pose": {
+                    "position_m": [1.0, 0.0, 0.0],
+                    "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                }
+            }
+        },
+    )
+    planner = CartesianEdgePlanner(
+        _ContinuationSensitiveKinematics(),
+        world,
+        lambda q, keyframe: True,
+        translation_step_m=0.25,
+        max_joint_step_rad=0.1,
+        wrap_joints=False,
+    )
+
+    result = planner.plan(
+        (0.0,),
+        (1.0,),
+        None,
+        _keyframe(KeyframePlannerType.CARTESIAN),
+    )
+
+    assert result.valid
+    assert result.joint_path[0] == (0.0,)
+    assert result.joint_path[-1] == (1.0,)
+    assert max(q[0] for q in result.joint_path) <= 1.0
 
 
 def test_rrt_connect_routes_around_invalid_joint_region() -> None:
