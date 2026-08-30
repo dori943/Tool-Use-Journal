@@ -39,6 +39,11 @@ from tuj.m4_motion.schema import (
     Pose,
     WorldSnapshot,
 )
+from tuj.m4_motion.task_semantics import (
+    is_acquire_task,
+    is_ee_exchange_task,
+    is_release_task,
+)
 from tuj.m4_motion.tool_use_journal import (
     ToolUseJournalCollisionModelCompiler,
     ToolUseJournalCompatibilityError,
@@ -554,6 +559,14 @@ class ToolUseJournalCollisionContextFactory:
         if not target:
             raise ToolUseJournalCollisionBindingError("PICK has no target object")
         _free_joint_name(request.world, target)
+        if request.task.metadata.get("grasp_execution_mode") == "CONTACT_FRICTION":
+            return self._bind_contact_friction_pick(
+                request,
+                artifact,
+                base,
+                active_ee,
+                target=target,
+            )
         source = artifact
         bound = artifact.model_copy(deep=True)
         contexts: dict[str, CollisionContext] = {base.context_id: base}
@@ -627,6 +640,62 @@ class ToolUseJournalCollisionContextFactory:
                         current_id = attached_id
         return _stamp_bound_artifact(request, source, bound), contexts
 
+    def _bind_contact_friction_pick(
+        self,
+        request: MotionPlanRequest,
+        artifact: KeyframePlanArtifact,
+        base: CollisionContext,
+        active_ee: str,
+        *,
+        target: str,
+    ) -> tuple[KeyframePlanArtifact, dict[str, CollisionContext]]:
+        """Keep a PICK target physically free while allowing finger contact.
+
+        A contact-friction grasp has no ATTACH_OBJECT transition.  The target
+        remains a MuJoCo free body throughout planning and execution, so the
+        gripper controller and contact friction are solely responsible for
+        lifting it.
+        """
+
+        source = artifact
+        bound = artifact.model_copy(deep=True)
+        contexts: dict[str, CollisionContext] = {base.context_id: base}
+        touch_selectors = [target, *request.task.allowed_touch_objects]
+        for candidate in bound.candidates:
+            grasp = self._event_keyframe(
+                candidate,
+                KeyframeEventType.GRIPPER_CLOSE,
+                KeyframeType.GRASP,
+            )
+            if any(
+                KeyframeEventType.ATTACH_OBJECT in keyframe.events_after
+                for keyframe in candidate.keyframes
+            ):
+                raise ToolUseJournalCollisionBindingError(
+                    f"contact-friction strategy {candidate.strategy_id!r} "
+                    "must not contain ATTACH_OBJECT"
+                )
+            token = _short_digest((candidate.strategy_id, grasp.keyframe_id))
+            contact_id = f"physical-grasp-contact:{target}:{token}"
+            contact = base.model_copy(
+                update={
+                    "context_id": contact_id,
+                    "allowed_collision_pairs": self._contact_pairs(
+                        active_ee, touch_selectors
+                    ),
+                }
+            )
+            contexts[contact_id] = contact
+            grasp_index = candidate.keyframes.index(grasp)
+            for keyframe_index, keyframe in enumerate(candidate.keyframes):
+                keyframe.collision_context_after_events_id = None
+                keyframe.collision_context_id = (
+                    contact_id
+                    if keyframe_index >= grasp_index
+                    else base.context_id
+                )
+        return _stamp_bound_artifact(request, source, bound), contexts
+
     def _bind_place(
         self,
         request: MotionPlanRequest,
@@ -696,7 +765,12 @@ class ToolUseJournalCollisionContextFactory:
         self,
         request: MotionPlanRequest,
         artifact: KeyframePlanArtifact,
-    ) -> tuple[KeyframePlanArtifact, dict[str, CollisionContext], str, str]:
+    ) -> tuple[
+        KeyframePlanArtifact,
+        dict[str, CollisionContext],
+        str,
+        str | None,
+    ]:
         if (
             request.world.robot_state.attached_object_id is not None
             or request.world.robot_state.held_tool_id is not None
@@ -704,12 +778,14 @@ class ToolUseJournalCollisionContextFactory:
             raise ToolUseJournalCollisionBindingError(
                 "EE_EXCHANGE requires an empty end effector"
             )
-        from_ee = str(request.task.metadata.get("from_ee") or "")
+        raw_from_ee = request.task.metadata.get("from_ee")
+        from_ee = str(raw_from_ee) if raw_from_ee else None
         to_ee = str(request.task.metadata.get("to_ee") or "")
-        active_ee = self._active_ee(request)
-        if not from_ee or not to_ee or active_ee != from_ee:
+        raw_active_ee = request.world.metadata.get("physical_active_ee")
+        active_ee = raw_active_ee if isinstance(raw_active_ee, str) else None
+        if not to_ee or active_ee != from_ee:
             raise ToolUseJournalCollisionBindingError(
-                "EE_EXCHANGE from_ee/to_ee does not match the current workcell"
+                "EE transition from_ee/to_ee does not match the current workcell"
             )
         contexts = self.compiler.build_ee_exchange_contexts(
             from_ee=from_ee,
@@ -723,7 +799,8 @@ class ToolUseJournalCollisionContextFactory:
             for context_id, context in contexts.items()
         }
         self._verify_context_references(artifact, contexts)
-        return artifact, contexts, f"ee-attached:{from_ee}", from_ee
+        initial_id = f"ee-attached:{from_ee}" if from_ee else "bare-flange"
+        return artifact, contexts, initial_id, from_ee
 
     def prepare(
         self,
@@ -731,8 +808,7 @@ class ToolUseJournalCollisionContextFactory:
         artifact: KeyframePlanArtifact,
     ) -> CollisionPlanningSetup:
         self._validate_environment(request)
-        goal_type = request.task.goal.goal_type
-        if goal_type is GoalType.EE_EXCHANGE:
+        if is_ee_exchange_task(request.task):
             bound, contexts, initial_id, default_ee = self._bind_ee_exchange(
                 request, artifact
             )
@@ -744,11 +820,11 @@ class ToolUseJournalCollisionContextFactory:
                     f"{active_ee!r} physically active"
                 )
             base = self._base_context(request, active_ee=active_ee)
-            if goal_type is GoalType.PICK:
+            if is_acquire_task(request.task):
                 bound, contexts = self._bind_pick(
                     request, artifact, base, active_ee
                 )
-            elif goal_type is GoalType.PLACE:
+            elif is_release_task(request.task):
                 bound, contexts = self._bind_place(
                     request, artifact, base, active_ee
                 )

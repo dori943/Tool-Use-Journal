@@ -848,6 +848,7 @@ class MuJoCoCollisionModelRegistry:
         self._validators = dict(validators)
         self._contexts = dict(collision_contexts)
         self._default_model_version = default_model_version
+        self.last_path_collision_check: PathCollisionCheckResult | None = None
 
     @property
     def joint_names(self) -> tuple[str, ...]:
@@ -941,7 +942,10 @@ class MuJoCoCollisionModelRegistry:
         waypoints: tuple[TrajectoryWaypoint, ...],
         context: CollisionContext,
     ) -> bool:
-        return self.check_waypoints(waypoints, context).valid
+        self.last_path_collision_check = self.check_waypoints(
+            waypoints, context
+        )
+        return self.last_path_collision_check.valid
 
 
 @dataclass(slots=True)

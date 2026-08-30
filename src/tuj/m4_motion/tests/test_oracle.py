@@ -90,6 +90,17 @@ def test_ee_exchange_checks_both_rack_slots(kinematics) -> None:
     assert oracle.check_ee_exchange(reachable).status is FeasibilityStatus.PASS
 
 
+def test_initial_ee_attach_checks_only_target_rack_slot(kinematics) -> None:
+    oracle = _oracle(
+        kinematics,
+        rack={"vacuum": {"dock_pose": IN_REACH}},
+    )
+
+    query = EEExchangeQuery(scene=SCENE, from_ee=None, to_ee="vacuum")
+
+    assert oracle.check_ee_exchange(query).status is FeasibilityStatus.PASS
+
+
 def test_ee_exchange_without_rack_data_is_unknown(kinematics) -> None:
     oracle = _oracle(kinematics)
     query = EEExchangeQuery(scene=SCENE, from_ee="2f", to_ee="vacuum")

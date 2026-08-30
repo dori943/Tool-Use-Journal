@@ -67,6 +67,7 @@ def validate_joint_segment(
     validator: StateValidator,
     *,
     max_joint_step_rad: float,
+    wrap_joints: bool = True,
 ) -> EdgePlanResult:
     """Conservatively sample an entire joint segment, including endpoints."""
 
@@ -74,7 +75,11 @@ def validate_joint_segment(
         raise ValueError("max_joint_step_rad must be positive")
     if len(source) != len(target):
         raise ValueError("joint configurations must have the same DOF")
-    delta = wrapped_joint_delta(source, target)
+    delta = (
+        wrapped_joint_delta(source, target)
+        if wrap_joints
+        else np.asarray(target, dtype=float) - np.asarray(source, dtype=float)
+    )
     steps = max(
         1,
         int(math.ceil(float(np.max(np.abs(delta))) / max_joint_step_rad)),
@@ -147,6 +152,7 @@ class CartesianEdgePlanner:
     translation_step_m: float = 0.01
     rotation_step_rad: float = 0.1
     max_joint_step_rad: float = 0.02
+    wrap_joints: bool = True
 
     def __post_init__(self) -> None:
         if min(
@@ -199,7 +205,11 @@ class CartesianEdgePlanner:
             if index == steps:
                 selected = tuple(float(value) for value in target)
             else:
-                solutions = self.kinematics.solve_all_ik(position, orientation)
+                solutions = self.kinematics.solve_all_ik(
+                    position,
+                    orientation,
+                    seed_qpos=previous,
+                )
                 valid_solutions = []
                 for solution in solutions.solutions:
                     candidate = tuple(float(value) for value in solution.qpos)
@@ -217,8 +227,14 @@ class CartesianEdgePlanner:
                     )
                 selected = min(
                     valid_solutions,
-                    key=lambda candidate: wrapped_joint_distance(
-                        previous, candidate
+                    key=lambda candidate: (
+                        wrapped_joint_distance(previous, candidate)
+                        if self.wrap_joints
+                        else float(
+                            np.linalg.norm(
+                                np.asarray(candidate) - np.asarray(previous)
+                            )
+                        )
                     ),
                 )
             segment = validate_joint_segment(
@@ -227,6 +243,7 @@ class CartesianEdgePlanner:
                 target_keyframe,
                 self.state_validator,
                 max_joint_step_rad=self.max_joint_step_rad,
+                wrap_joints=self.wrap_joints,
             )
             if not segment.valid:
                 return EdgePlanResult(
@@ -280,6 +297,7 @@ class RRTConnectEdgePlanner:
     extension_step_rad: float = 0.25
     validation_step_rad: float = 0.02
     goal_bias: float = 0.15
+    wrap_joints: bool = True
 
     def __post_init__(self) -> None:
         if not self.joint_limits_rad:
@@ -313,11 +331,21 @@ class RRTConnectEdgePlanner:
     def _nearest(self, tree: list[_TreeNode], target: JointConfig) -> int:
         return min(
             range(len(tree)),
-            key=lambda index: wrapped_joint_distance(tree[index].q, target),
+            key=lambda index: self._distance(tree[index].q, target),
         )
 
+    def _delta(self, source: JointConfig, target: JointConfig) -> np.ndarray:
+        return (
+            wrapped_joint_delta(source, target)
+            if self.wrap_joints
+            else np.asarray(target, dtype=float) - np.asarray(source, dtype=float)
+        )
+
+    def _distance(self, source: JointConfig, target: JointConfig) -> float:
+        return float(np.linalg.norm(self._delta(source, target)))
+
     def _steer(self, source: JointConfig, target: JointConfig) -> JointConfig:
-        delta = wrapped_joint_delta(source, target)
+        delta = self._delta(source, target)
         distance = float(np.linalg.norm(delta))
         if distance <= self.extension_step_rad:
             return target
@@ -340,11 +368,12 @@ class RRTConnectEdgePlanner:
             keyframe,
             self.state_validator,
             max_joint_step_rad=self.validation_step_rad,
+            wrap_joints=self.wrap_joints,
         )
         if not segment.valid:
             return "TRAPPED", None, segment.min_clearance_m
         tree.append(_TreeNode(q=candidate, parent=nearest_index))
-        reached = wrapped_joint_distance(candidate, target) <= 1e-9
+        reached = self._distance(candidate, target) <= 1e-9
         return ("REACHED" if reached else "ADVANCED"), len(tree) - 1, segment.min_clearance_m
 
     def _connect(
@@ -381,6 +410,7 @@ class RRTConnectEdgePlanner:
             target_keyframe,
             self.state_validator,
             max_joint_step_rad=self.validation_step_rad,
+            wrap_joints=self.wrap_joints,
         )
         if direct.valid:
             return direct
@@ -430,10 +460,48 @@ class RRTConnectEdgePlanner:
                         path = a_path + list(reversed(b_path))[1:]
                     else:
                         path = b_path + list(reversed(a_path))[1:]
+                    # Exploration clearance includes rejected / trapped
+                    # branches and may be negative even when the selected
+                    # connection is collision-free.  Report clearance only
+                    # for the path that will actually be executed.
+                    selected_minimum: float | None = None
+                    for path_source, path_target in zip(path, path[1:]):
+                        selected_segment = validate_joint_segment(
+                            path_source,
+                            path_target,
+                            target_keyframe,
+                            self.state_validator,
+                            max_joint_step_rad=self.validation_step_rad,
+                            wrap_joints=self.wrap_joints,
+                        )
+                        if not selected_segment.valid:
+                            return EdgePlanResult(
+                                valid=False,
+                                failure_code=(
+                                    selected_segment.failure_code
+                                    or "RRT_SELECTED_PATH_INVALID"
+                                ),
+                                detail=(
+                                    "selected RRT path failed final clearance "
+                                    f"validation: {selected_segment.detail}"
+                                ),
+                                min_clearance_m=(
+                                    selected_segment.min_clearance_m
+                                ),
+                            )
+                        if selected_segment.min_clearance_m is not None:
+                            selected_minimum = (
+                                selected_segment.min_clearance_m
+                                if selected_minimum is None
+                                else min(
+                                    selected_minimum,
+                                    selected_segment.min_clearance_m,
+                                )
+                            )
                     return EdgePlanResult(
                         valid=True,
                         joint_path=tuple(path),
-                        min_clearance_m=minimum,
+                        min_clearance_m=selected_minimum,
                     )
             tree_a, tree_b = tree_b, tree_a
             a_is_start = not a_is_start

@@ -171,6 +171,24 @@ def _tool_rotation_from_axis(axis_world: np.ndarray, roll_rad: float) -> np.ndar
     return base @ roll
 
 
+def quaternion_matrix_xyzw(values: Sequence[float]) -> np.ndarray:
+    """Public quaternion-to-matrix utility for geometry strategy providers."""
+
+    return _quaternion_matrix_xyzw(values)
+
+
+def matrix_quaternion_xyzw(matrix: np.ndarray) -> tuple[float, float, float, float]:
+    """Public matrix-to-quaternion utility for geometry strategy providers."""
+
+    return _matrix_quaternion_xyzw(matrix)
+
+
+def tool_rotation_from_axis(axis_world: np.ndarray, roll_rad: float) -> np.ndarray:
+    """Public axis/roll convention shared by keyframe generators and resolver."""
+
+    return _tool_rotation_from_axis(axis_world, roll_rad)
+
+
 class RelativePoseResolver:
     """Resolve object/rack-relative keyframes against one immutable snapshot."""
 

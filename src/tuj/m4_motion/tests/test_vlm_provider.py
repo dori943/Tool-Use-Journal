@@ -178,6 +178,59 @@ def _batch(*, frame_ref: str = "object:bottle") -> GeneratedKeyframeBatch:
     )
 
 
+def _release_batch() -> GeneratedKeyframeBatch:
+    strategy = GeneratedStrategy(
+                strategy_id="return",
+                rationale="Return the held tool to its grounded home pose.",
+                keyframes=[
+                    GeneratedKeyframe(
+                        keyframe_id="pre-place",
+                        keyframe_type="PRE_PLACE",
+                        frame_ref="object:bottle",
+                        anchor="top_center",
+                        approach_axis_xyz=[0.0, 0.0, 1.0],
+                        tool_axis_to_align="-z",
+                        offset_along_approach_m=0.10,
+                        roll_rad=0.0,
+                        planner="CARTESIAN",
+                    ),
+                    GeneratedKeyframe(
+                        keyframe_id="place",
+                        keyframe_type="PLACE",
+                        frame_ref="object:bottle",
+                        anchor="top_center",
+                        approach_axis_xyz=[0.0, 0.0, 1.0],
+                        tool_axis_to_align="-z",
+                        offset_along_approach_m=0.01,
+                        roll_rad=0.0,
+                        planner="CARTESIAN",
+                    ),
+                    GeneratedKeyframe(
+                        keyframe_id="retreat",
+                        keyframe_type="RETREAT",
+                        frame_ref="object:bottle",
+                        anchor="top_center",
+                        approach_axis_xyz=[0.0, 0.0, 1.0],
+                        tool_axis_to_align="-z",
+                        offset_along_approach_m=0.12,
+                        roll_rad=0.0,
+                        planner="CARTESIAN",
+                    ),
+                ],
+            )
+    return GeneratedKeyframeBatch(
+        candidates=[
+            strategy,
+            strategy.model_copy(
+                update={
+                    "strategy_id": "return-alternate",
+                    "rationale": "Alternate valid return candidate.",
+                }
+            ),
+        ]
+    )
+
+
 class _FakeResponses:
     def __init__(self, parsed) -> None:
         self.parsed = parsed
@@ -249,6 +302,38 @@ def test_unknown_generated_frame_fails_before_ik() -> None:
         provider.generate(_request())
 
 
+def test_invalid_candidate_is_dropped_when_another_candidate_is_valid() -> None:
+    batch = _batch()
+    invalid_keyframes = list(batch.candidates[0].keyframes)
+    invalid_keyframes[0] = invalid_keyframes[0].model_copy(
+        update={"frame_ref": "object:not-in-scene"}
+    )
+    batch = batch.model_copy(
+        update={
+            "candidates": [
+                batch.candidates[0].model_copy(
+                    update={"keyframes": invalid_keyframes}
+                ),
+                batch.candidates[1],
+            ]
+        }
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    artifact = provider.generate(_request())
+
+    assert [candidate.strategy_id for candidate in artifact.candidates] == [
+        "sg-pick:side"
+    ]
+    assert artifact.provenance.metadata["rejected_candidate_count"] == 1
+    assert "unknown object frame" in artifact.provenance.metadata[
+        "rejected_candidates"
+    ][0]
+
+
 def test_missing_api_key_fails_without_network(monkeypatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     provider = OpenAIKeyframeProvider(
@@ -277,7 +362,7 @@ def test_pick_keyframe_gets_deterministic_grasp_and_attach_events() -> None:
         owner_id="bottle",
     )
     request.task.goal = MotionGoal(
-        goal_type=GoalType.PICK,
+        goal_type=GoalType.POSE,
         target_object_id="bottle",
     )
     provider = OpenAIKeyframeProvider(
@@ -293,3 +378,47 @@ def test_pick_keyframe_gets_deterministic_grasp_and_attach_events() -> None:
         KeyframeEventType.ATTACH_OBJECT,
     ]
     assert grasp.metadata["event_target_id"] == "bottle"
+
+
+def test_pick_tool_marks_attachment_as_a_tool_resource() -> None:
+    request = _request()
+    request.task.action_type = "PICK_TOOL"
+    request.task.tool = "bottle"
+    request.task.goal = MotionGoal(
+        goal_type=GoalType.POSE,
+        target_object_id="bottle",
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_batch()),
+    )
+
+    artifact = provider.generate(request)
+
+    grasp = artifact.candidates[0].keyframes[1]
+    assert grasp.events_after[-1] is KeyframeEventType.ATTACH_OBJECT
+    assert grasp.metadata["event_parameters"]["ATTACH_OBJECT"] == {
+        "resource_kind": "tool"
+    }
+
+
+def test_return_tool_detaches_the_tool_resource() -> None:
+    request = _request()
+    request.task.action_type = "RETURN_TOOL"
+    request.task.tool = "bottle"
+    request.task.goal = MotionGoal(
+        goal_type=GoalType.POSE,
+        target_object_id="bottle",
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_release_batch()),
+    )
+
+    artifact = provider.generate(request)
+
+    place = artifact.candidates[0].keyframes[1]
+    assert place.events_after[0] is KeyframeEventType.DETACH_OBJECT
+    assert place.metadata["event_parameters"]["DETACH_OBJECT"] == {
+        "resource_kind": "tool"
+    }

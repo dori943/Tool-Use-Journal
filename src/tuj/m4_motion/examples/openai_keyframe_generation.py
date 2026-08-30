@@ -13,9 +13,9 @@ from pathlib import Path
 
 SRC = Path(__file__).resolve().parents[3]
 REPOSITORY = SRC.parent
-for path in (REPOSITORY, SRC):
-    if str(path) not in sys.path:
-        sys.path.insert(0, str(path))
+for package_root in (REPOSITORY, SRC):
+    if str(package_root) not in sys.path:
+        sys.path.insert(0, str(package_root))
 
 from tuj.m4_motion.schema import MotionPlanRequest  # noqa: E402
 from tuj.m4_motion.vlm_provider import (  # noqa: E402

@@ -72,6 +72,8 @@ def _selected_plan() -> SelectedPlan:
                 candidate_id="candidate-place",
                 ee="2F",
                 action_type="place",
+                mode="in_region",
+                source_binding={"?target": "part", "?region": "bin"},
                 target_ids=["part"],
                 goal_region_id="bin",
                 action_parameters=place_parameters,
@@ -134,7 +136,8 @@ def test_converts_selected_order_to_grounded_motion_requests() -> None:
         "sg-place",
         "sg-pick",
     ]
-    assert requests[0].task.goal.goal_type is GoalType.PLACE
+    assert requests[0].task.goal.goal_type is GoalType.POSE
+    assert requests[0].task.action_type == "place"
     assert requests[0].task.goal.target_pose is not None
     assert requests[0].task.goal.target_pose.frame_id == "object:bin"
     assert requests[0].task.goal.target_pose.position_m == (0.01, 0.02, 0.03)
@@ -142,9 +145,15 @@ def test_converts_selected_order_to_grounded_motion_requests() -> None:
         math.sqrt(0.5)
     )
     assert requests[0].task.goal.approach_distance_m == pytest.approx(0.04)
+    assert requests[0].task.metadata["mode"] == "in_region"
+    assert requests[0].task.metadata["source_binding"] == {
+        "?target": "part",
+        "?region": "bin",
+    }
     assert requests[0].task.metadata["task_planner_steps"][0]["action"] == "ATTACH_EE"
 
-    assert requests[1].task.goal.goal_type is GoalType.PICK
+    assert requests[1].task.goal.goal_type is GoalType.POSE
+    assert requests[1].task.action_type == "acquire"
     assert requests[1].task.grasp is not None
     assert requests[1].task.grasp.grasp_id == "grasp-1"
     assert requests[1].task.allowed_touch_objects == ["part"]
@@ -167,12 +176,61 @@ def test_rejects_one_stale_world_for_multiple_subgoals() -> None:
         )
 
 
-def test_acquire_requires_structured_grasp() -> None:
+def test_acquire_without_structured_grasp_is_grounded_for_m5_planning() -> None:
     selected = _selected_plan()
     selected.candidate_assignments[1].grasp = None
     selected.candidate_assignments[1].grasp_id = None
 
-    with pytest.raises(SelectedPlanAdapterError, match="requires a structured grasp"):
+    requests = SelectedPlanMotionRequestAdapter().convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": _world("scene:pick", [0.2, 0.3]),
+        },
+        constraints=MotionConstraints(),
+    )
+
+    assert requests[1].task.grasp is None
+    assert requests[1].task.goal.target_object_id == "part"
+    assert requests[1].task.goal.target_pose is not None
+
+
+@pytest.mark.parametrize(
+    ("target_id", "message"),
+    [
+        ("?tool", "unresolved targets"),
+        ("missing-object", "absent from the WorldSnapshot"),
+    ],
+)
+def test_rejects_unresolved_or_absent_targets(
+    target_id: str,
+    message: str,
+) -> None:
+    selected = _selected_plan()
+    selected.candidate_assignments[1].target_ids = [target_id]
+    selected.candidate_assignments[1].grasp = None
+    selected.candidate_assignments[1].grasp_id = None
+
+    with pytest.raises(SelectedPlanAdapterError, match=message):
+        SelectedPlanMotionRequestAdapter().convert(
+            selected,
+            worlds={
+                "sg-place": _world("scene:place", [0.0, 0.1]),
+                "sg-pick": _world("scene:pick", [0.2, 0.3]),
+            },
+            constraints=MotionConstraints(),
+        )
+
+
+def test_rejects_grasp_owned_by_a_different_resource() -> None:
+    selected = _selected_plan()
+    selected.candidate_assignments[1].grasp = GraspSpec(
+        grasp_id="wrong-owner",
+        owner_kind="object",
+        owner_id="bin",
+    )
+
+    with pytest.raises(SelectedPlanAdapterError, match="does not match targets"):
         SelectedPlanMotionRequestAdapter().convert(
             selected,
             worlds={

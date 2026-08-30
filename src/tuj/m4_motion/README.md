@@ -2,8 +2,10 @@
 
 ## 빠른 시작
 
-M4 모듈 위치는 `src/tuj/m4_motion/`이며, 패키지 경로는 `tuj.m4_motion`이다.
-M3(`tuj.m3_taskplanner`)를 입력 계약으로 사용하므로 두 모듈이 같은 트리에 있어야 한다.
+Motion Planner(M5) 모듈 위치는 `src/tuj/m4_motion/`이며, 기존 Git 단계명을 유지한
+패키지 경로는 `tuj.m4_motion`이다. Task Planner(M4)의 패키지 경로도 기존 단계명을
+유지해 `tuj.m3_taskplanner`를 사용한다. 별도 worktree라면 두 저장소의 `src/`가 모두
+Python import 경로에 있어야 하며, 아래 M5 runner가 이를 자동 설정한다.
 
 ```bash
 python -m venv .venv
@@ -18,9 +20,9 @@ Windows PowerShell에서 가상환경을 활성화하려면 다음 명령을 먼
 .\.venv\Scripts\Activate.ps1
 ```
 
-테스트는 `tests/conftest.py`가 `src/`와 저장소 루트를 import 경로에 넣으므로 별도 설치
-없이 동작한다. 다만 일부 테스트가 `scripts/assets/`를 상대 경로로 읽으므로 **저장소
-루트에서 실행**해야 한다.
+테스트는 `tests/conftest.py`가 현재 `src/`와 같은 상위 폴더의 Task Planner worktree
+`src/`를 import 경로에 넣으므로 별도 설치 없이 동작한다. 테스트 asset 경로는 저장소
+기준으로 해석하므로 다른 작업 디렉터리에서도 실행할 수 있다.
 
 OpenAI keyframe 기능을 쓸 때만 추가로 설치한다.
 
@@ -28,35 +30,172 @@ OpenAI keyframe 기능을 쓸 때만 추가로 설치한다.
 python -m pip install "openai>=2,<3"
 ```
 
-### C1_1 end-to-end 실행
-
-먼저 M3 결과를 생성한다.
+현재 통합 단계 명칭은 **M4 Task Planner**, **M5 Motion Planner**다. 다만 기존 Git
+브랜치 이름은 각각 `feature/dain-m3`, `feature/dain-m4`를 유지한다. 두 feature
+branch를 병렬로 검토할 때는 별도 worktree를 사용한다.
 
 ```bash
-PYTHONPATH=src python -m tuj.m3_taskplanner.cli plan   --gk output/c1_1/gk_bundle.json   --m1 output/c1_1/m1.json   --robot-spec configs/robot_spec.json   --output output/c1_1/task_planner.json
+git fetch origin \
+  feature/dain-m3:refs/remotes/origin/feature/dain-m3 \
+  feature/dain-m4:refs/remotes/origin/feature/dain-m4
+git worktree add ../tuj-m3 origin/feature/dain-m3
+git worktree add ../tuj-m4 origin/feature/dain-m4
+python -m pip install -r ../tuj-m4/requirements.txt
 ```
 
-이 입력에서는 GK bundle의 `roles.selected_tool`인 `light_plate`가 M3
-`candidate_assignments`를 거쳐 M4까지 그대로 전달된다. 세 개로 분할된 sweep도 각각의
+### 범용 M4 → M5 실행
+
+범용 M5 runner는 C1_1 경로나 환경을 기본값으로 추정하지 않는다. M4 결과와 초기
+`WorldSnapshot`을 명시하거나, 지원되는 Tool-Use-Journal 환경 이름을 넘겨 현재 world를
+캡처한다.
+
+지원 환경은 M5 내부 상수로 관리하지 않는다. 새 환경 모듈을
+`environments/__init__.py`에서 import해 robosuite에 등록하면 runner가 checkout-local
+registry에서 환경 이름을 자동 발견한다. 등록된 환경은 reset 후 다음 공통 계약을
+만족해야 한다.
+
+- UR5e 로봇과 bare-flange 환경 생성
+- `2F`, `3F`, `vac` 각각의 물리 gripper variant 생성
+- 세 EE의 `ee_rack_info`
+- M1/GK ID와 일치하는 `obj_body_id`
+- `model.get_xml()` 및 동일 seed reset 상태 재현
+
+목록 등록은 자동이지만 위 물리 계약은 생략되지 않는다. 계약이 없는 일반 robosuite
+환경은 planning/simulation 전에 명확한 compatibility error로 중단한다.
+
+```powershell
+# 다른 Task의 입력 계약만 검증
+python scripts\run_m5_motion_planner.py `
+  --task-planner C:\tasks\sorting\task_planner.json `
+  --initial-world C:\tasks\sorting\initial_world.json `
+  --validate-input-only
+
+# 환경에서 초기 world 캡처 후 실제 계획
+$env:OPENAI_API_KEY = "<project-api-key>"
+python scripts\run_m5_motion_planner.py `
+  --task-planner C:\tasks\sorting\task_planner.json `
+  --environment C2_1_ObjectSorting `
+  --initial-ee none
+```
+
+`--constraints`와 `--options`는 공통 JSON 또는 subgoal id별 JSON mapping을 받는다.
+생략하면 초기 world의 관절 이름을 기준으로 보수적인 기본 제약을 만든다. 출력 폴더를
+생략하면 `artifacts/<Task 입력 폴더명>/`을 사용한다.
+
+#### M4 입력 grounding 계약
+
+- `target_ids`는 현재 `WorldSnapshot.objects` 또는 `rack`에 존재하는 구체 ID여야
+  한다. `?tool` 같은 미해결 변수와 scene에 없는 ID는 계획 전에 거부한다.
+- M4의 structured `grasp`는 선택 입력이다. 없으면 M5 keyframe provider가 선택된
+  Tool/object와 현재 world에서 접촉 자세 후보를 만든다.
+- `PICK_TOOL`은 Tool object를 물리적으로 attach하고 `attached_object_id`와
+  `held_tool_id`를 함께 갱신한다. `RETURN_TOOL`은 같은 object를 detach하고 두 상태를
+  해제한다. Tool을 든 동안 EE 교체는 허용하지 않는다.
+- 실제 region geometry가 있는 sweep/push는 실행 후 모든 target footprint가 region
+  안에 들어왔는지 판정한다. `tool_rest`처럼 M1의 개념적 위치 이름만 있고 geometry가
+  없는 운반 단계는 M4→M5 predicted world에 보존된 Tool home pose를 사용한다.
+
+계획부터 MuJoCo 실행까지 한 번에 확인하려면 다음 중 하나를 선택한다.
+
+```powershell
+# controller physics와 live viewer (기본 realtime factor 1.0)
+python scripts\run_m5_motion_planner.py `
+  --task-planner C:\tasks\sorting\task_planner.json `
+  --environment C2_1_ObjectSorting `
+  --initial-ee none `
+  --simulate controller
+
+# 빠른 deterministic qpos replay, viewer 없음
+python scripts\run_m5_motion_planner.py `
+  --task-planner C:\tasks\sorting\task_planner.json `
+  --environment C2_1_ObjectSorting `
+  --initial-ee none `
+  --simulate kinematic `
+  --headless
+
+# controller physics를 offscreen MP4로 기록
+python scripts\run_m5_motion_planner.py `
+  --task-planner C:\tasks\sorting\task_planner.json `
+  --environment C2_1_ObjectSorting `
+  --initial-ee none `
+  --video artifacts\sorting\run.mp4
+```
+
+`--video`는 `--simulate controller`를 암시한다. `--realtime-factor`,
+`--hold-seconds`, `--camera`, `--width`, `--height`, `--video-fps`로 재생 및
+렌더링을 조정할 수 있다. 전체 sequence의 run/report/goal 평가는
+`<output-dir>/simulation/`에, 계획·실행 요약은 `m5_summary.json`에 저장된다.
+simulation 실패 또는 목표 검증 실패 시 runner는 종료 코드 2를 반환하며 생성된
+report와 manifest는 그대로 보존한다.
+
+파일로 받은 `--initial-world`는 environment reset과 같은 관절·EE 상태여야 한다.
+일치하지 않으면 잘못된 scene에서 궤적을 재생하지 않고 중단한다. held/attached
+object가 있는 외부 snapshot도 fresh reset으로 재현할 수 없으므로 거부한다. 임의 Task를 바로
+시뮬레이션할 때는 `--environment`를 사용해 계획과 실행이 같은 seed의 deterministic
+reset을 공유하게 하는 것이 가장 안전하다. 범용 evaluator는 grounded Tool 상태,
+pose/joint, 실제 region containment를 판정한다. 그 밖의 scenario-level 성공 조건은
+`UNKNOWN`으로 처리된다. C1 sweep의 검증된 rim grasp, 마찰, closed-loop rollback과
+cleanup 정책까지 필요하면 전용 runner를 사용한다.
+
+### C1_1 전용 물리 실행
+
+C1_1은 M4 결과에 없는 plate rim-grasp와 분할 sweep geometry를 전용 binder가
+보완하므로 범용 runner와 분리한다. `tuj-m3`, `tuj-m4`가 같은 폴더에 있으면 C1_1
+runner가 M4 결과를 자동으로 찾는다.
+
+```bash
+python ../tuj-m3/scripts/run_m4_task_planner.py
+python ../tuj-m4/scripts/run_m5_c1_1_motion_planner.py --validate-input-only
+
+export OPENAI_API_KEY="<project-api-key>"
+python ../tuj-m4/scripts/run_m5_c1_1_motion_planner.py
+```
+
+PowerShell에서는 마지막 두 명령 앞에 다음과 같이 API key를 설정한다.
+
+```powershell
+$env:OPENAI_API_KEY = "<project-api-key>"
+```
+
+worktree 이름이 다르면 C1_1 runner에 `--task-planner path/to/task_planner.json`으로
+M4 결과를 명시한다. `--controller-kp`, `--planning-time` 등 C1_1 Motion Planner
+옵션은 runner가 그대로 전달한다. Tool과 EE는 두 runner 모두 M4 결과에서 읽는다.
+
+이 입력에서는 GK bundle의 `roles.selected_tool`인 `light_plate`가 M4
+`candidate_assignments`를 거쳐 M5까지 그대로 전달된다. 세 개로 분할된 sweep도 각각의
 target 목록과 실행 순서를 유지한 채 차례대로 motion plan으로 변환된다.
 
-그다음 OpenAI API key를 환경변수로 전달하고 M4를 실행한다. key는 파일이나 생성
-artifact에 기록되지 않는다.
-
-먼저 network 요청이나 시뮬레이터 실행 없이 M3→M4 입력 계약을 확인할 수 있다.
-
-```bash
-python src/tuj/m4_motion/examples/c1_1_openai_motion_run.py   .   --task-planner output/c1_1/task_planner.json   --output-dir artifacts/c1_1   --validate-input-only
-```
-
-```bash
-export OPENAI_API_KEY="<project-api-key>"
-python src/tuj/m4_motion/examples/c1_1_openai_motion_run.py   .   --task-planner output/c1_1/task_planner.json   --output-dir artifacts/c1_1   --controller-kp 50   --controller-damping-ratio 1
-```
-
-PowerShell에서는 `export` 대신 `$env:OPENAI_API_KEY = "<project-api-key>"`를 쓴다.
 처음에는 `--stop-after-pick`을 추가하면 전체 sweep 전에 설치와 물리 grasp까지만
 짧게 검증할 수 있다.
+
+### 최신 C1_1 물리 실행
+
+최신 개선분은 다음을 포함한다.
+
+- weld 없이 2F finger contact와 마찰로 `light_plate`를 파지하고, 양쪽 접촉·리프트·최종
+  유지 시간을 실제 MuJoCo 관측값으로 검증
+- live tool-in-EEF transform을 사용한 rim contact sweep과 table clearance 보정
+- block별 짧은 closed-loop push, 접촉 손실·진행 부족 시 checkpoint rollback 및
+  감소된 거리 재시도
+- collection zone 포함 여부와 지지 안정성을 확인하는 cleanup pass
+- 실행·goal 평가·recovery directive·artifact lineage 저장
+- 로봇 제어, grasp, contact, push, recovery 값을 검증된 profile로 분리
+
+검증된 C1_1 기본값은
+`src/tuj/m4_motion/examples/c1_1_physical_grasp_profile.json`에 있다. 기존 raw PICK
+keyframe을 재사용하면 API 호출 없이 물리 PICK까지만 재현할 수 있다.
+
+```powershell
+python scripts/run_m5_c1_1_motion_planner.py `
+  --pick-keyframes path\to\pick_keyframes_raw.json `
+  --motion-profile src\tuj\m4_motion\examples\c1_1_physical_grasp_profile.json `
+  --stop-after-pick
+```
+
+영상까지 포함한 전체 실행은 `--video artifacts\c1_1\run.mp4`를 추가한다. PICK
+keyframe을 전달하지 않거나 `--sweep-provider openai`를 선택한 경우에만
+`OPENAI_API_KEY`가 필요하다. 실행에 사용하는 `configs/robot_spec.json`의 2F 항목에는
+검증된 `grip_force_n`과 `fingerpad_friction`이 포함되어야 한다.
 
 ## 목표
 
@@ -112,10 +251,29 @@ Task Planner는 task/subgoal, EE, Tool, Grasp, 목표 pose를 결정한다. Moti
   검사 해상도와 Cartesian 속도 상한
 - `options`: planning algorithm, timeout, attempts, interpolation step, seed
 
+`MotionTask.action_type`과 `MotionGoal.goal_type`은 서로 다른 추상화 수준이다.
+
+- `action_type`: Task/Manipulation Planner가 정한 `PICK`, `PLACE`, `DOCK`,
+  `PUSH`, `SWEEP`, `INSERT` 등의 의미와 resource effect
+- `goal_type`: Motion Planner가 실제로 해석할 target representation인 `POSE` 또는
+  `JOINT`
+
+따라서 PLACE/DOCK 같은 동작도 `target_pose`, `target_object_id`,
+`target_region_id`, approach/retreat constraint를 가진 `POSE` goal로 전달한다. 새
+manipulation action을 추가해도 `GoalType`을 늘릴 필요가 없다. 기존 v3.2 JSON의
+action형 `goal_type` 값은 읽을 때 `POSE`로 마이그레이션하지만 새 artifact에는 쓰지
+않는다. attach/detach/EE exchange 같은 상태 효과는 `action_type`과 명시적 task
+metadata에서 판별한다.
+
+접촉 조작은 선택적으로 `MotionTask.contact`에 geometric intent를 전달한다.
+`ToolContactPatch`는 tool-local 접촉점·법선·접선·면적·collision geometry를 표현하며,
+Task Planner의 action taxonomy와 독립적이다.
+
 ### SelectedPlan 자동 변환
 
-Task Planner의 `SelectedPlan`은 선택 결과에 `action_type`, targets, EE, Tool, Grasp와
-candidate action parameter를 보존한다. adapter는 `subgoal_order` 순서대로 하나의
+Task Planner의 `SelectedPlan`은 선택 결과에 `action_type`, `mode`, source binding,
+targets, goal region, EE, Tool, Grasp와 candidate action parameter를 보존한다. adapter는
+`subgoal_order` 순서대로 하나의
 `MotionPlanRequest`씩 생성하며, 관련 transition/subgoal step도 task metadata에 함께
 보존한다.
 
@@ -165,9 +323,10 @@ motion_plans = sequence.plans
 manifest = sequence.manifest_path
 ```
 
-저장은 plan별 JSON과 ordered manifest를 임시 파일에 쓴 뒤 atomic replace한다. 중간
-transition 이후에는 request identity와 scene signature도 새 시작 상태에 맞게 다시
-고정한다.
+저장은 request/plan별 JSON과 full final `WorldSnapshot`을 포함한 ordered manifest를 임시
+파일에 쓴 뒤 atomic replace한다. 중간 transition 이후에는 request identity와 scene
+signature도 새 시작 상태에 맞게 다시 고정한다. 다른 process에서 simulation을 시작할 때는
+`MotionPlanStore(root).load_manifest()`로 goal 정보까지 포함한 동일 sequence를 복원한다.
 
 ### MotionPlan
 
@@ -247,6 +406,26 @@ branch는 모두 보존하지만 analytic completeness를 주장하지 않는다
 (`enumeration_complete=false`). 이후 calibrated analytic UR solver를 연결하면 이
 flag를 `true`로 올리고 최대 branch를 완전 열거할 수 있다.
 
+## 일반화된 contact manipulation
+
+접촉 작업의 공통 부분은 다음 계층으로 분리되어 있다.
+
+- `ToolAffordanceProvider`: tool geometry/registry에서 `ToolContactPatch` 후보를 제공
+- `PushToRegionStrategyProvider`: 관측한 target·region footprint와 선택된 patch로
+  approach → engage → push → retract keyframe을 생성
+- `ClosedLoopContactExecutor`: checkpoint → 실행 → contact/progress 관측 → rollback →
+  감소된 step 재시도를 bounded loop로 수행
+- `CompositeGoalEvaluator`: region containment, support stability, grasp retention,
+  tool clearance predicate를 fail-closed 방식으로 합성
+- `profiles.py`: robot control, grasp, contact, push planning, recovery, tool affordance
+  설정을 역할별 validated profile로 분리
+
+generic provider는 구체적인 tool 이름이나 C1_1 block 수를 알지 않는다. 단순 tool-frame
+계획에는 `DirectToolContactPoseResolver`를 사용하고, 실제로 파지한 tool은 측정된
+tool-in-EEF transform을 적용하는 resolver를 주입한다. C1_1의 기존 물리 실행 경로는
+live grasp transform과 MuJoCo contact를 사용하므로 후자에 해당하며, 공통 target ordering,
+step-distance reduction, contact schema를 재사용한다.
+
 ## EE 교체 템플릿
 
 EE 교체는 VLM 전략을 사용하지 않는다. `EEExchangeTemplateGenerator`가 rack slot의
@@ -260,6 +439,14 @@ old staging → old pre-undock → old dock → unlock/verify
 
 unlock/lock event 전후의 collision context가 분리되므로, 기존 EE가 장착된 형상,
 bare flange, 새 EE 장착 형상이 같은 segment 상태로 섞이지 않는다.
+
+초기 `current_ee`가 `null`이면 Task Planner는 `DETACH_EE` 없이 첫 `ATTACH_EE`만
+생성한다. 이때 Motion Planner는 아래처럼 bare flange에서 시작하는 4-keyframe 초기
+장착 macro를 사용한다. 첫 장착을 기존 EE와의 교체로 잘못 처리하지 않는다.
+
+```text
+new staging → new pre-dock → new dock → lock/verify → retreat
+```
 
 ## Trajectory processing
 
@@ -321,9 +508,10 @@ dock segment에만 적용되고, TOOL_LOCK/TOOL_UNLOCK 뒤에는 collision model
 object free-joint state, UR5e base, EE root와 rack slot은 reset된 환경의 compile된 MJCF와
 `MjData`에서 읽는다. 렌더 이미지는 수치 입력으로 사용하지 않는다.
 
-대상 브랜치에서 `gripper_types`를 생략하면 물리 모델은 `NullGripper`인데
-`robot_spec.json`은 `current_ee="2F"`이므로 서로 불일치한다. 반드시 아래 helper로
-실제 장착 EE를 명시하고, planning 전에 `require_physical_ee()`로 확인한다.
+`robot_spec.json`의 `current_ee`는 `null`이며 초기에는 장착 EE가 없다. Motion Planner는
+이 값을 임의로 `2F`로 바꾸지 않고 M4가 선택해 전달한 EE를 `active_ee`로 명시해 물리
+환경을 만든다. `gripper_types`를 생략하면 `NullGripper`가 되므로 반드시 아래 helper를
+사용하고, planning 전에 `require_physical_ee()`로 실제 모델을 확인한다.
 
 ```python
 from tuj.m4_motion import (
@@ -497,12 +685,73 @@ runtime = ToolUseJournalEERuntime.from_repository_for_controller(
     active_ee="vac",
     seed=0,
     control_timestep_s=simulation_run.config.control_timestep_s,
-    joint_position_kp=50.0,
-    joint_position_damping_ratio=1.0,
 )
 report = ToolUseJournalControllerTrajectoryPlayer(runtime).execute(
     simulation_run
 )
+```
+
+### 전체 MotionPlan 시퀀스 실행과 목표 검증
+
+`SelectedPlanMotionOrchestrator`가 만든 전체 plan sequence는
+`SelectedPlanSimulationOrchestrator`로 순서대로 실행한다. 각 실행 사이에는 직전
+`ExecutionReport.final_robot_state`와 다음 plan의 시작 waypoint를 비교한다. 오차가 실행
+tolerance를 넘거나 attached object/held Tool 상태가 다르면 남은 plan을 실행하지 않고
+`STATE_DIVERGED`로 중단한다.
+
+개별 `ExecutionReport.SUCCESS`는 controller/physics replay가 정상 종료됐다는 뜻이다.
+전체 sequence의 `SUCCESS`는 여기에 grounded goal 검증까지 통과해야 한다. 따라서
+collision-free replay가 끝났더라도 PICK 대상이 붙어 있지 않거나, PLACE 물체가 목표 pose에
+없거나, scenario-level evaluator가 task goal 실패를 반환하면 전체 결과는 `GOAL_FAILED`다.
+평가된 position/orientation error와 근거는 report metadata와 simulation manifest에 함께
+저장된다. 관측값이 없으면 PASS로 추정하지 않고 `UNKNOWN`으로 처리한다.
+
+Tool-Use-Journal에서는 실행 adapter가 plan에 고정된 event-scoped collision context로
+registry를 다시 만들고, controller player와 실제 world snapshot을 공급한다.
+
+```python
+from tuj.m4_motion import (
+    SimulationArtifactStore,
+    ToolUseJournalExecutionAdapter,
+)
+
+execution_adapter = ToolUseJournalExecutionAdapter.from_repository(
+    runtime,
+    repository,
+    seed=0,
+    controller=True,
+)
+execution = execution_adapter.execute(
+    sequence,
+    store=SimulationArtifactStore("artifacts/run-42/simulation"),
+)
+if not execution.successful:
+    raise RuntimeError(f"{execution.status.value}: {execution.detail}")
+```
+
+전체 task의 성공 조건이 개별 `MotionGoal`보다 넓으면 `sequence_goal_evaluator`를 전달한다.
+예를 들어 C1 sweep은 "모든 block이 collection zone 안에 있음"을 별도 evaluator로 검사해야
+한다. `src/tuj/m4_motion/examples/c1_1_openai_motion_run.py`도 controller replay와 이 task goal이 모두
+성공한 경우에만 최종 `status=SUCCESS`와 exit code 0을 반환한다.
+
+실패 report나 goal-failed sequence는 `RecoveryOrchestrator`가 artifact lineage를 따라
+원인 모듈의 입력 artifact에서만 재시작하도록 `RecoveryDirective`를 만든다. 알 수 없는
+failure code는 임의 모듈에 귀속하지 않으며, 실제 재실행은 명시적으로 등록된 handler에만
+전달된다.
+
+```python
+from tuj.m4_motion import RecoveryOrchestrator
+from tuj.m4_motion.schema import ModuleName
+
+recovery = RecoveryOrchestrator(
+    {
+        ModuleName.MOTION_PLANNER: retry_motion_planner,
+        ModuleName.SIMULATOR: retry_simulation,
+        ModuleName.TASK_PLANNER: retry_task_planner,
+    }
+)
+directive = recovery.directive_for_sequence(execution)
+outcome = recovery.execute(directive)
 ```
 
 지원 event는 `GRIPPER_OPEN/CLOSE`, `SUCTION_ON/OFF`,
@@ -570,8 +819,7 @@ detach는 현재 world pose와 velocity를 보존한 채 weld force를 제거한
 ```bash
 python src/tuj/m4_motion/examples/tool_use_journal_ee_runtime_smoke.py \
   . \
-  --env C2_1_ObjectSorting --from-ee 2F --to-ee vac --controller \
-  --controller-kp 50 --controller-damping-ratio 1
+  --env C2_1_ObjectSorting --from-ee 2F --to-ee vac --controller
 ```
 
 `C1_1_LegoSweep`와 `C2_1_ObjectSorting`은 `reward()`를 구현하지 않아 public
@@ -643,7 +891,7 @@ python -m pytest src\tuj\m4_motion\tests\test_vlm_provider_live.py -q
 스키마 타입을 변경한 뒤 정적 JSON Schema를 갱신한다.
 
 ```bash
-python -m motion_planner.schema
+PYTHONPATH=src python -m tuj.m4_motion.schema
 ```
 
 ## 구현 현황
@@ -678,22 +926,31 @@ python -m motion_planner.schema
 - free-joint 운반 물체 collision transform과 gripper joint collision snapshot
 - mass/inertia-scaled breakable 6-DoF weld와 contact-force 기반 `GRASP_LOST`
 - Vacuum cup뿐 아니라 stalk까지 포함하는 Tool collision geometry
+- 전체 MotionPlan sequence의 controller/kinematic 순차 실행과 actual-state 검증
+- `POSE`/`JOINT` representation evaluator와 action-semantic PICK/PLACE/EE/Tool 상태
+  evaluator의 분리, fail-closed UNKNOWN 처리
+- tool-local contact patch/affordance provider와 geometry-grounded push-to-region 전략
+- checkpoint/rollback 기반 closed-loop contact executor와 합성 task evaluator
+- robot/grasp/contact/push/recovery/affordance 역할별 validated profile
+- run/report/goal evaluation/sequence manifest atomic 저장
+- artifact lineage 기반 RecoveryDirective 생성과 등록 handler 재실행
 
 1~7 이후 고도화 범위:
 
 - bounded swept sampling을 대체하는 geometry-level exact continuous collision detection
 - TOTG/TOPP-RA/Ruckig adapter
-- Recovery Orchestrator 실행부
 
 미구현 검사는 PASS로 간주하지 않으며 기존 oracle에서는 계속 `UNKNOWN`을 반환한다.
 
 ## 테스트
 
 ```bash
-python -m pytest src/tuj/m4_motion/tests src/tuj/m3_taskplanner/tests -q
+python -m pytest src/tuj/m4_motion/tests -q
+python -m pytest ../tuj-m3/src/tuj/m3_taskplanner/tests -q
 ```
 
 테스트는 IK oracle뿐 아니라 schema version, joint dimension, timeline, event,
-plan/result 관계, 정적 JSON Schema 동기화, Tool-Use-Journal 상태/충돌 호환성을
+plan/result 관계, 정적 JSON Schema 동기화, Tool-Use-Journal 상태/충돌 호환성,
+goal-aware sequence 실행, recovery attribution, 실제 robosuite controller physics loop를
 검증한다. workspace 전체 `pytest`는 별도 `upstream_planner_a`의 import 설정까지
 요구하므로 위처럼 두 모듈의 test directory를 명시한다.

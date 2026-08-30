@@ -49,9 +49,6 @@ from tuj.m4_motion.schema import (
 )
 
 
-TOOL_USE_JOURNAL_ENVIRONMENTS = frozenset(
-    {"C1_1_LegoSweep", "C2_1_ObjectSorting"}
-)
 TOOL_USE_JOURNAL_EE_GRIPPER_TYPES: dict[str, str] = {
     "2F": "Robotiq85Gripper",
     "3F": "JacoThreeFingerDexterousGripper",
@@ -61,6 +58,7 @@ TOOL_USE_JOURNAL_TESTED_REVISION = (
     "113f84686d94203dbd90f1836187e351aa0b246d"
 )
 _EXPECTED_EES = frozenset(TOOL_USE_JOURNAL_EE_GRIPPER_TYPES)
+_REFERENCE_ACTIVE_EE = object()
 _PHYSICAL_EE_BY_CLASS = {
     "NullGripper": None,
     "Robotiq85Gripper": "2F",
@@ -328,12 +326,61 @@ def _declared_current_ee(env: object) -> str | None:
     return None
 
 
+def _load_repository_environments(repository_root: str | Path) -> object:
+    """Import the checkout-local ``environments`` registration package."""
+
+    root = Path(repository_root).resolve()
+    if not (root / "environments" / "__init__.py").is_file():
+        raise ToolUseJournalCompatibilityError(
+            f"{root} is not a Tool-Use-Journal checkout"
+        )
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    loaded = sys.modules.get("environments")
+    if loaded is not None:
+        loaded_file = Path(str(getattr(loaded, "__file__", ""))).resolve()
+        if root not in loaded_file.parents:
+            raise ToolUseJournalCompatibilityError(
+                "another top-level 'environments' package is already imported"
+            )
+    importlib.invalidate_caches()
+    return importlib.import_module("environments")
+
+
+def registered_tool_use_journal_environments(
+    repository_root: str | Path,
+) -> frozenset[str]:
+    """Discover checkout-local robosuite environments after package import.
+
+    Importing ``environments/__init__.py`` is the single registration step.
+    Any robosuite-registered class implemented by that package is accepted;
+    the runtime adapter separately verifies the robot, rack, and object API.
+    """
+
+    _load_repository_environments(repository_root)
+    from robosuite.environments.base import REGISTERED_ENVS
+
+    names = {
+        str(name)
+        for name, environment_type in REGISTERED_ENVS.items()
+        if str(getattr(environment_type, "__module__", "")) == "environments"
+        or str(getattr(environment_type, "__module__", "")).startswith(
+            "environments."
+        )
+    }
+    if not names:
+        raise ToolUseJournalCompatibilityError(
+            "environments/__init__.py did not register any checkout-local "
+            "robosuite environments"
+        )
+    return frozenset(names)
+
+
 def _environment_name(env: object) -> str:
     name = type(env).__name__
-    if name not in TOOL_USE_JOURNAL_ENVIRONMENTS:
+    if not name:
         raise ToolUseJournalCompatibilityError(
-            f"unsupported environment {name!r}; expected one of "
-            f"{sorted(TOOL_USE_JOURNAL_ENVIRONMENTS)}"
+            "environment class has no registered name"
         )
     return name
 
@@ -351,29 +398,17 @@ def make_tool_use_journal_env(
     model.  The caller owns the returned environment and should close it.
     """
 
-    if env_name not in TOOL_USE_JOURNAL_ENVIRONMENTS:
+    registered = registered_tool_use_journal_environments(repository_root)
+    if env_name not in registered:
         raise ToolUseJournalCompatibilityError(
-            f"unsupported environment {env_name!r}"
+            f"environment {env_name!r} is not registered by "
+            "environments/__init__.py; available checkout environments are "
+            f"{sorted(registered)}"
         )
     if active_ee is not None and active_ee not in _EXPECTED_EES:
         raise ToolUseJournalCompatibilityError(
             f"unsupported EE {active_ee!r}; expected one of {sorted(_EXPECTED_EES)}"
         )
-    root = Path(repository_root).resolve()
-    if not (root / "environments" / "__init__.py").is_file():
-        raise ToolUseJournalCompatibilityError(
-            f"{root} is not a Tool-Use-Journal checkout"
-        )
-    if str(root) not in sys.path:
-        sys.path.insert(0, str(root))
-    loaded = sys.modules.get("environments")
-    if loaded is not None:
-        loaded_file = Path(str(getattr(loaded, "__file__", ""))).resolve()
-        if root not in loaded_file.parents:
-            raise ToolUseJournalCompatibilityError(
-                "another top-level 'environments' package is already imported"
-            )
-    importlib.import_module("environments")
     import robosuite as suite
 
     options = {
@@ -401,7 +436,7 @@ def make_tool_use_journal_env(
 
 
 class ToolUseJournalEnvironmentAdapter:
-    """Read a reset C1/C2 environment into the Motion Planner contract."""
+    """Read a reset registered workcell into the Motion Planner contract."""
 
     def __init__(
         self,
@@ -883,7 +918,7 @@ class CompiledToolUseJournalCollisionModel:
 
 
 class ToolUseJournalCollisionModelCompiler:
-    """Compile synchronized bare and mounted-EE models from C1/C2 env variants."""
+    """Compile synchronized bare and mounted-EE workcell model variants."""
 
     def __init__(
         self,
@@ -1014,8 +1049,44 @@ class ToolUseJournalCollisionModelCompiler:
                 f"unknown EE {active_ee!r}"
             ) from error
 
+    def with_reference_environment(
+        self, reference_env: object
+    ) -> "ToolUseJournalCollisionModelCompiler":
+        """Reuse captured model variants with the current live scene state.
+
+        Constructing the four EE variants is intentionally expensive.  A
+        receding-horizon planner only needs to refresh the common arm and
+        free-object joint states between replans, while the underlying MJCF
+        variants remain unchanged.
+        """
+        reference_adapter = ToolUseJournalEnvironmentAdapter(
+            reference_env, source_revision=self.source_revision
+        )
+        if reference_adapter.environment_name != self.environment_name:
+            raise ToolUseJournalCompatibilityError(
+                "reference environment does not match captured collision "
+                f"models: {reference_adapter.environment_name!r} != "
+                f"{self.environment_name!r}"
+            )
+        reference_joint_names = tuple(
+            str(name) for name in reference_adapter.robot.robot_model.joints
+        )
+        if reference_joint_names != self.joint_names:
+            raise ToolUseJournalCompatibilityError(
+                "reference environment robot joint order does not match "
+                "captured collision models"
+            )
+        return type(self)(
+            self._captures,
+            reference_joint_states=_joint_state_map(
+                reference_adapter.model, reference_adapter.data
+            ),
+            source_revision=self.source_revision,
+            reference_active_ee=reference_adapter.physical_active_ee,
+        )
+
     def build_ee_exchange_contexts(
-        self, *, from_ee: str, to_ee: str
+        self, *, from_ee: str | None, to_ee: str
     ) -> dict[str, CollisionContext]:
         return EEExchangeTemplateGenerator().build_collision_contexts(
             from_ee=from_ee,
@@ -1104,14 +1175,18 @@ class ToolUseJournalCollisionModelCompiler:
         *,
         collision_margin_m: float,
         allowed_collision_pairs: Iterable[tuple[str, str]] = (),
-        default_active_ee: str | None = None,
+        default_active_ee: str | None | object = _REFERENCE_ACTIVE_EE,
         include_all_models: bool = False,
     ) -> MuJoCoCollisionModelRegistry:
         default_ee = (
             self.reference_active_ee
-            if default_active_ee is None
+            if default_active_ee is _REFERENCE_ACTIVE_EE
             else default_active_ee
         )
+        if default_ee is not None and not isinstance(default_ee, str):
+            raise ToolUseJournalCompatibilityError(
+                "default_active_ee must be an EE id or None"
+            )
         required: set[str | None] = {default_ee}
         for context in collision_contexts.values():
             if context.collision_model_version != self.model_version_for(

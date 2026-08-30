@@ -28,6 +28,7 @@ from tuj.m4_motion.schema import (
 from tuj.m4_motion.strategy import ConnectedStrategy
 from tuj.m4_motion.trajectory_processing import (
     QuinticTimeParameterizer,
+    clamp_joint_limit_roundoff,
     deviation_bounded_shortcut,
     unwrap_joint_path,
 )
@@ -75,6 +76,293 @@ def _scene_signature(context: CollisionContext) -> tuple[object, ...]:
         tuple(sorted(context.attached_object_ids)),
         context.collision_model_version,
     )
+
+
+def _finite_metadata_number(
+    value: object,
+    *,
+    field: str,
+    allow_zero: bool = True,
+) -> float:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+        or (float(value) < 0.0 if allow_zero else float(value) <= 0.0)
+    ):
+        qualifier = "non-negative" if allow_zero else "positive"
+        raise MotionPlanBuildError(
+            f"{field} must be a finite {qualifier} number"
+        )
+    return float(value)
+
+
+def _finite_metadata_signed_number(value: object, *, field: str) -> float:
+    if (
+        isinstance(value, bool)
+        or not isinstance(value, (int, float))
+        or not math.isfinite(float(value))
+    ):
+        raise MotionPlanBuildError(f"{field} must be a finite number")
+    return float(value)
+
+
+def _finite_metadata_position(value: object, *, field: str) -> list[float]:
+    if (
+        isinstance(value, (str, bytes))
+        or not isinstance(value, Sequence)
+        or len(value) != 3
+    ):
+        raise MotionPlanBuildError(f"{field} must contain exactly 3 numbers")
+    result: list[float] = []
+    for component in value:
+        if (
+            isinstance(component, bool)
+            or not isinstance(component, (int, float))
+            or not math.isfinite(float(component))
+        ):
+            raise MotionPlanBuildError(f"{field} must contain finite numbers")
+        result.append(float(component))
+    return result
+
+
+def _physical_tool_metadata(metadata: Mapping[str, object]) -> dict[str, object]:
+    """Validate and preserve M4 runtime metadata needed for physical tool use."""
+
+    result: dict[str, object] = {}
+    specifications: tuple[
+        tuple[str, tuple[str, ...], tuple[str, ...]], ...
+    ] = (
+        (
+            "physical_tool_control",
+            (
+                "target_clearance_m",
+                "clearance_tolerance_m",
+                "max_table_penetration_m",
+                "gain",
+                "rate_m_s",
+                "max_offset_m",
+                "activation_band_m",
+                "max_joint_offset_rad",
+            ),
+            ("max_table_penetration_m",),
+        ),
+        (
+            "physical_tool_settle",
+            (
+                "target_clearance_m",
+                "xy_tolerance_m",
+                "clearance_tolerance_m",
+                "max_table_penetration_m",
+                "max_tool_speed_m_s",
+            ),
+            ("max_table_penetration_m",),
+        ),
+    )
+    for metadata_name, numeric_fields, zero_allowed_fields in specifications:
+        raw = metadata.get(metadata_name)
+        if raw is None:
+            continue
+        if not isinstance(raw, Mapping):
+            raise MotionPlanBuildError(
+                f"keyframe {metadata_name} metadata must be a mapping"
+            )
+        allowed_fields = set(numeric_fields)
+        if metadata_name == "physical_tool_settle":
+            allowed_fields.add("target_position_m")
+        unknown_fields = set(raw) - allowed_fields
+        if unknown_fields:
+            raise MotionPlanBuildError(
+                f"unknown {metadata_name} fields: "
+                f"{sorted(str(value) for value in unknown_fields)}"
+            )
+        missing_fields = allowed_fields - set(raw)
+        if missing_fields:
+            raise MotionPlanBuildError(
+                f"{metadata_name} is missing fields: "
+                f"{sorted(missing_fields)}"
+            )
+        validated: dict[str, object] = {
+            name: _finite_metadata_number(
+                raw[name],
+                field=f"{metadata_name} {name}",
+                allow_zero=name in zero_allowed_fields,
+            )
+            for name in numeric_fields
+        }
+        if metadata_name == "physical_tool_settle":
+            validated["target_position_m"] = _finite_metadata_position(
+                raw["target_position_m"],
+                field="physical_tool_settle target_position_m",
+            )
+        result[metadata_name] = validated
+
+    raw_target = metadata.get("physical_tool_target_position_m")
+    if raw_target is not None:
+        result["physical_tool_target_position_m"] = _finite_metadata_position(
+            raw_target,
+            field="physical_tool_target_position_m",
+        )
+    raw_push = metadata.get("physical_push_control")
+    if raw_push is not None:
+        if not isinstance(raw_push, Mapping):
+            raise MotionPlanBuildError(
+                "keyframe physical_push_control metadata must be a mapping"
+            )
+        allowed_push_fields = {
+            "push_axis_world",
+            "contact_offset_local_m",
+            # Backward-compatible input alias for older C1_1 artifacts. The
+            # normalized controller metadata below is surface-agnostic.
+            "rim_contact_offset_local_m",
+            "block_support_m",
+            "contact_penetration_m",
+            "max_correction_m",
+            "contact_plan_time_scale",
+            "reacquire_timeout_s",
+            "max_reacquire_attempts",
+            "contact_height_offset_from_block_center_m",
+            "contact_height_target_m",
+            "block_support_center_z_m",
+            "block_support_tolerance_m",
+            "contact_height_gain",
+            "contact_height_rate_m_s",
+            "contact_height_max_offset_m",
+            "contact_height_max_downward_offset_m",
+        }
+        required_push_fields = allowed_push_fields - {
+            "contact_offset_local_m",
+            "rim_contact_offset_local_m",
+        }
+        unknown_push_fields = set(raw_push) - allowed_push_fields
+        missing_push_fields = required_push_fields - set(raw_push)
+        if unknown_push_fields:
+            raise MotionPlanBuildError(
+                "unknown physical_push_control fields: "
+                f"{sorted(str(value) for value in unknown_push_fields)}"
+            )
+        if missing_push_fields:
+            raise MotionPlanBuildError(
+                "physical_push_control is missing fields: "
+                f"{sorted(missing_push_fields)}"
+            )
+        contact_offset_fields = {
+            name
+            for name in (
+                "contact_offset_local_m",
+                "rim_contact_offset_local_m",
+            )
+            if name in raw_push
+        }
+        if len(contact_offset_fields) != 1:
+            raise MotionPlanBuildError(
+                "physical_push_control requires exactly one contact offset field"
+            )
+        push_axis = _finite_metadata_position(
+            raw_push["push_axis_world"],
+            field="physical_push_control push_axis_world",
+        )
+        axis_norm = math.sqrt(sum(value * value for value in push_axis))
+        if axis_norm <= 1e-9:
+            raise MotionPlanBuildError(
+                "physical_push_control push_axis_world must be non-zero"
+            )
+        result["physical_push_control"] = {
+            "push_axis_world": [value / axis_norm for value in push_axis],
+            "contact_offset_local_m": _finite_metadata_position(
+                raw_push[next(iter(contact_offset_fields))],
+                field="physical_push_control contact_offset_local_m",
+            ),
+            "block_support_m": _finite_metadata_number(
+                raw_push["block_support_m"],
+                field="physical_push_control block_support_m",
+                allow_zero=False,
+            ),
+            "contact_penetration_m": _finite_metadata_number(
+                raw_push["contact_penetration_m"],
+                field="physical_push_control contact_penetration_m",
+            ),
+            "max_correction_m": _finite_metadata_number(
+                raw_push["max_correction_m"],
+                field="physical_push_control max_correction_m",
+                allow_zero=False,
+            ),
+            "contact_plan_time_scale": _finite_metadata_number(
+                raw_push["contact_plan_time_scale"],
+                field="physical_push_control contact_plan_time_scale",
+                allow_zero=False,
+            ),
+            "reacquire_timeout_s": _finite_metadata_number(
+                raw_push["reacquire_timeout_s"],
+                field="physical_push_control reacquire_timeout_s",
+                allow_zero=False,
+            ),
+            "contact_height_offset_from_block_center_m": (
+                _finite_metadata_signed_number(
+                    raw_push["contact_height_offset_from_block_center_m"],
+                    field=(
+                        "physical_push_control "
+                        "contact_height_offset_from_block_center_m"
+                    ),
+                )
+            ),
+            "contact_height_target_m": _finite_metadata_number(
+                raw_push["contact_height_target_m"],
+                field="physical_push_control contact_height_target_m",
+                allow_zero=False,
+            ),
+            "block_support_center_z_m": _finite_metadata_number(
+                raw_push["block_support_center_z_m"],
+                field="physical_push_control block_support_center_z_m",
+                allow_zero=False,
+            ),
+            "block_support_tolerance_m": _finite_metadata_number(
+                raw_push["block_support_tolerance_m"],
+                field="physical_push_control block_support_tolerance_m",
+                allow_zero=False,
+            ),
+            "contact_height_gain": _finite_metadata_number(
+                raw_push["contact_height_gain"],
+                field="physical_push_control contact_height_gain",
+                allow_zero=False,
+            ),
+            "contact_height_rate_m_s": _finite_metadata_number(
+                raw_push["contact_height_rate_m_s"],
+                field="physical_push_control contact_height_rate_m_s",
+                allow_zero=False,
+            ),
+            "contact_height_max_offset_m": _finite_metadata_number(
+                raw_push["contact_height_max_offset_m"],
+                field="physical_push_control contact_height_max_offset_m",
+                allow_zero=False,
+            ),
+            "contact_height_max_downward_offset_m": _finite_metadata_number(
+                raw_push["contact_height_max_downward_offset_m"],
+                field=(
+                    "physical_push_control "
+                    "contact_height_max_downward_offset_m"
+                ),
+                allow_zero=False,
+            ),
+        }
+        raw_max_reacquire_attempts = raw_push["max_reacquire_attempts"]
+        if (
+            isinstance(raw_max_reacquire_attempts, bool)
+            or not isinstance(raw_max_reacquire_attempts, int)
+            or raw_max_reacquire_attempts <= 0
+        ):
+            raise MotionPlanBuildError(
+                "physical_push_control max_reacquire_attempts must be a "
+                "positive integer"
+            )
+        result["physical_push_control"]["max_reacquire_attempts"] = (
+            raw_max_reacquire_attempts
+        )
+        if result["physical_push_control"]["contact_plan_time_scale"] > 1.0:
+            raise MotionPlanBuildError(
+                "physical_push_control contact_plan_time_scale must be at most 1"
+            )
+    return result
 
 
 class MotionPlanBuilder:
@@ -159,6 +447,7 @@ class MotionPlanBuilder:
         collision_contexts: Mapping[str, CollisionContext],
         initial_collision_context_id: str,
         final_segment_validator: FinalSegmentValidator,
+        joint_position_limits_rad: Sequence[tuple[float, float]] | None = None,
     ) -> MotionPlan:
         if provenance.produced_by is not ModuleName.MOTION_PLANNER:
             raise MotionPlanBuildError("MotionPlan provenance must be produced by MOTION_PLANNER")
@@ -230,7 +519,13 @@ class MotionPlanBuilder:
             continuous_path = unwrap_joint_path(
                 edge.joint_path,
                 start_reference=continuous_joint_reference,
+                joint_limits_rad=joint_position_limits_rad,
             )
+            if joint_position_limits_rad is not None:
+                continuous_path = clamp_joint_limit_roundoff(
+                    continuous_path,
+                    joint_position_limits_rad,
+                )
             for shortcut_tolerance in shortcut_tolerances:
                 geometric_path = deviation_bounded_shortcut(
                     continuous_path,
@@ -259,8 +554,26 @@ class MotionPlanBuilder:
                     shortcut_applied = len(geometric_path) < len(continuous_path)
                     break
             if timed_waypoints is None or timed_duration is None:
+                validator_owner = getattr(
+                    final_segment_validator, "__self__", None
+                )
+                last_check = getattr(
+                    validator_owner, "last_path_collision_check", None
+                )
+                if last_check is None:
+                    last_check = getattr(
+                        final_segment_validator,
+                        "last_path_collision_check",
+                        None,
+                    )
+                detail = (
+                    f": {last_check.failure_code}: {last_check.detail}"
+                    if last_check is not None and not last_check.valid
+                    else ""
+                )
                 raise MotionPlanBuildError(
-                    f"final validation failed for {node.keyframe.keyframe_id!r}"
+                    f"final validation failed for "
+                    f"{node.keyframe.keyframe_id!r}{detail}"
                 )
 
             after_context = movement_context
@@ -287,6 +600,78 @@ class MotionPlanBuilder:
                     "non-negative"
                 )
             hold_duration = float(raw_hold_duration)
+            physical_tool_metadata = _physical_tool_metadata(
+                node.keyframe.metadata
+            )
+            raw_tracking_settle = node.keyframe.metadata.get("tracking_settle")
+            tracking_settle: dict[str, float | int] | None = None
+            if raw_tracking_settle is not None:
+                if not isinstance(raw_tracking_settle, Mapping):
+                    raise MotionPlanBuildError(
+                        "keyframe tracking_settle metadata must be a mapping"
+                    )
+                allowed_settle_fields = {
+                    "joint_tolerance_rad",
+                    "eef_tolerance_m",
+                    "max_wait_s",
+                    "required_consecutive_ticks",
+                }
+                unknown_settle_fields = set(raw_tracking_settle) - (
+                    allowed_settle_fields
+                )
+                if unknown_settle_fields:
+                    raise MotionPlanBuildError(
+                        "unknown tracking_settle fields: "
+                        f"{sorted(str(value) for value in unknown_settle_fields)}"
+                    )
+                tracking_settle = {}
+                for name in ("joint_tolerance_rad", "eef_tolerance_m"):
+                    raw_value = raw_tracking_settle.get(name)
+                    if raw_value is None:
+                        continue
+                    if (
+                        isinstance(raw_value, bool)
+                        or not isinstance(raw_value, (int, float))
+                        or not math.isfinite(float(raw_value))
+                        or float(raw_value) <= 0.0
+                    ):
+                        raise MotionPlanBuildError(
+                            f"tracking_settle {name} must be finite and positive"
+                        )
+                    tracking_settle[name] = float(raw_value)
+                if not any(
+                    name in tracking_settle
+                    for name in ("joint_tolerance_rad", "eef_tolerance_m")
+                ):
+                    raise MotionPlanBuildError(
+                        "tracking_settle requires a joint or EEF tolerance"
+                    )
+                raw_max_wait = raw_tracking_settle.get("max_wait_s", 2.0)
+                if (
+                    isinstance(raw_max_wait, bool)
+                    or not isinstance(raw_max_wait, (int, float))
+                    or not math.isfinite(float(raw_max_wait))
+                    or float(raw_max_wait) <= 0.0
+                ):
+                    raise MotionPlanBuildError(
+                        "tracking_settle max_wait_s must be finite and positive"
+                    )
+                raw_required_ticks = raw_tracking_settle.get(
+                    "required_consecutive_ticks", 3
+                )
+                if (
+                    isinstance(raw_required_ticks, bool)
+                    or not isinstance(raw_required_ticks, int)
+                    or raw_required_ticks <= 0
+                ):
+                    raise MotionPlanBuildError(
+                        "tracking_settle required_consecutive_ticks must be a "
+                        "positive integer"
+                    )
+                tracking_settle["max_wait_s"] = float(raw_max_wait)
+                tracking_settle["required_consecutive_ticks"] = (
+                    raw_required_ticks
+                )
             raw_event_offsets = node.keyframe.metadata.get(
                 "event_time_offsets_s", {}
             )
@@ -357,6 +742,21 @@ class MotionPlanBuilder:
                         "planner": node.keyframe.planner.value,
                         "motion_end_time_s": movement_end,
                         "hold_duration_after_s": hold_duration,
+                        **(
+                            {
+                                "target_block_id": node.keyframe.metadata[
+                                    "target_block_id"
+                                ]
+                            }
+                            if "target_block_id" in node.keyframe.metadata
+                            else {}
+                        ),
+                        **(
+                            {"tracking_settle": tracking_settle}
+                            if tracking_settle is not None
+                            else {}
+                        ),
+                        **physical_tool_metadata,
                     },
                 )
             )
@@ -388,8 +788,11 @@ class MotionPlanBuilder:
                         ),
                         event_type=EventType(event_type.value),
                         target_id=str(event_target) if event_target is not None else None,
+                        command=raw_parameters.get("command"),
                         parameters={
-                            str(key): value for key, value in raw_parameters.items()
+                            str(key): value
+                            for key, value in raw_parameters.items()
+                            if key != "command"
                         },
                     )
                 )

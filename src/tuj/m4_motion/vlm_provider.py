@@ -31,6 +31,13 @@ from tuj.m4_motion.schema import (
     StrategyGenerationProvenance,
     StrategyGeneratorKind,
 )
+from tuj.m4_motion.task_semantics import (
+    attaches_target,
+    detaches_target,
+    is_acquire_task,
+    is_release_task,
+    task_operation,
+)
 
 
 _PROMPT_VERSION = "OPENAI_KEYFRAME_STRATEGY_V2"
@@ -308,33 +315,27 @@ class OpenAIKeyframeProvider:
         resolver = RelativePoseResolver(request.world)
         strategies: list[KeyframePlanCandidate] = []
         strategy_ids: set[str] = set()
+        rejected_candidates: list[str] = []
         for strategy_index, proposed in enumerate(generated.candidates, start=1):
             strategy_id = f"{request.task.subgoal_id}:{proposed.strategy_id}"
             if strategy_id in strategy_ids:
-                raise OpenAIKeyframeProviderError(
-                    f"duplicate generated strategy_id {strategy_id!r}"
+                rejected_candidates.append(
+                    f"{strategy_id}: duplicate generated strategy_id"
                 )
-            strategy_ids.add(strategy_id)
+                continue
             keyframes: list[RelativeKeyframeSpec] = []
+            candidate_error: str | None = None
             for keyframe_index, item in enumerate(proposed.keyframes, start=1):
                 try:
                     events: list[KeyframeEventType] = []
                     event_target_id: str | None = None
-                    goal_type = request.task.goal.goal_type.value
                     is_vacuum = request.task.ee.strip().lower() in {
                         "vac",
                         "vacuum",
                         "suction",
                     }
-                    picks_resource = goal_type == "PICK" or (
-                        goal_type == "TOOL_CHANGE"
-                        and request.task.action_type == "PICK_TOOL"
-                    )
-                    releases_resource = goal_type == "PLACE" or (
-                        goal_type == "TOOL_CHANGE"
-                        and request.task.action_type
-                        in {"RETURN_TOOL", "TERMINAL_RETURN_TOOL"}
-                    )
+                    picks_resource = is_acquire_task(request.task)
+                    releases_resource = is_release_task(request.task)
                     if picks_resource and item.keyframe_type is KeyframeType.GRASP:
                         events = [
                             (
@@ -343,12 +344,12 @@ class OpenAIKeyframeProvider:
                                 else KeyframeEventType.GRIPPER_CLOSE
                             )
                         ]
-                        if goal_type == "PICK":
+                        if attaches_target(request.task):
                             events.append(KeyframeEventType.ATTACH_OBJECT)
                         event_target_id = request.task.goal.target_object_id
                     elif releases_resource and item.keyframe_type is KeyframeType.PLACE:
                         events = []
-                        if goal_type == "PLACE":
+                        if detaches_target(request.task):
                             events.append(KeyframeEventType.DETACH_OBJECT)
                         events.append(
                             KeyframeEventType.SUCTION_OFF
@@ -356,6 +357,27 @@ class OpenAIKeyframeProvider:
                             else KeyframeEventType.GRIPPER_OPEN
                         )
                         event_target_id = request.task.goal.target_object_id
+                    metadata: dict[str, Any] = {}
+                    if event_target_id is not None:
+                        metadata["event_target_id"] = event_target_id
+                    operation = task_operation(request.task)
+                    event_parameters: dict[str, dict[str, str]] = {}
+                    if (
+                        operation == "PICK_TOOL"
+                        and KeyframeEventType.ATTACH_OBJECT in events
+                    ):
+                        event_parameters[KeyframeEventType.ATTACH_OBJECT.value] = {
+                            "resource_kind": "tool"
+                        }
+                    if (
+                        operation in {"RETURN_TOOL", "TERMINAL_RETURN_TOOL"}
+                        and KeyframeEventType.DETACH_OBJECT in events
+                    ):
+                        event_parameters[KeyframeEventType.DETACH_OBJECT.value] = {
+                            "resource_kind": "tool"
+                        }
+                    if event_parameters:
+                        metadata["event_parameters"] = event_parameters
                     keyframe = RelativeKeyframeSpec(
                         keyframe_id=(
                             f"{strategy_id}:{keyframe_index}:{item.keyframe_id}"
@@ -369,46 +391,41 @@ class OpenAIKeyframeProvider:
                         roll_rad=item.roll_rad,
                         planner=item.planner,
                         events_after=events,
-                        metadata=(
-                            {"event_target_id": event_target_id}
-                            if event_target_id is not None
-                            else {}
-                        ),
+                        metadata=metadata,
                     )
                     # Resolve now so unknown frames/anchors never enter the compiler.
                     resolver.resolve(keyframe)
                 except (ValueError, GeometryResolutionError) as error:
-                    raise OpenAIKeyframeProviderError(
+                    candidate_error = (
                         f"invalid generated keyframe {item.keyframe_id!r}: {error}"
-                    ) from error
+                    )
+                    break
                 keyframes.append(keyframe)
+            if candidate_error is not None:
+                rejected_candidates.append(f"{strategy_id}: {candidate_error}")
+                continue
             kinds = [keyframe.keyframe_type for keyframe in keyframes]
-            picks_resource = request.task.goal.goal_type.value == "PICK" or (
-                request.task.goal.goal_type.value == "TOOL_CHANGE"
-                and request.task.action_type == "PICK_TOOL"
-            )
-            releases_resource = request.task.goal.goal_type.value == "PLACE" or (
-                request.task.goal.goal_type.value == "TOOL_CHANGE"
-                and request.task.action_type
-                in {"RETURN_TOOL", "TERMINAL_RETURN_TOOL"}
-            )
+            picks_resource = is_acquire_task(request.task)
+            releases_resource = is_release_task(request.task)
             if picks_resource:
                 if KeyframeType.GRASP not in kinds or not any(
                     kind in {KeyframeType.LIFT, KeyframeType.RETREAT}
                     for kind in kinds[kinds.index(KeyframeType.GRASP) + 1 :]
                 ):
-                    raise OpenAIKeyframeProviderError(
-                        f"PICK strategy {strategy_id!r} requires GRASP followed "
-                        "by LIFT or RETREAT"
+                    rejected_candidates.append(
+                        f"{strategy_id}: PICK requires GRASP followed by "
+                        "LIFT or RETREAT"
                     )
+                    continue
             if releases_resource:
                 if KeyframeType.PLACE not in kinds or KeyframeType.RETREAT not in kinds[
                     kinds.index(KeyframeType.PLACE) + 1 :
                 ]:
-                    raise OpenAIKeyframeProviderError(
-                        f"PLACE strategy {strategy_id!r} requires PLACE followed "
-                        "by RETREAT"
+                    rejected_candidates.append(
+                        f"{strategy_id}: PLACE requires PLACE followed by RETREAT"
                     )
+                    continue
+            strategy_ids.add(strategy_id)
             strategies.append(
                 KeyframePlanCandidate(
                     strategy_id=strategy_id,
@@ -424,6 +441,13 @@ class OpenAIKeyframeProvider:
                         attempt_index=1,
                     ),
                 )
+            )
+
+        if not strategies:
+            details = "; ".join(rejected_candidates)
+            raise OpenAIKeyframeProviderError(
+                "OpenAI response contained no valid keyframe candidates"
+                + (f": {details}" if details else "")
             )
 
         artifact_hash = _sha256(
@@ -446,6 +470,8 @@ class OpenAIKeyframeProvider:
                     "model": self.config.model,
                     "prompt_version": _PROMPT_VERSION,
                     "provider_request_id": response_id,
+                    "rejected_candidate_count": len(rejected_candidates),
+                    "rejected_candidates": rejected_candidates,
                 },
             ),
             scene_signature=request.world.scene.signature,
@@ -505,8 +531,16 @@ class OpenAIKeyframeProvider:
         if parsed is None:
             response_id = str(getattr(response, "id", "unknown"))
             status = str(getattr(response, "status", "unknown"))
+            incomplete_details = getattr(response, "incomplete_details", None)
+            incomplete_reason = getattr(incomplete_details, "reason", None)
+            reason_suffix = (
+                f", reason={incomplete_reason}"
+                if incomplete_reason is not None
+                else ""
+            )
             raise OpenAIKeyframeProviderError(
-                f"OpenAI response {response_id!r} had no parsed output (status={status})"
+                f"OpenAI response {response_id!r} had no parsed output "
+                f"(status={status}{reason_suffix})"
             )
         if not isinstance(parsed, GeneratedKeyframeBatch):
             try:

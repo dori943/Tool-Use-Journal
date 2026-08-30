@@ -491,8 +491,10 @@ class ToolUseJournalEERuntime:
         self._gripper_command = -1.0
         self._grasp_engaged = False
         self._attachment: AttachedObjectState | None = None
+        self._held_tool_id: str | None = None
         self._breakable_runtime: _BreakableAttachmentRuntime | None = None
         self._last_attachment_break: AttachmentBreakObservation | None = None
+        self._render_callback: Callable[[object], None] | None = None
         self._set_declared_active_ee(env, self._active_ee)
         self._hidden_rack_ee = self._apply_rack_visibility(
             env, self._active_ee
@@ -612,13 +614,286 @@ class ToolUseJournalEERuntime:
         return self._attachment.object_id if self._attachment is not None else None
 
     @property
+    def held_tool_id(self) -> str | None:
+        """Task-level tool resource currently attached to the active EE."""
+
+        return self._held_tool_id
+
+    def mark_attached_object_as_tool(self, object_id: str) -> None:
+        """Record that the physical attachment represents a held task tool."""
+
+        if self.attached_object_id != object_id:
+            raise ToolUseJournalRuntimeError(
+                f"cannot mark tool {object_id!r}; attached object is "
+                f"{self.attached_object_id!r}"
+            )
+        self._held_tool_id = object_id
+
+    @property
     def last_attachment_break(self) -> AttachmentBreakObservation | None:
         return self._last_attachment_break
+
+    def set_render_callback(
+        self,
+        callback: Callable[[object], None] | None,
+    ) -> None:
+        """Override per-tick rendering without binding to one EE env variant.
+
+        EE exchange replaces the underlying robosuite environment. Keeping the
+        callback on the runtime lets viewers and recorders follow that swap
+        instead of retaining a closed environment.
+        """
+
+        if callback is not None and not callable(callback):
+            raise TypeError("render callback must be callable or None")
+        self._render_callback = callback
+
+    def render(self) -> None:
+        """Render the current environment, including after an EE model swap."""
+
+        callback = self._render_callback
+        if callback is not None:
+            callback(self.env)
+            return
+        render = getattr(self.env, "render", None)
+        if callable(render):
+            render()
 
     @property
     def attachment_contact_metrics(self) -> AttachmentContactMetrics | None:
         runtime = self._breakable_runtime
         return runtime.latest_contact if runtime is not None else None
+
+    def set_joint_position_controller_gains(
+        self,
+        *,
+        kp: float,
+        damping_ratio: float = 1.0,
+    ) -> None:
+        """Retune the live absolute joint controller between plan phases."""
+
+        if (
+            isinstance(kp, bool)
+            or not isinstance(kp, (int, float))
+            or not math.isfinite(float(kp))
+            or not 0.0 < float(kp) <= 300.0
+        ):
+            raise ValueError("kp must be finite and within (0, 300]")
+        if (
+            isinstance(damping_ratio, bool)
+            or not isinstance(damping_ratio, (int, float))
+            or not math.isfinite(float(damping_ratio))
+            or not 0.0 < float(damping_ratio) <= 10.0
+        ):
+            raise ValueError("damping_ratio must be finite and within (0, 10]")
+        try:
+            controller = self.env.robots[0].part_controllers["right"]  # type: ignore[attr-defined]
+        except (AttributeError, IndexError, KeyError, TypeError) as error:
+            raise ToolUseJournalRuntimeError(
+                "runtime is missing the right-arm controller"
+            ) from error
+        if getattr(controller, "name", None) != "JOINT_POSITION":
+            raise ToolUseJournalRuntimeError(
+                "live gain update requires a JOINT_POSITION controller"
+            )
+        control_dim = int(getattr(controller, "control_dim", 0))
+        if control_dim <= 0:
+            raise ToolUseJournalRuntimeError(
+                "joint-position controller has invalid control_dim"
+            )
+        controller.kp = np.full(control_dim, float(kp), dtype=float)
+        controller.kd = (
+            2.0
+            * np.sqrt(controller.kp)
+            * float(damping_ratio)
+        )
+
+    def set_finger_gripper_actuator_gains(
+        self,
+        *,
+        kp: float,
+        max_grip_force_n: float | None = None,
+    ) -> tuple[str, ...]:
+        """Retune mounted finger position actuators within an EE force limit."""
+
+        if self._active_ee not in {"2F", "3F"}:
+            raise ToolUseJournalRuntimeError(
+                "finger actuator gains require a mounted 2F or 3F gripper"
+            )
+        if (
+            isinstance(kp, bool)
+            or not isinstance(kp, (int, float))
+            or not math.isfinite(float(kp))
+            or float(kp) <= 0.0
+        ):
+            raise ValueError("finger actuator kp must be finite and positive")
+        if max_grip_force_n is not None and (
+            isinstance(max_grip_force_n, bool)
+            or not isinstance(max_grip_force_n, (int, float))
+            or not math.isfinite(float(max_grip_force_n))
+            or float(max_grip_force_n) <= 0.0
+        ):
+            raise ValueError("max_grip_force_n must be finite and positive")
+
+        model, _ = _raw_model_data(self.env)
+        actuator_ids = tuple(
+            actuator_id
+            for actuator_id in range(model.nu)
+            if _name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, actuator_id).startswith(
+                "gripper0_right_"
+            )
+            and int(model.actuator_gaintype[actuator_id])
+            == int(mujoco.mjtGain.mjGAIN_FIXED)
+            and int(model.actuator_biastype[actuator_id])
+            == int(mujoco.mjtBias.mjBIAS_AFFINE)
+        )
+        if not actuator_ids:
+            raise ToolUseJournalRuntimeError(
+                "mounted finger gripper has no position actuators"
+            )
+        per_actuator_force_n = (
+            float(max_grip_force_n) / len(actuator_ids)
+            if max_grip_force_n is not None
+            else None
+        )
+        for actuator_id in actuator_ids:
+            model.actuator_gainprm[actuator_id, 0] = float(kp)
+            model.actuator_biasprm[actuator_id, 1] = -float(kp)
+            if per_actuator_force_n is not None:
+                model.actuator_forcelimited[actuator_id] = 1
+                model.actuator_forcerange[actuator_id] = (
+                    -per_actuator_force_n,
+                    per_actuator_force_n,
+                )
+        return tuple(
+            _name(model, mujoco.mjtObj.mjOBJ_ACTUATOR, actuator_id)
+            for actuator_id in actuator_ids
+        )
+
+    def set_finger_gripper_force_target(
+        self,
+        *,
+        total_force_n: float,
+        actuator_kp: float,
+        max_grip_force_n: float,
+    ) -> tuple[str, ...]:
+        """Apply a bounded physical clamp-force target after contact forms."""
+
+        for name, value in {
+            "total_force_n": total_force_n,
+            "actuator_kp": actuator_kp,
+            "max_grip_force_n": max_grip_force_n,
+        }.items():
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or float(value) <= 0.0
+            ):
+                raise ValueError(f"{name} must be finite and positive")
+        if total_force_n > max_grip_force_n:
+            raise ValueError(
+                "requested finger force exceeds the EE maximum grip force"
+            )
+        actuator_names = self.set_finger_gripper_actuator_gains(
+            kp=actuator_kp,
+            max_grip_force_n=max_grip_force_n,
+        )
+        model, _ = _raw_model_data(self.env)
+        per_actuator_force_n = float(total_force_n) / len(actuator_names)
+        for actuator_name in actuator_names:
+            actuator_id = mujoco.mj_name2id(
+                model, mujoco.mjtObj.mjOBJ_ACTUATOR, actuator_name
+            )
+            joint_id = int(model.actuator_trnid[actuator_id, 0])
+            if joint_id < 0 or not bool(model.jnt_limited[joint_id]):
+                raise ToolUseJournalRuntimeError(
+                    f"finger actuator {actuator_name!r} has no limited joint"
+                )
+            joint_upper_rad = float(model.jnt_range[joint_id, 1])
+            model.actuator_ctrllimited[actuator_id] = 1
+            # Keep the position target inside the real joint travel. Driving
+            # beyond the upper stop can eject a thin, rounded rim sideways;
+            # the persistent close command below supplies clamp pressure and
+            # the force range provides the physical safety limit.
+            model.actuator_ctrlrange[actuator_id, 1] = joint_upper_rad
+            model.actuator_forcelimited[actuator_id] = 1
+            model.actuator_forcerange[actuator_id] = (
+                -per_actuator_force_n,
+                per_actuator_force_n,
+            )
+        try:
+            controller = self.env.robots[0].part_controllers[  # type: ignore[attr-defined]
+                "right_gripper"
+            ]
+            actuator_ids = np.asarray(
+                [
+                    mujoco.mj_name2id(
+                        model, mujoco.mjtObj.mjOBJ_ACTUATOR, name
+                    )
+                    for name in actuator_names
+                ],
+                dtype=int,
+            )
+            controller.actuator_min = np.asarray(
+                model.actuator_ctrlrange[actuator_ids, 0], dtype=float
+            ).copy()
+            controller.actuator_max = np.asarray(
+                model.actuator_ctrlrange[actuator_ids, 1], dtype=float
+            ).copy()
+        except (AttributeError, IndexError, KeyError, TypeError) as error:
+            raise ToolUseJournalRuntimeError(
+                "runtime is missing the live right-gripper controller"
+            ) from error
+        return actuator_names
+
+    def set_finger_gripper_contact_friction(
+        self,
+        friction: Sequence[float],
+    ) -> tuple[str, ...]:
+        """Apply declared pad-material friction to live finger contacts."""
+
+        values = tuple(float(value) for value in friction)
+        if len(values) != 3 or any(
+            not math.isfinite(value) or value <= 0.0 for value in values
+        ):
+            raise ValueError(
+                "finger contact friction must contain three positive values"
+            )
+        if self._active_ee not in {"2F", "3F"}:
+            raise ToolUseJournalRuntimeError(
+                "finger contact friction requires a mounted finger gripper"
+            )
+        model, data = _raw_model_data(self.env)
+        geom_ids = tuple(
+            geom_id
+            for geom_id in range(model.ngeom)
+            if (
+                (name := _name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id))
+                .startswith("gripper0_right_")
+                and (
+                    "fingertip_collision" in name
+                    or "fingerpad_collision" in name
+                )
+            )
+        )
+        if not geom_ids:
+            raise ToolUseJournalRuntimeError(
+                "mounted finger gripper has no fingertip contact geometry"
+            )
+        for geom_id in geom_ids:
+            model.geom_friction[geom_id] = values
+            # MuJoCo's default 3-D contact model uses only the two sliding
+            # friction directions.  M0 supplies sliding, torsional, and
+            # rolling coefficients, so request the 6-D contact model or the
+            # latter two declarations are silently ignored.  This is still a
+            # free physical contact; no equality constraint or weld is added.
+            model.geom_condim[geom_id] = 6
+        mujoco.mj_forward(model, data)
+        return tuple(
+            _name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+            for geom_id in geom_ids
+        )
 
     @staticmethod
     def _set_declared_active_ee(env: object, active_ee: str | None) -> None:
@@ -865,9 +1140,9 @@ class ToolUseJournalEERuntime:
                 f"{self._active_ee!r}"
             )
         normalized = self._normalized_command(command, engaged=engaged)
-        if engaged and normalized <= 0.0:
+        if engaged and normalized < 0.0:
             raise ToolUseJournalRuntimeError(
-                "close / suction-on command must be greater than zero"
+                "close / suction-on command must be non-negative"
             )
         if not engaged and normalized >= 0.0:
             raise ToolUseJournalRuntimeError(
@@ -876,6 +1151,21 @@ class ToolUseJournalEERuntime:
         self._gripper_command = normalized
         self._grasp_engaged = engaged
         return self._gripper_command
+
+    def hold_gripper_position(self) -> None:
+        """Keep commanding closure so a finger gripper retains its clamp."""
+
+        if self._active_ee not in {"2F", "3F"} or not self._grasp_engaged:
+            raise ToolUseJournalRuntimeError(
+                "finger position hold requires an engaged 2F or 3F gripper"
+            )
+        # SimpleGripController maps the normalized action directly across the
+        # actuator control range on every control tick.  A zero action selects
+        # the range midpoint; it does *not* preserve the previous target and
+        # therefore releases a thin object after contact.  Keep requesting the
+        # upper (closed) target while the actuator force limit bounds the
+        # physical clamp force.
+        self._gripper_command = 1.0
 
     @staticmethod
     def _attachment_reference_body_id(
@@ -902,6 +1192,52 @@ class ToolUseJournalEERuntime:
             )
         return body_id
 
+    def object_contact_metrics(self, object_id: str) -> AttachmentContactMetrics:
+        """Measure live contacts between one free object and the mounted EE."""
+
+        model, _ = _raw_model_data(self.env)
+        try:
+            object_body_id = int(self.env.obj_body_id[object_id])  # type: ignore[attr-defined]
+        except (AttributeError, KeyError, TypeError, ValueError) as error:
+            raise ToolUseJournalRuntimeError(
+                f"runtime object {object_id!r} is absent"
+            ) from error
+        if object_body_id < 0 or object_body_id >= int(model.nbody):
+            raise ToolUseJournalRuntimeError(
+                f"runtime object {object_id!r} has invalid body id {object_body_id}"
+            )
+        return self._object_contact_metrics_by_body_id(object_body_id)
+
+    def fingerpad_separation_m(self) -> float:
+        """Return the live center-to-center separation of mounted 2F pads."""
+
+        if self._active_ee != "2F":
+            raise ToolUseJournalRuntimeError(
+                "fingerpad separation is defined only for the mounted 2F EE"
+            )
+        model, data = _raw_model_data(self.env)
+        geom_ids: list[int] = []
+        for side in ("left", "right"):
+            suffix = f"gripper0_right_{side}_fingerpad_collision"
+            matches = [
+                geom_id
+                for geom_id in range(int(model.ngeom))
+                if (
+                    mujoco.mj_id2name(
+                        model, mujoco.mjtObj.mjOBJ_GEOM, geom_id
+                    )
+                    or ""
+                ).endswith(suffix)
+            ]
+            if len(matches) != 1:
+                raise ToolUseJournalRuntimeError(
+                    f"mounted {side} fingerpad geometry is not unique"
+                )
+            geom_ids.append(matches[0])
+        return float(
+            np.linalg.norm(data.geom_xpos[geom_ids[0]] - data.geom_xpos[geom_ids[1]])
+        )
+
     def _attachment_contact_metrics(
         self, attachment: AttachedObjectState
     ) -> AttachmentContactMetrics:
@@ -916,6 +1252,12 @@ class ToolUseJournalEERuntime:
                 f"object free joint {attachment.free_joint_name!r} is absent"
             )
         object_body_id = int(model.jnt_bodyid[joint_id])
+        return self._object_contact_metrics_by_body_id(object_body_id)
+
+    def _object_contact_metrics_by_body_id(
+        self, object_body_id: int
+    ) -> AttachmentContactMetrics:
+        model, data = _raw_model_data(self.env)
         adapter = ToolUseJournalEnvironmentAdapter(self.env)
         mounted_body_id = mujoco.mj_name2id(
             model,
@@ -959,8 +1301,16 @@ class ToolUseJournalEERuntime:
             mounted_suffix = ee_geom_name.rsplit("gripper0_right_", 1)[-1]
             if mounted_suffix.startswith("left_"):
                 contact_groups.add("left_finger")
+                if "fingerpad_collision" in mounted_suffix:
+                    contact_groups.add("left_fingerpad")
+                if "fingertip_collision" in mounted_suffix:
+                    contact_groups.add("left_fingertip")
             elif mounted_suffix.startswith("right_"):
                 contact_groups.add("right_finger")
+                if "fingerpad_collision" in mounted_suffix:
+                    contact_groups.add("right_fingerpad")
+                if "fingertip_collision" in mounted_suffix:
+                    contact_groups.add("right_fingertip")
             if "suction" in mounted_suffix or "vacuum" in mounted_suffix:
                 contact_groups.add("suction")
         return AttachmentContactMetrics(
@@ -1064,6 +1414,8 @@ class ToolUseJournalEERuntime:
         )
         self._clear_attachment_wrench()
         self._attachment = None
+        if self._held_tool_id == attachment.object_id:
+            self._held_tool_id = None
         self._breakable_runtime = None
         self._last_attachment_break = observation
         raise ToolUseJournalAttachmentBroken(observation)
@@ -1475,6 +1827,8 @@ class ToolUseJournalEERuntime:
             qvel_start = int(model.jnt_dofadr[joint_id])
             data.qvel[qvel_start : qvel_start + 6] = 0.0
         self._attachment = None
+        if self._held_tool_id == attachment.object_id:
+            self._held_tool_id = None
         self._breakable_runtime = None
         mujoco.mj_forward(model, data)
         return attachment
@@ -1802,6 +2156,8 @@ class ToolUseJournalKinematicTrajectoryPlayer:
                 attachment_mode=mode,
                 breakable_weld=breakable_weld,
             )
+            if event.parameters.get("resource_kind") == "tool":
+                self.runtime.mark_attached_object_as_tool(target)
             message = (
                 f"attached {target} in {attachment.mode.value} mode to "
                 f"{attachment.reference_kind} "
@@ -1902,6 +2258,7 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             gripper_mode = GripperMode.OPEN
         return state.model_copy(
             update={
+                "held_tool_id": runtime.held_tool_id,
                 "gripper": GripperState(
                     mode=gripper_mode,
                     command=runtime.gripper_command,
@@ -1972,6 +2329,7 @@ class ToolUseJournalKinematicTrajectoryPlayer:
                 "collision_probe_enabled": self._collision_probe is not None,
                 "final_active_ee": self.runtime.active_ee,
                 "final_attached_object_id": self.runtime.attached_object_id,
+                "final_held_tool_id": self.runtime.held_tool_id,
                 "final_gripper_command": self.runtime.gripper_command,
                 "ee_transition_count": len(self.runtime.transitions),
                 "attachment_mode": (
@@ -2014,6 +2372,12 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             raise ToolUseJournalRuntimeError(
                 f"plan expects attached object {expected_attachment!r}, runtime has "
                 f"{self.runtime.attached_object_id!r}"
+            )
+        expected_tool = plan.expected_final_state.held_tool_id
+        if expected_tool != self.runtime.held_tool_id:
+            raise ToolUseJournalRuntimeError(
+                f"plan expects held tool {expected_tool!r}, runtime has "
+                f"{self.runtime.held_tool_id!r}"
             )
 
     def _verify_runtime_context(self, context: Any, *, label: str) -> None:
@@ -2187,9 +2551,7 @@ class ToolUseJournalKinematicTrajectoryPlayer:
                         )
 
                     if run.config.render:
-                        render = getattr(self.runtime.env, "render", None)
-                        if callable(render):
-                            render()
+                        self.runtime.render()
                     if run.config.realtime_factor > 0.0:
                         delta = max(0.0, executed_time - previous_wall_time)
                         time.sleep(delta / run.config.realtime_factor)
@@ -2258,6 +2620,54 @@ class ToolUseJournalControllerTrajectoryPlayer(
     _PLAYBACK_MODE = "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER"
     _CONTROLLER_TRACKING = True
 
+    def __init__(
+        self,
+        runtime: ToolUseJournalEERuntime,
+        *,
+        collision_probe: MuJoCoCollisionModelRegistry | CollisionProbe | None = None,
+        collision_check_stride: int = 1,
+    ) -> None:
+        super().__init__(runtime, collision_probe=collision_probe)
+        if (
+            not isinstance(collision_check_stride, int)
+            or isinstance(collision_check_stride, bool)
+            or collision_check_stride <= 0
+        ):
+            raise ValueError("collision_check_stride must be a positive integer")
+        self._collision_check_stride = collision_check_stride
+        self._gripper_rate_credit = 0.0
+        self._active_segment: TrajectorySegment | None = None
+
+    def _custom_settle_evaluation(
+        self,
+        *,
+        segment: TrajectorySegment,
+        settle_config: Mapping[str, float | int],
+        joint_error_rad: float,
+        eef_position_error_m: float | None,
+    ) -> Mapping[str, Any] | None:
+        """Optionally replace rigid EEF settling with task-relevant physics.
+
+        The default controller remains joint / EEF based.  A subclass carrying
+        a frictionally held free tool can instead return a mapping containing a
+        boolean ``succeeded`` and its observed task-space evidence.  Keeping
+        this hook in the generic player avoids teaching the runtime about any
+        particular tool geometry.
+        """
+
+        return None
+
+    def _plan_time_step_s(
+        self,
+        *,
+        segment: TrajectorySegment,
+        control_timestep_s: float,
+    ) -> float:
+        """Return the next nominal-time increment for adaptive playback."""
+
+        del segment
+        return control_timestep_s
+
     @staticmethod
     def _timeline(plan: MotionPlan) -> tuple[TrajectoryWaypoint, ...]:
         timeline: list[TrajectoryWaypoint] = []
@@ -2316,6 +2726,60 @@ class ToolUseJournalControllerTrajectoryPlayer(
         )
 
     @staticmethod
+    def _tracking_settle_config(
+        segment: TrajectorySegment,
+    ) -> dict[str, float | int] | None:
+        raw = segment.metadata.get("tracking_settle")
+        if raw is None:
+            return None
+        if not isinstance(raw, Mapping):
+            raise ToolUseJournalRuntimeError(
+                f"segment {segment.segment_id!r} tracking_settle must be a mapping"
+            )
+        config: dict[str, float | int] = {}
+        for name in ("joint_tolerance_rad", "eef_tolerance_m"):
+            value = raw.get(name)
+            if value is None:
+                continue
+            if (
+                isinstance(value, bool)
+                or not isinstance(value, (int, float))
+                or not math.isfinite(float(value))
+                or float(value) <= 0.0
+            ):
+                raise ToolUseJournalRuntimeError(
+                    f"segment {segment.segment_id!r} {name} must be positive"
+                )
+            config[name] = float(value)
+        if not config:
+            raise ToolUseJournalRuntimeError(
+                f"segment {segment.segment_id!r} tracking_settle has no tolerance"
+            )
+        max_wait = raw.get("max_wait_s", 2.0)
+        required_ticks = raw.get("required_consecutive_ticks", 3)
+        if (
+            isinstance(max_wait, bool)
+            or not isinstance(max_wait, (int, float))
+            or not math.isfinite(float(max_wait))
+            or float(max_wait) <= 0.0
+        ):
+            raise ToolUseJournalRuntimeError(
+                f"segment {segment.segment_id!r} max_wait_s must be positive"
+            )
+        if (
+            isinstance(required_ticks, bool)
+            or not isinstance(required_ticks, int)
+            or required_ticks <= 0
+        ):
+            raise ToolUseJournalRuntimeError(
+                f"segment {segment.segment_id!r} required_consecutive_ticks "
+                "must be a positive integer"
+            )
+        config["max_wait_s"] = float(max_wait)
+        config["required_consecutive_ticks"] = required_ticks
+        return config
+
+    @staticmethod
     def _segment_at_time(
         plan: MotionPlan, time_s: float
     ) -> TrajectorySegment:
@@ -2368,8 +2832,166 @@ class ToolUseJournalControllerTrajectoryPlayer(
         gripper_slice = split_indexes.get("right_gripper")
         if gripper_slice is not None:
             gripper_start, gripper_end = gripper_slice
-            action[gripper_start:gripper_end] = self.runtime.gripper_command
+            command = float(self.runtime.gripper_command)
+            if command == 0.0:
+                self._gripper_rate_credit = 0.0
+                gripper_action = 0.0
+            elif abs(command) >= 1.0:
+                self._gripper_rate_credit = 0.0
+                gripper_action = math.copysign(1.0, command)
+            else:
+                self._gripper_rate_credit += abs(command)
+                if self._gripper_rate_credit + 1e-12 >= 1.0:
+                    self._gripper_rate_credit -= 1.0
+                    gripper_action = math.copysign(1.0, command)
+                else:
+                    gripper_action = 0.0
+            action[gripper_start:gripper_end] = gripper_action
         return action
+
+    def preshape_finger_gripper(
+        self,
+        *,
+        close_pulses: int,
+        settle_ticks: int,
+    ) -> float:
+        """Partially close a finger gripper in free space before a side grasp.
+
+        Robotiq85 actions increment an internal aperture target by 0.2 for each
+        positive policy pulse. A configured pulse count followed by zero
+        actions therefore creates a deterministic aperture through the normal
+        MuJoCo actuator path, without attaching an object.
+        """
+
+        if close_pulses <= 0:
+            raise ValueError("close_pulses must be positive")
+        if settle_ticks < 0:
+            raise ValueError("settle_ticks must be non-negative")
+        if self.runtime.active_ee not in {"2F", "3F"}:
+            raise ToolUseJournalRuntimeError(
+                "gripper pre-shaping requires a finger gripper"
+            )
+        env = self.runtime.env
+        try:
+            robot = env.robots[0]  # type: ignore[attr-defined]
+            split_indexes = robot.composite_controller._action_split_indexes
+            arm_start, arm_end = split_indexes["right"]
+            gripper_start, gripper_end = split_indexes["right_gripper"]
+            joint_names = tuple(str(name) for name in robot.robot_model.joints)
+            action = np.zeros(int(robot.action_dim), dtype=float)
+        except (AttributeError, IndexError, KeyError, TypeError) as error:
+            raise ToolUseJournalRuntimeError(
+                "runtime is missing controller metadata for gripper pre-shaping"
+            ) from error
+        action[arm_start:arm_end] = self._actual_joint_positions(
+            env, joint_names
+        )
+        for tick in range(close_pulses + settle_ticks):
+            action[gripper_start:gripper_end] = (
+                1.0 if tick < close_pulses else 0.0
+            )
+            self._advance_controller(action)
+        self.runtime.command_gripper(
+            engaged=True,
+            suction=False,
+            command=0.0,
+        )
+        if self.runtime.active_ee != "2F":
+            return float("nan")
+        return self.runtime.fingerpad_separation_m()
+
+    def preshape_finger_gripper_to_aperture(
+        self,
+        *,
+        target_aperture_m: float,
+        tolerance_m: float = 0.002,
+        max_iterations: int = 30,
+        settle_ticks_per_iteration: int = 20,
+        final_settle_ticks: int = 25,
+    ) -> float:
+        """Pre-shape 2F to a metric aperture independent of actuator gain."""
+
+        if (
+            not math.isfinite(target_aperture_m)
+            or not 0.0 < target_aperture_m < 0.085
+        ):
+            raise ValueError("target_aperture_m must be within (0, 0.085)")
+        if not math.isfinite(tolerance_m) or tolerance_m <= 0.0:
+            raise ValueError("tolerance_m must be finite and positive")
+        for name, value in {
+            "max_iterations": max_iterations,
+            "settle_ticks_per_iteration": settle_ticks_per_iteration,
+            "final_settle_ticks": final_settle_ticks,
+        }.items():
+            if not isinstance(value, int) or isinstance(value, bool) or value <= 0:
+                raise ValueError(f"{name} must be a positive integer")
+        if self.runtime.active_ee != "2F":
+            raise ToolUseJournalRuntimeError(
+                "metric aperture pre-shaping requires the mounted 2F gripper"
+            )
+
+        env = self.runtime.env
+        try:
+            robot = env.robots[0]  # type: ignore[attr-defined]
+            split_indexes = robot.composite_controller._action_split_indexes
+            arm_start, arm_end = split_indexes["right"]
+            gripper_start, gripper_end = split_indexes["right_gripper"]
+            joint_names = tuple(str(name) for name in robot.robot_model.joints)
+            action = np.zeros(int(robot.action_dim), dtype=float)
+        except (AttributeError, IndexError, KeyError, TypeError) as error:
+            raise ToolUseJournalRuntimeError(
+                "runtime is missing 2F controller metadata for metric pre-shaping"
+            ) from error
+        action[arm_start:arm_end] = self._actual_joint_positions(
+            env, joint_names
+        )
+        action[gripper_start:gripper_end] = 0.0
+
+        aperture_m = self.runtime.fingerpad_separation_m()
+        previous_error_m: float | None = None
+        previous_direction = 0.0
+        for _ in range(max_iterations):
+            aperture_m = self.runtime.fingerpad_separation_m()
+            error_m = aperture_m - target_aperture_m
+            if abs(error_m) <= tolerance_m:
+                for _ in range(final_settle_ticks):
+                    self._advance_controller(action)
+                aperture_m = self.runtime.fingerpad_separation_m()
+                if abs(aperture_m - target_aperture_m) <= tolerance_m:
+                    break
+                error_m = aperture_m - target_aperture_m
+            direction = 1.0 if error_m > 0.0 else -1.0
+            if (
+                previous_error_m is not None
+                and direction != previous_direction
+                and abs(error_m) >= abs(previous_error_m)
+            ):
+                raise ToolUseJournalRuntimeError(
+                    "target aperture is between discrete 2F controller states: "
+                    f"target={target_aperture_m:.6f}, actual={aperture_m:.6f}, "
+                    f"tolerance={tolerance_m:.6f}"
+                )
+            # Exercise the public GRIP input for exactly one policy tick. This
+            # preserves the Robotiq85 underactuated joint path instead of
+            # writing its private persistent target directly.
+            action[gripper_start:gripper_end] = direction
+            self._advance_controller(action)
+            action[gripper_start:gripper_end] = 0.0
+            for _ in range(settle_ticks_per_iteration):
+                self._advance_controller(action)
+            previous_error_m = error_m
+            previous_direction = direction
+        else:
+            raise ToolUseJournalRuntimeError(
+                "2F metric aperture pre-shape did not converge: "
+                f"target={target_aperture_m:.6f}, actual={aperture_m:.6f}"
+            )
+        self.runtime.command_gripper(
+            engaged=True,
+            suction=False,
+            command=0.0,
+        )
+        return aperture_m
 
     def _advance_controller(self, action: np.ndarray) -> float:
         """Advance one robosuite policy period without calling reward()."""
@@ -2467,22 +3089,43 @@ class ToolUseJournalControllerTrajectoryPlayer(
         max_tracking_error = 0.0
         max_eef_error: float | None = None
         collision_count = 0
+        collision_check_count = 0
+        control_step_index = 0
+        last_collision_segment_id: str | None = None
         executed_time = 0.0
+        plan_time = 0.0
         failure: _PlaybackFailure | None = None
+        settle_states: dict[str, dict[str, Any]] = {}
+        segment_tracking: list[dict[str, Any]] = []
+
+        def add_runtime_metadata(report: ExecutionReport) -> ExecutionReport:
+            report.metadata["collision_check_stride"] = (
+                self._collision_check_stride
+            )
+            report.metadata["collision_check_count"] = collision_check_count
+            report.metadata["nominal_plan_duration_s"] = plan.duration_s
+            report.metadata["final_plan_time_s"] = plan_time
+            report.metadata["adaptive_settle_extra_duration_s"] = max(
+                0.0, executed_time - plan_time
+            )
+            report.metadata["segment_tracking"] = segment_tracking
+            return report
 
         def failed_report(
             status: ExecutionStatus = ExecutionStatus.FAILED,
         ) -> ExecutionReport:
-            return self._build_report(
-                run,
-                report_id=report_name,
-                status=status,
-                executed_duration_s=executed_time,
-                max_tracking_error=max_tracking_error,
-                max_eef_error=max_eef_error,
-                collision_count=collision_count,
-                events=executed_events,
-                failure=failure,
+            return add_runtime_metadata(
+                self._build_report(
+                    run,
+                    report_id=report_name,
+                    status=status,
+                    executed_duration_s=executed_time,
+                    max_tracking_error=max_tracking_error,
+                    max_eef_error=max_eef_error,
+                    collision_count=collision_count,
+                    events=executed_events,
+                    failure=failure,
+                )
             )
 
         try:
@@ -2529,12 +3172,12 @@ class ToolUseJournalControllerTrajectoryPlayer(
 
             while True:
                 desired_now = self._desired_joint_position(
-                    timeline, min(executed_time, plan.duration_s)
+                    timeline, min(plan_time, plan.duration_s)
                 )
                 while (
                     next_event_index < len(sorted_events)
                     and sorted_events[next_event_index].time_from_start_s
-                    <= executed_time + self._TIME_TOLERANCE_S
+                    <= plan_time + self._TIME_TOLERANCE_S
                 ):
                     event = sorted_events[next_event_index]
                     try:
@@ -2583,7 +3226,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
                         completed_segment.segment_id
                         not in verified_segment_ends
                         and completed_segment.end_time_s
-                        <= executed_time + self._TIME_TOLERANCE_S
+                        <= plan_time + self._TIME_TOLERANCE_S
                     ):
                         self._verify_runtime_context(
                             completed_segment.collision_context_after,
@@ -2591,16 +3234,115 @@ class ToolUseJournalControllerTrajectoryPlayer(
                                 f"segment {completed_segment.segment_id!r} end"
                             ),
                         )
+                        actual_at_end = self._actual_joint_positions(
+                            self.runtime.env, plan.joint_names
+                        )
+                        target_waypoint = completed_segment.waypoints[-1]
+                        joint_error_at_end = float(
+                            np.max(
+                                np.abs(
+                                    actual_at_end
+                                    - np.asarray(
+                                        target_waypoint.joint_positions_rad,
+                                        dtype=float,
+                                    )
+                                )
+                            )
+                        )
+                        eef_error_at_end: float | None = None
+                        if target_waypoint.eef_pose is not None:
+                            eef_error_at_end = float(
+                                np.linalg.norm(
+                                    self._eef_position(self.runtime.env)
+                                    - np.asarray(
+                                        target_waypoint.eef_pose.position_m,
+                                        dtype=float,
+                                    )
+                                )
+                            )
+                        settle_state = settle_states.get(
+                            completed_segment.segment_id, {}
+                        )
+                        segment_tracking.append(
+                            {
+                                "segment_id": completed_segment.segment_id,
+                                "keyframe_id": completed_segment.metadata.get(
+                                    "keyframe_id"
+                                ),
+                                "target_block_id": completed_segment.metadata.get(
+                                    "target_block_id"
+                                ),
+                                "nominal_end_time_s": completed_segment.end_time_s,
+                                "actual_execution_time_s": executed_time,
+                                "max_joint_error_rad": joint_error_at_end,
+                                "eef_position_error_m": eef_error_at_end,
+                                "adaptive_settle_requested": (
+                                    "tracking_settle" in completed_segment.metadata
+                                ),
+                                "adaptive_settle_succeeded": settle_state.get(
+                                    "settled"
+                                ),
+                                "adaptive_settle_wait_s": settle_state.get(
+                                    "wait_duration_s", 0.0
+                                ),
+                                "custom_settle": settle_state.get(
+                                    "custom_settle"
+                                ),
+                            }
+                        )
                         verified_segment_ends.add(
                             completed_segment.segment_id
                         )
 
-                if executed_time >= plan.duration_s - self._TIME_TOLERANCE_S:
+                if plan_time >= plan.duration_s - self._TIME_TOLERANCE_S:
                     break
-                target_time = min(
-                    executed_time + control_timestep, plan.duration_s
+                segment = self._segment_at_time(plan, plan_time)
+                self._active_segment = segment
+                settle_config = self._tracking_settle_config(segment)
+                settle_state = settle_states.setdefault(
+                    segment.segment_id,
+                    {
+                        "consecutive_ticks": 0,
+                        "settled": False,
+                    },
                 )
-                desired = self._desired_joint_position(timeline, target_time)
+                motion_end_time = float(
+                    segment.metadata.get(
+                        "motion_end_time_s", segment.end_time_s
+                    )
+                )
+                settling = (
+                    settle_config is not None
+                    and plan_time
+                    >= motion_end_time - self._TIME_TOLERANCE_S
+                    and not bool(settle_state["settled"])
+                )
+                if settling:
+                    settle_state.setdefault("started_at_execution_s", executed_time)
+                    target_plan_time = plan_time
+                    desired = np.asarray(
+                        segment.waypoints[-1].joint_positions_rad, dtype=float
+                    )
+                else:
+                    plan_time_step_s = self._plan_time_step_s(
+                        segment=segment,
+                        control_timestep_s=control_timestep,
+                    )
+                    if (
+                        not math.isfinite(plan_time_step_s)
+                        or plan_time_step_s < 0.0
+                        or plan_time_step_s > control_timestep
+                    ):
+                        raise ToolUseJournalRuntimeError(
+                            "adaptive plan-time step must be within one "
+                            "control timestep"
+                        )
+                    target_plan_time = min(
+                        plan_time + plan_time_step_s, plan.duration_s
+                    )
+                    desired = self._desired_joint_position(
+                        timeline, target_plan_time
+                    )
                 action = self._controller_action(plan, desired)
                 try:
                     self._advance_controller(action)
@@ -2621,23 +3363,126 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 actual = self._actual_joint_positions(
                     self.runtime.env, plan.joint_names
                 )
-                desired_at_actual = self._desired_joint_position(
-                    timeline, min(executed_time, plan.duration_s)
+                desired_at_actual = desired
+                step_joint_error = float(
+                    np.max(np.abs(actual - desired_at_actual))
                 )
                 max_tracking_error = max(
                     max_tracking_error,
-                    float(np.max(np.abs(actual - desired_at_actual))),
+                    step_joint_error,
                 )
+                actual_eef_position = self._eef_position(self.runtime.env)
+                if settling:
+                    target_waypoint = segment.waypoints[-1]
+                    target_eef_error: float | None = None
+                    if target_waypoint.eef_pose is not None:
+                        target_eef_error = float(
+                            np.linalg.norm(
+                                actual_eef_position
+                                - np.asarray(
+                                    target_waypoint.eef_pose.position_m,
+                                    dtype=float,
+                                )
+                            )
+                        )
+                        max_eef_error = (
+                            target_eef_error
+                            if max_eef_error is None
+                            else max(max_eef_error, target_eef_error)
+                        )
+                    joint_ok = (
+                        "joint_tolerance_rad" not in settle_config
+                        or step_joint_error
+                        <= float(settle_config["joint_tolerance_rad"])
+                    )
+                    eef_ok = (
+                        "eef_tolerance_m" not in settle_config
+                        or (
+                            target_eef_error is not None
+                            and target_eef_error
+                            <= float(settle_config["eef_tolerance_m"])
+                        )
+                    )
+                    custom_settle = self._custom_settle_evaluation(
+                        segment=segment,
+                        settle_config=settle_config,
+                        joint_error_rad=step_joint_error,
+                        eef_position_error_m=target_eef_error,
+                    )
+                    settle_ok = (
+                        joint_ok and eef_ok
+                        if custom_settle is None
+                        else bool(custom_settle.get("succeeded", False))
+                    )
+                    settle_state["last_joint_error_rad"] = step_joint_error
+                    settle_state["last_eef_error_m"] = target_eef_error
+                    if custom_settle is not None:
+                        settle_state["custom_settle"] = dict(custom_settle)
+                    if settle_ok:
+                        settle_state["consecutive_ticks"] = (
+                            int(settle_state["consecutive_ticks"]) + 1
+                        )
+                    else:
+                        settle_state["consecutive_ticks"] = 0
+                    wait_duration = executed_time - float(
+                        settle_state["started_at_execution_s"]
+                    )
+                    if int(settle_state["consecutive_ticks"]) >= int(
+                        settle_config["required_consecutive_ticks"]
+                    ):
+                        settle_state["settled"] = True
+                        settle_state["wait_duration_s"] = wait_duration
+                    elif wait_duration >= float(settle_config["max_wait_s"]):
+                        settle_state["wait_duration_s"] = wait_duration
+                        segment_tracking.append(
+                            {
+                                "segment_id": segment.segment_id,
+                                "keyframe_id": segment.metadata.get("keyframe_id"),
+                                "target_block_id": segment.metadata.get(
+                                    "target_block_id"
+                                ),
+                                "nominal_end_time_s": segment.end_time_s,
+                                "actual_execution_time_s": executed_time,
+                                "max_joint_error_rad": step_joint_error,
+                                "eef_position_error_m": target_eef_error,
+                                "custom_settle": settle_state.get(
+                                    "custom_settle"
+                                ),
+                                "adaptive_settle_requested": True,
+                                "adaptive_settle_succeeded": False,
+                                "adaptive_settle_wait_s": wait_duration,
+                            }
+                        )
+                        failure = _PlaybackFailure(
+                            code="TRACKING_NOT_SETTLED",
+                            message=(
+                                "controller did not converge before the next "
+                                "contact-sensitive motion"
+                            ),
+                            segment_id=segment.segment_id,
+                            observed={
+                                "joint_error_rad": step_joint_error,
+                                "eef_position_error_m": target_eef_error,
+                                "settle_config": dict(settle_config),
+                                "wait_duration_s": wait_duration,
+                                "custom_settle": settle_state.get(
+                                    "custom_settle"
+                                ),
+                            },
+                        )
+                        return failed_report()
+                else:
+                    plan_time = target_plan_time
                 while (
                     next_eef_waypoint_index < len(timeline)
                     and timeline[next_eef_waypoint_index].time_from_start_s
-                    <= executed_time + self._TIME_TOLERANCE_S
+                    <= plan_time + self._TIME_TOLERANCE_S
                 ):
                     eef_waypoint = timeline[next_eef_waypoint_index]
                     if eef_waypoint.eef_pose is not None:
                         eef_error = float(
                             np.linalg.norm(
-                                self._eef_position(self.runtime.env)
+                                actual_eef_position
                                 - np.asarray(
                                     eef_waypoint.eef_pose.position_m,
                                     dtype=float,
@@ -2661,13 +3506,19 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     )
                     return failed_report(ExecutionStatus.TIMEOUT)
 
-                segment = self._segment_at_time(
-                    plan, min(executed_time, plan.duration_s)
+                control_step_index += 1
+                check_collision_now = (
+                    control_step_index % self._collision_check_stride == 0
+                    or segment.segment_id != last_collision_segment_id
+                    or target_plan_time
+                    >= plan.duration_s - self._TIME_TOLERANCE_S
                 )
                 if (
                     self._collision_probe is not None
                     and segment.collision_context_before is not None
+                    and check_collision_now
                 ):
+                    collision_check_count += 1
                     collision = self._collision_probe.check(
                         actual,
                         context=segment.collision_context_before,
@@ -2685,10 +3536,10 @@ class ToolUseJournalControllerTrajectoryPlayer(
                                 },
                             )
                             return failed_report()
+                if check_collision_now:
+                    last_collision_segment_id = segment.segment_id
                 if run.config.render:
-                    render = getattr(self.runtime.env, "render", None)
-                    if callable(render):
-                        render()
+                    self.runtime.render()
                 if run.config.realtime_factor > 0.0:
                     time.sleep(control_timestep / run.config.realtime_factor)
 
@@ -2715,14 +3566,16 @@ class ToolUseJournalControllerTrajectoryPlayer(
             )
             return failed_report()
 
-        return self._build_report(
-            run,
-            report_id=report_name,
-            status=ExecutionStatus.SUCCESS,
-            executed_duration_s=executed_time,
-            max_tracking_error=max_tracking_error,
-            max_eef_error=max_eef_error,
-            collision_count=collision_count,
-            events=executed_events,
-            failure=None,
+        return add_runtime_metadata(
+            self._build_report(
+                run,
+                report_id=report_name,
+                status=ExecutionStatus.SUCCESS,
+                executed_duration_s=executed_time,
+                max_tracking_error=max_tracking_error,
+                max_eef_error=max_eef_error,
+                collision_count=collision_count,
+                events=executed_events,
+                failure=None,
+            )
         )

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from types import SimpleNamespace
 
 import mujoco
@@ -12,6 +13,8 @@ from tuj.m4_motion.tool_use_journal import (
     ToolUseJournalCollisionModelCompiler,
     ToolUseJournalCompatibilityError,
     ToolUseJournalEnvironmentAdapter,
+    make_tool_use_journal_env,
+    registered_tool_use_journal_environments,
 )
 from tuj.m4_motion.oracle import _as_position
 from tuj.m4_motion.schema import (
@@ -196,6 +199,45 @@ def _fake_env(active_ee: str | None):
     return env
 
 
+def test_repository_environment_registry_is_discovered_from_package_import(
+    monkeypatch,
+) -> None:
+    import robosuite
+    from robosuite.environments.base import REGISTERED_ENVS
+
+    repository = Path(__file__).resolve().parents[4]
+    registered = registered_tool_use_journal_environments(repository)
+    assert {"C1_1_LegoSweep", "C2_1_ObjectSorting"} <= registered
+    assert "Lift" not in registered
+
+    experimental_type = type("ExperimentalTask", (), {})
+    experimental_type.__module__ = "environments.experimental_task"
+    monkeypatch.setitem(REGISTERED_ENVS, "ExperimentalTask", experimental_type)
+    observed: dict[str, object] = {}
+
+    def fake_make(*, env_name: str, **options):
+        observed["env_name"] = env_name
+        observed["options"] = options
+        return SimpleNamespace(environment_name=env_name)
+
+    monkeypatch.setattr(robosuite, "make", fake_make)
+
+    env = make_tool_use_journal_env(
+        repository,
+        "ExperimentalTask",
+        active_ee=None,
+        seed=7,
+    )
+
+    assert "ExperimentalTask" in registered_tool_use_journal_environments(
+        repository
+    )
+    assert env.environment_name == "ExperimentalTask"
+    assert observed["env_name"] == "ExperimentalTask"
+    assert observed["options"]["gripper_types"] is None
+    assert observed["options"]["seed"] == 7
+
+
 def test_adapter_captures_mjcf_world_and_target_ee_ids() -> None:
     env = _fake_env("2F")
     adapter = ToolUseJournalEnvironmentAdapter(env, source_revision="fixture")
@@ -232,6 +274,43 @@ def test_adapter_rejects_declared_ee_that_is_physically_bare() -> None:
         adapter.require_physical_ee()
 
 
+def test_finger_friction_enables_declared_torsional_and_rolling_terms() -> None:
+    model = mujoco.MjModel.from_xml_string(
+        """
+        <mujoco>
+          <worldbody>
+            <body name="hand">
+              <geom name="gripper0_right_left_fingertip_collision"
+                    type="box" size="0.01 0.01 0.01"/>
+              <geom name="gripper0_right_right_fingerpad_collision"
+                    type="box" size="0.01 0.01 0.01" pos="0.03 0 0"/>
+            </body>
+          </worldbody>
+        </mujoco>
+        """
+    )
+    data = mujoco.MjData(model)
+    runtime = object.__new__(ToolUseJournalEERuntime)
+    runtime._active_ee = "2F"
+    runtime._closed = False
+    runtime._env = SimpleNamespace(
+        sim=SimpleNamespace(
+            model=SimpleNamespace(_model=model),
+            data=SimpleNamespace(_data=data),
+        )
+    )
+
+    names = runtime.set_finger_gripper_contact_friction((1.0, 0.005, 0.0001))
+
+    assert len(names) == 2
+    for name in names:
+        geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name)
+        assert model.geom_friction[geom_id] == pytest.approx(
+            (1.0, 0.005, 0.0001)
+        )
+        assert int(model.geom_condim[geom_id]) == 6
+
+
 def test_compiler_promotes_rack_and_removes_active_display_duplicate() -> None:
     variants = {
         active_ee: _fake_env(active_ee)
@@ -260,6 +339,28 @@ def test_compiler_promotes_rack_and_removes_active_display_duplicate() -> None:
     entities = dict(attached.entity_selectors)
     assert entities["2F"] == (MOUNTED_ROOTS["2F"],)
     assert entities["rack_support:2F"] == ("ee_rack_support_2F",)
+
+
+def test_compiler_reuses_variants_with_current_reference_state() -> None:
+    variants = {
+        active_ee: _fake_env(active_ee)
+        for active_ee in (None, "2F", "3F", "vac")
+    }
+    compiler = ToolUseJournalCollisionModelCompiler.from_environments(
+        variants["2F"], variants, source_revision="fixture"
+    )
+    live = _fake_env("2F")
+    live.sim.data._data.qpos[0] = 0.43
+
+    refreshed = compiler.with_reference_environment(live)
+    compiled = refreshed.compile("2F")
+
+    arm_joint_id = mujoco.mj_name2id(
+        compiled.model, mujoco.mjtObj.mjOBJ_JOINT, ARM_JOINTS[0]
+    )
+    qpos_index = int(compiled.model.jnt_qposadr[arm_joint_id])
+    assert compiled.baseline_qpos[qpos_index] == pytest.approx(0.43)
+    assert refreshed.attached_model_versions == compiler.attached_model_versions
 
 
 def test_exchange_contexts_route_to_target_scene_models() -> None:
@@ -359,6 +460,18 @@ def test_runtime_grasp_attach_tracks_hand_and_blocks_tool_exchange() -> None:
     data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
     mujoco.mj_forward(model, data)
 
+    assert (
+        runtime.command_gripper(
+            engaged=True,
+            suction=False,
+            command=0.0,
+        )
+        == 0.0
+    )
+    assert runtime.grasp_engaged is True
+    assert runtime.command_gripper(engaged=True, suction=False) == 1.0
+    runtime.hold_gripper_position()
+    assert runtime.gripper_command == 1.0
     assert runtime.command_gripper(engaged=True, suction=False) == 1.0
     attachment = runtime.attach_object(
         "apple",
@@ -367,6 +480,8 @@ def test_runtime_grasp_attach_tracks_hand_and_blocks_tool_exchange() -> None:
     )
     assert attachment.object_id == "apple"
     assert runtime.attached_object_id == "apple"
+    runtime.mark_attached_object_as_tool("apple")
+    assert runtime.held_tool_id == "apple"
     with pytest.raises(ToolUseJournalRuntimeError, match="while object"):
         runtime.unlock("2F")
     with pytest.raises(ToolUseJournalRuntimeError, match="detach object"):
@@ -385,36 +500,131 @@ def test_runtime_grasp_attach_tracks_hand_and_blocks_tool_exchange() -> None:
     runtime.detach_object("apple")
     runtime.command_gripper(engaged=False, suction=False)
     assert runtime.attached_object_id is None
+    assert runtime.held_tool_id is None
     runtime.close()
 
 
 def test_controller_config_uses_absolute_joint_targets() -> None:
     config = tool_use_journal_joint_position_controller_config(
-        kp=75.0,
-        damping_ratio=0.8,
+        kp=80.0, damping_ratio=1.2
     )
     arm = config["body_parts"]["right"]
 
     assert arm["type"] == "JOINT_POSITION"
     assert arm["input_type"] == "absolute"
-    assert arm["kp"] == 75.0
-    assert arm["damping_ratio"] == 0.8
+    assert arm["kp"] == pytest.approx(80.0)
+    assert arm["damping_ratio"] == pytest.approx(1.2)
     assert arm["gripper"]["type"] == "GRIP"
     assert ToolUseJournalControllerTrajectoryPlayer._CONTROLLER_TRACKING is True
+    with pytest.raises(ValueError, match="kp"):
+        tool_use_journal_joint_position_controller_config(kp=0.0)
 
 
-@pytest.mark.parametrize(
-    ("kwargs", "message"),
-    [
-        ({"kp": 0.0}, "kp must be finite"),
-        ({"damping_ratio": 0.0}, "damping_ratio must be finite"),
-    ],
-)
-def test_controller_config_rejects_invalid_gains(
-    kwargs: dict[str, float], message: str
-) -> None:
-    with pytest.raises(ValueError, match=message):
-        tool_use_journal_joint_position_controller_config(**kwargs)
+def test_controller_collision_check_stride_must_be_positive() -> None:
+    runtime = SimpleNamespace()
+
+    player = ToolUseJournalControllerTrajectoryPlayer(
+        runtime, collision_check_stride=5
+    )
+    assert player._collision_check_stride == 5
+    with pytest.raises(ValueError, match="positive integer"):
+        ToolUseJournalControllerTrajectoryPlayer(
+            runtime, collision_check_stride=0
+        )
+
+
+def test_live_joint_controller_gains_can_be_retuned_between_phases() -> None:
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    controller = SimpleNamespace(name="JOINT_POSITION", control_dim=6)
+    runtime.env.robots[0].part_controllers = {"right": controller}
+
+    runtime.set_joint_position_controller_gains(kp=80.0, damping_ratio=1.0)
+
+    assert controller.kp == pytest.approx([80.0] * 6)
+    assert controller.kd == pytest.approx([2.0 * np.sqrt(80.0)] * 6)
+    runtime.close()
+
+
+def test_controller_player_advances_the_real_robosuite_physics_loop() -> None:
+    pytest.importorskip("robosuite")
+    repository = Path(__file__).resolve().parents[2] / "Tool-Use-Journal"
+    if not repository.is_dir():
+        pytest.skip("workspace Tool-Use-Journal checkout is unavailable")
+    runtime = ToolUseJournalEERuntime.from_repository_for_controller(
+        repository,
+        "C1_1_LegoSweep",
+        active_ee="2F",
+        seed=0,
+        ignore_done=True,
+        use_camera_obs=False,
+        has_renderer=False,
+        has_offscreen_renderer=False,
+    )
+    try:
+        state = ToolUseJournalEnvironmentAdapter(runtime.env).world_snapshot().robot_state
+        q = list(state.joint_positions_rad)
+        duration = 2.0 * float(runtime.env.control_timestep)
+        plan = MotionPlan(
+            plan_id="controller-physics-smoke-plan",
+            request_id="controller-physics-smoke-request",
+            provenance=_provenance(
+                "controller-physics-plan-artifact",
+                "MotionPlan",
+                ModuleName.MOTION_PLANNER,
+            ),
+            scene_signature="controller-physics-smoke-scene",
+            robot_id=state.robot_id,
+            joint_names=list(state.joint_names),
+            duration_s=duration,
+            segments=[
+                TrajectorySegment(
+                    segment_id="controller-physics-stationary",
+                    segment_type=SegmentType.CUSTOM,
+                    start_time_s=0.0,
+                    end_time_s=duration,
+                    collision_checked=False,
+                    waypoints=[
+                        TrajectoryWaypoint(
+                            time_from_start_s=0.0,
+                            joint_positions_rad=q,
+                        ),
+                        TrajectoryWaypoint(
+                            time_from_start_s=duration,
+                            joint_positions_rad=q,
+                        ),
+                    ],
+                )
+            ],
+            expected_final_state=state.model_copy(
+                update={"joint_velocities_rad_s": [0.0] * len(q)}
+            ),
+        )
+        run = SimulationRun(
+            run_id="controller-physics-smoke-run",
+            provenance=_provenance(
+                "controller-physics-run-artifact",
+                "SimulationRun",
+                ModuleName.SIMULATOR,
+            ),
+            plan=plan,
+            config=SimulationConfig(
+                physics_timestep_s=float(runtime.env.model_timestep),
+                control_timestep_s=float(runtime.env.control_timestep),
+                max_duration_s=duration + 1.0,
+            ),
+        )
+
+        report = ToolUseJournalControllerTrajectoryPlayer(runtime).execute(run)
+
+        assert report.status is ExecutionStatus.SUCCESS
+        assert report.failure is None
+        assert report.metrics.executed_duration_s >= duration
+        assert report.metadata["controller_tracking_simulated"] is True
+        assert report.metadata["playback_mode"] == (
+            "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER"
+        )
+    finally:
+        runtime.close()
 
 
 def test_breakable_weld_can_require_opposed_finger_contacts() -> None:

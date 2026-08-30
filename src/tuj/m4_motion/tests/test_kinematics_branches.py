@@ -34,3 +34,20 @@ def test_full_pose_ik_is_deterministic(kinematics) -> None:
     second = kinematics.solve_all_ik(position, orientation)
 
     assert first == second
+
+
+def test_full_pose_ik_prefers_a_supplied_local_seed(kinematics) -> None:
+    seed_q = (0.3, -1.2, 1.4, -1.7, -1.2, 0.4)
+    position, orientation = kinematics.forward_pose_world(seed_q)
+
+    result = kinematics.solve_all_ik(
+        position,
+        orientation,
+        seed_qpos=seed_q,
+    )
+
+    assert result.solved
+    assert max(
+        abs(actual - expected)
+        for actual, expected in zip(result.solutions[0].qpos, seed_q)
+    ) <= 1e-9

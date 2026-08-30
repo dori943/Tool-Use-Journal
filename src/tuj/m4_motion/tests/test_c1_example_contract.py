@@ -8,8 +8,7 @@ import pytest
 
 from tuj.m4_motion.examples.c1_1_gk_task_preview import _selected_resources
 from tuj.m4_motion.examples.c1_1_openai_motion_run import (
-    _selected_binding,
-    _selected_bindings,
+    _selected_sweep_binding,
 )
 
 
@@ -22,33 +21,43 @@ def _assignment(
     tool: str = "light_plate",
 ) -> SimpleNamespace:
     return SimpleNamespace(
+        candidate_id=f"{subgoal_id}-candidate",
         action_type=action_type,
         subgoal_id=subgoal_id,
+        mode=("sweep" if action_type == "tool_act" else None),
         ee="2F",
         tool=tool,
         target_ids=target_ids or [],
         goal_region_id=goal_region_id,
+        grasp=None,
+    )
+
+
+def _step(assignment: SimpleNamespace) -> SimpleNamespace:
+    return SimpleNamespace(
+        kind="subgoal",
+        action="EXECUTE_SUBGOAL",
+        candidate_id=assignment.candidate_id,
+        subgoal_id=assignment.subgoal_id,
+        preconditions=[],
+        postconditions=[],
     )
 
 
 def test_c1_binding_reads_candidate_assignments() -> None:
+    acquire = _assignment("acquire", subgoal_id="SG1_d1")
+    sweep_assignment = _assignment(
+        "tool_act",
+        subgoal_id="SG1_d2",
+        target_ids=["block_0", "block_1"],
+        goal_region_id="collection_zone_visual",
+    )
     selected = SimpleNamespace(
-        candidate_assignments=[
-            _assignment("acquire", subgoal_id="SG1_d1"),
-            _assignment(
-                "tool_act",
-                subgoal_id="SG1_d2",
-                target_ids=["block_0", "block_1"],
-                goal_region_id="collection_zone_visual",
-            ),
-        ]
+        candidate_assignments=[acquire, sweep_assignment],
+        steps=[_step(sweep_assignment)],
     )
 
-    sweep = _selected_binding(
-        selected,
-        action_type="tool_act",
-        label="sweep",
-    )
+    sweep = _selected_sweep_binding(selected)
 
     assert sweep.subgoal_id == "SG1_d2"
     assert sweep.ee == "2F"
@@ -58,46 +67,38 @@ def test_c1_binding_reads_candidate_assignments() -> None:
 
 
 def test_c1_binding_rejects_missing_assignment() -> None:
-    selected = SimpleNamespace(candidate_assignments=[])
+    selected = SimpleNamespace(candidate_assignments=[], steps=[])
 
-    with pytest.raises(RuntimeError, match="at least one sweep assignment"):
-        _selected_binding(
-            selected,
-            action_type="tool_act",
-            label="sweep",
-        )
+    with pytest.raises(RuntimeError, match="at least one sweep subgoal"):
+        _selected_sweep_binding(selected)
 
 
 def test_c1_binding_accepts_split_sweeps_from_gk_bundle() -> None:
-    selected = SimpleNamespace(
-        candidate_assignments=[
-            _assignment("acquire", subgoal_id="SG1_s1_d1"),
-            _assignment(
-                "tool_act",
-                subgoal_id="SG1_s1_d2",
-                target_ids=["block_0", "block_1"],
-                goal_region_id="collection_zone_visual",
-            ),
-            _assignment(
-                "tool_act",
-                subgoal_id="SG1_s2_d2",
-                target_ids=["block_2"],
-                goal_region_id="collection_zone_visual",
-            ),
-        ]
-    )
-
-    sweeps = _selected_bindings(
-        selected,
-        action_type="tool_act",
-        label="sweep",
-    )
-
-    assert [item.subgoal_id for item in sweeps] == [
-        "SG1_s1_d2",
-        "SG1_s2_d2",
+    acquire = _assignment("acquire", subgoal_id="SG1_s1_d1")
+    sweep_assignments = [
+        _assignment(
+            "tool_act",
+            subgoal_id="SG1_s1_d2",
+            target_ids=["block_0", "block_1"],
+            goal_region_id="collection_zone_visual",
+        ),
+        _assignment(
+            "tool_act",
+            subgoal_id="SG1_s2_d2",
+            target_ids=["block_2"],
+            goal_region_id="collection_zone_visual",
+        ),
     ]
-    assert {item.tool for item in sweeps} == {"light_plate"}
+    selected = SimpleNamespace(
+        candidate_assignments=[acquire, *sweep_assignments],
+        steps=[_step(item) for item in sweep_assignments],
+    )
+
+    sweep = _selected_sweep_binding(selected)
+
+    assert sweep.subgoal_id == "SG1_d2"
+    assert sweep.target_ids == ("block_0", "block_1", "block_2")
+    assert sweep.tool == "light_plate"
 
 
 def test_preview_reads_candidate_assignments_without_heavy_plate_default() -> None:
