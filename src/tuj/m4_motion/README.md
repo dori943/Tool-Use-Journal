@@ -43,21 +43,43 @@ git worktree add ../tuj-m4 origin/feature/dain-m4
 python -m pip install -r ../tuj-m4/requirements.txt
 ```
 
-### M4 → M5 한 명령 실행
+### 범용 M4 → M5 실행
 
-각 runner는 실행 위치와 관계없이 저장소 기준 경로를 사용한다. 위 예시처럼
-`tuj-m3`, `tuj-m4`가 같은 폴더에 있으면 M5 runner가 M4 결과를 자동으로 찾는다.
+범용 M5 runner는 C1_1 경로나 환경을 기본값으로 추정하지 않는다. M4 결과와 초기
+`WorldSnapshot`을 명시하거나, 지원되는 Tool-Use-Journal 환경 이름을 넘겨 현재 world를
+캡처한다.
+
+```powershell
+# 다른 Task의 입력 계약만 검증
+python scripts\run_m5_motion_planner.py `
+  --task-planner C:\tasks\sorting\task_planner.json `
+  --initial-world C:\tasks\sorting\initial_world.json `
+  --validate-input-only
+
+# 환경에서 초기 world 캡처 후 실제 계획
+$env:OPENAI_API_KEY = "<project-api-key>"
+python scripts\run_m5_motion_planner.py `
+  --task-planner C:\tasks\sorting\task_planner.json `
+  --environment C2_1_ObjectSorting `
+  --initial-ee none
+```
+
+`--constraints`와 `--options`는 공통 JSON 또는 subgoal id별 JSON mapping을 받는다.
+생략하면 초기 world의 관절 이름을 기준으로 보수적인 기본 제약을 만든다. 출력 폴더를
+생략하면 `artifacts/<Task 입력 폴더명>/`을 사용한다.
+
+### C1_1 전용 물리 실행
+
+C1_1은 M4 결과에 없는 plate rim-grasp와 분할 sweep geometry를 전용 binder가
+보완하므로 범용 runner와 분리한다. `tuj-m3`, `tuj-m4`가 같은 폴더에 있으면 C1_1
+runner가 M4 결과를 자동으로 찾는다.
 
 ```bash
-# M4 Task Planner
 python ../tuj-m3/scripts/run_m4_task_planner.py
+python ../tuj-m4/scripts/run_m5_c1_1_motion_planner.py --validate-input-only
 
-# API·시뮬레이터 없이 M4→M5 입력 계약 확인
-python ../tuj-m4/scripts/run_m5_motion_planner.py --validate-input-only
-
-# 전체 M5 실행
 export OPENAI_API_KEY="<project-api-key>"
-python ../tuj-m4/scripts/run_m5_motion_planner.py
+python ../tuj-m4/scripts/run_m5_c1_1_motion_planner.py
 ```
 
 PowerShell에서는 마지막 두 명령 앞에 다음과 같이 API key를 설정한다.
@@ -66,9 +88,9 @@ PowerShell에서는 마지막 두 명령 앞에 다음과 같이 API key를 설�
 $env:OPENAI_API_KEY = "<project-api-key>"
 ```
 
-worktree 이름이 다르면 `--task-planner path/to/task_planner.json`으로 M4 결과를
-명시한다. `--controller-kp`, `--planning-time` 등 기존 Motion Planner 옵션은 runner가
-그대로 전달한다. Tool과 EE는 runner 인자가 아니며 M4 결과에서만 읽는다.
+worktree 이름이 다르면 C1_1 runner에 `--task-planner path/to/task_planner.json`으로
+M4 결과를 명시한다. `--controller-kp`, `--planning-time` 등 C1_1 Motion Planner
+옵션은 runner가 그대로 전달한다. Tool과 EE는 두 runner 모두 M4 결과에서 읽는다.
 
 이 입력에서는 GK bundle의 `roles.selected_tool`인 `light_plate`가 M4
 `candidate_assignments`를 거쳐 M5까지 그대로 전달된다. 세 개로 분할된 sweep도 각각의
@@ -95,7 +117,7 @@ target 목록과 실행 순서를 유지한 채 차례대로 motion plan으로 �
 keyframe을 재사용하면 API 호출 없이 물리 PICK까지만 재현할 수 있다.
 
 ```powershell
-python scripts/run_m5_motion_planner.py `
+python scripts/run_m5_c1_1_motion_planner.py `
   --pick-keyframes path\to\pick_keyframes_raw.json `
   --motion-profile src\tuj\m4_motion\examples\c1_1_physical_grasp_profile.json `
   --stop-after-pick
