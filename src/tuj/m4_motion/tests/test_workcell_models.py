@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import xml.etree.ElementTree as ET
+from pathlib import Path
 
 import mujoco
 import numpy as np
@@ -9,6 +10,8 @@ import pytest
 from tuj.m4_motion.ee_exchange import EEExchangeTemplateGenerator
 from tuj.m4_motion.workcell_models import EEWorkcellCollisionModelCompiler
 
+
+REPOSITORY = Path(__file__).resolve().parents[4]
 
 @pytest.fixture(scope="module")
 def rack_env_and_compiler():
@@ -72,7 +75,9 @@ def test_attached_root_uses_qc_mjcf_coupling_position(
     qc_id = model.body("gripper0_right_qc_master_base").id
     active_id = model.body(dict(attached.entity_body_names)["vacuum"]).id
     qc_rotation = np.asarray(data.xmat[qc_id]).reshape(3, 3)
-    qc_asset = ET.parse("experiment/assets/quick_changer_master.xml").getroot()
+    qc_asset = ET.parse(
+        REPOSITORY / "experiment" / "assets" / "quick_changer_master.xml"
+    ).getroot()
     coupling_body = qc_asset.find(".//body[@name='eef']")
     assert coupling_body is not None
     coupling_position = np.fromstring(coupling_body.get("pos", ""), sep=" ")

@@ -249,6 +249,38 @@ def test_unknown_generated_frame_fails_before_ik() -> None:
         provider.generate(_request())
 
 
+def test_invalid_candidate_is_dropped_when_another_candidate_is_valid() -> None:
+    batch = _batch()
+    invalid_keyframes = list(batch.candidates[0].keyframes)
+    invalid_keyframes[0] = invalid_keyframes[0].model_copy(
+        update={"frame_ref": "object:not-in-scene"}
+    )
+    batch = batch.model_copy(
+        update={
+            "candidates": [
+                batch.candidates[0].model_copy(
+                    update={"keyframes": invalid_keyframes}
+                ),
+                batch.candidates[1],
+            ]
+        }
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    artifact = provider.generate(_request())
+
+    assert [candidate.strategy_id for candidate in artifact.candidates] == [
+        "sg-pick:side"
+    ]
+    assert artifact.provenance.metadata["rejected_candidate_count"] == 1
+    assert "unknown object frame" in artifact.provenance.metadata[
+        "rejected_candidates"
+    ][0]
+
+
 def test_missing_api_key_fails_without_network(monkeypatch) -> None:
     monkeypatch.delenv("OPENAI_API_KEY", raising=False)
     provider = OpenAIKeyframeProvider(
@@ -277,7 +309,7 @@ def test_pick_keyframe_gets_deterministic_grasp_and_attach_events() -> None:
         owner_id="bottle",
     )
     request.task.goal = MotionGoal(
-        goal_type=GoalType.PICK,
+        goal_type=GoalType.POSE,
         target_object_id="bottle",
     )
     provider = OpenAIKeyframeProvider(

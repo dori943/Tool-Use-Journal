@@ -229,6 +229,83 @@
       "title": "CollisionContext",
       "type": "object"
     },
+    "ContactManipulationSpec": {
+      "additionalProperties": false,
+      "description": "Grounded contact intent carried alongside an opaque task action label.",
+      "properties": {
+        "primitive": {
+          "minLength": 1,
+          "title": "Primitive",
+          "type": "string"
+        },
+        "contact_surface": {
+          "$ref": "#/$defs/ContactSurfaceType",
+          "default": "AUTO"
+        },
+        "contact_patch_id": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Contact Patch Id"
+        },
+        "path_pattern": {
+          "default": "AUTO",
+          "title": "Path Pattern",
+          "type": "string"
+        },
+        "target_grouping": {
+          "default": "SINGLE",
+          "title": "Target Grouping",
+          "type": "string"
+        },
+        "maintain_contact": {
+          "default": false,
+          "title": "Maintain Contact",
+          "type": "boolean"
+        },
+        "max_contact_force_n": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "number"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Max Contact Force N"
+        },
+        "metadata": {
+          "additionalProperties": true,
+          "title": "Metadata",
+          "type": "object"
+        }
+      },
+      "required": [
+        "primitive"
+      ],
+      "title": "ContactManipulationSpec",
+      "type": "object"
+    },
+    "ContactSurfaceType": {
+      "description": "Stable geometric contact categories, not manipulation-action labels.",
+      "enum": [
+        "AUTO",
+        "BROAD_FACE",
+        "RIM",
+        "EDGE",
+        "POINT"
+      ],
+      "title": "ContactSurfaceType",
+      "type": "string"
+    },
     "EventExecutionStatus": {
       "enum": [
         "SUCCESS",
@@ -502,14 +579,10 @@
       "type": "object"
     },
     "GoalType": {
+      "description": "Representation of the motion target, independent of task semantics.",
       "enum": [
         "POSE",
-        "JOINT",
-        "PICK",
-        "PLACE",
-        "DOCK",
-        "TOOL_CHANGE",
-        "EE_EXCHANGE"
+        "JOINT"
       ],
       "title": "GoalType",
       "type": "string"
@@ -908,7 +981,7 @@
     },
     "MotionGoal": {
       "additionalProperties": false,
-      "description": "Grounded goal from Task Planner; no trajectory is supplied here.",
+      "description": "Grounded geometric target; manipulation meaning lives on MotionTask.",
       "properties": {
         "goal_type": {
           "$ref": "#/$defs/GoalType"
@@ -1195,6 +1268,17 @@
         },
         "goal": {
           "$ref": "#/$defs/MotionGoal"
+        },
+        "contact": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ContactManipulationSpec"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
         },
         "allowed_touch_objects": {
           "items": {

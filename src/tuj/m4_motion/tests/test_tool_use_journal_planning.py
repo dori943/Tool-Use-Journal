@@ -27,6 +27,7 @@ from tuj.m4_motion.schema import (
     StrategyGeneratorKind,
     WorldSnapshot,
 )
+from tuj.m4_motion.ee_exchange import EEExchangeKeyframeProvider
 from tuj.m4_motion.tool_use_journal_planning import (
     ToolUseJournalCollisionContextFactory,
     WorkcellMotionRequestRouter,
@@ -53,6 +54,17 @@ class _Compiler:
     @staticmethod
     def model_version_for(active_ee):
         return f"model:{active_ee}"
+
+    @staticmethod
+    def build_ee_exchange_contexts(*, from_ee, to_ee):
+        from tuj.m4_motion.ee_exchange import EEExchangeTemplateGenerator
+
+        return EEExchangeTemplateGenerator().build_collision_contexts(
+            from_ee=from_ee,
+            to_ee=to_ee,
+            bare_flange_model_version="model:None",
+            attached_model_versions={to_ee: f"model:{to_ee}"},
+        )
 
     def build_collision_registry(self, contexts, **kwargs):
         self.calls.append((dict(contexts), kwargs))
@@ -97,6 +109,15 @@ def _world(*, attached: AttachedObjectTransform | None = None) -> WorldSnapshot:
                 },
             },
         },
+        rack={
+            "2F": {
+                "dock_pose": {
+                    "position_m": [0.2, -0.5, 0.4],
+                    "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                },
+                "approach_axis_xyz": [1.0, 0.0, 0.0],
+            }
+        },
         metadata={
             "environment_name": "C2_1_ObjectSorting",
             "physical_active_ee": "2F",
@@ -121,9 +142,14 @@ def _constraints() -> MotionConstraints:
     )
 
 
-def _request(goal: MotionGoal, *, attached=None) -> MotionPlanRequest:
+def _request(
+    goal: MotionGoal,
+    *,
+    action_type: str = "MOVE",
+    attached=None,
+) -> MotionPlanRequest:
     grasp = None
-    if goal.goal_type is GoalType.PICK:
+    if action_type.upper() == "PICK":
         grasp = GraspSpec(
             grasp_id="grasp-1",
             owner_kind="object",
@@ -141,7 +167,7 @@ def _request(goal: MotionGoal, *, attached=None) -> MotionPlanRequest:
         task=MotionTask(
             task_id="task-1",
             subgoal_id="subgoal-1",
-            action_type=goal.goal_type.value,
+            action_type=action_type,
             ee="2F",
             target_ids=["bottle"],
             grasp=grasp,
@@ -200,7 +226,8 @@ def _factory(compiler=None):
 
 def test_pick_binds_contact_then_candidate_specific_attachment_context() -> None:
     request = _request(
-        MotionGoal(goal_type=GoalType.PICK, target_object_id="bottle")
+        MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle"),
+        action_type="PICK",
     )
     request.task.metadata["support_collision_selectors"] = ["table*"]
     source = _artifact(
@@ -246,6 +273,43 @@ def test_pick_binds_contact_then_candidate_specific_attachment_context() -> None
     ]
 
 
+def test_contact_friction_pick_keeps_target_free_after_gripper_close() -> None:
+    request = _request(
+        MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle"),
+        action_type="PICK",
+    )
+    request.task.metadata["grasp_execution_mode"] = "CONTACT_FRICTION"
+    source = _artifact(
+        (
+            _keyframe("pre", KeyframeType.PRE_GRASP),
+            _keyframe(
+                "grasp",
+                KeyframeType.GRASP,
+                events=(KeyframeEventType.GRIPPER_CLOSE,),
+            ),
+            _keyframe("lift", KeyframeType.LIFT),
+        )
+    )
+
+    setup = _factory().prepare(request, source)
+    pre, grasp, lift = setup.keyframe_artifact.candidates[0].keyframes
+
+    assert pre.collision_context_id == setup.initial_collision_context_id
+    assert grasp.collision_context_id.startswith(
+        "physical-grasp-contact:bottle:"
+    )
+    assert lift.collision_context_id == grasp.collision_context_id
+    assert grasp.collision_context_after_events_id is None
+    assert all(
+        not context.attached_object_ids
+        for context in setup.collision_contexts.values()
+    )
+    assert (
+        "2F",
+        "bottle",
+    ) in setup.collision_contexts[grasp.collision_context_id].allowed_collision_pairs
+
+
 def test_place_binds_detach_and_stationary_target_pose_for_retreat() -> None:
     attached = AttachedObjectTransform(
         object_id="bottle",
@@ -262,11 +326,12 @@ def test_place_binds_detach_and_stationary_target_pose_for_retreat() -> None:
     )
     request = _request(
         MotionGoal(
-            goal_type=GoalType.PLACE,
+            goal_type=GoalType.POSE,
             target_object_id="bottle",
             target_pose=target_pose,
             target_region_id="table_collision",
         ),
+        action_type="PLACE",
         attached=attached,
     )
     source = _artifact(
@@ -327,6 +392,29 @@ def test_default_motion_gets_explicit_context_on_every_keyframe() -> None:
         item.collision_context_id
         for item in setup.keyframe_artifact.candidates[0].keyframes
     } == {setup.initial_collision_context_id}
+
+
+def test_initial_ee_attach_binds_bare_flange_as_initial_context() -> None:
+    request = _request(
+        MotionGoal(goal_type=GoalType.POSE, target_object_id="2F")
+    )
+    request.world.metadata["physical_active_ee"] = None
+    request.world.metadata["declared_active_ee"] = None
+    request.task.action_type = "EE_ATTACH"
+    request.task.target_ids = ["2F"]
+    request.task.metadata = {"from_ee": None, "to_ee": "2F"}
+    compiler = _Compiler()
+    artifact = EEExchangeKeyframeProvider().generate(request)
+
+    setup = _factory(compiler).prepare(request, artifact)
+
+    assert setup.initial_collision_context_id == "bare-flange"
+    assert set(setup.collision_contexts) == {
+        "bare-flange",
+        "bare-flange-dock-contact:2F",
+        "ee-attached:2F",
+    }
+    assert compiler.calls[0][1]["default_active_ee"] is None
 
 
 def test_workcell_router_selects_environment_binding() -> None:

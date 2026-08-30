@@ -121,11 +121,11 @@ def main() -> int:
             model.cam_fovy[camera_id] = 70.0
             mujoco.mj_forward(model, data)
 
-        if selected_tool not in {"light_plate", "heavy_plate"}:
+        tool_object = getattr(env, selected_tool, None)
+        if tool_object is None or not getattr(tool_object, "joints", None):
             raise ValueError(
-                f"selected tool {selected_tool!r} is not a C1_1 plate"
+                f"M4-selected tool {selected_tool!r} is absent from C1_1"
             )
-        tool_object = getattr(env, selected_tool)
         tool_joint = tool_object.joints[0]
         joint_id = mujoco.mj_name2id(
             model, mujoco.mjtObj.mjOBJ_JOINT, tool_joint

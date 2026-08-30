@@ -160,7 +160,7 @@ def test_motion_plan_request_carries_grounded_task_and_world() -> None:
             target_ids=["obj1"],
             grasp=_grasp(),
             goal=MotionGoal(
-                goal_type=GoalType.PICK,
+                goal_type=GoalType.POSE,
                 target_object_id="obj1",
                 approach_direction=(0.0, 0.0, -1.0),
                 approach_distance_m=0.1,
@@ -172,15 +172,23 @@ def test_motion_plan_request_carries_grounded_task_and_world() -> None:
     assert request.world.scene.signature == "scene-1"
 
 
-def test_pick_task_requires_grasp() -> None:
-    with pytest.raises(ValidationError, match="PICK task requires"):
+def test_task_can_explicitly_require_a_structured_grasp() -> None:
+    with pytest.raises(ValidationError, match="explicitly requires"):
         MotionTask(
             task_id="task-1",
             subgoal_id="pick-obj1",
             action_type="pick",
             ee="2f",
-            goal=MotionGoal(goal_type=GoalType.PICK),
+            goal=MotionGoal(goal_type=GoalType.POSE, target_object_id="obj1"),
+            metadata={"require_structured_grasp": True},
         )
+
+
+def test_legacy_action_goal_type_migrates_to_pose_representation() -> None:
+    goal = MotionGoal(goal_type="PICK", target_object_id="obj1")
+
+    assert goal.goal_type is GoalType.POSE
+    assert set(GoalType) == {GoalType.POSE, GoalType.JOINT}
 
 
 def test_robot_state_rejects_mismatched_joint_dimensions() -> None:

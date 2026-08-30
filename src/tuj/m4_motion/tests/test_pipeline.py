@@ -135,8 +135,12 @@ class _FakeClient:
 
 
 class _FakeKinematics:
+    def __init__(self):
+        self.endpoint_seeds = []
+
     def solve_all_ik(self, position, orientation, **kwargs):
-        del orientation, kwargs
+        del orientation
+        self.endpoint_seeds.append(kwargs.get("seed_qpos"))
         q0 = round(float(position[0]), 3)
         return IKSolutionSet(
             solutions=(
@@ -158,7 +162,8 @@ def test_openai_candidates_are_robot_filtered_and_finalized() -> None:
         OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
         client=_FakeClient(),
     )
-    pipeline = MotionPlanningPipeline(provider, _FakeKinematics())
+    kinematics = _FakeKinematics()
+    pipeline = MotionPlanningPipeline(provider, kinematics)
     context = CollisionContext(
         context_id="default",
         active_ee="2F",
@@ -185,6 +190,8 @@ def test_openai_candidates_are_robot_filtered_and_finalized() -> None:
         "request-artifact",
         result.keyframe_artifact.provenance.artifact_id,
     ]
+    assert kinematics.endpoint_seeds
+    assert all(seed is None for seed in kinematics.endpoint_seeds)
 
 
 def test_pipeline_accepts_one_artifact_aware_collision_factory() -> None:
@@ -192,7 +199,8 @@ def test_pipeline_accepts_one_artifact_aware_collision_factory() -> None:
         OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
         client=_FakeClient(),
     )
-    pipeline = MotionPlanningPipeline(provider, _FakeKinematics())
+    kinematics = _FakeKinematics()
+    pipeline = MotionPlanningPipeline(provider, kinematics)
     context = CollisionContext(
         context_id="factory-default",
         active_ee="2F",
@@ -206,6 +214,7 @@ def test_pipeline_accepts_one_artifact_aware_collision_factory() -> None:
             for candidate in bound.candidates:
                 for keyframe in candidate.keyframes:
                     keyframe.collision_context_id = context.context_id
+                    keyframe.metadata["preserve_endpoint_continuity"] = True
             return CollisionPlanningSetup(
                 keyframe_artifact=bound,
                 state_validator=lambda q, keyframe: True,
@@ -223,6 +232,13 @@ def test_pipeline_accepts_one_artifact_aware_collision_factory() -> None:
         segment.collision_context_before == context
         for segment in result.plan.segments
     )
+    assert kinematics.endpoint_seeds
+    assert all(
+        tuple(seed) == (0.0, 0.0)
+        for seed in kinematics.endpoint_seeds
+        if seed is not None
+    )
+    assert all(seed is not None for seed in kinematics.endpoint_seeds)
 
     with pytest.raises(ValueError, match="cannot be combined"):
         pipeline.plan(

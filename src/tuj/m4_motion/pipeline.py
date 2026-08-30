@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import hashlib
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from typing import Mapping, Protocol
 
 from tuj.m4_motion.compiler import (
@@ -26,7 +26,12 @@ from tuj.m4_motion.schema import (
     MotionPlan,
     MotionPlanRequest,
 )
-from tuj.m4_motion.strategy import EdgePlanner, InterpolatingEdgePlanner, StateValidator
+from tuj.m4_motion.strategy import (
+    EdgePlanner,
+    FirstFeasibleBranchSelector,
+    InterpolatingEdgePlanner,
+    StateValidator,
+)
 
 
 class KeyframeStrategyProvider(Protocol):
@@ -208,14 +213,44 @@ class MotionPlanningPipeline:
                     request.constraints.max_jacobian_condition_number
                 ),
             )
+        max_strategy_keyframes = max(
+            len(candidate.keyframes) for candidate in artifact.candidates
+        )
+        # Branch selection owns the whole layered keyframe graph, while an RRT
+        # timeout applies to one edge.  A fixed 10 s / 256-edge selector budget
+        # incorrectly rejects longer task-geometry strategies even when every
+        # pose has valid IK and individual edges remain inside their request
+        # budgets.  Scale the outer graph budget with the frozen strategy size,
+        # but retain finite caps so malformed candidate sets still fail closed.
+        branch_selector = FirstFeasibleBranchSelector(
+            max_edge_evaluations=max(
+                256,
+                min(
+                    4096,
+                    max_strategy_keyframes
+                    * request.options.max_attempts
+                    * 8,
+                ),
+            ),
+            timeout_s=max(
+                10.0,
+                min(
+                    300.0,
+                    request.options.allowed_planning_time_s
+                    * min(max_strategy_keyframes, 12),
+                ),
+            ),
+        )
         compiler = FirstFeasibleStrategyCompiler(
             self._kinematics,
             position_tolerance_m=request.constraints.position_tolerance_m,
             orientation_tolerance_rad=request.constraints.orientation_tolerance_rad,
+            branch_selector=branch_selector,
         )
         joint_planner = InterpolatingEdgePlanner(
             state_validator=effective_state_validator,
             max_joint_step_rad=request.constraints.max_joint_path_step_rad,
+            wrap_joints=False,
         )
         joint_limits = getattr(self._kinematics, "joint_limits_rad", None)
         if joint_limits is None:
@@ -236,6 +271,7 @@ class MotionPlanningPipeline:
                 max_joint_step_rad=(
                     request.constraints.max_joint_path_step_rad
                 ),
+                wrap_joints=False,
             ),
             sampling_based=RRTConnectEdgePlanner(
                 effective_state_validator,
@@ -248,6 +284,7 @@ class MotionPlanningPipeline:
                     request.constraints.max_joint_path_step_rad
                 ),
                 goal_bias=request.options.rrt_goal_bias,
+                wrap_joints=False,
             ),
         )
         compilation = compiler.compile(
@@ -259,7 +296,11 @@ class MotionPlanningPipeline:
         )
         if compilation.connected is None:
             failures = "; ".join(
-                f"{attempt.strategy_id}={attempt.failure_code or 'UNKNOWN'}"
+                (
+                    f"{attempt.strategy_id}="
+                    f"{attempt.failure_code or 'UNKNOWN'}"
+                    + (f" ({attempt.detail})" if attempt.detail else "")
+                )
                 for attempt in compilation.attempts
             )
             raise MotionPlanningPipelineError(
@@ -274,18 +315,43 @@ class MotionPlanningPipeline:
                 context: CollisionContext,
             ) -> bool:
                 if not final_segment_validator(waypoints, context):
+                    source_owner = getattr(
+                        final_segment_validator, "__self__", None
+                    )
+                    setattr(
+                        final_validator,
+                        "last_path_collision_check",
+                        getattr(
+                            source_owner,
+                            "last_path_collision_check",
+                            None,
+                        ),
+                    )
                     return False
                 if not isinstance(
                     effective_state_validator, KinematicSafetyValidator
                 ):
                     return True
-                return all(
-                    effective_state_validator.check(
+                for waypoint_index, waypoint in enumerate(waypoints):
+                    safety_report = effective_state_validator.check(
                         waypoint.joint_positions_rad,
                         context=context,
-                    ).valid
-                    for waypoint in waypoints
-                )
+                    )
+                    if not safety_report.valid:
+                        safety_report = replace(
+                            safety_report,
+                            detail=(
+                                f"waypoint {waypoint_index}: "
+                                f"{safety_report.detail}"
+                            ),
+                        )
+                        setattr(
+                            final_validator,
+                            "last_path_collision_check",
+                            safety_report,
+                        )
+                        return False
+                return True
 
             plan = self._builder.build(
                 request,
@@ -295,6 +361,7 @@ class MotionPlanningPipeline:
                 collision_contexts=collision_contexts,
                 initial_collision_context_id=initial_collision_context_id,
                 final_segment_validator=final_validator,
+                joint_position_limits_rad=joint_limits,
             )
         except Exception as error:
             raise MotionPlanningPipelineError(

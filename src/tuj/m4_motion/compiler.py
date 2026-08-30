@@ -83,11 +83,22 @@ class FirstFeasibleStrategyCompiler:
                     failure_code = "KEYFRAME_GEOMETRY_INVALID"
                     failure_detail = f"{keyframe.keyframe_id}: {error}"
                     break
+                ik_options = {
+                    "position_tolerance_m": self._position_tolerance_m,
+                    "orientation_tolerance_rad": self._orientation_tolerance_rad,
+                }
+                if bool(
+                    keyframe.metadata.get("preserve_endpoint_continuity", False)
+                ):
+                    # Contact-continuation callers can require the current
+                    # branch as an explicit endpoint candidate. Applying this
+                    # policy to unrelated transfer / grasp keyframes changes
+                    # previously validated global branch selection.
+                    ik_options["seed_qpos"] = start_joint_config
                 solutions = self._kinematics.solve_all_ik(
                     pose.position_m,
                     pose.orientation_xyzw,
-                    position_tolerance_m=self._position_tolerance_m,
-                    orientation_tolerance_rad=self._orientation_tolerance_rad,
+                    **ik_options,
                 )
                 valid_solutions = filter_ik_solutions(
                     solutions, keyframe, state_validator

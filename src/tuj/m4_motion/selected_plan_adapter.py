@@ -12,6 +12,8 @@ from tuj.m3_taskplanner.serialization import CandidateAssignment, PlanStep, Sele
 
 from tuj.m4_motion.schema import (
     ArtifactProvenance,
+    ContactManipulationSpec,
+    ContactSurfaceType,
     GoalType,
     ModuleName,
     MotionConstraints,
@@ -22,6 +24,7 @@ from tuj.m4_motion.schema import (
     Pose,
     WorldSnapshot,
 )
+from tuj.m4_motion.task_semantics import is_acquire_action
 
 
 class SelectedPlanAdapterError(ValueError):
@@ -213,31 +216,45 @@ def _goal(
         target_pose = _object_pose(world, target_ids)
 
     normalized = action_type.strip().lower()
-    explicit_goal = parameters.get("goal_type")
+    explicit_goal = parameters.get("goal_representation", parameters.get("goal_type"))
     if explicit_goal is not None:
+        normalized_goal = str(getattr(explicit_goal, "value", explicit_goal)).upper()
+        if normalized_goal in {
+            "PICK",
+            "PLACE",
+            "DOCK",
+            "TOOL_CHANGE",
+            "EE_EXCHANGE",
+            "PUSH",
+            "PULL",
+            "SWEEP",
+            "INSERT",
+            "POUR",
+        }:
+            normalized_goal = GoalType.POSE.value
         try:
-            goal_type = GoalType(str(explicit_goal).upper())
+            goal_type = GoalType(normalized_goal)
         except ValueError as error:
             raise SelectedPlanAdapterError(
-                f"unsupported goal_type {explicit_goal!r} for {assignment.subgoal_id!r}"
+                "unsupported motion goal representation "
+                f"{explicit_goal!r} for {assignment.subgoal_id!r}"
             ) from error
     elif joint_target is not None:
         goal_type = GoalType.JOINT
-    elif any(token in normalized for token in ("pick", "grasp", "acquire")):
-        goal_type = GoalType.PICK
-    elif any(token in normalized for token in ("place", "position", "release")):
-        goal_type = GoalType.PLACE
-    elif "dock" in normalized:
-        goal_type = GoalType.DOCK
     else:
         goal_type = GoalType.POSE
 
-    if goal_type in {GoalType.POSE, GoalType.PLACE, GoalType.DOCK} and target_pose is None:
+    if (
+        goal_type is GoalType.POSE
+        and target_pose is None
+        and not target_ids
+        and assignment.goal_region_id is None
+    ):
         raise SelectedPlanAdapterError(
-            f"subgoal {assignment.subgoal_id!r} requires a target pose but none was "
-            "preserved in the selected candidate, grasp, or world snapshot"
+            f"subgoal {assignment.subgoal_id!r} requires a grounded pose, object, "
+            "or region target"
         )
-    if goal_type is GoalType.PICK and assignment.grasp is None:
+    if any(token in normalized for token in ("pick", "grasp", "acquire")) and assignment.grasp is None:
         raise SelectedPlanAdapterError(
             f"PICK subgoal {assignment.subgoal_id!r} requires a structured grasp"
         )
@@ -261,6 +278,32 @@ def _goal(
     )
 
 
+def _contact_spec(
+    assignment: CandidateAssignment,
+    execution: PlanStep,
+) -> ContactManipulationSpec | None:
+    """Preserve an optional grounded contact intent without action enums."""
+
+    parameters = _merged_action_parameters(assignment, execution)
+    raw = parameters.get("contact")
+    if isinstance(raw, Mapping):
+        return ContactManipulationSpec.model_validate(raw)
+
+    action = _action_type(assignment, execution)
+    mode = str(assignment.mode or "").strip()
+    normalized = f"{action}:{mode}".lower()
+    if not any(token in normalized for token in ("push", "pull", "sweep")):
+        return None
+    surface = parameters.get("contact_surface", ContactSurfaceType.AUTO.value)
+    return ContactManipulationSpec(
+        primitive=mode or action,
+        contact_surface=surface,
+        contact_patch_id=parameters.get("contact_patch_id"),
+        path_pattern=str(parameters.get("path_pattern", "AUTO")),
+        target_grouping=str(parameters.get("target_grouping", "SINGLE")),
+        maintain_contact=bool(parameters.get("maintain_contact", False)),
+        max_contact_force_n=parameters.get("max_contact_force_n"),
+    )
 def _source_value(
     source: Any,
     subgoal_id: str,
@@ -386,7 +429,8 @@ class SelectedPlanMotionRequestAdapter:
             allowed_touch = _merged_action_parameters(
                 assignment, execution
             ).get("allowed_touch_objects", [])
-            if goal.goal_type is GoalType.PICK and not allowed_touch:
+            contact = _contact_spec(assignment, execution)
+            if is_acquire_action(action_type) and not allowed_touch:
                 allowed_touch = list(target_ids)
             if not isinstance(allowed_touch, list):
                 raise SelectedPlanAdapterError(
@@ -429,11 +473,14 @@ class SelectedPlanMotionRequestAdapter:
                         target_ids=target_ids,
                         grasp=assignment.grasp,
                         goal=goal,
+                        contact=contact,
                         allowed_touch_objects=[str(item) for item in allowed_touch],
                         metadata={
                             "selected_plan_index": index,
                             "candidate_id": assignment.candidate_id,
                             "description": assignment.description,
+                            "mode": assignment.mode,
+                            "source_binding": dict(assignment.source_binding),
                             "task_planner_steps": [
                                 step.model_dump(mode="json") for step in steps
                             ],

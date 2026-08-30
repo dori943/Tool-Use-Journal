@@ -449,6 +449,7 @@ class UR5eKinematics:
         world_pos: Sequence[float],
         orientation_xyzw: Sequence[float],
         *,
+        seed_qpos: Sequence[float] | None = None,
         position_tolerance_m: float = 5e-3,
         orientation_tolerance_rad: float = 5e-2,
         max_iterations: int = 180,
@@ -488,9 +489,32 @@ class UR5eKinematics:
                 ),
             )
 
-        # Cover the three binary UR branch choices deterministically.  The
-        # original comfort seeds remain first so common poses converge quickly.
-        seeds: list[tuple[float, ...]] = list(_SEED_LADDER)
+        # A Cartesian edge is a continuation problem, not a fresh global IK
+        # query.  Put its previous joint state first so a locally continuous
+        # solution is retained before enumerating the global UR branches.  A
+        # fixed global seed ladder alone can miss the nearby branch at an
+        # intermediate pose; joint interpolation to the remaining far-away
+        # solution then makes the EEF leave the requested Cartesian line and
+        # come back in a large, physically unsafe loop.
+        seeds: list[tuple[float, ...]] = []
+        if seed_qpos is not None:
+            seed_values = np.asarray(seed_qpos, dtype=float)
+            if seed_values.shape != (self._nq,) or not np.all(
+                np.isfinite(seed_values)
+            ):
+                raise ValueError(
+                    f"seed_qpos must contain {self._nq} finite joint values"
+                )
+            if np.any(seed_values < self._lower - 1e-9) or np.any(
+                seed_values > self._upper + 1e-9
+            ):
+                raise ValueError("seed_qpos must remain inside physical joint limits")
+            seeds.append(tuple(float(value) for value in seed_values))
+
+        # Cover the three binary UR branch choices deterministically after the
+        # local continuation seed.  Global pose queries keep the original
+        # deterministic ordering when no seed is supplied.
+        seeds.extend(_SEED_LADDER)
         for shoulder in (-1.57, 1.57):
             for elbow in (-1.57, 1.57):
                 for wrist in (-1.57, 1.57):
