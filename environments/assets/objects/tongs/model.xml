@@ -1,0 +1,123 @@
+<mujoco model="model">
+  <option timestep="0.0020" gravity="0.0000 0.0000 -9.8100"/>
+  <compiler angle="radian"/>
+  <asset>
+    <mesh file="visuals/Tong001.obj" name="Tong001_vis"/>
+    <mesh file="visuals/Tong001_Body001.obj" name="Tong001_Body001_vis"/>
+    <texture file="visuals/T_Tong001_BC001.png" name="Tong001_material" type="2d"/>
+    <material name="Tong001_material" rgba="1 1 1 1.0000" texture="Tong001_material" shininess="0.85" specular="0.90"/>
+    <texture file="visuals/T_Tong001_BC001.png" name="Tong001_Body001_material" type="2d"/>
+    <material name="Tong001_Body001_material" rgba="1 1 1 1.0000" texture="Tong001_Body001_material" shininess="0.16" specular="0.22"/>
+    <mesh file="collision/Tong001001.obj" name="Tong001001_mesh"/>
+    <mesh file="collision/Tong001002.obj" name="Tong001002_mesh"/>
+    <mesh file="collision/Tong001003.obj" name="Tong001003_mesh"/>
+    <mesh file="collision/Tong001004.obj" name="Tong001004_mesh"/>
+    <mesh file="collision/Tong001005.obj" name="Tong001005_mesh"/>
+    <mesh file="collision/Tong001006.obj" name="Tong001006_mesh"/>
+    <mesh file="collision/Tong001007.obj" name="Tong001007_mesh"/>
+    <mesh file="collision/Tong001008.obj" name="Tong001008_mesh"/>
+    <mesh file="collision/Tong001009.obj" name="Tong001009_mesh"/>
+    <mesh file="collision/Tong001010.obj" name="Tong001010_mesh"/>
+    <mesh file="collision/Tong001011.obj" name="Tong001011_mesh"/>
+    <mesh file="collision/Tong001012.obj" name="Tong001012_mesh"/>
+    <mesh file="collision/Tong001013.obj" name="Tong001013_mesh"/>
+    <mesh file="collision/Tong001014.obj" name="Tong001014_mesh"/>
+    <mesh file="collision/Tong001015.obj" name="Tong001015_mesh"/>
+    <mesh file="collision/Tong001016.obj" name="Tong001016_mesh"/>
+    <mesh file="collision/Tong001017.obj" name="Tong001017_mesh"/>
+    <mesh file="collision/Tong001018.obj" name="Tong001018_mesh"/>
+    <mesh file="collision/Tong001019.obj" name="Tong001019_mesh"/>
+    <mesh file="collision/Tong001020.obj" name="Tong001020_mesh"/>
+    <mesh file="collision/Tong001021.obj" name="Tong001021_mesh"/>
+    <mesh file="collision/Tong001022.obj" name="Tong001022_mesh"/>
+    <mesh file="collision/Tong001023.obj" name="Tong001023_mesh"/>
+    <mesh file="collision/Tong001024.obj" name="Tong001024_mesh"/>
+    <mesh file="collision/Tong001025.obj" name="Tong001025_mesh"/>
+    <mesh file="collision/Tong001026.obj" name="Tong001026_mesh"/>
+    <mesh file="collision/Tong001027.obj" name="Tong001027_mesh"/>
+    <mesh file="collision/Tong001028.obj" name="Tong001028_mesh"/>
+    <mesh file="collision/Tong001_Body001001.obj" name="Tong001_Body001001_mesh"/>
+    <mesh file="collision/Tong001_Body001002.obj" name="Tong001_Body001002_mesh"/>
+    <mesh file="collision/Tong001_Body001003.obj" name="Tong001_Body001003_mesh"/>
+    <mesh file="collision/Tong001_Body001004.obj" name="Tong001_Body001004_mesh"/>
+    <mesh file="collision/Tong001_Body001005.obj" name="Tong001_Body001005_mesh"/>
+    <mesh file="collision/Tong001_Body001006.obj" name="Tong001_Body001006_mesh"/>
+    <mesh file="collision/Tong001_Body001007.obj" name="Tong001_Body001007_mesh"/>
+    <mesh file="collision/Tong001_Body001008.obj" name="Tong001_Body001008_mesh"/>
+    <mesh file="collision/Tong001_Body001009.obj" name="Tong001_Body001009_mesh"/>
+    <mesh file="collision/Tong001_Body001010.obj" name="Tong001_Body001010_mesh"/>
+    <mesh file="collision/Tong001_Body001011.obj" name="Tong001_Body001011_mesh"/>
+    <mesh file="collision/Tong001_Body001012.obj" name="Tong001_Body001012_mesh"/>
+    <mesh file="collision/Tong001_Body001013.obj" name="Tong001_Body001013_mesh"/>
+  </asset>
+  <default>
+    <default class="visual">
+      <geom conaffinity="0" contype="0" group="1" type="mesh"/>
+    </default>
+    <default class="collision">
+      <geom group="0" rgba="0.5 0 0 0.5" density="1.0" solref="0.004 1" solimp="0.998 0.998 0.001"/>
+    </default>
+    <default class="spawn">
+      <geom group="0" rgba="1 1 1 0.5" contype="0" conaffinity="0"/>
+      <site group="0" rgba="1 1 1 0.5"/>
+    </default>
+    <default class="region">
+      <geom group="1" conaffinity="0" contype="0" rgba="0 1 0 0" mass="0"/>
+    </default>
+  </default>
+  <worldbody>
+    <body>
+      <body name="object">
+        <geom class="region" name="reg_bbox" type="box" pos="9.229999999999829e-06 3.1964999999994914e-05 0.002249625" size="0.01535827 0.129195495 0.012652625"/>
+        <geom mesh="Tong001_vis" type="mesh" friction="0.9500 0.3000 0.1000" class="visual" material="Tong001_material"/>
+        <body name="Tong001_Body001">
+          <geom mesh="Tong001_Body001_vis" type="mesh" friction="0.9500 0.3000 0.1000" class="visual" material="Tong001_Body001_material"/>
+        </body>
+        <geom mesh="Tong001001_mesh" type="mesh" class="collision" name="collision_1"/>
+        <geom mesh="Tong001002_mesh" type="mesh" class="collision" name="collision_2"/>
+        <geom mesh="Tong001003_mesh" type="mesh" class="collision" name="collision_3"/>
+        <geom mesh="Tong001004_mesh" type="mesh" class="collision" name="collision_4"/>
+        <geom mesh="Tong001005_mesh" type="mesh" class="collision" name="collision_5"/>
+        <geom mesh="Tong001006_mesh" type="mesh" class="collision" name="collision_6"/>
+        <geom mesh="Tong001007_mesh" type="mesh" class="collision" name="collision_7"/>
+        <geom mesh="Tong001008_mesh" type="mesh" class="collision" name="collision_8"/>
+        <geom mesh="Tong001009_mesh" type="mesh" class="collision" name="collision_9"/>
+        <geom mesh="Tong001010_mesh" type="mesh" class="collision" name="collision_10"/>
+        <geom mesh="Tong001011_mesh" type="mesh" class="collision" name="collision_11"/>
+        <geom mesh="Tong001012_mesh" type="mesh" class="collision" name="collision_12"/>
+        <geom mesh="Tong001013_mesh" type="mesh" class="collision" name="collision_13"/>
+        <geom mesh="Tong001014_mesh" type="mesh" class="collision" name="collision_14"/>
+        <geom mesh="Tong001015_mesh" type="mesh" class="collision" name="collision_15"/>
+        <geom mesh="Tong001016_mesh" type="mesh" class="collision" name="collision_16"/>
+        <geom mesh="Tong001017_mesh" type="mesh" class="collision" name="collision_17"/>
+        <geom mesh="Tong001018_mesh" type="mesh" class="collision" name="collision_18"/>
+        <geom mesh="Tong001019_mesh" type="mesh" class="collision" name="collision_19"/>
+        <geom mesh="Tong001020_mesh" type="mesh" class="collision" name="collision_20"/>
+        <geom mesh="Tong001021_mesh" type="mesh" class="collision" name="collision_21"/>
+        <geom mesh="Tong001022_mesh" type="mesh" class="collision" name="collision_22"/>
+        <geom mesh="Tong001023_mesh" type="mesh" class="collision" name="collision_23"/>
+        <geom mesh="Tong001024_mesh" type="mesh" class="collision" name="collision_24"/>
+        <geom mesh="Tong001025_mesh" type="mesh" class="collision" name="collision_25"/>
+        <geom mesh="Tong001026_mesh" type="mesh" class="collision" name="collision_26"/>
+        <geom mesh="Tong001027_mesh" type="mesh" class="collision" name="collision_27"/>
+        <geom mesh="Tong001028_mesh" type="mesh" class="collision" name="collision_28"/>
+        <geom mesh="Tong001_Body001001_mesh" type="mesh" class="collision" name="collision_29"/>
+        <geom mesh="Tong001_Body001002_mesh" type="mesh" class="collision" name="collision_30"/>
+        <geom mesh="Tong001_Body001003_mesh" type="mesh" class="collision" name="collision_31"/>
+        <geom mesh="Tong001_Body001004_mesh" type="mesh" class="collision" name="collision_32"/>
+        <geom mesh="Tong001_Body001005_mesh" type="mesh" class="collision" name="collision_33"/>
+        <geom mesh="Tong001_Body001006_mesh" type="mesh" class="collision" name="collision_34"/>
+        <geom mesh="Tong001_Body001007_mesh" type="mesh" class="collision" name="collision_35"/>
+        <geom mesh="Tong001_Body001008_mesh" type="mesh" class="collision" name="collision_36"/>
+        <geom mesh="Tong001_Body001009_mesh" type="mesh" class="collision" name="collision_37"/>
+        <geom mesh="Tong001_Body001010_mesh" type="mesh" class="collision" name="collision_38"/>
+        <geom mesh="Tong001_Body001011_mesh" type="mesh" class="collision" name="collision_39"/>
+        <geom mesh="Tong001_Body001012_mesh" type="mesh" class="collision" name="collision_40"/>
+        <geom mesh="Tong001_Body001013_mesh" type="mesh" class="collision" name="collision_41"/>
+      </body>
+    </body>
+  </worldbody>
+  <custom>
+    <text name="material_gt" data="metal_plastic"/>
+  </custom>
+</mujoco>

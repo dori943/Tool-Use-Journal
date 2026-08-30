@@ -57,6 +57,8 @@ def run_m1(task: str, m0_serialized: dict, rough=None) -> dict:
             "n_edges": len(edges),
             "n_mutex": len(mutex),
             "n_m2_queries": len(all_queries),
+            # 단계별 LLM 토큰 (0828 — Fig1 token 그래프, 호출 통합 A/B 근거)
+            "llm_usage": getattr(rough, "usage", {}),
         },
     }
 
@@ -91,5 +93,12 @@ def run_m1_with_m2(task: str, m0: dict, ee_pool: list[dict], reach_mm: float,
                 mat.query_relational(gk, c["a"], c["b"], c["relation"], q["queried_by"])
             elif c["kind"] == "ee":
                 mat.query_ee(gk, c["node_id"], ee_pool, q["queried_by"], reach_mm=reach_mm)
+            elif c["kind"] in ("batch", "swept_space"):
+                # 0828 신규 질의 — 측정 모듈(m2_grounding)에 구현되기 전까지는 건너뛴다
+                # (해당 술어는 unanswered로 남고, 분할 없이 기존 동작으로 폴백)
+                fn = getattr(mat, "query_batch" if c["kind"] == "batch"
+                             else "query_swept_space", None)
+                if fn is not None:
+                    fn(gk, c, q["queried_by"])
         gks.append(gk)
     return out, gks

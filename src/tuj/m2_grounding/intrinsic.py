@@ -47,8 +47,6 @@ class PropertyBackend:
         raise NotImplementedError
 
 
-# SiPhyBackend는 siphy_backend.py (공개 코드 이식본) — __init__에서 re-export.
-
 
 class MockBackend(PropertyBackend):
     """클래스→속성 표 (배관·결정로직 검증용, 결정론적)."""
@@ -120,11 +118,13 @@ class FrictionHead:
             rec.update(mu=mu, stage=1, material=material, rms_mm=round(float(rms_mm), 2))
             if abs(margin_fn(mu)) >= eps:
                 return rec
-        if probe_fn is not None:                                  # 2단: 물리 프로브
-            track, dt = probe_fn()
-            mu_p = self.probe_mu_from_track(track, dt)
-            if mu_p is not None:
-                rec.update(mu=mu_p, stage=2)
+        # ── 2단 마찰 프로브: M4 프리미티브(probe_push) 연결 전까지 비활성 ──
+        # TODO(M4): src/tuj/m4_motion/README.md의 probe_push 완성 시 주석 해제
+        # if probe_fn is not None:                                  # 2단: 물리 프로브
+        #     track, dt = probe_fn()
+        #     mu_p = self.probe_mu_from_track(track, dt)
+        #     if mu_p is not None:
+        #         rec.update(mu=mu_p, stage=2)
         return rec
 
 
