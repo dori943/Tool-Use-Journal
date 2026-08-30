@@ -36,6 +36,7 @@ from tuj.m4_motion.task_semantics import (
     detaches_target,
     is_acquire_task,
     is_release_task,
+    task_operation,
 )
 
 
@@ -356,6 +357,27 @@ class OpenAIKeyframeProvider:
                             else KeyframeEventType.GRIPPER_OPEN
                         )
                         event_target_id = request.task.goal.target_object_id
+                    metadata: dict[str, Any] = {}
+                    if event_target_id is not None:
+                        metadata["event_target_id"] = event_target_id
+                    operation = task_operation(request.task)
+                    event_parameters: dict[str, dict[str, str]] = {}
+                    if (
+                        operation == "PICK_TOOL"
+                        and KeyframeEventType.ATTACH_OBJECT in events
+                    ):
+                        event_parameters[KeyframeEventType.ATTACH_OBJECT.value] = {
+                            "resource_kind": "tool"
+                        }
+                    if (
+                        operation in {"RETURN_TOOL", "TERMINAL_RETURN_TOOL"}
+                        and KeyframeEventType.DETACH_OBJECT in events
+                    ):
+                        event_parameters[KeyframeEventType.DETACH_OBJECT.value] = {
+                            "resource_kind": "tool"
+                        }
+                    if event_parameters:
+                        metadata["event_parameters"] = event_parameters
                     keyframe = RelativeKeyframeSpec(
                         keyframe_id=(
                             f"{strategy_id}:{keyframe_index}:{item.keyframe_id}"
@@ -369,11 +391,7 @@ class OpenAIKeyframeProvider:
                         roll_rad=item.roll_rad,
                         planner=item.planner,
                         events_after=events,
-                        metadata=(
-                            {"event_target_id": event_target_id}
-                            if event_target_id is not None
-                            else {}
-                        ),
+                        metadata=metadata,
                     )
                     # Resolve now so unknown frames/anchors never enter the compiler.
                     resolver.resolve(keyframe)

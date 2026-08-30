@@ -49,9 +49,6 @@ from tuj.m4_motion.schema import (
 )
 
 
-TOOL_USE_JOURNAL_ENVIRONMENTS = frozenset(
-    {"C1_1_LegoSweep", "C2_1_ObjectSorting"}
-)
 TOOL_USE_JOURNAL_EE_GRIPPER_TYPES: dict[str, str] = {
     "2F": "Robotiq85Gripper",
     "3F": "JacoThreeFingerDexterousGripper",
@@ -329,12 +326,61 @@ def _declared_current_ee(env: object) -> str | None:
     return None
 
 
+def _load_repository_environments(repository_root: str | Path) -> object:
+    """Import the checkout-local ``environments`` registration package."""
+
+    root = Path(repository_root).resolve()
+    if not (root / "environments" / "__init__.py").is_file():
+        raise ToolUseJournalCompatibilityError(
+            f"{root} is not a Tool-Use-Journal checkout"
+        )
+    if str(root) not in sys.path:
+        sys.path.insert(0, str(root))
+    loaded = sys.modules.get("environments")
+    if loaded is not None:
+        loaded_file = Path(str(getattr(loaded, "__file__", ""))).resolve()
+        if root not in loaded_file.parents:
+            raise ToolUseJournalCompatibilityError(
+                "another top-level 'environments' package is already imported"
+            )
+    importlib.invalidate_caches()
+    return importlib.import_module("environments")
+
+
+def registered_tool_use_journal_environments(
+    repository_root: str | Path,
+) -> frozenset[str]:
+    """Discover checkout-local robosuite environments after package import.
+
+    Importing ``environments/__init__.py`` is the single registration step.
+    Any robosuite-registered class implemented by that package is accepted;
+    the runtime adapter separately verifies the robot, rack, and object API.
+    """
+
+    _load_repository_environments(repository_root)
+    from robosuite.environments.base import REGISTERED_ENVS
+
+    names = {
+        str(name)
+        for name, environment_type in REGISTERED_ENVS.items()
+        if str(getattr(environment_type, "__module__", "")) == "environments"
+        or str(getattr(environment_type, "__module__", "")).startswith(
+            "environments."
+        )
+    }
+    if not names:
+        raise ToolUseJournalCompatibilityError(
+            "environments/__init__.py did not register any checkout-local "
+            "robosuite environments"
+        )
+    return frozenset(names)
+
+
 def _environment_name(env: object) -> str:
     name = type(env).__name__
-    if name not in TOOL_USE_JOURNAL_ENVIRONMENTS:
+    if not name:
         raise ToolUseJournalCompatibilityError(
-            f"unsupported environment {name!r}; expected one of "
-            f"{sorted(TOOL_USE_JOURNAL_ENVIRONMENTS)}"
+            "environment class has no registered name"
         )
     return name
 
@@ -352,29 +398,17 @@ def make_tool_use_journal_env(
     model.  The caller owns the returned environment and should close it.
     """
 
-    if env_name not in TOOL_USE_JOURNAL_ENVIRONMENTS:
+    registered = registered_tool_use_journal_environments(repository_root)
+    if env_name not in registered:
         raise ToolUseJournalCompatibilityError(
-            f"unsupported environment {env_name!r}"
+            f"environment {env_name!r} is not registered by "
+            "environments/__init__.py; available checkout environments are "
+            f"{sorted(registered)}"
         )
     if active_ee is not None and active_ee not in _EXPECTED_EES:
         raise ToolUseJournalCompatibilityError(
             f"unsupported EE {active_ee!r}; expected one of {sorted(_EXPECTED_EES)}"
         )
-    root = Path(repository_root).resolve()
-    if not (root / "environments" / "__init__.py").is_file():
-        raise ToolUseJournalCompatibilityError(
-            f"{root} is not a Tool-Use-Journal checkout"
-        )
-    if str(root) not in sys.path:
-        sys.path.insert(0, str(root))
-    loaded = sys.modules.get("environments")
-    if loaded is not None:
-        loaded_file = Path(str(getattr(loaded, "__file__", ""))).resolve()
-        if root not in loaded_file.parents:
-            raise ToolUseJournalCompatibilityError(
-                "another top-level 'environments' package is already imported"
-            )
-    importlib.import_module("environments")
     import robosuite as suite
 
     options = {
@@ -402,7 +436,7 @@ def make_tool_use_journal_env(
 
 
 class ToolUseJournalEnvironmentAdapter:
-    """Read a reset C1/C2 environment into the Motion Planner contract."""
+    """Read a reset registered workcell into the Motion Planner contract."""
 
     def __init__(
         self,
@@ -884,7 +918,7 @@ class CompiledToolUseJournalCollisionModel:
 
 
 class ToolUseJournalCollisionModelCompiler:
-    """Compile synchronized bare and mounted-EE models from C1/C2 env variants."""
+    """Compile synchronized bare and mounted-EE workcell model variants."""
 
     def __init__(
         self,

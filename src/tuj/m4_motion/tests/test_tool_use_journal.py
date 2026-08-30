@@ -13,6 +13,8 @@ from tuj.m4_motion.tool_use_journal import (
     ToolUseJournalCollisionModelCompiler,
     ToolUseJournalCompatibilityError,
     ToolUseJournalEnvironmentAdapter,
+    make_tool_use_journal_env,
+    registered_tool_use_journal_environments,
 )
 from tuj.m4_motion.oracle import _as_position
 from tuj.m4_motion.schema import (
@@ -195,6 +197,45 @@ def _fake_env(active_ee: str | None):
         for index, (ee, root) in enumerate(EE_ROOTS.items())
     }
     return env
+
+
+def test_repository_environment_registry_is_discovered_from_package_import(
+    monkeypatch,
+) -> None:
+    import robosuite
+    from robosuite.environments.base import REGISTERED_ENVS
+
+    repository = Path(__file__).resolve().parents[4]
+    registered = registered_tool_use_journal_environments(repository)
+    assert {"C1_1_LegoSweep", "C2_1_ObjectSorting"} <= registered
+    assert "Lift" not in registered
+
+    experimental_type = type("ExperimentalTask", (), {})
+    experimental_type.__module__ = "environments.experimental_task"
+    monkeypatch.setitem(REGISTERED_ENVS, "ExperimentalTask", experimental_type)
+    observed: dict[str, object] = {}
+
+    def fake_make(*, env_name: str, **options):
+        observed["env_name"] = env_name
+        observed["options"] = options
+        return SimpleNamespace(environment_name=env_name)
+
+    monkeypatch.setattr(robosuite, "make", fake_make)
+
+    env = make_tool_use_journal_env(
+        repository,
+        "ExperimentalTask",
+        active_ee=None,
+        seed=7,
+    )
+
+    assert "ExperimentalTask" in registered_tool_use_journal_environments(
+        repository
+    )
+    assert env.environment_name == "ExperimentalTask"
+    assert observed["env_name"] == "ExperimentalTask"
+    assert observed["options"]["gripper_types"] is None
+    assert observed["options"]["seed"] == 7
 
 
 def test_adapter_captures_mjcf_world_and_target_ee_ids() -> None:
@@ -439,6 +480,8 @@ def test_runtime_grasp_attach_tracks_hand_and_blocks_tool_exchange() -> None:
     )
     assert attachment.object_id == "apple"
     assert runtime.attached_object_id == "apple"
+    runtime.mark_attached_object_as_tool("apple")
+    assert runtime.held_tool_id == "apple"
     with pytest.raises(ToolUseJournalRuntimeError, match="while object"):
         runtime.unlock("2F")
     with pytest.raises(ToolUseJournalRuntimeError, match="detach object"):
@@ -457,6 +500,7 @@ def test_runtime_grasp_attach_tracks_hand_and_blocks_tool_exchange() -> None:
     runtime.detach_object("apple")
     runtime.command_gripper(engaged=False, suction=False)
     assert runtime.attached_object_id is None
+    assert runtime.held_tool_id is None
     runtime.close()
 
 

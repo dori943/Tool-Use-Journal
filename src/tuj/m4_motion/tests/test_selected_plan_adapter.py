@@ -176,12 +176,61 @@ def test_rejects_one_stale_world_for_multiple_subgoals() -> None:
         )
 
 
-def test_acquire_requires_structured_grasp() -> None:
+def test_acquire_without_structured_grasp_is_grounded_for_m5_planning() -> None:
     selected = _selected_plan()
     selected.candidate_assignments[1].grasp = None
     selected.candidate_assignments[1].grasp_id = None
 
-    with pytest.raises(SelectedPlanAdapterError, match="requires a structured grasp"):
+    requests = SelectedPlanMotionRequestAdapter().convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": _world("scene:pick", [0.2, 0.3]),
+        },
+        constraints=MotionConstraints(),
+    )
+
+    assert requests[1].task.grasp is None
+    assert requests[1].task.goal.target_object_id == "part"
+    assert requests[1].task.goal.target_pose is not None
+
+
+@pytest.mark.parametrize(
+    ("target_id", "message"),
+    [
+        ("?tool", "unresolved targets"),
+        ("missing-object", "absent from the WorldSnapshot"),
+    ],
+)
+def test_rejects_unresolved_or_absent_targets(
+    target_id: str,
+    message: str,
+) -> None:
+    selected = _selected_plan()
+    selected.candidate_assignments[1].target_ids = [target_id]
+    selected.candidate_assignments[1].grasp = None
+    selected.candidate_assignments[1].grasp_id = None
+
+    with pytest.raises(SelectedPlanAdapterError, match=message):
+        SelectedPlanMotionRequestAdapter().convert(
+            selected,
+            worlds={
+                "sg-place": _world("scene:place", [0.0, 0.1]),
+                "sg-pick": _world("scene:pick", [0.2, 0.3]),
+            },
+            constraints=MotionConstraints(),
+        )
+
+
+def test_rejects_grasp_owned_by_a_different_resource() -> None:
+    selected = _selected_plan()
+    selected.candidate_assignments[1].grasp = GraspSpec(
+        grasp_id="wrong-owner",
+        owner_kind="object",
+        owner_id="bin",
+    )
+
+    with pytest.raises(SelectedPlanAdapterError, match="does not match targets"):
         SelectedPlanMotionRequestAdapter().convert(
             selected,
             worlds={

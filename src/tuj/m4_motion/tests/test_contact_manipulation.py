@@ -12,6 +12,7 @@ from tuj.m4_motion.closed_loop_contact import (
 from tuj.m4_motion.contact_evaluation import (
     CompositeGoalEvaluator,
     RegionContainmentEvaluator,
+    TaskAwareGoalEvaluator,
     ToolClearanceEvaluator,
 )
 from tuj.m4_motion.execution import GoalEvaluationStatus
@@ -35,6 +36,7 @@ from tuj.m4_motion.schema import (
     MotionGoal,
     MotionPlanRequest,
     MotionTask,
+    Pose,
     RobotState,
     SceneRef,
     SimulationMetrics,
@@ -250,6 +252,39 @@ def test_composite_goal_requires_region_containment_and_tool_clearance() -> None
     outside_world = _world(target_x_m=0.24)
     failed = evaluator.evaluate(request, _report(), outside_world)
     assert failed.status is GoalEvaluationStatus.FAILED
+
+
+def test_task_aware_goal_routes_physical_regions_and_conceptual_tool_rest() -> None:
+    region_request = _request(target_x_m=0.04)
+    evaluator = TaskAwareGoalEvaluator()
+
+    region_result = evaluator.evaluate(
+        region_request,
+        _report(),
+        region_request.world,
+    )
+    assert region_result.status is GoalEvaluationStatus.SATISFIED
+    assert region_result.observed["region_id"] == "region"
+
+    rest_pose = Pose(
+        frame_id="world",
+        position_m=(0.0, -0.25, 0.08),
+        orientation_xyzw=(0.0, 0.0, 0.0, 1.0),
+    )
+    transport = region_request.model_copy(deep=True)
+    transport.task.action_type = "transport"
+    transport.task.target_ids = ["plate"]
+    transport.task.goal = MotionGoal(
+        goal_type=GoalType.POSE,
+        target_pose=rest_pose,
+        target_object_id="plate",
+        target_region_id="tool_rest",
+    )
+    report = _report()
+    report.final_robot_state.eef_pose = rest_pose
+
+    rest_result = evaluator.evaluate(transport, report, transport.world)
+    assert rest_result.status is GoalEvaluationStatus.SATISFIED
 
 
 def test_profiles_reject_nonphysical_retry_configuration() -> None:

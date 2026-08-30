@@ -491,8 +491,10 @@ class ToolUseJournalEERuntime:
         self._gripper_command = -1.0
         self._grasp_engaged = False
         self._attachment: AttachedObjectState | None = None
+        self._held_tool_id: str | None = None
         self._breakable_runtime: _BreakableAttachmentRuntime | None = None
         self._last_attachment_break: AttachmentBreakObservation | None = None
+        self._render_callback: Callable[[object], None] | None = None
         self._set_declared_active_ee(env, self._active_ee)
         self._hidden_rack_ee = self._apply_rack_visibility(
             env, self._active_ee
@@ -612,8 +614,50 @@ class ToolUseJournalEERuntime:
         return self._attachment.object_id if self._attachment is not None else None
 
     @property
+    def held_tool_id(self) -> str | None:
+        """Task-level tool resource currently attached to the active EE."""
+
+        return self._held_tool_id
+
+    def mark_attached_object_as_tool(self, object_id: str) -> None:
+        """Record that the physical attachment represents a held task tool."""
+
+        if self.attached_object_id != object_id:
+            raise ToolUseJournalRuntimeError(
+                f"cannot mark tool {object_id!r}; attached object is "
+                f"{self.attached_object_id!r}"
+            )
+        self._held_tool_id = object_id
+
+    @property
     def last_attachment_break(self) -> AttachmentBreakObservation | None:
         return self._last_attachment_break
+
+    def set_render_callback(
+        self,
+        callback: Callable[[object], None] | None,
+    ) -> None:
+        """Override per-tick rendering without binding to one EE env variant.
+
+        EE exchange replaces the underlying robosuite environment. Keeping the
+        callback on the runtime lets viewers and recorders follow that swap
+        instead of retaining a closed environment.
+        """
+
+        if callback is not None and not callable(callback):
+            raise TypeError("render callback must be callable or None")
+        self._render_callback = callback
+
+    def render(self) -> None:
+        """Render the current environment, including after an EE model swap."""
+
+        callback = self._render_callback
+        if callback is not None:
+            callback(self.env)
+            return
+        render = getattr(self.env, "render", None)
+        if callable(render):
+            render()
 
     @property
     def attachment_contact_metrics(self) -> AttachmentContactMetrics | None:
@@ -1370,6 +1414,8 @@ class ToolUseJournalEERuntime:
         )
         self._clear_attachment_wrench()
         self._attachment = None
+        if self._held_tool_id == attachment.object_id:
+            self._held_tool_id = None
         self._breakable_runtime = None
         self._last_attachment_break = observation
         raise ToolUseJournalAttachmentBroken(observation)
@@ -1781,6 +1827,8 @@ class ToolUseJournalEERuntime:
             qvel_start = int(model.jnt_dofadr[joint_id])
             data.qvel[qvel_start : qvel_start + 6] = 0.0
         self._attachment = None
+        if self._held_tool_id == attachment.object_id:
+            self._held_tool_id = None
         self._breakable_runtime = None
         mujoco.mj_forward(model, data)
         return attachment
@@ -2108,6 +2156,8 @@ class ToolUseJournalKinematicTrajectoryPlayer:
                 attachment_mode=mode,
                 breakable_weld=breakable_weld,
             )
+            if event.parameters.get("resource_kind") == "tool":
+                self.runtime.mark_attached_object_as_tool(target)
             message = (
                 f"attached {target} in {attachment.mode.value} mode to "
                 f"{attachment.reference_kind} "
@@ -2208,6 +2258,7 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             gripper_mode = GripperMode.OPEN
         return state.model_copy(
             update={
+                "held_tool_id": runtime.held_tool_id,
                 "gripper": GripperState(
                     mode=gripper_mode,
                     command=runtime.gripper_command,
@@ -2278,6 +2329,7 @@ class ToolUseJournalKinematicTrajectoryPlayer:
                 "collision_probe_enabled": self._collision_probe is not None,
                 "final_active_ee": self.runtime.active_ee,
                 "final_attached_object_id": self.runtime.attached_object_id,
+                "final_held_tool_id": self.runtime.held_tool_id,
                 "final_gripper_command": self.runtime.gripper_command,
                 "ee_transition_count": len(self.runtime.transitions),
                 "attachment_mode": (
@@ -2320,6 +2372,12 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             raise ToolUseJournalRuntimeError(
                 f"plan expects attached object {expected_attachment!r}, runtime has "
                 f"{self.runtime.attached_object_id!r}"
+            )
+        expected_tool = plan.expected_final_state.held_tool_id
+        if expected_tool != self.runtime.held_tool_id:
+            raise ToolUseJournalRuntimeError(
+                f"plan expects held tool {expected_tool!r}, runtime has "
+                f"{self.runtime.held_tool_id!r}"
             )
 
     def _verify_runtime_context(self, context: Any, *, label: str) -> None:
@@ -2493,9 +2551,7 @@ class ToolUseJournalKinematicTrajectoryPlayer:
                         )
 
                     if run.config.render:
-                        render = getattr(self.runtime.env, "render", None)
-                        if callable(render):
-                            render()
+                        self.runtime.render()
                     if run.config.realtime_factor > 0.0:
                         delta = max(0.0, executed_time - previous_wall_time)
                         time.sleep(delta / run.config.realtime_factor)
@@ -3483,9 +3539,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 if check_collision_now:
                     last_collision_segment_id = segment.segment_id
                 if run.config.render:
-                    render = getattr(self.runtime.env, "render", None)
-                    if callable(render):
-                        render()
+                    self.runtime.render()
                 if run.config.realtime_factor > 0.0:
                     time.sleep(control_timestep / run.config.realtime_factor)
 
