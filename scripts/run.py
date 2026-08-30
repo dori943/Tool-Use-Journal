@@ -14,6 +14,7 @@
   python scripts/run.py c1_1              # output/c1_1/m1.json 있으면 그걸로, 없으면 mock
   python scripts/run.py c2_1
   python scripts/run.py c1_1 --m1-json path.json   # M1 JSON 경로 직접 지정
+  python scripts/run.py c1_1 --start-from m5       # 앞 단계 산출물 재사용, M5 만 다시
 
 실행 순서 (--no-roundtrip 이면 3~4 생략):
   1) M1 씬 추상화            2) M2 서브골 분해(LLM)
@@ -253,6 +254,79 @@ def stage_m4(task, out, args, gk_paths=None):
     call_main(module, argv, "run_m4_task_planner")
 
 
+def dump_motion_failure(exc, m5_dir):
+    """MotionPlanningPipelineError 가 물고 있는 거절 사유를 펼쳐 보여준다.
+
+    예외 메시지는 "NO_CONNECTED_SEQUENCE (evaluated 196 branch edges)" 까지만
+    말해준다. 왜 196개가 전부 거절됐는지는 compilation.attempts[].selection
+    .rejected_edges 에 코드와 detail 로 들어 있다.
+    """
+    from collections import Counter
+
+    comp = getattr(exc, "compilation", None)
+    print(f"\n[M5] 모션 계획 실패: {exc}")
+    if comp is None or not getattr(comp, "attempts", None):
+        print("[M5] 세부 거절 사유가 예외에 실려 있지 않습니다.")
+        return
+
+    hint = {
+        "COLLISION_MARGIN_VIOLATION":
+            "경로가 물체/랙과 충돌하거나 여유거리를 못 지킴 — detail 의 geom 쌍을 확인",
+        "INTERPOLATED_STATE_INVALID":
+            "양 끝은 유효하나 보간 중간 자세가 무효 — 스텝을 줄이거나 경유 keyframe 필요",
+        "NO_IK_BRANCH": "그 포즈에 대한 IK 해가 없음 — 도달 범위 밖이거나 자세가 과함",
+        "KINEMATIC_SINGULARITY": "특이점 부근 — 접근 자세를 바꿔야 함",
+        "JOINT_LIMIT_VIOLATION": "관절 한계 초과",
+        "RRT_CONNECT_EXHAUSTED": "샘플링 계획 반복 소진 — --options 로 반복/시간 상향 여지",
+        "RRT_CONNECT_TIMEOUT": "샘플링 계획 시간 초과 — --options 로 시간 상향 여지",
+        "CARTESIAN_INTERMEDIATE_IK_FAILED":
+            "직선 경로 중간점 IK 실패 — 샘플링 계획으로 우회 필요",
+    }
+
+    report = []
+    for attempt in comp.attempts:
+        sel = getattr(attempt, "selection", None)
+        edges = list(getattr(sel, "rejected_edges", ()) or ())
+        code = attempt.failure_code or getattr(sel, "failure_code", None) or "?"
+        print(f"\n[M5] strategy {attempt.strategy_id}: {code} — 거절 엣지 {len(edges)}건")
+        counts = Counter(e.failure_code for e in edges)
+        for c, n in counts.most_common(6):
+            ex = next(e for e in edges if e.failure_code == c)
+            print(f"       {c:34s} {n:4d}건  "
+                  f"{ex.source_keyframe_id} -> {ex.target_keyframe_id}")
+            if ex.detail:
+                print(f"         └ {ex.detail[:300]}")
+            if c in hint:
+                print(f"         └ {hint[c]}")
+        report.append({
+            "strategy_id": attempt.strategy_id,
+            "failure_code": code,
+            "detail": attempt.detail or getattr(sel, "detail", ""),
+            "rejected_edge_counts": dict(counts),
+            "rejected_edges": [
+                {"from": e.source_keyframe_id, "to": e.target_keyframe_id,
+                 "from_branch": e.source_branch_id, "to_branch": e.target_branch_id,
+                 "failure_code": e.failure_code, "detail": e.detail}
+                for e in edges
+            ],
+        })
+
+    path = m5_dir / "m5_failure.json"
+    path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
+    print(f"\n[M5] 거절 엣지 전체 -> {path}")
+
+
+def run_m5_runner(module, argv, label, m5_dir):
+    """M5 러너 호출 — 모션 계획 실패는 사유를 펼친 뒤 파이프라인을 멈춘다."""
+    try:
+        call_main(module, argv, label)
+    except Exception as exc:                      # noqa: BLE001
+        if type(exc).__name__ != "MotionPlanningPipelineError":
+            raise
+        dump_motion_failure(exc, m5_dir)
+        sys.exit("\n[중단] M5 모션 계획 실패 — 위 거절 사유를 확인하십시오.")
+
+
 def stage_m5(task, out, args):
     """M5 모션 계획.
 
@@ -281,7 +355,7 @@ def stage_m5(task, out, args):
         if args.m5_validate_only:
             argv.append("--validate-input-only")
         argv += args.m5_args
-        call_main(module, argv, "run_m5_c1_1_motion_planner")
+        run_m5_runner(module, argv, "run_m5_c1_1_motion_planner", m5_dir)
     else:
         if not env_name:
             sys.exit(f"[err] {task!r} 의 환경 이름을 모릅니다 — "
@@ -296,7 +370,7 @@ def stage_m5(task, out, args):
         elif args.m5_simulate:
             argv += ["--simulate", args.m5_simulate, "--headless"]
         argv += args.m5_args
-        call_main(module, argv, "run_m5_motion_planner")
+        run_m5_runner(module, argv, "run_m5_motion_planner", m5_dir)
 
     summary = m5_dir / "m5_summary.json"
     if summary.exists():
@@ -332,6 +406,8 @@ def build_parser():
                    help="M4 초기 상태 JSON (미지정 시 robot_spec 에서 유도)")
     p.add_argument("--no-roundtrip", action="store_true",
                    help="M3→M2 측정 반영 및 서브골 분할 왕복을 생략")
+    p.add_argument("--start-from", choices=STAGES, default=None,
+                   help="해당 모듈부터 실행 (앞 단계는 기존 산출물 재사용)")
     p.add_argument("--stop-after", choices=STAGES, default=None,
                    help="해당 모듈까지만 실행")
     p.add_argument("--skip-m4", action="store_true")
@@ -355,18 +431,29 @@ def main():
     task = args.task
     out = ROOT / "output" / task
     out.mkdir(parents=True, exist_ok=True)
+    start = STAGES.index(args.start_from) if args.start_from else 0
     stop = STAGES.index(args.stop_after) if args.stop_after else len(STAGES) - 1
+    if start > stop:
+        sys.exit(f"[err] --start-from {STAGES[start]} 이 --stop-after {STAGES[stop]} 보다 뒤입니다.")
+    gk_paths = None
 
     print(f"[run] task={task} seed={args.seed} out={out}")
-    print(f"[run] 단계: {' -> '.join(STAGES[:stop + 1])}"
-          + ("" if not args.no_roundtrip else "  (M2<->M3 왕복 생략)"))
+    print(f"[run] 단계: {' -> '.join(STAGES[start:stop + 1])}"
+          + ("" if not args.no_roundtrip else "  (M2<->M3 왕복 생략)")
+          + ("" if start == 0 else f"  (m1~{STAGES[start - 1]} 는 기존 산출물 재사용)"))
 
-    banner("M1  Scene Abstraction")
-    stage_m1(task, out, args)
+    if start <= 0:
+        banner("M1  Scene Abstraction")
+        stage_m1(task, out, args)
     if stop < 1:
         return
 
-    if args.no_roundtrip:
+    if start > 2:
+        pass                                   # M2·M3 는 기존 산출물 사용
+    elif start == 2:
+        banner("M3  Metric & Physical Grounding")
+        gk_paths = stage_m3(task, out, args)
+    elif args.no_roundtrip:
         banner("M2  Subgoal Decomposition")
         stage_m2(task, out, args, pass_no=1)
         if stop < 2:
@@ -387,11 +474,11 @@ def main():
     if stop < 3:
         return
 
-    if args.skip_m4:
-        print("\n[M4] --skip-m4 로 생략")
-        return
-    banner("M4  Task Planner")
-    stage_m4(task, out, args, gk_paths)
+    if args.skip_m4 or start > 3:
+        print("\n[M4] " + ("--skip-m4 로 생략" if args.skip_m4 else "기존 m4.json 재사용"))
+    else:
+        banner("M4  Task Planner")
+        stage_m4(task, out, args, gk_paths)
     if stop < 4:
         return
 
