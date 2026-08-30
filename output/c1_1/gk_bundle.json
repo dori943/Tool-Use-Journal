@@ -227,22 +227,66 @@
             {
               "id": "SG1_s1_d1_p0",
               "expr": "reachable(?tool)",
+<<<<<<< HEAD
               "eval_by": "m3"
+=======
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_plate_light_plate",
+                  "reachable": true,
+                  "margin_mm": 455.7
+                }
+              ]
+>>>>>>> 58b32ff (refactor: 모듈 번호 +1 시프트 (M0 Knowledge Memory 신설 대비))
             },
             {
               "id": "SG1_s1_d1_p1",
               "expr": "top_exposed(?tool)",
+<<<<<<< HEAD
               "eval_by": "m3"
+=======
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_plate_light_plate",
+                  "top_exposed": null
+                }
+              ]
+>>>>>>> 58b32ff (refactor: 모듈 번호 +1 시프트 (M0 Knowledge Memory 신설 대비))
             },
             {
               "id": "SG1_s1_d1_p2",
               "expr": "ee_usable(?EE, ?tool)",
+<<<<<<< HEAD
               "eval_by": "m3"
+=======
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_plate_light_plate",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+>>>>>>> 58b32ff (refactor: 모듈 번호 +1 시프트 (M0 Knowledge Memory 신설 대비))
             },
             {
               "id": "SG1_s1_d1_p3",
               "expr": "batch_feasible(?EE, ?tool)",
+<<<<<<< HEAD
               "eval_by": "m3"
+=======
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+>>>>>>> 58b32ff (refactor: 모듈 번호 +1 시프트 (M0 Knowledge Memory 신설 대비))
             },
             {
               "id": "SG1_s1_d1_p4",
@@ -273,6 +317,7 @@
             },
             {
               "id": "SG1_s1_d2_p1",
+<<<<<<< HEAD
               "expr": "batch_feasible(?tool, {obj_block_block_3})",
               "eval_by": "m3"
             },
@@ -280,6 +325,47 @@
               "id": "SG1_s1_d2_p2",
               "expr": "act_space_clear(?tool, {obj_block_block_3}, obj_zone_collection_zone_visual)",
               "eval_by": "m3"
+=======
+              "expr": "batch_feasible(?tool, {obj_block_block_4,obj_block_block_8,obj_block_block_3,obj_block_block_0,obj_block_block_1})",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "object",
+                    "id": "obj_plate_light_plate"
+                  },
+                  "feasible": true,
+                  "binding_check": "group_extent_le_tool_width",
+                  "partition": [
+                    [
+                      "obj_block_block_4",
+                      "obj_block_block_8",
+                      "obj_block_block_3",
+                      "obj_block_block_0",
+                      "obj_block_block_1"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_s1_d2_p2",
+              "expr": "act_space_clear(?tool, {obj_block_block_4,obj_block_block_8,obj_block_block_3,obj_block_block_0,obj_block_block_1}, obj_zone_collection_zone_visual)",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "object",
+                    "id": "obj_plate_light_plate"
+                  },
+                  "clear": true,
+                  "margin_mm": 86.5,
+                  "blockers": []
+                }
+              ]
+>>>>>>> 58b32ff (refactor: 모듈 번호 +1 시프트 (M0 Knowledge Memory 신설 대비))
             },
             {
               "id": "SG1_s1_d2_p3",
@@ -649,6 +735,7 @@
               "eval_by": "m2"
             },
             {
+<<<<<<< HEAD
               "id": "SG1_s10_d2_p1",
               "expr": "batch_feasible(?tool, {obj_block_block_10})",
               "eval_by": "m3"
@@ -657,6 +744,48 @@
               "id": "SG1_s10_d2_p2",
               "expr": "act_space_clear(?tool, {obj_block_block_10}, obj_zone_collection_zone_visual)",
               "eval_by": "m3"
+=======
+              "id": "SG1_s2_d2_p1",
+              "expr": "batch_feasible(?tool, {obj_block_block_6,obj_block_block_5,obj_block_block_9,obj_block_block_10,obj_block_block_7})",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "object",
+                    "id": "obj_plate_light_plate"
+                  },
+                  "feasible": true,
+                  "binding_check": "group_extent_le_tool_width",
+                  "partition": [
+                    [
+                      "obj_block_block_9",
+                      "obj_block_block_7",
+                      "obj_block_block_5",
+                      "obj_block_block_10",
+                      "obj_block_block_6"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_s2_d2_p2",
+              "expr": "act_space_clear(?tool, {obj_block_block_6,obj_block_block_5,obj_block_block_9,obj_block_block_10,obj_block_block_7}, obj_zone_collection_zone_visual)",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "object",
+                    "id": "obj_plate_light_plate"
+                  },
+                  "clear": true,
+                  "margin_mm": 86.5,
+                  "blockers": []
+                }
+              ]
+>>>>>>> 58b32ff (refactor: 모듈 번호 +1 시프트 (M0 Knowledge Memory 신설 대비))
             },
             {
               "id": "SG1_s10_d2_p3",
@@ -956,6 +1085,7 @@
               "eval_by": "m2"
             },
             {
+<<<<<<< HEAD
               "id": "SG1_s11_d2_p1",
               "expr": "batch_feasible(?tool, {obj_block_block_1})",
               "eval_by": "m3"
@@ -964,6 +1094,45 @@
               "id": "SG1_s11_d2_p2",
               "expr": "act_space_clear(?tool, {obj_block_block_1}, obj_zone_collection_zone_visual)",
               "eval_by": "m3"
+=======
+              "id": "SG1_s3_d2_p1",
+              "expr": "batch_feasible(?tool, {obj_block_block_2,obj_block_block_11})",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "object",
+                    "id": "obj_plate_light_plate"
+                  },
+                  "feasible": true,
+                  "binding_check": "group_extent_le_tool_width",
+                  "partition": [
+                    [
+                      "obj_block_block_2",
+                      "obj_block_block_11"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_s3_d2_p2",
+              "expr": "act_space_clear(?tool, {obj_block_block_2,obj_block_block_11}, obj_zone_collection_zone_visual)",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "object",
+                    "id": "obj_plate_light_plate"
+                  },
+                  "clear": true,
+                  "margin_mm": 86.5,
+                  "blockers": []
+                }
+              ]
+>>>>>>> 58b32ff (refactor: 모듈 번호 +1 시프트 (M0 Knowledge Memory 신설 대비))
             },
             {
               "id": "SG1_s11_d2_p3",
@@ -1321,7 +1490,13 @@
             {
               "id": "SG1_s12_d2b_p1",
               "expr": "act_space_clear(?EE, ?tool, tool_rest)",
+<<<<<<< HEAD
               "eval_by": "m3"
+=======
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+>>>>>>> 58b32ff (refactor: 모듈 번호 +1 시프트 (M0 Knowledge Memory 신설 대비))
             },
             {
               "id": "SG1_s12_d2b_p2",
@@ -1329,6 +1504,7 @@
               "eval_by": "motion"
             },
             {
+<<<<<<< HEAD
               "id": "SG1_s12_d2b_p3",
               "expr": "in({obj_block_block_3}, obj_zone_collection_zone_visual)",
               "eval_by": "m2"
@@ -1386,6 +1562,20 @@
             {
               "id": "SG1_s12_d2b_p14",
               "expr": "in({obj_block_block_11}, obj_zone_collection_zone_visual)",
+=======
+              "id": "SG1_s3_d2b_p3",
+              "expr": "in({obj_block_block_4,obj_block_block_8,obj_block_block_3,obj_block_block_0,obj_block_block_1}, obj_zone_collection_zone_visual)",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_d2b_p4",
+              "expr": "in({obj_block_block_6,obj_block_block_5,obj_block_block_9,obj_block_block_10,obj_block_block_7}, obj_zone_collection_zone_visual)",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_d2b_p5",
+              "expr": "in({obj_block_block_2,obj_block_block_11}, obj_zone_collection_zone_visual)",
+>>>>>>> 58b32ff (refactor: 모듈 번호 +1 시프트 (M0 Knowledge Memory 신설 대비))
               "eval_by": "m2"
             }
           ],
@@ -1415,12 +1605,24 @@
             {
               "id": "SG1_s12_d3_p2",
               "expr": "fits(?tool, tool_rest)",
+<<<<<<< HEAD
               "eval_by": "m3"
+=======
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+>>>>>>> 58b32ff (refactor: 모듈 번호 +1 시프트 (M0 Knowledge Memory 신설 대비))
             },
             {
               "id": "SG1_s12_d3_p3",
               "expr": "clear(tool_rest)",
+<<<<<<< HEAD
               "eval_by": "m3"
+=======
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+>>>>>>> 58b32ff (refactor: 모듈 번호 +1 시프트 (M0 Knowledge Memory 신설 대비))
             }
           ],
           "establish": [
