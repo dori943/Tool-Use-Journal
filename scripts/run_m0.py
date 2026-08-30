@@ -17,6 +17,10 @@ from __future__ import annotations
 
 import json
 import os
+<<<<<<< HEAD
+=======
+import re
+>>>>>>> da6cdbb (fix(run_m0): c1_1 어댑터를 환경 추종 방식으로 - 접시 1개 신규 환경 대응, 인스턴스 이름 기반 클래스 자동 유추로 환경 변경 시 코드 수정 불필요)
 import sys
 from pathlib import Path
 
@@ -49,6 +53,7 @@ AUTO_FIT_MARGIN = 0.85      # 프레임 여백 (85% 안에 맞춤)
 
 # ── 태스크별 어댑터 ─────────────────────────────────────────────
 
+<<<<<<< HEAD
 def _c1_1_class_of(inst):
     if inst.startswith("block_"):                       return "block"
     if inst in ("light_plate", "heavy_plate"):          return "plate"
@@ -56,6 +61,35 @@ def _c1_1_class_of(inst):
     if inst == "collection_zone_visual":                return "zone"
     if "rack" in inst.lower():                          return "rack"
     return None
+=======
+_ROBOT_MARKERS = ("ur5e", "mount", "nullgripper", "robotiq", "gripper0", "robot0")
+
+
+def _generic_class_of(inst):
+    """환경 인스턴스 이름에서 클래스를 유추한다 — 환경에 물체가 추가되어도 코드 수정 불필요.
+
+    규칙: 로봇 부속 제외 / rack 포함 -> rack / zone 포함 -> zone /
+          끝의 _숫자 제거(block_0 -> block) / _distractor 제거(bottle_distractor -> bottle).
+    """
+    low = inst.lower()
+    if any(k in low for k in _ROBOT_MARKERS) and "rack" not in low:
+        return None
+    if "rack" in low:                                   return "rack"
+    if "zone" in low:                                   return "zone"
+    base = re.sub(r"_\d+$", "", low)
+    base = re.sub(r"_distractor$", "", base)
+    return base or None
+
+
+def _generic_bound_bodies(env, class_of):
+    """auto-fit 대상: 환경의 물체 목록(obj_body_id)에서 rack/zone 제외 전부."""
+    ids = []
+    for inst, bid in dict(env.obj_body_id).items():
+        cls = class_of(inst)
+        if cls and cls not in ("rack", "zone"):
+            ids.append(int(bid))
+    return ids
+>>>>>>> da6cdbb (fix(run_m0): c1_1 어댑터를 환경 추종 방식으로 - 접시 1개 신규 환경 대응, 인스턴스 이름 기반 클래스 자동 유추로 환경 변경 시 코드 수정 불필요)
 
 
 def _c2_1_class_of(inst):
@@ -71,9 +105,14 @@ def _c2_1_class_of(inst):
 
 TASKS = {
     "c1_1": dict(env_name="C1_1_LegoSweep",
+<<<<<<< HEAD
                  class_of=_c1_1_class_of,
                  bound_objects=lambda env: list(env.blocks) +
                      [env.light_plate, env.heavy_plate, env.bottle_distractor],
+=======
+                 class_of=_generic_class_of,
+                 bound_objects=lambda env: _generic_bound_bodies(env, _generic_class_of),
+>>>>>>> da6cdbb (fix(run_m0): c1_1 어댑터를 환경 추종 방식으로 - 접시 1개 신규 환경 대응, 인스턴스 이름 기반 클래스 자동 유추로 환경 변경 시 코드 수정 불필요)
                  extra_geom_names=["collection_zone"]),
     "c2_1": dict(env_name="C2_1_ObjectSorting",
                  class_of=_c2_1_class_of,
@@ -113,7 +152,11 @@ def object_bound_points(env, spec):
     m, d = env.sim.model, env.sim.data
     gids = set()
     for o in spec["bound_objects"](env):
+<<<<<<< HEAD
         root = m.body_name2id(o.root_body)
+=======
+        root = o if isinstance(o, int) else m.body_name2id(o.root_body)
+>>>>>>> da6cdbb (fix(run_m0): c1_1 어댑터를 환경 추종 방식으로 - 접시 1개 신규 환경 대응, 인스턴스 이름 기반 클래스 자동 유추로 환경 변경 시 코드 수정 불필요)
         for gid in range(m.ngeom):
             bid = m.geom_bodyid[gid]
             while bid not in (0, root):
