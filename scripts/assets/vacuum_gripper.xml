@@ -11,7 +11,9 @@
             <inertial pos="0 0 0.05" mass="0.3" diaginertia="1e-3 1e-3 1e-3"/>
 
             <!-- +z: 손목 플랜지에서 대상 쪽. 자루로 컵을 ~11cm 내민다. -->
-            <!-- 자루(시각 전용, 충돌 없음) -->
+            <!-- 자루: Motion Planner 충돌 검사와 렌더링 geom을 분리한다. -->
+            <geom name="vac_mount_col" type="cylinder" size="0.018 0.05" pos="0 0 0.05"
+                  rgba="0.2 0.2 0.25 1" group="0" contype="1" conaffinity="1"/>
             <geom name="vac_mount" type="cylinder" size="0.018 0.05" pos="0 0 0.05"
                   rgba="0.2 0.2 0.25 1" group="1" contype="0" conaffinity="0"/>
             <!-- 흡착 컵. 접촉이 필요해서 충돌 ON. 뷰어는 group 0을 숨기므로 시각용 쌍을 둔다. -->
