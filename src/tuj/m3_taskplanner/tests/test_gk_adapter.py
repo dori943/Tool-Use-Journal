@@ -200,6 +200,8 @@ def test_gk_adapter_normalizes_c1_1_ids_actions_and_conditions() -> None:
     assert request.task_graph.log["adapter"] == "gk-m1-v1"
     assert first.tool_id == "light_plate"
     assert first.tool_selection_source == "upstream_fixed"
+    assert first.action_type == "PICK_TOOL"
+    assert first.target_ids == ["light_plate"]
     assert first.goal_region_id is None
     assert sweep.action_type == "tool_act"
     assert sweep.mode == "sweep"
@@ -273,6 +275,21 @@ def test_repository_c1_1_bundle_selects_forwarded_light_plate() -> None:
     sweeps = [item for item in assignments if item.action_type == "tool_act"]
     assert len(sweeps) == 3
     assert len({target for item in sweeps for target in item.target_ids}) == 12
+    pick = next(item for item in assignments if item.action_type == "PICK_TOOL")
+    returned = next(
+        item for item in assignments if item.action_type == "RETURN_TOOL"
+    )
+    assert pick.target_ids == ["light_plate"]
+    assert returned.target_ids == ["light_plate"]
+    resource_subgoals = {pick.subgoal_id, returned.subgoal_id}
+    assert not any(
+        step.kind == "transition"
+        and step.subgoal_id in resource_subgoals
+        and step.action in {"PICK_TOOL", "RETURN_TOOL"}
+        for step in result.selected_plan.steps
+    )
+    assert result.selected_plan.action_counts.n_tool_picks == 1
+    assert result.selected_plan.action_counts.n_tool_returns == 1
 
 
 def test_gk_accepts_selected_tool_id_alias() -> None:

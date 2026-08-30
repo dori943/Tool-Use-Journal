@@ -24,18 +24,25 @@ python scripts/run_m4_task_planner.py
 | Robot spec | `configs/robot_spec.json` |
 | M5 전달 결과 | `output/c1_1/task_planner.json` |
 
-다른 입력을 사용할 때만 경로를 덮어쓴다.
+다른 입력을 사용할 때만 경로를 덮어쓴다. `--output`을 생략하면 GK 입력과 같은
+폴더에 `task_planner.json`을 생성하므로, Task별 입력 폴더를 그대로 넘겨도 C1_1
+출력 폴더에 섞이지 않는다.
 
 ```bash
 python scripts/run_m4_task_planner.py \
   --gk path/to/gk_bundle.json \
   --m1 path/to/m1.json \
-  --robot-spec path/to/robot_spec.json \
-  --output path/to/task_planner.json
+  --robot-spec path/to/robot_spec.json
 ```
 
+다른 위치에 저장해야 할 때만 `--output path/to/task_planner.json`을 추가한다.
+
 이 runner는 Tool 이름을 인자로 받지 않는다. Tool은 항상 GK bundle의
-`roles.selected_tool`에서 읽고 결과의 `candidate_assignments`로 전달한다.
+`roles.selected_tool`에서 읽고 결과의 `candidate_assignments`로 전달한다. M1의
+`?tool` binding도 같은 ID로 치환되므로 `PICK_TOOL`, 작업, 운반, `RETURN_TOOL` 모두
+동일한 구체 Tool ID를 M5에 전달한다. M1에 acquire/place detail이 이미 있으면 이를
+각각 Tool 자원 subgoal로 사용하며 별도의 자동 PICK/RETURN transition을 중복 생성하지
+않는다.
 
 저장소 루트에서 Python 3.11 이상 가상환경을 만든 뒤 의존성을 설치한다.
 
@@ -117,6 +124,8 @@ SearchState(
 - `tool_id`는 앞단이 고정하며 Task Planner가 선택하거나 대체하지 않는다.
 - `None→A`, `A→None`, `A→B`는 Tool identity 변경 1회다.
 - Tool을 든 상태에서 EE를 바꿀 때는 `RETURN_TOOL`이 `DETACH_EE`보다 먼저다.
+- 명시적인 `PICK_TOOL`/`RETURN_TOOL` detail은 `EXECUTE_SUBGOAL` 한 번으로 직렬화한다.
+- 모든 `?tool` object binding은 GK의 `roles.selected_tool`로 grounding한다.
 - 입력에 없는 EE, Tool, 작업 pose를 만들어내지 않는다.
 - 작업 pose는 Motion Planner에 opaque 입력으로 전달할 수 있으며 Task Planner는
   이를 생성·해석·선택하지 않는다.

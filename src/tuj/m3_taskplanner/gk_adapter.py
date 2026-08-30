@@ -182,7 +182,15 @@ def adapt_gk_m1_output(
                     )
 
             target_ids = _detail_target_ids(
-                binding, action_type, rough_targets
+                binding,
+                action_type,
+                rough_targets,
+                selected_tool_id=tool_id,
+            )
+            action_type = _normalize_tool_resource_action(
+                action_type,
+                target_ids=target_ids,
+                selected_tool_id=tool_id,
             )
             region = binding.get("?r")
             goal_region_id = region if isinstance(region, str) else None
@@ -744,17 +752,45 @@ def _normalize_binding(
 
 
 def _detail_target_ids(
-    binding: Mapping[str, Any], action_type: str | None, rough_targets: list[str]
+    binding: Mapping[str, Any],
+    action_type: str | None,
+    rough_targets: list[str],
+    *,
+    selected_tool_id: str | None,
 ) -> list[str]:
     targets = binding.get("?targets")
     if isinstance(targets, list):
-        return [item for item in targets if isinstance(item, str)]
+        return [
+            selected_tool_id if item == "?tool" else item
+            for item in targets
+            if isinstance(item, str) and (item != "?tool" or selected_tool_id)
+        ]
     obj = binding.get("?o")
+    if obj == "?tool" and selected_tool_id is not None:
+        return [selected_tool_id]
     if isinstance(obj, str) and not obj.startswith("?"):
         return [obj]
     if action_type == "tool_act":
         return list(rough_targets)
     return []
+
+
+def _normalize_tool_resource_action(
+    action_type: str | None,
+    *,
+    target_ids: list[str],
+    selected_tool_id: str | None,
+) -> str | None:
+    """Give Tool acquisition/release one unambiguous physical operation."""
+
+    if selected_tool_id is None or target_ids != [selected_tool_id]:
+        return action_type
+    normalized = str(action_type or "").strip().lower().replace("-", "_")
+    if normalized in {"acquire", "grasp", "pick", "pick_object"}:
+        return "PICK_TOOL"
+    if normalized in {"place", "release", "return"}:
+        return "RETURN_TOOL"
+    return action_type
 
 
 def _feasible_ees_for_group(

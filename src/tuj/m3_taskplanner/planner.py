@@ -489,6 +489,16 @@ def _build_selected_plan(
             params = prim.parameters_dict()
             if prim.action == P.EXECUTE_SUBGOAL:
                 subgoal = subgoals[edge.subgoal_id]
+                normalized_action = str(
+                    edge.candidate.action_type if edge.candidate else ""
+                ).strip().upper().replace("-", "_")
+                if normalized_action == "PICK_TOOL":
+                    counts.n_tool_picks += 1
+                elif normalized_action in {
+                    "RETURN_TOOL",
+                    "TERMINAL_RETURN_TOOL",
+                }:
+                    counts.n_tool_returns += 1
                 steps.append(
                     PlanStep(
                         step_index=step_index,

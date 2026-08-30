@@ -32,12 +32,18 @@ def make_state(
     )
 
 
-def make_candidate(ee: str = "A", tool: str | None = None) -> Candidate:
+def make_candidate(
+    ee: str = "A",
+    tool: str | None = None,
+    *,
+    action_type: str | None = None,
+) -> Candidate:
     return Candidate(
         candidate_id=f"c-{ee}-{tool}",
         subgoal_id="S1",
         ee=ee,
         tool=tool,
+        action_type=action_type,
     )
 
 
@@ -175,3 +181,50 @@ def test_object_held_tool_acquisition_infeasible() -> None:
     assert not result.feasible
     assert result.rejection is not None
     assert result.rejection.reason_code is ReasonCode.OBJECT_HELD_TOOL_ACQUIRE
+
+
+def test_explicit_pick_tool_executes_once_without_automatic_pick_transition() -> None:
+    result = build_transition(
+        make_state(tool=None),
+        make_candidate(tool="t1", action_type="PICK_TOOL"),
+        ctx(),
+    )
+
+    assert result.feasible
+    assert actions(result) == [
+        P.KEEP_EE,
+        P.MOVE_TO_TOOL_RACK,
+        P.EXECUTE_SUBGOAL,
+    ]
+    assert result.next_held_tool == "t1"
+    assert result.cost.tool_switches == 1
+
+
+def test_explicit_return_tool_executes_once_without_automatic_return_transition() -> None:
+    result = build_transition(
+        make_state(tool="t1"),
+        make_candidate(tool="t1", action_type="RETURN_TOOL"),
+        ctx(),
+    )
+
+    assert result.feasible
+    assert actions(result) == [
+        P.KEEP_EE,
+        P.KEEP_TOOL,
+        P.MOVE_TO_TOOL_RACK,
+        P.EXECUTE_SUBGOAL,
+    ]
+    assert result.next_held_tool is None
+    assert result.cost.tool_switches == 1
+
+
+def test_explicit_return_rejects_a_tool_that_is_not_held() -> None:
+    result = build_transition(
+        make_state(tool=None),
+        make_candidate(tool="t1", action_type="RETURN_TOOL"),
+        ctx(),
+    )
+
+    assert not result.feasible
+    assert result.rejection is not None
+    assert result.rejection.reason_code is ReasonCode.TOOL_MISMATCH

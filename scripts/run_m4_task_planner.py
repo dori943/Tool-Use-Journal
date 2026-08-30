@@ -1,4 +1,4 @@
-"""Run the M4 Task Planner for C1_1 with repository-local defaults.
+"""Run the M4 Task Planner with repository-local C1_1 defaults.
 
 Run from any working directory:
 
@@ -19,7 +19,6 @@ from typing import Sequence
 
 REPOSITORY = Path(__file__).resolve().parents[1]
 SOURCE_ROOT = REPOSITORY / "src"
-DEFAULT_OUTPUT = REPOSITORY / "output" / "c1_1" / "task_planner.json"
 
 
 def _parser() -> argparse.ArgumentParser:
@@ -58,8 +57,10 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument(
         "--output",
         type=Path,
-        default=DEFAULT_OUTPUT,
-        help="Task Planner result consumed by M5",
+        help=(
+            "Task Planner result consumed by M5; defaults to "
+            "<GK input folder>/task_planner.json"
+        ),
     )
     return parser
 
@@ -103,7 +104,11 @@ def main(argv: Sequence[str] | None = None) -> int:
     if missing:
         parser.error("input file not found: " + ", ".join(missing))
 
-    output = _resolved(args.output)
+    output = (
+        _resolved(args.output)
+        if args.output is not None
+        else required_inputs["--gk"].parent / "task_planner.json"
+    )
     output.parent.mkdir(parents=True, exist_ok=True)
 
     if str(SOURCE_ROOT) not in sys.path:

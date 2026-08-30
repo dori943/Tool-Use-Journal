@@ -183,6 +183,24 @@ def build_transition(
     motion = context.policy.motion_costs
     initial_attach = state.current_ee is None
     ee_change = not initial_attach and state.current_ee != candidate.ee
+    operation = str(candidate.action_type or "").strip().upper().replace("-", "_")
+    acquires_tool = operation == "PICK_TOOL"
+    releases_tool = operation in {"RETURN_TOOL", "TERMINAL_RETURN_TOOL"}
+    if (acquires_tool or releases_tool) and candidate.tool is None:
+        return _infeasible(
+            ReasonCode.TOOL_REQUIRED_MISSING,
+            f"explicit {operation} subgoal has no grounded tool",
+            candidate,
+        )
+    if releases_tool and state.held_tool != candidate.tool:
+        return _infeasible(
+            ReasonCode.TOOL_MISMATCH,
+            f"cannot return tool {candidate.tool!r}; held tool is "
+            f"{state.held_tool!r}",
+            candidate,
+        )
+    required_tool = None if acquires_tool else candidate.tool
+    resulting_tool = None if releases_tool else candidate.tool
     held_objects = held_object_ids(state, context)
     rack = state.rack_signature
 
@@ -193,7 +211,7 @@ def build_transition(
             "forbidden",
             candidate,
         )
-    if held_objects and state.held_tool != candidate.tool:
+    if held_objects and state.held_tool != required_tool:
         return _infeasible(
             ReasonCode.OBJECT_HELD_TOOL_ACQUIRE,
             f"holding object(s) {sorted(held_objects)!r}; changing the held "
@@ -229,7 +247,7 @@ def build_transition(
                 _prim(P.VERIFY_ATTACHMENT, {"ee": candidate.ee}, verify=True),
             ]
         )
-        if candidate.tool is not None:
+        if required_tool is not None:
             prims.extend(
                 _pick_tool_prims(
                     candidate,
@@ -252,7 +270,7 @@ def build_transition(
                     preconditions=(f"holding_tool({cur_tool})",),
                     effects=("hand_empty",),
                     cost=CostVector(
-                        tool_switches=0 if candidate.tool is not None else 1
+                        tool_switches=0 if required_tool is not None else 1
                     ),
                 )
             )
@@ -285,15 +303,15 @@ def build_transition(
                 _prim(P.VERIFY_ATTACHMENT, {"ee": candidate.ee}, verify=True),
             ]
         )
-        if candidate.tool is not None:
+        if required_tool is not None:
             prims.extend(
                 _pick_tool_prims(
                     candidate,
                     motion.move_to_tool_rack,
-                    switch=cur_tool != candidate.tool,
+                    switch=cur_tool != required_tool,
                 )
             )
-    elif cur_tool == candidate.tool:
+    elif cur_tool == required_tool:
         prims.append(_prim(P.KEEP_EE, {"ee": state.current_ee}))
         if cur_tool is not None:
             prims.append(_prim(P.KEEP_TOOL, {"tool": cur_tool}))
@@ -312,19 +330,35 @@ def build_transition(
                     preconditions=(f"holding_tool({cur_tool})",),
                     effects=("hand_empty",),
                     cost=CostVector(
-                        tool_switches=0 if candidate.tool is not None else 1
+                        tool_switches=0 if required_tool is not None else 1
                     ),
                 )
             )
-        if candidate.tool is not None:
+        if required_tool is not None:
             prims.extend(_pick_tool_prims(candidate, None, switch=True))
 
-    prims.extend(_workspace_and_execute(candidate, motion.move_to_workspace, subgoal))
+    if acquires_tool or releases_tool:
+        prims.extend(
+            _tool_resource_and_execute(
+                candidate,
+                motion.move_to_tool_rack,
+                switch=state.held_tool != resulting_tool,
+                subgoal=subgoal,
+            )
+        )
+    else:
+        prims.extend(
+            _workspace_and_execute(
+                candidate,
+                motion.move_to_workspace,
+                subgoal,
+            )
+        )
     return TransitionResult(
         feasible=True,
         primitives=tuple(prims),
         cost=_sum_cost(prims),
-        next_held_tool=candidate.tool,
+        next_held_tool=resulting_tool,
         next_rack_signature=next_rack,
     )
 
@@ -372,6 +406,43 @@ def _workspace_and_execute(
                 "action_parameters": dict(candidate.metadata),
             },
             cost=CostVector(execution_cost=candidate.nominal_execution_cost),
+            verify=verify,
+        ),
+    ]
+
+
+def _tool_resource_and_execute(
+    candidate: Candidate,
+    tool_rack_cost: int,
+    *,
+    switch: bool,
+    subgoal: Subgoal | None = None,
+) -> list[Primitive]:
+    """Execute an explicit PICK_TOOL/RETURN_TOOL subgoal exactly once."""
+
+    verify = bool(
+        subgoal
+        and any(requires_runtime_verification(cond) for cond in subgoal.preconditions)
+    )
+    return [
+        _prim(
+            P.MOVE_TO_TOOL_RACK,
+            {"tool": candidate.tool},
+            cost=CostVector(motion_cost=tool_rack_cost),
+        ),
+        _prim(
+            P.EXECUTE_SUBGOAL,
+            {
+                "subgoal": candidate.subgoal_id,
+                "candidate": candidate.candidate_id,
+                "ee": candidate.ee,
+                "tool": candidate.tool,
+                "action_parameters": dict(candidate.metadata),
+            },
+            cost=CostVector(
+                tool_switches=1 if switch else 0,
+                execution_cost=candidate.nominal_execution_cost,
+            ),
             verify=verify,
         ),
     ]
