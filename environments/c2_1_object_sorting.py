@@ -876,7 +876,7 @@ class C2_1_ObjectSorting(ManipulationEnv):
         )
 
     def get_evaluation_material_gt(self):
-        """평가 전용 GT. 관측 및 LLM/M2 입력 경로에서는 호출하지 않는다."""
+        """평가 전용 GT. 관측 및 LLM/M3 입력 경로에서는 호출하지 않는다."""
         return {
             obj.name: obj.material_gt
             for obj in self.target_objects

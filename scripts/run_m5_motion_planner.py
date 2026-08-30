@@ -19,7 +19,7 @@ def main(argv: Sequence[str] | None = None) -> int:
     for source_root in reversed(SOURCE_ROOTS):
         if source_root.is_dir() and str(source_root) not in sys.path:
             sys.path.insert(0, str(source_root))
-    from tuj.m4_motion.generic_runner import main as generic_main
+    from tuj.m5_motion.generic_runner import main as generic_main
 
     return generic_main(argv, repository=REPOSITORY)
 

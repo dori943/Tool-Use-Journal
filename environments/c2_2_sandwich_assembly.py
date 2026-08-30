@@ -1360,7 +1360,7 @@ class C2_2_SandwichAssembly(KitchenBase):
         return False
 
     def get_evaluation_material_gt(self):
-        """Evaluation-only GT; never used by observation, M2, or tool metadata."""
+        """Evaluation-only GT; never used by observation, M3, or tool metadata."""
         names = (
             "bread_a",
             "bread_b",

@@ -1,343 +1,476 @@
 {
-  "responses": [
+  "nodes": [
     {
-      "subgoal_id": "SG1_s1",
-      "queried_by": "SG1_s1_d1_p0",
-      "node_id": "obj_plate_light_plate",
-      "geometry": {
-        "length_mm": 178.5,
-        "diameter_mm": null,
-        "extents_mm": [
-          178.5,
-          176.2,
-          9.5
-        ],
-        "height_z_mm": 9.4,
-        "cylinder_like": false,
-        "surface_rms_mm": 0.3
-      },
-      "material": "plastic",
-      "density_kgm3": 950,
-      "mass_kg": 0.279,
-      "youngs_gpa": 2.0,
-      "mu": {
-        "mu": 0.338,
-        "stage": 0,
-        "material": "plastic",
-        "rms_mm": 0.3
-      },
-      "confidence": 0.85
-    },
-    {
-      "subgoal_id": "SG1_s1",
-      "queried_by": "SG1_s1_d1_p1",
-      "node_id": "obj_plate_light_plate",
-      "geometry": {
-        "length_mm": 178.5,
-        "diameter_mm": null,
-        "extents_mm": [
-          178.5,
-          176.2,
-          9.5
-        ],
-        "height_z_mm": 9.4,
-        "cylinder_like": false,
-        "surface_rms_mm": 0.3
-      },
-      "material": "plastic",
-      "density_kgm3": 950,
-      "mass_kg": 0.279,
-      "youngs_gpa": 2.0,
-      "mu": {
-        "mu": 0.338,
-        "stage": 0,
-        "material": "plastic",
-        "rms_mm": 0.3
-      },
-      "confidence": 0.85
-    },
-    {
-      "subgoal_id": "SG1_s1",
-      "queried_by": "SG1_s1_d1_p2",
-      "node_id": "obj_plate_light_plate",
-      "ee": {
-        "2F": {
-          "feasible": true,
-          "margin": 4.721,
-          "margin_unit": "kg",
-          "reason": "질량 0.279 vs 페이로드 5.0kg",
-          "checks": [
-            {
-              "rule": "dim_lt_stroke",
-              "value": 9.5,
-              "limit": 85.0,
-              "pass": true
-            },
-            {
-              "rule": "mass_lt_payload",
-              "value": 0.279,
-              "limit": 5.0,
-              "pass": true
-            },
-            {
-              "rule": "grip_slip",
-              "value": 4.049,
-              "limit": 140.0,
-              "pass": true
-            }
-          ]
-        },
-        "3F": {
-          "feasible": true,
-          "margin": 2.221,
-          "margin_unit": "kg",
-          "reason": "질량 0.279 vs 페이로드 2.5kg",
-          "checks": [
-            {
-              "rule": "dim_lt_stroke",
-              "value": 9.5,
-              "limit": 140.0,
-              "pass": true
-            },
-            {
-              "rule": "mass_lt_payload",
-              "value": 0.279,
-              "limit": 2.5,
-              "pass": true
-            },
-            {
-              "rule": "grip_slip",
-              "value": 4.049,
-              "limit": 60.0,
-              "pass": true
-            }
-          ]
-        },
-        "vac": {
-          "feasible": true,
-          "margin": 0.221,
-          "margin_unit": "kg",
-          "reason": "질량 0.279 vs 페이로드 0.5kg",
-          "checks": [
-            {
-              "rule": "flatness",
-              "value": 0.3,
-              "limit": 1.5,
-              "pass": true
-            },
-            {
-              "rule": "mass_lt_payload",
-              "value": 0.279,
-              "limit": 0.5,
-              "pass": true
-            },
-            {
-              "rule": "seal_contact",
-              "value": 30.0,
-              "limit": 176.2,
-              "pass": true
-            }
-          ]
-        }
-      },
-      "reachability": {
-        "distance_mm": 394.5,
-        "reach_mm": 850,
-        "reachable": true,
-        "margin_mm": 455.5
-      }
-    },
-    {
-      "subgoal_id": "SG1_s1",
-      "queried_by": "SG1_s1_d2_p1",
-      "kind": "batch",
-      "actor": {
-        "type": "object",
-        "id": "obj_plate_light_plate"
-      },
-      "feasible": false,
-      "checks": [
-        {
-          "rule": "group_extent_le_tool_width",
-          "capacity": 174.4,
-          "demand": 444.8,
-          "unit": "mm",
-          "margin": -270.4,
-          "pass": false
-        }
+      "id": "obj_block_block_0",
+      "class": "block",
+      "center_mm": [
+        944.3,
+        -177.0,
+        817.5
       ],
-      "binding_check": "group_extent_le_tool_width",
-      "partition": [
-        [
-          "obj_block_block_1",
-          "obj_block_block_3"
-        ],
-        [
-          "obj_block_block_8",
-          "obj_block_block_4",
-          "obj_block_block_0"
-        ]
+      "bbox_mm": [
+        25.4,
+        25.0,
+        10.6
       ]
     },
     {
-      "subgoal_id": "SG1_s1",
-      "queried_by": "SG1_s1_d2_p2",
-      "kind": "swept_space",
-      "actor": {
-        "type": "object",
-        "id": "obj_plate_light_plate"
-      },
-      "clear": false,
-      "margin_mm": -18.2,
-      "blockers": [
-        {
-          "node_id": "obj_block_block_10",
-          "overlap_mm": 18.2
-        }
-      ]
-    },
-    {
-      "subgoal_id": "SG1_s2",
-      "queried_by": "SG1_s2_d2_p1",
-      "kind": "batch",
-      "actor": {
-        "type": "object",
-        "id": "obj_plate_light_plate"
-      },
-      "feasible": false,
-      "checks": [
-        {
-          "rule": "group_extent_le_tool_width",
-          "capacity": 174.4,
-          "demand": 580.8,
-          "unit": "mm",
-          "margin": -406.4,
-          "pass": false
-        }
+      "id": "obj_block_block_1",
+      "class": "block",
+      "center_mm": [
+        908.9,
+        -149.9,
+        817.8
       ],
-      "binding_check": "group_extent_le_tool_width",
-      "partition": [
-        [
-          "obj_block_block_5"
-        ],
-        [
-          "obj_block_block_10",
-          "obj_block_block_9",
-          "obj_block_block_6"
-        ],
-        [
-          "obj_block_block_7"
-        ]
+      "bbox_mm": [
+        21.2,
+        21.6,
+        10.1
       ]
     },
     {
-      "subgoal_id": "SG1_s2",
-      "queried_by": "SG1_s2_d2_p2",
-      "kind": "swept_space",
-      "actor": {
-        "type": "object",
-        "id": "obj_plate_light_plate"
-      },
-      "clear": false,
-      "margin_mm": -74.8,
-      "blockers": [
-        {
-          "node_id": "obj_block_block_4",
-          "overlap_mm": 74.8
-        },
-        {
-          "node_id": "obj_block_block_8",
-          "overlap_mm": 37.7
-        }
-      ]
-    },
-    {
-      "subgoal_id": "SG1_s3",
-      "queried_by": "SG1_s3_d2_p1",
-      "kind": "batch",
-      "actor": {
-        "type": "object",
-        "id": "obj_plate_light_plate"
-      },
-      "feasible": false,
-      "checks": [
-        {
-          "rule": "group_extent_le_tool_width",
-          "capacity": 174.4,
-          "demand": 453.4,
-          "unit": "mm",
-          "margin": -279.0,
-          "pass": false
-        }
+      "id": "obj_block_block_2",
+      "class": "block",
+      "center_mm": [
+        858.0,
+        196.5,
+        817.6
       ],
-      "binding_check": "group_extent_le_tool_width",
-      "partition": [
-        [
-          "obj_block_block_11"
-        ],
-        [
-          "obj_block_block_2"
-        ]
+      "bbox_mm": [
+        22.6,
+        22.8,
+        10.6
       ]
     },
     {
-      "subgoal_id": "SG1_s3",
-      "queried_by": "SG1_s3_d2_p2",
-      "kind": "swept_space",
-      "actor": {
-        "type": "object",
-        "id": "obj_plate_light_plate"
-      },
-      "clear": false,
-      "margin_mm": -74.3,
-      "blockers": [
-        {
-          "node_id": "obj_block_block_0",
-          "overlap_mm": 64.3
-        },
-        {
-          "node_id": "obj_block_block_4",
-          "overlap_mm": 52.9
-        },
-        {
-          "node_id": "obj_block_block_6",
-          "overlap_mm": 74.3
-        },
-        {
-          "node_id": "obj_block_block_8",
-          "overlap_mm": 16.2
-        },
-        {
-          "node_id": "obj_block_block_9",
-          "overlap_mm": 50.2
-        },
-        {
-          "node_id": "obj_block_block_10",
-          "overlap_mm": 27.6
-        }
+      "id": "obj_block_block_3",
+      "class": "block",
+      "center_mm": [
+        902.4,
+        -196.5,
+        817.8
+      ],
+      "bbox_mm": [
+        24.0,
+        23.7,
+        10.0
       ]
     },
     {
-      "subgoal_id": "SG1_s3",
-      "queried_by": "SG1_s3_d3_p2",
+      "id": "obj_block_block_4",
+      "class": "block",
+      "center_mm": [
+        893.1,
+        -268.8,
+        817.6
+      ],
+      "bbox_mm": [
+        24.8,
+        24.5,
+        10.5
+      ]
+    },
+    {
+      "id": "obj_block_block_5",
+      "class": "block",
+      "center_mm": [
+        879.9,
+        -15.9,
+        817.8
+      ],
+      "bbox_mm": [
+        25.0,
+        24.4,
+        10.2
+      ]
+    },
+    {
+      "id": "obj_block_block_6",
+      "class": "block",
+      "center_mm": [
+        946.5,
+        -27.0,
+        818.0
+      ],
+      "bbox_mm": [
+        24.2,
+        24.2,
+        9.7
+      ]
+    },
+    {
+      "id": "obj_block_block_7",
+      "class": "block",
+      "center_mm": [
+        870.6,
+        84.3,
+        817.9
+      ],
+      "bbox_mm": [
+        23.3,
+        24.2,
+        10.0
+      ]
+    },
+    {
+      "id": "obj_block_block_8",
+      "class": "block",
+      "center_mm": [
+        856.7,
+        -235.0,
+        818.1
+      ],
+      "bbox_mm": [
+        23.4,
+        23.4,
+        9.7
+      ]
+    },
+    {
+      "id": "obj_block_block_9",
+      "class": "block",
+      "center_mm": [
+        834.0,
+        0.2,
+        817.8
+      ],
+      "bbox_mm": [
+        21.6,
+        22.2,
+        10.2
+      ]
+    },
+    {
+      "id": "obj_block_block_10",
+      "class": "block",
+      "center_mm": [
+        912.5,
+        31.4,
+        817.8
+      ],
+      "bbox_mm": [
+        18.9,
+        19.3,
+        10.1
+      ]
+    },
+    {
+      "id": "obj_block_block_11",
+      "class": "block",
+      "center_mm": [
+        856.3,
+        323.8,
+        817.8
+      ],
+      "bbox_mm": [
+        19.1,
+        20.4,
+        10.3
+      ]
+    },
+    {
+      "id": "obj_plate_light_plate",
+      "class": "plate",
+      "center_mm": [
+        381.1,
+        -101.1,
+        807.5
+      ],
+      "bbox_mm": [
+        173.0,
+        179.2,
+        9.8
+      ]
+    },
+    {
+      "id": "obj_plate_heavy_plate",
+      "class": "plate",
+      "center_mm": [
+        381.1,
+        169.1,
+        807.5
+      ],
+      "bbox_mm": [
+        173.0,
+        179.4,
+        9.8
+      ]
+    },
+    {
+      "id": "obj_bottle_bottle_distractor",
+      "class": "bottle",
+      "center_mm": [
+        388.7,
+        385.6,
+        869.9
+      ],
+      "bbox_mm": [
+        30.4,
+        43.0,
+        132.8
+      ]
+    },
+    {
+      "id": "obj_zone_collection_zone_visual",
+      "class": "zone",
+      "center_mm": [
+        658.7,
+        -0.9,
+        801.1
+      ],
+      "bbox_mm": [
+        245.0,
+        177.8,
+        0.2
+      ]
+    }
+  ],
+  "edges": [
+    {
+      "from": "obj_block_block_0",
+      "to": "obj_block_block_1",
+      "type": "near",
+      "gap_mm": 12.1
+    },
+    {
+      "from": "obj_block_block_0",
+      "to": "obj_block_block_3",
+      "type": "near",
+      "gap_mm": 17.2
+    },
+    {
+      "from": "obj_block_block_0",
+      "to": "obj_block_block_4",
+      "type": "near",
+      "gap_mm": 67.1
+    },
+    {
+      "from": "obj_block_block_0",
+      "to": "obj_block_block_5",
+      "type": "near",
+      "gap_mm": 136.4
+    },
+    {
+      "from": "obj_block_block_0",
+      "to": "obj_block_block_6",
+      "type": "near",
+      "gap_mm": 125.4
+    },
+    {
+      "from": "obj_block_block_0",
+      "to": "obj_block_block_8",
+      "type": "near",
+      "gap_mm": 63.2
+    },
+    {
+      "from": "obj_block_block_1",
+      "to": "obj_block_block_3",
+      "type": "near",
+      "gap_mm": 23.9
+    },
+    {
+      "from": "obj_block_block_1",
+      "to": "obj_block_block_4",
+      "type": "near",
+      "gap_mm": 95.9
+    },
+    {
+      "from": "obj_block_block_1",
+      "to": "obj_block_block_5",
+      "type": "near",
+      "gap_mm": 111.0
+    },
+    {
+      "from": "obj_block_block_1",
+      "to": "obj_block_block_6",
+      "type": "near",
+      "gap_mm": 100.0
+    },
+    {
+      "from": "obj_block_block_1",
+      "to": "obj_block_block_8",
+      "type": "near",
+      "gap_mm": 62.6
+    },
+    {
+      "from": "obj_block_block_1",
+      "to": "obj_block_block_9",
+      "type": "near",
+      "gap_mm": 128.2
+    },
+    {
+      "from": "obj_block_block_1",
+      "to": "obj_zone_collection_zone_visual",
+      "type": "near",
+      "gap_mm": 117.1
+    },
+    {
+      "from": "obj_block_block_2",
+      "to": "obj_block_block_7",
+      "type": "near",
+      "gap_mm": 88.7
+    },
+    {
+      "from": "obj_block_block_2",
+      "to": "obj_zone_collection_zone_visual",
+      "type": "near",
+      "gap_mm": 97.1
+    },
+    {
+      "from": "obj_block_block_3",
+      "to": "obj_block_block_4",
+      "type": "near",
+      "gap_mm": 48.2
+    },
+    {
+      "from": "obj_block_block_3",
+      "to": "obj_block_block_6",
+      "type": "near",
+      "gap_mm": 145.6
+    },
+    {
+      "from": "obj_block_block_3",
+      "to": "obj_block_block_8",
+      "type": "near",
+      "gap_mm": 22.0
+    },
+    {
+      "from": "obj_block_block_3",
+      "to": "obj_zone_collection_zone_visual",
+      "type": "near",
+      "gap_mm": 109.2
+    },
+    {
+      "from": "obj_block_block_4",
+      "to": "obj_block_block_8",
+      "type": "near",
+      "gap_mm": 12.3
+    },
+    {
+      "from": "obj_block_block_5",
+      "to": "obj_block_block_6",
+      "type": "near",
+      "gap_mm": 42.0
+    },
+    {
+      "from": "obj_block_block_5",
+      "to": "obj_block_block_7",
+      "type": "near",
+      "gap_mm": 75.9
+    },
+    {
+      "from": "obj_block_block_5",
+      "to": "obj_block_block_9",
+      "type": "near",
+      "gap_mm": 22.6
+    },
+    {
+      "from": "obj_block_block_5",
+      "to": "obj_zone_collection_zone_visual",
+      "type": "near",
+      "gap_mm": 86.2
+    },
+    {
+      "from": "obj_block_block_6",
+      "to": "obj_block_block_7",
+      "type": "near",
+      "gap_mm": 87.1
+    },
+    {
+      "from": "obj_block_block_6",
+      "to": "obj_block_block_9",
+      "type": "near",
+      "gap_mm": 89.6
+    },
+    {
+      "from": "obj_block_block_7",
+      "to": "obj_block_block_9",
+      "type": "near",
+      "gap_mm": 60.9
+    },
+    {
+      "from": "obj_block_block_7",
+      "to": "obj_zone_collection_zone_visual",
+      "type": "near",
+      "gap_mm": 77.7
+    },
+    {
+      "from": "obj_block_block_8",
+      "to": "obj_zone_collection_zone_visual",
+      "type": "near",
+      "gap_mm": 133.5
+    },
+    {
+      "from": "obj_block_block_9",
+      "to": "obj_zone_collection_zone_visual",
+      "type": "near",
+      "gap_mm": 42.0
+    },
+    {
+      "from": "obj_block_block_10",
+      "to": "obj_block_block_2",
+      "type": "near",
+      "gap_mm": 144.0
+    },
+    {
+      "from": "obj_block_block_10",
+      "to": "obj_block_block_5",
+      "type": "near",
+      "gap_mm": 25.4
+    },
+    {
+      "from": "obj_block_block_10",
+      "to": "obj_block_block_6",
+      "type": "near",
+      "gap_mm": 36.6
+    },
+    {
+      "from": "obj_block_block_10",
+      "to": "obj_block_block_7",
+      "type": "near",
+      "gap_mm": 31.1
+    },
+    {
+      "from": "obj_block_block_10",
+      "to": "obj_block_block_9",
+      "type": "near",
+      "gap_mm": 58.2
+    },
+    {
+      "from": "obj_block_block_10",
+      "to": "obj_zone_collection_zone_visual",
+      "type": "near",
+      "gap_mm": 121.8
+    },
+    {
+      "from": "obj_block_block_11",
+      "to": "obj_block_block_2",
+      "type": "near",
+      "gap_mm": 105.7
+    },
+    {
       "from": "obj_plate_light_plate",
-      "to": "obj_rack_ee_rack",
-      "type": "fits_inside",
-      "value_mm": 71.2,
-      "check": "opening_245.6 - footprint_174.4",
-      "pass": true
+      "to": "obj_zone_collection_zone_visual",
+      "type": "near",
+      "gap_mm": 68.6
     },
     {
-      "subgoal_id": "SG1_s3",
-      "queried_by": "SG1_s3_d3_p3",
-      "node_id": "obj_rack_ee_rack",
-      "type": "clear",
-      "value": false,
-      "occupants": [
-        "obj_rack_gripperrack_2F_robotiq_85_adapter_link",
-        "obj_rack_gripperrack_vac_vacuum_base"
-      ],
-      "pass": false
+      "from": "obj_plate_heavy_plate",
+      "to": "obj_plate_light_plate",
+      "type": "near",
+      "gap_mm": 90.9
+    },
+    {
+      "from": "obj_plate_heavy_plate",
+      "to": "obj_zone_collection_zone_visual",
+      "type": "near",
+      "gap_mm": 68.6
+    },
+    {
+      "from": "obj_bottle_bottle_distractor",
+      "to": "obj_plate_heavy_plate",
+      "type": "near",
+      "gap_mm": 105.3
     }
   ]
 }

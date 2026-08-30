@@ -473,7 +473,7 @@ class C1_2_DoughFlatten(KitchenBase):
         return False
 
     def get_evaluation_material_gt(self):
-        """평가 전용 GT. 관측 및 LLM/M2 입력 경로에서는 호출하지 않는다."""
+        """평가 전용 GT. 관측 및 LLM/M3 입력 경로에서는 호출하지 않는다."""
         names = ("dough", "bottle", "spatula", "spoon", "tongs")
         return {name: self.objects[name].material_gt for name in names}
 
