@@ -16,7 +16,7 @@ class SearchState:
     """
 
     completed_subgoals: frozenset[str]
-    current_ee: str
+    current_ee: str | None
     held_tool: str | None
     # EE committed per group_id, as a sorted tuple of (group_id, ee) pairs.
     group_ee_bindings: tuple[tuple[str, str], ...]

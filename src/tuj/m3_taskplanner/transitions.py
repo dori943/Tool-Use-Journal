@@ -52,7 +52,7 @@ class Primitive:
 class TransitionContext:
     catalog: ResourceCatalog
     policy: PlanningPolicy
-    initial_ee: str
+    initial_ee: str | None
 
 
 @dataclass(slots=True)
@@ -69,7 +69,7 @@ def transition_signature(
     state: SearchState, candidate: Candidate
 ) -> tuple[str, str, str]:
     """Identity of a transition for no-good bans and geometry caching."""
-    return state.current_ee, state.held_tool or "", candidate.candidate_id
+    return state.current_ee or "", state.held_tool or "", candidate.candidate_id
 
 
 def held_object_ids(
@@ -147,6 +147,31 @@ def _rack_after_exchange(
     return tuple(sorted(occupancy.items())), None
 
 
+def _rack_after_initial_attach(
+    rack: tuple[tuple[str, str], ...] | None,
+    catalog: ResourceCatalog,
+    new_ee: str,
+) -> tuple[tuple[tuple[str, str], ...] | None, str | None]:
+    """Remove the first selected EE from its home slot.
+
+    Unlike a normal exchange there is no mounted EE to detach and therefore no
+    newly occupied rack slot.
+    """
+    if rack is None:
+        return None, None
+    occupancy = dict(rack)
+    new_slot = catalog.end_effectors[new_ee].home_slot
+    if new_slot is None:
+        return None, f"missing home slot for {new_ee!r}"
+    if occupancy.get(new_slot) != new_ee:
+        return None, (
+            f"slot {new_slot!r} holds {occupancy.get(new_slot)!r}, not "
+            f"{new_ee!r}"
+        )
+    occupancy[new_slot] = "empty"
+    return tuple(sorted(occupancy.items())), None
+
+
 def build_transition(
     state: SearchState,
     candidate: Candidate,
@@ -156,14 +181,16 @@ def build_transition(
     """Prepare ``candidate.ee/tool`` and execute its subgoal."""
     prims: list[Primitive] = []
     motion = context.policy.motion_costs
-    ee_change = state.current_ee != candidate.ee
+    initial_attach = state.current_ee is None
+    ee_change = not initial_attach and state.current_ee != candidate.ee
     held_objects = held_object_ids(state, context)
     rack = state.rack_signature
 
-    if held_objects and ee_change:
+    if held_objects and (initial_attach or ee_change):
         return _infeasible(
             ReasonCode.OBJECT_HELD_EE_SWITCH,
-            f"holding object(s) {sorted(held_objects)!r}; EE detach is forbidden",
+            f"holding object(s) {sorted(held_objects)!r}; EE attach/detach is "
+            "forbidden",
             candidate,
         )
     if held_objects and state.held_tool != candidate.tool:
@@ -176,7 +203,41 @@ def build_transition(
 
     cur_tool = state.held_tool
     next_rack = rack
-    if ee_change:
+    if initial_attach:
+        # With no mounted EE there can be no held tool or object (validated at
+        # input time).  Attach the search-selected EE without charging an EE
+        # *exchange*; only subsequent EE changes increment ee_switches.
+        next_rack, rack_error = _rack_after_initial_attach(
+            rack, context.catalog, candidate.ee
+        )
+        if rack_error is not None:
+            return _infeasible(
+                ReasonCode.RACK_SLOT_UNAVAILABLE, rack_error, candidate
+            )
+        prims.extend(
+            [
+                _prim(
+                    P.MOVE_TO_EE_RACK,
+                    cost=CostVector(motion_cost=motion.move_to_ee_rack),
+                ),
+                _prim(
+                    P.ATTACH_EE,
+                    {"ee": candidate.ee},
+                    preconditions=(f"docked({candidate.ee})",),
+                    effects=(f"mounted({candidate.ee})",),
+                ),
+                _prim(P.VERIFY_ATTACHMENT, {"ee": candidate.ee}, verify=True),
+            ]
+        )
+        if candidate.tool is not None:
+            prims.extend(
+                _pick_tool_prims(
+                    candidate,
+                    motion.move_to_tool_rack,
+                    switch=True,
+                )
+            )
+    elif ee_change:
         if cur_tool is not None:
             prims.append(
                 _prim(
@@ -329,7 +390,7 @@ class TerminalResult:
     primitives: tuple[Primitive, ...] = ()
     cost: CostVector = field(default_factory=CostVector)
     rejection: Rejection | None = None
-    next_ee: str = ""
+    next_ee: str | None = None
     next_rack_signature: tuple[tuple[str, str], ...] | None = None
 
 
@@ -355,7 +416,9 @@ def build_terminal_transition(
         )
 
     needs_restore = (
-        policy.restore_initial_ee_at_end and state.current_ee != context.initial_ee
+        policy.restore_initial_ee_at_end
+        and context.initial_ee is not None
+        and state.current_ee != context.initial_ee
     )
     if needs_restore and held_objects:
         return TerminalResult(

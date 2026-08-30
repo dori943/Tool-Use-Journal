@@ -106,6 +106,7 @@ def _is_goal(state: SearchState, problem: SearchProblem) -> bool:
         return False
     if (
         terminal.restore_initial_ee_at_end
+        and problem.transition_context.initial_ee is not None
         and state.current_ee != problem.transition_context.initial_ee
     ):
         return False
@@ -157,7 +158,7 @@ def _geometry_ok(
                 "transition",
                 lambda: problem.geometry.check_transition(
                     state.scene_signature,
-                    state.current_ee,
+                    state.current_ee or "",
                     state.held_tool,
                     candidate,
                     scene_ref=scene_ref,
@@ -203,7 +204,7 @@ def _geometry_ok(
         key = (
             scope,
             state.scene_signature,
-            state.current_ee if scope == "transition" else "",
+            (state.current_ee or "") if scope == "transition" else "",
             (state.held_tool or "") if scope == "transition" else "",
             candidate.candidate_id,
             code.value,
@@ -265,7 +266,12 @@ def _terminal_geometry_ok(
         if result.status is FeasibilityStatus.UNKNOWN
         else ReasonCode.GEOMETRY_FAILED
     )
-    key = ("terminalGeometry", state.scene_signature, state.current_ee, code.value)
+    key = (
+        "terminalGeometry",
+        state.scene_signature,
+        state.current_ee or "",
+        code.value,
+    )
     rejections.setdefault(
         key,
         make_rejection(

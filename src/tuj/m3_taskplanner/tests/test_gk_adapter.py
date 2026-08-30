@@ -409,6 +409,21 @@ def test_gk_requires_explicit_initial_robot_state() -> None:
         )
 
 
+def test_gk_accepts_explicit_null_initial_ee() -> None:
+    robot_spec = _robot_spec()
+    robot_spec["current_ee"] = None
+
+    request = build_request_from_gk(
+        _gk(), _m1(), m0_payload=_m0(), robot_spec_payload=robot_spec
+    )
+    result = plan(request)
+
+    assert request.task_graph.initial_state.current_ee is None
+    assert result.status is PlanStatus.SUCCESS
+    assert result.selected_plan is not None
+    assert result.selected_plan.cost_vector.ee_switches == 0
+
+
 def test_gk_accepts_normalized_initial_state_override() -> None:
     robot_spec = _robot_spec()
     robot_spec.pop("current_ee")
