@@ -507,7 +507,7 @@ class GeometryCache:
     def check_ee_exchange(
         self,
         scene_signature: str,
-        from_ee: str,
+        from_ee: str | None,
         to_ee: str,
         *,
         held_tool: str | None = None,
@@ -517,7 +517,7 @@ class GeometryCache:
         """Vacuous PASS unless the checker models EE exchange."""
         if not self.is_motion_oracle:
             return CheckResult.ok()
-        key = (scene_signature, from_ee, to_ee, held_tool or "")
+        key = (scene_signature, from_ee or "", to_ee, held_tool or "")
         if key in self.exchange_cache:
             self.cache_hits += 1
             return self.exchange_cache[key]

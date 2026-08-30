@@ -122,6 +122,19 @@ def test_unknown_initial_ee_rejected() -> None:
     assert ReasonCode.UNKNOWN_EE in _codes(result)
 
 
+def test_held_tool_without_initial_ee_is_rejected() -> None:
+    request = make_request(
+        [sg("S1", feasible=["A"])],
+        proposals={"S1": [prop("S1-c1", "S1", "A")]},
+        initial_ee=None,
+        initial_kwargs={"held_tool": "t1"},
+    )
+    result = plan(request)
+
+    assert result.status is PlanStatus.INVALID_INPUT
+    assert ReasonCode.EE_TOOL_INCOMPATIBLE in _codes(result)
+
+
 def test_empty_feasible_ee_is_no_candidate() -> None:
     request = make_request(
         [sg("S1", feasible=[])],

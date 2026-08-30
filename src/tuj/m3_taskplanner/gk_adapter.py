@@ -944,17 +944,22 @@ def _initial_state(
     )
 
 
-def _current_ee(robot_spec: Mapping[str, Any], all_ees: list[str]) -> str:
-    candidates = [
-        robot_spec.get("current_ee"),
-        _mapping(robot_spec.get("robot_state")).get("current_ee"),
-        _mapping(robot_spec.get("robot")).get("current_ee"),
-    ]
-    for value in candidates:
-        if value is None:
+def _current_ee(
+    robot_spec: Mapping[str, Any], all_ees: list[str]
+) -> str | None:
+    sources = (
+        robot_spec,
+        _mapping(robot_spec.get("robot_state")),
+        _mapping(robot_spec.get("robot")),
+    )
+    for source in sources:
+        if "current_ee" not in source:
             continue
+        value = source["current_ee"]
+        if value is None:
+            return None
         if not isinstance(value, str):
-            raise ValueError("initial current_ee must be a string")
+            raise ValueError("initial current_ee must be a string or null")
         if value not in all_ees:
             raise ValueError(
                 f"initial current_ee {value!r} is not in the EE catalog {all_ees!r}"

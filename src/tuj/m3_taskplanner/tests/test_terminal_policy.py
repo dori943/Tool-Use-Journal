@@ -59,6 +59,30 @@ def test_restore_initial_ee_adds_switch_and_step() -> None:
     assert result.selected_plan.terminal_state["current_ee"] == "A"
 
 
+def test_restore_policy_has_no_target_when_initial_ee_is_absent() -> None:
+    policy = PlanningPolicy(
+        terminal=TerminalPolicy(restore_initial_ee_at_end=True)
+    )
+    subgoals = [sg("S1", targets=["obj1"], feasible=["B"])]
+    proposals = {"S1": [prop("S1-c1", "S1", "B")]}
+
+    result = plan(
+        make_request(
+            subgoals,
+            proposals=proposals,
+            initial_ee=None,
+            policy=policy,
+        )
+    )
+
+    assert result.status is PlanStatus.SUCCESS
+    assert result.selected_plan is not None
+    actions = [step.action for step in result.selected_plan.steps]
+    assert P.TERMINAL_RESTORE_EE not in actions
+    assert result.selected_plan.cost_vector.ee_switches == 0
+    assert result.selected_plan.terminal_state["current_ee"] == "B"
+
+
 def test_terminal_cleanup_cost_is_not_hidden() -> None:
     with_return = plan(_tool_request())
     policy = PlanningPolicy(terminal=TerminalPolicy(return_tool_at_end=False))

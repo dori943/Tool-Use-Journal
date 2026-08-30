@@ -123,7 +123,7 @@ def make_request(
     edges: Iterable[tuple[str, str]] = (),
     proposals: dict[str, list[CandidateProposal]] | None = None,
     catalog: ResourceCatalog | None = None,
-    initial_ee: str = "A",
+    initial_ee: str | None = "A",
     policy: PlanningPolicy | None = None,
     facts: Iterable[Condition] = (),
     order_kwargs: dict[str, Any] | None = None,

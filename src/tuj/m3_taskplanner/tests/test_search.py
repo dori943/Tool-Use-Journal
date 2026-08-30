@@ -94,6 +94,38 @@ def test_search_limit_returns_limit_status_without_fabricating_a_plan() -> None:
     assert result.selected_plan is None
 
 
+def test_empty_initial_mount_selects_first_ee_to_minimize_later_exchanges() -> None:
+    subgoals = [
+        sg("S1", targets=["obj1"], feasible=["A", "B"]),
+        sg("S2", targets=["obj2"], feasible=["B"]),
+    ]
+    proposals = {
+        "S1": [
+            prop("S1-A", "S1", "A"),
+            prop("S1-B", "S1", "B"),
+        ],
+        "S2": [prop("S2-B", "S2", "B")],
+    }
+
+    result = plan(
+        make_request(
+            subgoals,
+            edges=[("S1", "S2")],
+            proposals=proposals,
+            initial_ee=None,
+        )
+    )
+
+    assert result.status is PlanStatus.SUCCESS
+    assert result.selected_plan is not None
+    actions = [step.action for step in result.selected_plan.steps]
+    assert actions.count(P.ATTACH_EE) == 1
+    assert P.DETACH_EE not in actions
+    assert result.selected_plan.cost_vector.ee_switches == 0
+    assert result.selected_plan.terminal_state["current_ee"] == "B"
+    assert result.selected_plan.ee_blocks[0]["ee"] == "B"
+
+
 # --------------------------------------------------------------------------- #
 # Lexicographic priority in an actual plan choice                             #
 # --------------------------------------------------------------------------- #

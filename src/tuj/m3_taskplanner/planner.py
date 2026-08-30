@@ -135,7 +135,10 @@ def plan(
         group_bindings = tuple(
             sorted(getattr(execution_state, "group_ee_bindings", {}).items())
         )
-        if current_ee not in request.resource_catalog.end_effectors:
+        if (
+            current_ee is not None
+            and current_ee not in request.resource_catalog.end_effectors
+        ):
             return PlanningResult(
                 status=PlanStatus.INVALID_INPUT,
                 task=task,
@@ -382,14 +385,26 @@ def _validate_execution_state(
                 subgoal_id=subgoal_id,
             )
 
-    ee_spec = catalog.end_effectors.get(execution_state.current_ee)
-    if ee_spec is None:
+    ee_spec = (
+        catalog.end_effectors.get(execution_state.current_ee)
+        if execution_state.current_ee is not None
+        else None
+    )
+    if (
+        execution_state.current_ee is not None
+        and ee_spec is None
+    ):
         reject(
             ReasonCode.UNKNOWN_EE,
             f"execution state current_ee {execution_state.current_ee!r} not in catalog",
         )
 
     if execution_state.held_tool is not None:
+        if execution_state.current_ee is None:
+            reject(
+                ReasonCode.EE_TOOL_INCOMPATIBLE,
+                "execution held_tool requires a mounted current_ee",
+            )
         tool_spec = catalog.tools.get(execution_state.held_tool)
         if tool_spec is None:
             reject(
@@ -536,12 +551,16 @@ def _build_selected_plan(
                         ee=edge.candidate.ee,
                         tool=edge.candidate.tool,
                         action_type=edge.candidate.action_type,
+                        mode=subgoals[edge.subgoal_id].mode,
                         target_ids=list(edge.candidate.target_ids),
                         goal_region_id=subgoals[edge.subgoal_id].goal_region_id,
                         description=subgoals[edge.subgoal_id].description,
                         grasp_id=edge.candidate.grasp_id,
                         grasp=edge.candidate.grasp,
                         action_parameters=dict(edge.candidate.metadata),
+                        source_binding=dict(
+                            subgoals[edge.subgoal_id].source_binding
+                        ),
                         suitability_score=edge.candidate.suitability_score,
                         suitability=edge.candidate.metadata.get("suitability"),
                         ee_selection_source="task_planner",
