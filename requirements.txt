@@ -1,18 +1,40 @@
-# robosuite 1.5.2 requires mujoco>=3.3.0,<3.10 (3.10+ breaks controller mass matrix API)
-robosuite==1.5.2
-mujoco>=3.3.0,<3.10
+# robosuite
+# Verified post-v1.5.2 source for C1/C2/C4 environments.
+# Official PyPI robosuite==1.5.2 does not provide load_model_on_init.
+robosuite @ git+https://github.com/ARISE-Initiative/robosuite.git@5ce6643f3092639d08f7b0f90ed1c6a84f50552c
 
-# Transitive dependencies (pinned from working install on Windows + Python 3.12)
+# MuJoCo
+mujoco==3.3.1
+
+# Dependencies
+# Pinned for Windows + Python 3.11
+
 absl-py==2.5.0
 colorama==0.4.6
 etils==1.14.0
 fsspec==2026.7.0
 glfw==2.10.2
+
+# RoboCasa runtime dependencies
+gymnasium==0.29.1
+h5py==3.16.0
+hidapi==0.15.0
+ImageIO==2.37.4
+imageio-ffmpeg==0.6.0
+lxml==6.1.2
+pygame==2.6.1
+PyYAML==6.0.3
+pyyaml-include==1.4.1
+tianshou==0.4.10
+
+# Numerical / scientific dependencies
+llvmlite==0.44.0
+numba==0.61.2
+numpy==2.2.5
+scipy==1.15.3
+
+# Other dependencies
 iniconfig==2.3.0
-llvmlite==0.49.0
-mink==0.0.5
-numba==0.67.0
-numpy==1.26.4
 opencv-python==4.11.0.86
 packaging==26.3
 pillow==12.3.0
@@ -23,7 +45,6 @@ PyOpenGL==3.1.10
 pytest==9.1.1
 qpsolvers==4.13.0
 quadprog==0.1.13
-scipy==1.17.1
 six==1.17.0
 termcolor==3.3.0
 tqdm==4.70.0
