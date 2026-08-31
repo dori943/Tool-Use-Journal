@@ -53,13 +53,9 @@ sys.path.insert(0, str(ROOT / "src"))
 
 STAGES = ("m1", "m2", "m3", "m4", "m5")
 
-# M5 는 자체적으로 환경을 다시 만들기 때문에 환경 이름이 필요하다.
-# scripts/run_m1.py 의 TASKS 와 같은 내용이며, M1 을 건너뛰어도(=--m1-json)
-# robosuite import 없이 환경 이름을 알 수 있도록 여기에도 둔다.
-TASK_ENV = {
-    "c1_1": "C1_1_LegoSweep",
-    "c2_1": "C2_1_ObjectSorting",
-}
+# 태스크 id <-> 환경 이름은 단일 출처(task_registry)에서 가져온다.
+# (M5 가 환경을 다시 만들 때 등 robosuite import 없이 이름만 필요할 때 쓴다.)
+from task_registry import TASK_ENVS as TASK_ENV  # noqa: E402
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -156,8 +152,8 @@ def stage_m1(task, out, args):
 
     seed_everything(args.seed)
     module = load_script("run_m1")
-    if task not in module.TASKS:
-        sys.exit(f"[err] run_m1.TASKS 에 {task!r} 없음: {list(module.TASKS)}")
+    if task not in TASK_ENV:
+        sys.exit(f"[err] 등록되지 않은 태스크 {task!r}. 등록됨: {list(TASK_ENV)}")
     argv = [task] + (["--view"] if args.view else [])
     call_main(module, argv, "run_m1")
 

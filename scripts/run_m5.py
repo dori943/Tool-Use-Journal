@@ -3,7 +3,7 @@
 
 run_m1.py 와 같은 방식이다. 태스크 id(c1_1, c2_1, ...)만 주면
   입력: output/<task>/m4.json  (M4 SelectedPlan)
-  환경: 아래 TASKS 에 등록된 robosuite 환경으로 초기 world 를 캡처
+  환경: task_registry 에 등록된 robosuite 환경으로 초기 world 를 캡처
   출력: output/<task>/m5/
 를 자동으로 채운다. 명시적 플래그를 주면 그 값이 우선한다.
 
@@ -24,8 +24,8 @@ run_m1.py 와 같은 방식이다. 태스크 id(c1_1, c2_1, ...)만 주면
       --environment C1_1_LegoSweep --output-dir out/   # 태스크 없이 직접 지정
 
 태스크 추가:
-  - 범용 계획만: TASKS 에 (task id -> 환경 이름) 한 줄.
-  - 물리 실행도: PHYSICAL 에 (task id -> 전용 예제 러너/프로파일/환경) 한 항목.
+  - 범용 계획만: task_registry.TASKS 에 한 줄.
+  - 물리 실행도: PHYSICAL 에 (task id -> 전용 예제 러너/프로파일) 한 항목.
 범용 옵션(--seed, --simulate, ...)은 generic_runner 로, 물리 옵션
 (--motion-profile, --sweep-provider, --pick-keyframes, --stop-after-pick 등)은
 전용 예제 러너로 그대로 전달된다.
@@ -49,21 +49,18 @@ SOURCE_ROOTS = (
     REPOSITORY.parent / "tuj-m3" / "src",
 )
 
-# 태스크 id -> robosuite 환경 이름 (run_m1.py 의 TASKS env_name 과 동일 명명).
-TASKS = {
-    "c1_1": "C1_1_LegoSweep",
-    "c2_1": "C2_1_ObjectSorting",
-    # c1_2, c2_2: 씬 파일(environments/*.py) 추가 시 여기에 한 항목 등록
-}
+# 태스크 id <-> 환경 이름은 단일 출처(task_registry)에서 가져온다.
+sys.path.insert(0, str(REPOSITORY))
+from task_registry import TASK_ENVS  # noqa: E402
 
-# 물리 실행: 태스크 id -> 전용 예제 러너 + 검증된 물리 프로파일 + 환경.
+# 물리 실행: 태스크 id -> 전용 예제 러너 + 검증된 물리 프로파일.
+# (환경 이름은 TASK_ENVS 에서 가져오므로 여기서 중복하지 않는다.)
 # 물리 grasp/sweep 는 태스크 전용 기하(예: C1_1 rim-grasp 바인더)에 묶여 있어
 # 전용 예제 러너가 있어야 한다. 새 태스크의 물리 예제가 생기면 여기에 등록한다.
 PHYSICAL = {
     "c1_1": {
         "runner": "src/tuj/m5_motion/examples/c1_1_openai_motion_run.py",
         "profile": "src/tuj/m5_motion/examples/c1_1_physical_grasp_profile.json",
-        "environment": "C1_1_LegoSweep",
     },
 }
 
@@ -79,14 +76,14 @@ def _expand_task(argv: list[str]) -> list[str]:
     if not argv or argv[0].startswith("-"):
         return list(argv)
     task, rest = argv[0], list(argv[1:])
-    if task not in TASKS:
-        sys.exit(f"[err] 등록되지 않은 태스크 {task!r}. 등록된 태스크: {list(TASKS)}")
+    if task not in TASK_ENVS:
+        sys.exit(f"[err] 등록되지 않은 태스크 {task!r}. 등록된 태스크: {list(TASK_ENVS)}")
     out = REPOSITORY / "output" / task
     injected: list[str] = []
     if "--task-planner" not in rest:
         injected += ["--task-planner", str(out / "m4.json")]
     if "--environment" not in rest and "--initial-world" not in rest:
-        injected += ["--environment", TASKS[task]]
+        injected += ["--environment", TASK_ENVS[task]]
     if "--output-dir" not in rest:
         injected += ["--output-dir", str(out / "m5")]
     return injected + rest
@@ -133,7 +130,7 @@ def _run_physical(argv: list[str]) -> int:
     parser.add_argument("--motion-profile", type=Path,
                         default=REPOSITORY / spec["profile"],
                         help="검증된 물리 grasp/contact/recovery 설정")
-    parser.add_argument("--environment", default=spec["environment"])
+    parser.add_argument("--environment", default=TASK_ENVS[task])
     parser.add_argument("--sweep-provider", choices=("task-geometry", "openai"),
                         default="task-geometry")
     parser.add_argument("--pick-keyframes", type=Path,
