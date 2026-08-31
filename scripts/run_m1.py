@@ -10,7 +10,7 @@
       output/<task>/crops/*.png     — 노드별 마스크 크롭 (SiPhy 백엔드 VLM 입력)
       output/<task>/frame*.png      — 카메라 진단용 프레임
 
-태스크 추가: 아래 TASKS 딕셔너리에 항목 하나 등록 (env_name / class_of / bound_objects).
+태스크 추가: task_registry.TASKS 에 한 줄. 이름 규칙 깨진 env 만 _OVERRIDES 에 등록.
 M3는 robosuite 없이 이 출력만으로 실행 가능 → M3 쪽 반복 실험 시 sim 재기동 불필요.
 """
 from __future__ import annotations
@@ -37,6 +37,7 @@ import robosuite.macros as macros
 macros.IMAGE_CONVENTION = "opencv"                     # 상하반전 방지 (역투영 필수)
 
 import environments  # noqa: F401  (suite.make 등록)
+from task_registry import TASK_ENVS
 import robosuite as suite
 from robosuite.utils import camera_utils as CU
 
@@ -90,17 +91,30 @@ def _c2_1_class_of(inst):
     return None
 
 
-TASKS = {
-    "c1_1": dict(env_name="C1_1_LegoSweep",
-                 class_of=_generic_class_of,
-                 bound_objects=lambda env: _generic_bound_bodies(env, _generic_class_of),
-                 extra_geom_names=["collection_zone"]),
-    "c2_1": dict(env_name="C2_1_ObjectSorting",
-                 class_of=_c2_1_class_of,
-                 bound_objects=lambda env: env.target_objects + env.trays,
-                 extra_geom_names=[]),
-    # c1_2, c2_2: 씬 파일(environments/*.py) 추가 시 여기에 한 항목 등록
+# 이름 규칙이 깨진 env 만 M1 인식 오버라이드. 나머지는 범용 어댑터로 자동 처리한다.
+_OVERRIDES = {
+    "c2_1": dict(class_of=_c2_1_class_of,
+                 bound_objects=lambda env: env.target_objects + env.trays),
 }
+# 카메라 auto-fit 에 추가로 포함할 지오메트리(바디 아님) 이름.
+_EXTRA_GEOMS = {
+    "c1_1": ["collection_zone"],
+}
+
+
+def task_spec(name):
+    """task_registry + 오버라이드로 M1 씬 스펙을 만든다.
+
+    env_name 은 단일 출처(task_registry)에서 가져오고, class_of/bound_objects 는
+    기본이 범용 어댑터다. 이름 규칙이 깨진 env 만 _OVERRIDES 로 대체한다.
+    """
+    ov = _OVERRIDES.get(name, {})
+    class_of = ov.get("class_of", _generic_class_of)
+    bound = ov.get("bound_objects", lambda env: _generic_bound_bodies(env, class_of))
+    return dict(env_name=TASK_ENVS[name],
+                class_of=class_of,
+                bound_objects=bound,
+                extra_geom_names=_EXTRA_GEOMS.get(name, []))
 
 
 def save_crops(rgb, seg, name_of_id, node_ids, out_dir, min_box=8):
@@ -179,9 +193,9 @@ def fit_camera_to_points(env, cid, pts, margin=0.85, iters=12):
 def main():
     name = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else "c1_1"
     view = "--view" in sys.argv
-    if name not in TASKS:
-        sys.exit(f"[err] unknown task {name!r}. 등록된 태스크: {list(TASKS)}")
-    spec = TASKS[name]
+    if name not in TASK_ENVS:
+        sys.exit(f"[err] unknown task {name!r}. 등록된 태스크: {list(TASK_ENVS)}")
+    spec = task_spec(name)
     OUT = ROOT / "output" / name
 
     env = suite.make(

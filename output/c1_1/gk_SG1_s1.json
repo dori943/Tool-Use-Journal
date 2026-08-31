@@ -178,10 +178,10 @@
         }
       },
       "reachability": {
-        "distance_mm": 378.5,
+        "distance_mm": 379.2,
         "reach_mm": 850,
         "reachable": true,
-        "margin_mm": 471.5
+        "margin_mm": 470.8
       }
     }
   },
@@ -194,7 +194,7 @@
   "subgoal_kind": "sweep_collect",
   "roles": {
     "target": [
-      "obj_block_block_3"
+      "obj_block_block_1"
     ],
     "container": "obj_zone_collection_zone_visual",
     "tool_candidates": [
@@ -209,8 +209,20 @@
           "3F",
           "vac"
         ],
-        "reach_margin_mm": 471.5,
+        "reach_margin_mm": 470.8,
         "batch_groups": 12
+      },
+      {
+        "node": "obj_scissors_scissors",
+        "feasible_ees": [],
+        "reach_margin_mm": 0.0,
+        "batch_groups": null
+      },
+      {
+        "node": "obj_fork_fork",
+        "feasible_ees": [],
+        "reach_margin_mm": 0.0,
+        "batch_groups": null
       }
     ]
   },
@@ -260,7 +272,7 @@
       "action_type": "tool_act:sweep",
       "binding": {
         "?t": "?tool",
-        "?targets": "{obj_block_block_3}",
+        "?targets": "{obj_block_block_1}",
         "?r": "obj_zone_collection_zone_visual"
       },
       "pre": [
@@ -271,12 +283,12 @@
         },
         {
           "id": "SG1_s1_d2_p1",
-          "expr": "batch_feasible(?tool, {obj_block_block_3})",
+          "expr": "batch_feasible(?tool, {obj_block_block_1})",
           "eval_by": "m3"
         },
         {
           "id": "SG1_s1_d2_p2",
-          "expr": "act_space_clear(?tool, {obj_block_block_3}, obj_zone_collection_zone_visual)",
+          "expr": "act_space_clear(?tool, {obj_block_block_1}, obj_zone_collection_zone_visual)",
           "eval_by": "m3"
         },
         {
@@ -286,7 +298,7 @@
         }
       ],
       "establish": [
-        "in({obj_block_block_3}, obj_zone_collection_zone_visual)"
+        "in({obj_block_block_1}, obj_zone_collection_zone_visual)"
       ],
       "destroy": []
     }
@@ -360,7 +372,7 @@
     {
       "from": "SG1_s1_d2",
       "to": "SG1_s12_d2b",
-      "why": "causal_link: in({obj_block_block_3}, obj_zone_collection_zone_visual)"
+      "why": "causal_link: in({obj_block_block_1}, obj_zone_collection_zone_visual)"
     },
     {
       "from": "SG1_s1_d1",
@@ -377,7 +389,7 @@
   "invariants": [
     {
       "id": "INV_SG1_s1",
-      "expr": "all_in({obj_block_block_3}, obj_zone_collection_zone_visual)",
+      "expr": "all_in({obj_block_block_1}, obj_zone_collection_zone_visual)",
       "check_at": "final"
     }
   ],
@@ -406,11 +418,11 @@
         "id": "obj_ladle_ladle"
       },
       "clear": false,
-      "margin_mm": -23.2,
+      "margin_mm": -7.2,
       "blockers": [
         {
           "node_id": "obj_block_block_6",
-          "overlap_mm": 23.2
+          "overlap_mm": 7.2
         }
       ]
     }
