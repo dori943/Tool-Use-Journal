@@ -241,9 +241,9 @@ def build_gk_bundle(out, gk_paths=None):
 
 
 def stage_m4(task, out, args, gk_paths=None):
-    """scripts/run_m4_task_planner.py — gk_bundle + m2 + m1 → m4.json."""
+    """scripts/run_m4.py — gk_bundle + m2 + m1 → m4.json."""
     bundle = build_gk_bundle(out, gk_paths)
-    module = load_script("run_m4_task_planner")
+    module = load_script("run_m4")
     argv = ["--gk", str(bundle),
             "--m2", str(out / "m2.json"),
             "--m1", str(out / "m1.json"),
@@ -251,7 +251,7 @@ def stage_m4(task, out, args, gk_paths=None):
             "--output", str(out / "m4.json")]
     if args.initial_state:
         argv += ["--initial-state", str(args.initial_state)]
-    call_main(module, argv, "run_m4_task_planner")
+    call_main(module, argv, "run_m4")
 
 
 def dump_motion_failure(exc, m5_dir):
@@ -330,8 +330,9 @@ def run_m5_runner(module, argv, label, m5_dir):
 def stage_m5(task, out, args):
     """M5 모션 계획.
 
-    기본은 태스크 비의존 범용 러너(run_m5_motion_planner.py). --m5-physical 이면
-    C1_1 전용 물리 실행 러너(run_m5_c1_1_motion_planner.py)를 쓴다.
+    기본은 태스크 비의존 범용 러너(run_m5.py). --m5-physical
+    이면 같은 러너의 물리 실행 모드(--physical)를 쓴다 — 태스크 전용 물리 예제
+    러너를 subprocess 로 띄운다(현재 c1_1 만 지원).
 
     범용 러너는 --environment 로 환경을 다시 만들어 초기 WorldSnapshot 을 뜬다.
     같은 프로세스 안에서 M1 과 같은 시드를 다시 심어 배치를 맞춘다.
@@ -350,17 +351,18 @@ def stage_m5(task, out, args):
 
     seed_everything(args.seed)
     if args.m5_physical:
-        module = load_script("run_m5_c1_1_motion_planner")
-        argv = ["--task-planner", str(m4), "--output-dir", str(m5_dir)]
+        module = load_script("run_m5")
+        argv = [task, "--physical",
+                "--task-planner", str(m4), "--output-dir", str(m5_dir)]
         if args.m5_validate_only:
             argv.append("--validate-input-only")
         argv += args.m5_args
-        run_m5_runner(module, argv, "run_m5_c1_1_motion_planner", m5_dir)
+        run_m5_runner(module, argv, "run_m5(physical)", m5_dir)
     else:
         if not env_name:
             sys.exit(f"[err] {task!r} 의 환경 이름을 모릅니다 — "
                      f"--m5-environment 로 지정하거나 TASK_ENV 에 등록하십시오.")
-        module = load_script("run_m5_motion_planner")
+        module = load_script("run_m5")
         argv = ["--task-planner", str(m4),
                 "--environment", env_name,
                 "--output-dir", str(m5_dir),
@@ -370,7 +372,7 @@ def stage_m5(task, out, args):
         elif args.m5_simulate:
             argv += ["--simulate", args.m5_simulate, "--headless"]
         argv += args.m5_args
-        run_m5_runner(module, argv, "run_m5_motion_planner", m5_dir)
+        run_m5_runner(module, argv, "run_m5", m5_dir)
 
     summary = m5_dir / "m5_summary.json"
     if summary.exists():
@@ -419,7 +421,7 @@ def build_parser():
     p.add_argument("--m5-simulate", choices=("kinematic", "controller"),
                    default=None, help="M5 계획을 MuJoCo 로 헤드리스 재생")
     p.add_argument("--m5-physical", action="store_true",
-                   help="C1_1 전용 물리 실행 러너를 사용")
+                   help="물리 실행 모드 (태스크 전용 물리 예제 러너, 현재 c1_1)")
     p.add_argument("--m5-args", nargs=argparse.REMAINDER, default=[],
                    help="이 뒤의 인자는 M5 러너로 그대로 전달")
     p.add_argument("--view", action="store_true", help="M1 단계에서 뷰어 표시")
