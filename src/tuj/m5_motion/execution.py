@@ -355,14 +355,23 @@ class GroundedMotionGoalEvaluator:
 
         if is_ee_exchange_task(request.task):
             actual = report.metadata.get("final_active_ee")
-            satisfied = actual == request.task.ee
+            expected = request.task.ee
+            try:
+                from tuj.m5_motion.precomputed_ee_attach import normalize_ee_id
+
+                expected = normalize_ee_id(expected)
+                actual = normalize_ee_id(actual)
+            except ValueError:
+                # Non-rack custom EEs retain the general exact-match behavior.
+                pass
+            satisfied = actual == expected
             return self._result(
                 request,
                 GoalEvaluationStatus.SATISFIED if satisfied else GoalEvaluationStatus.FAILED,
                 (
-                    f"EE {request.task.ee!r} is active"
+                    f"EE {expected!r} is active"
                     if satisfied
-                    else f"expected active EE {request.task.ee!r}, observed {actual!r}"
+                    else f"expected active EE {expected!r}, observed {actual!r}"
                 ),
                 observed={"final_active_ee": actual},
             )

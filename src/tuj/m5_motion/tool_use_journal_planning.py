@@ -17,12 +17,30 @@ from typing import Any, Protocol
 import numpy as np
 
 from tuj.m5_motion.ee_exchange import RoutedKeyframeStrategyProvider
+from tuj.m5_motion.ee_exchange_entry import (
+    EEExchangeEntryPlanner,
+    is_ee_exchange_entry_request,
+)
 from tuj.m5_motion.geometry import RelativePoseResolver
 from tuj.m5_motion.pipeline import (
     CollisionPlanningSetup,
     KeyframeStrategyProvider,
     MotionPlanningPipeline,
     MotionPlanningResult,
+)
+from tuj.m5_motion.precomputed_ee_attach import (
+    EEAttachPathFailureCode,
+    EEAttachPolicy,
+    PrecomputedEEAttachPlanner,
+    PrecomputedEEAttachRegistry,
+    PrecomputedEEPathError,
+    is_initial_ee_attach,
+    normalize_ee_id,
+)
+from tuj.m5_motion.precomputed_ee_exchange import (
+    PrecomputedEEExchangePlanner,
+    PrecomputedEEReturnRegistry,
+    is_ee_exchange_request,
 )
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
@@ -802,6 +820,173 @@ class ToolUseJournalCollisionContextFactory:
         initial_id = f"ee-attached:{from_ee}" if from_ee else "bare-flange"
         return artifact, contexts, initial_id, from_ee
 
+    def prepare_precomputed_ee_attach(
+        self,
+        request: MotionPlanRequest,
+    ) -> tuple[Mapping[str, CollisionContext], object]:
+        """Build current-scene collision models without generating keyframes."""
+
+        self._validate_environment(request)
+        if not is_initial_ee_attach(request):
+            raise ToolUseJournalCollisionBindingError(
+                "precomputed EE attach setup requires an initial bare EE_ATTACH"
+            )
+        if (
+            request.world.robot_state.attached_object_id is not None
+            or request.world.robot_state.held_tool_id is not None
+        ):
+            raise ToolUseJournalCollisionBindingError(
+                "EE_ATTACH requires an empty bare flange"
+            )
+        try:
+            to_ee = normalize_ee_id(
+                request.task.metadata.get("to_ee") or request.task.ee
+            )
+        except ValueError as error:
+            raise ToolUseJournalCollisionBindingError(str(error)) from error
+        contexts = self.compiler.build_ee_exchange_contexts(
+            from_ee=None,
+            to_ee=to_ee,
+        )
+        free_poses = _free_object_poses(request.world)
+        contexts = {
+            context_id: context.model_copy(
+                update={"free_object_poses": free_poses}
+            )
+            for context_id, context in contexts.items()
+        }
+        try:
+            registry = self.compiler.build_collision_registry(
+                contexts,
+                collision_margin_m=request.constraints.collision_margin_m,
+                allowed_collision_pairs=(
+                    request.constraints.allowed_collision_pairs
+                ),
+                default_active_ee=None,
+            )
+        except ToolUseJournalCompatibilityError:
+            raise
+        except Exception as error:  # noqa: BLE001
+            raise ToolUseJournalCollisionBindingError(
+                "failed to build precomputed EE attach collision registry"
+            ) from error
+        return contexts, registry
+
+    def prepare_precomputed_ee_exchange(
+        self,
+        request: MotionPlanRequest,
+    ) -> tuple[Mapping[str, CollisionContext], object]:
+        """Build the current-scene collision variants for a composed exchange."""
+
+        self._validate_environment(request)
+        if not is_ee_exchange_request(request):
+            raise ToolUseJournalCollisionBindingError(
+                "precomputed EE exchange setup requires an attached-EE EE_EXCHANGE"
+            )
+        if (
+            request.world.robot_state.attached_object_id is not None
+            or request.world.robot_state.held_tool_id is not None
+        ):
+            raise ToolUseJournalCollisionBindingError(
+                "EE_EXCHANGE requires an empty end effector"
+            )
+        try:
+            from_ee = normalize_ee_id(request.task.metadata.get("from_ee"))
+            to_ee = normalize_ee_id(
+                request.task.metadata.get("to_ee") or request.task.ee
+            )
+        except ValueError as error:
+            raise ToolUseJournalCollisionBindingError(str(error)) from error
+        contexts = self.compiler.build_ee_exchange_contexts(
+            from_ee=from_ee,
+            to_ee=to_ee,
+        )
+        free_poses = _free_object_poses(request.world)
+        contexts = {
+            context_id: context.model_copy(
+                update={"free_object_poses": free_poses}
+            )
+            for context_id, context in contexts.items()
+        }
+        try:
+            registry = self.compiler.build_collision_registry(
+                contexts,
+                collision_margin_m=request.constraints.collision_margin_m,
+                allowed_collision_pairs=(
+                    request.constraints.allowed_collision_pairs
+                ),
+                default_active_ee=from_ee,
+            )
+        except ToolUseJournalCompatibilityError:
+            raise
+        except Exception as error:  # noqa: BLE001
+            raise ToolUseJournalCollisionBindingError(
+                "failed to build precomputed EE exchange collision registry"
+            ) from error
+        return contexts, registry
+
+    def prepare_ee_exchange_entry(
+        self,
+        request: MotionPlanRequest,
+    ) -> tuple[Mapping[str, CollisionContext], object]:
+        """Build attached-EE collision models for the entry positioning leg."""
+
+        self._validate_environment(request)
+        if not is_ee_exchange_entry_request(request):
+            raise ToolUseJournalCollisionBindingError(
+                "exchange-entry setup requires EE_EXCHANGE_ENTRY"
+            )
+        if (
+            request.world.robot_state.attached_object_id is not None
+            or request.world.robot_state.held_tool_id is not None
+        ):
+            raise ToolUseJournalCollisionBindingError(
+                "EE_EXCHANGE_ENTRY requires an empty end effector"
+            )
+        try:
+            source = normalize_ee_id(
+                request.task.metadata.get("entry_ee")
+                or request.task.metadata.get("from_ee")
+                or request.task.ee
+            )
+            target = normalize_ee_id(request.task.metadata.get("next_ee"))
+            physical = normalize_ee_id(
+                request.world.metadata.get("physical_active_ee")
+            )
+        except ValueError as error:
+            raise ToolUseJournalCollisionBindingError(str(error)) from error
+        if source != physical or source == target:
+            raise ToolUseJournalCollisionBindingError(
+                "exchange-entry source/target does not match the mounted EE transition"
+            )
+        contexts = self.compiler.build_ee_exchange_contexts(
+            from_ee=source,
+            to_ee=target,
+        )
+        free_poses = _free_object_poses(request.world)
+        contexts = {
+            context_id: context.model_copy(
+                update={"free_object_poses": free_poses}
+            )
+            for context_id, context in contexts.items()
+        }
+        try:
+            registry = self.compiler.build_collision_registry(
+                contexts,
+                collision_margin_m=request.constraints.collision_margin_m,
+                allowed_collision_pairs=(
+                    request.constraints.allowed_collision_pairs
+                ),
+                default_active_ee=source,
+            )
+        except ToolUseJournalCompatibilityError:
+            raise
+        except Exception as error:  # noqa: BLE001
+            raise ToolUseJournalCollisionBindingError(
+                "failed to build EE exchange-entry collision registry"
+            ) from error
+        return contexts, registry
+
     def prepare(
         self,
         request: MotionPlanRequest,
@@ -865,9 +1050,20 @@ class ToolUseJournalMotionRequestPlanner:
         self,
         pipeline: MotionPlanningPipeline,
         collision_context_factory: ToolUseJournalCollisionContextFactory,
+        *,
+        precomputed_ee_attach_planner: PrecomputedEEAttachPlanner | None = None,
+        precomputed_ee_exchange_planner: PrecomputedEEExchangePlanner | None = None,
+        ee_exchange_entry_planner: EEExchangeEntryPlanner | None = None,
+        ee_attach_policy: EEAttachPolicy | str = EEAttachPolicy.PRECOMPUTED_REQUIRED,
+        log: Any = print,
     ) -> None:
         self.pipeline = pipeline
         self.collision_context_factory = collision_context_factory
+        self.precomputed_ee_attach_planner = precomputed_ee_attach_planner
+        self.precomputed_ee_exchange_planner = precomputed_ee_exchange_planner
+        self.ee_exchange_entry_planner = ee_exchange_entry_planner
+        self.ee_attach_policy = EEAttachPolicy(ee_attach_policy)
+        self._log = log
 
     @property
     def environment_name(self) -> str:
@@ -881,6 +1077,12 @@ class ToolUseJournalMotionRequestPlanner:
         *,
         provider: KeyframeStrategyProvider | None = None,
         seed: int = 0,
+        ee_attach_registry_root: str | Path | None = None,
+        ee_attach_trajectory_paths: Sequence[str | Path] = (),
+        ee_return_trajectory_paths: Sequence[str | Path] = (),
+        ee_attach_policy: EEAttachPolicy | str = EEAttachPolicy.PRECOMPUTED_REQUIRED,
+        ee_attach_start_tolerance_rad: float = 0.01,
+        log: Any = print,
         **suite_make_kwargs: Any,
     ) -> "ToolUseJournalMotionRequestPlanner":
         adapter = ToolUseJournalEnvironmentAdapter(env)
@@ -897,10 +1099,8 @@ class ToolUseJournalMotionRequestPlanner:
             if isinstance(selected_provider, RoutedKeyframeStrategyProvider)
             else RoutedKeyframeStrategyProvider(selected_provider)
         )
-        pipeline = MotionPlanningPipeline(
-            routed_provider,
-            adapter.make_kinematics(),
-        )
+        kinematics = adapter.make_kinematics()
+        pipeline = MotionPlanningPipeline(routed_provider, kinematics)
         factory = ToolUseJournalCollisionContextFactory(
             compiler,
             attachment_reference_name=(
@@ -924,9 +1124,134 @@ class ToolUseJournalMotionRequestPlanner:
                 else "body"
             ),
         )
-        return cls(pipeline, factory)
+        registry_root = (
+            Path(ee_attach_registry_root)
+            if ee_attach_registry_root is not None
+            else Path(repository_root) / "configs" / "precomputed_ee_paths"
+        )
+        precomputed = PrecomputedEEAttachPlanner(
+            PrecomputedEEAttachRegistry(
+                registry_root,
+                trajectory_paths=ee_attach_trajectory_paths,
+            ),
+            start_tolerance_rad=ee_attach_start_tolerance_rad,
+            joint_position_limits_rad=getattr(
+                kinematics, "joint_limits_rad", None
+            ),
+            log=log,
+        )
+        return_registry = PrecomputedEEReturnRegistry(
+            registry_root,
+            trajectory_paths=ee_return_trajectory_paths,
+        )
+        precomputed_exchange = PrecomputedEEExchangePlanner(
+            return_registry,
+            precomputed,
+            log=log,
+        )
+        entry_planner = EEExchangeEntryPlanner(
+            return_registry,
+            joint_position_limits_rad=getattr(kinematics, "joint_limits_rad"),
+            log=log,
+        )
+        return cls(
+            pipeline,
+            factory,
+            precomputed_ee_attach_planner=precomputed,
+            precomputed_ee_exchange_planner=precomputed_exchange,
+            ee_exchange_entry_planner=entry_planner,
+            ee_attach_policy=ee_attach_policy,
+            log=log,
+        )
 
-    def __call__(self, request: MotionPlanRequest) -> MotionPlanningResult:
+    def __call__(self, request: MotionPlanRequest) -> Any:
+        if is_ee_exchange_entry_request(request):
+            source = str(
+                request.task.metadata.get("entry_ee")
+                or request.task.metadata.get("from_ee")
+                or request.task.ee
+            )
+            if self.ee_exchange_entry_planner is None:
+                raise PrecomputedEEPathError(
+                    EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_NOT_FOUND,
+                    "no EE exchange-entry planner is configured",
+                )
+            try:
+                template = self.ee_exchange_entry_planner.load(request)
+                contexts, collision_registry = (
+                    self.collision_context_factory.prepare_ee_exchange_entry(
+                        request
+                    )
+                )
+                return self.ee_exchange_entry_planner.plan(
+                    request,
+                    collision_contexts=contexts,
+                    collision_checker=collision_registry,
+                    template=template,
+                )
+            except PrecomputedEEPathError as error:
+                self._log(
+                    f"[M5][EE_ENTRY] miss: {source} "
+                    f"code={error.failure_code.value}"
+                )
+                raise
+        if is_initial_ee_attach(request):
+            target = str(request.task.metadata.get("to_ee") or request.task.ee)
+            try:
+                if self.precomputed_ee_attach_planner is None:
+                    raise PrecomputedEEPathError(
+                        EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_NOT_FOUND,
+                        "no precomputed EE attach registry is configured",
+                    )
+                template = self.precomputed_ee_attach_planner.load(request)
+                contexts, collision_registry = (
+                    self.collision_context_factory.prepare_precomputed_ee_attach(
+                        request
+                    )
+                )
+                return self.precomputed_ee_attach_planner.plan(
+                    request,
+                    collision_contexts=contexts,
+                    collision_checker=collision_registry,
+                    template=template,
+                )
+            except PrecomputedEEPathError as error:
+                self._log(
+                    f"[M5][EE_PATH] miss: bare->{target} "
+                    f"code={error.failure_code.value}"
+                )
+                if self.ee_attach_policy is EEAttachPolicy.PRECOMPUTED_REQUIRED:
+                    raise
+                self._log("[M5][EE_PATH] fallback=dynamic-planner")
+        elif is_ee_exchange_request(request):
+            source = str(request.task.metadata.get("from_ee") or "")
+            target = str(request.task.metadata.get("to_ee") or request.task.ee)
+            try:
+                if self.precomputed_ee_exchange_planner is None:
+                    raise PrecomputedEEPathError(
+                        EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_NOT_FOUND,
+                        "no precomputed EE exchange registry is configured",
+                    )
+                templates = self.precomputed_ee_exchange_planner.load(request)
+                contexts, collision_registry = (
+                    self.collision_context_factory.prepare_precomputed_ee_exchange(
+                        request
+                    )
+                )
+                return self.precomputed_ee_exchange_planner.plan(
+                    request,
+                    collision_contexts=contexts,
+                    collision_checker=collision_registry,
+                    templates=templates,
+                )
+            except PrecomputedEEPathError as error:
+                self._log(
+                    f"[M5][EE_PATH] miss: {source}->{target} "
+                    f"code={error.failure_code.value}"
+                )
+                if self.ee_attach_policy is EEAttachPolicy.PRECOMPUTED_REQUIRED:
+                    raise
+                self._log("[M5][EE_PATH] fallback=dynamic-planner")
         return self.pipeline.plan(
             request,
             collision_context_factory=self.collision_context_factory,
