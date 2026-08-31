@@ -94,14 +94,26 @@ def test_ee_exchange_template_has_explicit_model_transitions() -> None:
     dock = next(
         item for item in candidate.keyframes if item.keyframe_type is KeyframeType.EE_DOCK
     )
+    retreat = candidate.keyframes[-1]
     assert undock.events_after == [
         KeyframeEventType.TOOL_UNLOCK,
         KeyframeEventType.VERIFY_TOOL_RELEASE,
     ]
     assert undock.collision_context_id == "ee-attached-dock-contact:2f"
-    assert undock.collision_context_after_events_id == "bare-flange"
+    assert (
+        undock.collision_context_after_events_id
+        == "bare-flange-dock-contact:2f"
+    )
+    old_retreat = candidate.keyframes[3]
+    assert old_retreat.collision_context_id == "bare-flange-dock-contact:2f"
+    assert old_retreat.collision_context_after_events_id == "bare-flange"
     assert dock.collision_context_id == "bare-flange-dock-contact:vacuum"
-    assert dock.collision_context_after_events_id == "ee-attached:vacuum"
+    assert (
+        dock.collision_context_after_events_id
+        == "ee-attached-dock-contact:vacuum"
+    )
+    assert retreat.collision_context_id == "ee-attached-dock-contact:vacuum"
+    assert retreat.collision_context_after_events_id == "ee-attached:vacuum"
     assert all(item.frame_ref.startswith("rack:") for item in candidate.keyframes)
 
 
@@ -132,6 +144,7 @@ def test_initial_ee_attach_starts_bare_and_skips_undock() -> None:
     assert set(contexts) == {
         "bare-flange",
         "bare-flange-dock-contact:vacuum",
+        "ee-attached-dock-contact:vacuum",
         "ee-attached:vacuum",
     }
 
@@ -145,16 +158,25 @@ def test_ee_exchange_contexts_limit_contact_relaxation_to_dock_segments() -> Non
     old_free = contexts["ee-attached:2f"]
     old_dock = contexts["ee-attached-dock-contact:2f"]
     bare = contexts["bare-flange"]
+    old_bare_dock = contexts["bare-flange-dock-contact:2f"]
     new_dock = contexts["bare-flange-dock-contact:vacuum"]
+    new_attached = contexts["ee-attached:vacuum"]
+    new_attached_dock = contexts["ee-attached-dock-contact:vacuum"]
 
     assert old_free.scene_state_id == old_dock.scene_state_id
     assert old_free.collision_model_version == old_dock.collision_model_version
     assert old_free.allowed_collision_pairs == []
     assert old_dock.allowed_collision_pairs == [("2f", "rack_support:2f")]
+    assert old_bare_dock.scene_state_id == bare.scene_state_id
+    assert old_bare_dock.allowed_collision_pairs == [("qc_master", "2f")]
     assert bare.scene_state_id == new_dock.scene_state_id
     assert bare.collision_model_version == new_dock.collision_model_version
     assert new_dock.allowed_collision_pairs == [("qc_master", "vacuum")]
-    assert contexts["ee-attached:vacuum"].active_ee == "vacuum"
+    assert new_attached.active_ee == "vacuum"
+    assert new_attached.scene_state_id == new_attached_dock.scene_state_id
+    assert new_attached_dock.allowed_collision_pairs == [
+        ("vacuum", "rack_support:vacuum")
+    ]
 
 
 def test_routed_provider_uses_template_without_calling_default() -> None:
