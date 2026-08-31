@@ -27,6 +27,7 @@ from tuj.m5_motion.schema import (
     PlannerOptions,
     WorldSnapshot,
 )
+from tuj.m5_motion.precomputed_ee_attach import EEAttachPolicy
 from tuj.m5_motion.selected_plan_adapter import (
     ConstraintSource,
     OptionSource,
@@ -225,9 +226,24 @@ def capture_initial_world(
 class ToolUseJournalPlannerPool:
     """Lazily bind one physical planner to each requested environment/EE state."""
 
-    def __init__(self, repository: Path, *, seed: int) -> None:
+    def __init__(
+        self,
+        repository: Path,
+        *,
+        seed: int,
+        ee_attach_registry_root: Path | None = None,
+        ee_attach_trajectory_paths: Sequence[Path] = (),
+        ee_return_trajectory_paths: Sequence[Path] = (),
+        ee_attach_policy: EEAttachPolicy | str = EEAttachPolicy.PRECOMPUTED_REQUIRED,
+        ee_attach_start_tolerance_rad: float = 0.01,
+    ) -> None:
         self.repository = repository
         self.seed = seed
+        self.ee_attach_registry_root = ee_attach_registry_root
+        self.ee_attach_trajectory_paths = tuple(ee_attach_trajectory_paths)
+        self.ee_return_trajectory_paths = tuple(ee_return_trajectory_paths)
+        self.ee_attach_policy = EEAttachPolicy(ee_attach_policy)
+        self.ee_attach_start_tolerance_rad = ee_attach_start_tolerance_rad
         self._planners: dict[tuple[str, str | None], Any] = {}
         self._environments: list[Any] = []
 
@@ -259,6 +275,13 @@ class ToolUseJournalPlannerPool:
                 env,
                 self.repository,
                 seed=self.seed,
+                ee_attach_registry_root=self.ee_attach_registry_root,
+                ee_attach_trajectory_paths=self.ee_attach_trajectory_paths,
+                ee_return_trajectory_paths=self.ee_return_trajectory_paths,
+                ee_attach_policy=self.ee_attach_policy,
+                ee_attach_start_tolerance_rad=(
+                    self.ee_attach_start_tolerance_rad
+                ),
             )
             self._planners[key] = planner
         return planner(request)
@@ -586,6 +609,45 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
     parser.add_argument("--repository", type=Path, default=repository)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument(
+        "--ee-attach-policy",
+        choices=tuple(policy.value for policy in EEAttachPolicy),
+        default=EEAttachPolicy.PRECOMPUTED_REQUIRED.value,
+        help=(
+            "Require validated EE attach/return trajectories, or explicitly "
+            "allow development-only dynamic planning fallback"
+        ),
+    )
+    parser.add_argument(
+        "--ee-attach-registry",
+        type=Path,
+        help=(
+            "Root containing <environment>/bare_to_<EE>.json and "
+            "<EE>_to_bare.json trajectories"
+        ),
+    )
+    parser.add_argument(
+        "--ee-attach-trajectory",
+        type=Path,
+        action="append",
+        default=[],
+        help="Explicit EEAttachTrajectoryTemplate override; may be repeated",
+    )
+    parser.add_argument(
+        "--ee-return-trajectory",
+        type=Path,
+        action="append",
+        default=[],
+        help="Explicit EEReturnTrajectoryTemplate override; may be repeated",
+    )
+    parser.add_argument(
+        "--ee-attach-start-tolerance-rad",
+        type=float,
+        default=0.01,
+        help=(
+            "Maximum per-joint error from stored bare-home or EE exchange-entry"
+        ),
+    )
     parser.add_argument("--validate-input-only", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument(
@@ -636,6 +698,13 @@ def main(
         not math.isfinite(args.realtime_factor) or args.realtime_factor < 0.0
     ):
         parser.error("--realtime-factor must be finite and non-negative")
+    if (
+        not math.isfinite(args.ee_attach_start_tolerance_rad)
+        or args.ee_attach_start_tolerance_rad < 0.0
+    ):
+        parser.error(
+            "--ee-attach-start-tolerance-rad must be finite and non-negative"
+        )
     if not math.isfinite(args.hold_seconds) or args.hold_seconds < 0.0:
         parser.error("--hold-seconds must be finite and non-negative")
     if args.width <= 0 or args.height <= 0:
@@ -743,7 +812,26 @@ def main(
         envelope.get("artifact_id")
         or f"task-planner:selected-plan:{selected_hash[:24]}"
     )
-    planners = ToolUseJournalPlannerPool(repository_path, seed=args.seed)
+    planner_pool_options: dict[str, Any] = {"seed": args.seed}
+    if args.ee_attach_registry is not None:
+        planner_pool_options["ee_attach_registry_root"] = (
+            args.ee_attach_registry.expanduser().resolve()
+        )
+    if args.ee_attach_trajectory:
+        planner_pool_options["ee_attach_trajectory_paths"] = tuple(
+            path.expanduser().resolve() for path in args.ee_attach_trajectory
+        )
+    if args.ee_return_trajectory:
+        planner_pool_options["ee_return_trajectory_paths"] = tuple(
+            path.expanduser().resolve() for path in args.ee_return_trajectory
+        )
+    if args.ee_attach_policy != EEAttachPolicy.PRECOMPUTED_REQUIRED.value:
+        planner_pool_options["ee_attach_policy"] = args.ee_attach_policy
+    if not math.isclose(args.ee_attach_start_tolerance_rad, 0.01, abs_tol=0.0):
+        planner_pool_options["ee_attach_start_tolerance_rad"] = (
+            args.ee_attach_start_tolerance_rad
+        )
+    planners = ToolUseJournalPlannerPool(repository_path, **planner_pool_options)
     try:
         result = SelectedPlanMotionOrchestrator(
             planners,

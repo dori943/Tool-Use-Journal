@@ -33,6 +33,7 @@ def task_operation(task: Any) -> str:
 def is_ee_exchange_task(task: Any) -> bool:
     return task_operation(task) in {
         "EE_ATTACH",
+        "EE_EXCHANGE_ENTRY",
         "EE_EXCHANGE",
         "EXCHANGE_EE",
         "INITIAL_ATTACH_EE",
