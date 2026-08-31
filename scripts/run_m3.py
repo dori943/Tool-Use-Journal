@@ -210,7 +210,8 @@ def main():
             elif kind in ("batch", "swept_space"):
                 call = {"kind": kind, "action_type": q.get("action_type"),
                         "actor": q.get("actor"), "member_ids": q.get("member_ids", []),
-                        "to": q.get("to")}
+                        "to": q.get("to"),
+                        "ignore_ids": q.get("ignore_ids", [])}
                 fn = mat.query_batch if kind == "batch" else mat.query_swept_space
                 r = fn(gk, call, queried_by=qid)
             elif kind == "error":
