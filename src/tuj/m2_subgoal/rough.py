@@ -14,7 +14,7 @@
 
 출력 스키마 (두 구현체 공통, 최소):
   [{"subgoal_id", "goal",                       # goal: G_k에 실리는 한 줄 (← M2)
-    "kind": "relocate" | "sweep_collect",
+    "kind": relocate | sweep_collect | flatten | stack | scoop_transfer | extract,
     "target_ids": [...], "container_id": str|None,
     "tool_candidate_ids": [...]}]               # 도구 후보만 나열 — 선택은 M4
 """
@@ -23,6 +23,8 @@ from __future__ import annotations
 import json
 import os
 import time
+
+from .core import TOOL_KINDS
 
 
 class TemplateRough:
@@ -87,7 +89,9 @@ PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 �
   정리하기)를 발명하지 않는다.
 - target_ids / container_id / tool_candidate_ids 에는 위 노드 id만 쓴다.
 - 도구를 '선택'하지 말라. 후보만 나열한다 (선택은 뒤 모듈이 한다).
-- kind는 relocate(옮기기) 또는 sweep_collect(쓸어 담기) 중 하나.
+- kind는 relocate(옮기기), sweep_collect(모아 담기), flatten(평평하게 펴기),
+  stack(쌓기 — target_ids 순서가 곧 쌓는 순서, 아래→위), scoop_transfer(일부를 떠서 옮기기),
+  extract(좁은 틈에서 빼내기) 중 하나.
 - kind는 지시문의 동사 표현이 아니라 장면 구성과 물리적 제약을 근거로 고른다.
   직전 계획 평가가 아래에 주어진 경우, 평가에서 실행 불가로 드러난 제약을
   해소하지 못하는 분해는 무효다.
@@ -117,13 +121,13 @@ PROMPT_SELECT = """너는 로봇 계획의 객체 선택 단계다. 각 서브�
 규칙:
 - object_ids에는 이 서브골에서 물리·기하 추론이 필요한 객체만 담는다.
   장면 노드를 전부 나열하는 것은 선택이 아니다.
-- kind가 sweep_collect면 도구로 쓸 수 있는 물체를 장면에서 골라
+- kind가 sweep_collect, flatten, scoop_transfer, extract면 도구로 쓸 수 있는 물체를 장면에서 골라
   tool_candidate_ids에 담는다 (object_ids에도 포함).
   너에게는 물체의 크기·질량 정보가 없다. 이름의 의미만으로 후보를 좁히지 말고,
   도구 가능성을 배제할 명확한 이유가 없는 물체는 전부 후보에 담아라.
   장면에 그런 물체가 둘 이상이면 후보도 2개 이상이어야 한다.
   어느 것을 쓸지 최종 선택은 뒤 모듈이 측정값을 보고 한다.
-- kind가 relocate면 대상과 목적지를 object_ids에 담는다 (들어가는지 판정에 필요).
+- kind가 relocate나 stack이면 대상과 목적지(받침)를 object_ids에 담는다 (들어가는지·놓이는지 판정에 필요).
 - 위 장면 노드 id만 쓴다. reason에 선택 이유를 한국어 한 문장으로 쓴다.
 - confidence: 이 객체 선택이 옳다는 확신을 0.0~1.0으로 매긴다. 지금은 물체의
   질량·재질·파지 가능 여부 등 측정값이 없는 상태다. 근거 없이 후하게 주지 말 것.
@@ -148,7 +152,9 @@ PROMPT_COMBINED = """로봇 매니퓰레이션 태스크를 planning-level 서�
 - 태스크에 명시된 목표만 서브골로 만든다. 태스크에 없는 목표(예: 장애물 치우기,
   정리하기)를 발명하지 않는다.
 - target_ids / container_id / tool_candidate_ids / object_ids 에는 위 노드 id만 쓴다.
-- kind는 relocate(옮기기) 또는 sweep_collect(쓸어 담기) 중 하나.
+- kind는 relocate(옮기기), sweep_collect(모아 담기), flatten(평평하게 펴기),
+  stack(쌓기 — target_ids 순서가 곧 쌓는 순서, 아래→위), scoop_transfer(일부를 떠서 옮기기),
+  extract(좁은 틈에서 빼내기) 중 하나.
 - kind는 지시문의 동사 표현이 아니라 장면 구성과 물리적 제약을 근거로 고른다.
   직전 계획 평가가 아래에 주어진 경우, 평가에서 실행 불가로 드러난 제약을
   해소하지 못하는 분해는 무효다.
@@ -159,13 +165,13 @@ PROMPT_COMBINED = """로봇 매니퓰레이션 태스크를 planning-level 서�
 선택 규칙:
 - object_ids에는 이 서브골에서 물리·기하 추론이 필요한 객체만 담는다.
   장면 노드를 전부 나열하는 것은 선택이 아니다.
-- kind가 sweep_collect면 도구로 쓸 수 있는 물체를 장면에서 골라
+- kind가 sweep_collect, flatten, scoop_transfer, extract면 도구로 쓸 수 있는 물체를 장면에서 골라
   tool_candidate_ids에 담는다 (object_ids에도 포함).
   너에게는 물체의 크기·질량 정보가 없다. 이름의 의미만으로 후보를 좁히지 말고,
   도구 가능성을 배제할 명확한 이유가 없는 물체는 전부 후보에 담아라.
   장면에 그런 물체가 둘 이상이면 후보도 2개 이상이어야 한다.
   어느 것을 쓸지 최종 선택은 뒤 모듈이 측정값을 보고 한다.
-- kind가 relocate면 대상과 목적지를 object_ids에 담는다 (들어가는지 판정에 필요).
+- kind가 relocate나 stack이면 대상과 목적지(받침)를 object_ids에 담는다 (들어가는지·놓이는지 판정에 필요).
 - reason에 선택 이유를 한국어 한 문장으로 쓴다.
 - confidence: 분해와 객체 선택 각각의 확신을 0.0~1.0으로 매긴다. 지금은 물체의
   질량·재질·파지 가능 여부 등 측정값이 없는 상태다. 근거 없이 후하게 주지 말 것.
@@ -233,7 +239,9 @@ def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
             t["target_ids"] += [x for x in s["target_ids"] if x not in t["target_ids"]]
             t["tool_candidate_ids"] += [x for x in s["tool_candidate_ids"]
                                         if x not in t["tool_candidate_ids"]]
-            verb = "쓸어 담는다" if s.get("kind") == "sweep_collect" else "옮긴다"
+            verb = {"sweep_collect": "쓸어 담는다", "flatten": "평평하게 편다",
+                    "stack": "쌓는다", "scoop_transfer": "떠서 옮긴다",
+                    "extract": "빼낸다"}.get(s.get("kind"), "옮긴다")
             t["goal"] = f"대상 {len(t['target_ids'])}개를 {t['container_id']}로 {verb}"
             continue
         by_dst[key] = s
@@ -265,10 +273,10 @@ def validate_selection(sel: list[dict], subgoals: list[dict], ids: list[str]) ->
         e = by_id.get(s["subgoal_id"])
         if e is None:
             raise ValueError(f"{s['subgoal_id']}의 선택 항목이 없다. 서브골마다 하나씩 출력하라")
-        if s["kind"] == "sweep_collect":
+        if s["kind"] in TOOL_KINDS:
             cands = e.get("tool_candidate_ids", [])
             if not cands:
-                raise ValueError(f"{s['subgoal_id']}(sweep_collect): 도구로 쓸 물체를 "
+                raise ValueError(f"{s['subgoal_id']}({s['kind']}): 도구로 쓸 물체를 "
                                  "tool_candidate_ids에 1개 이상 골라라")
             if len(cands) == 1:
                 # 의미만으로 후보를 하나로 좁히는 것 방지 (0831 — 국자 단독 후보 사례):
@@ -279,7 +287,7 @@ def validate_selection(sel: list[dict], subgoals: list[dict], ids: list[str]) ->
                               and not i.startswith(("obj_zone_", "obj_rack_")))
                 if pool:
                     raise ValueError(
-                        f"{s['subgoal_id']}(sweep_collect): 도구 후보가 {cands[0]} 하나뿐이다. "
+                        f"{s['subgoal_id']}({s['kind']}): 도구 후보가 {cands[0]} 하나뿐이다. "
                         "너에게는 크기·질량 정보가 없으므로 이름의 의미만으로 후보를 좁히지 마라. "
                         f"도구 가능성을 배제할 수 없는 물체를 후보에 추가하라: {pool}")
     return by_id
