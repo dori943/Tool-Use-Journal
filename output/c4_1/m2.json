@@ -1,0 +1,362 @@
+{
+  "task": "가전 사이 틈에 떨어진 카드를 꺼내라",
+  "m2_subgoals": [
+    {
+      "subgoal_id": "SG1",
+      "goal": "가전 사이 틈에 떨어진 카드를 꺼낸다.",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_card_card"
+      ],
+      "container_id": "obj_appliance_left_appliance_left",
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_card_card",
+        "obj_appliance_left_appliance_left"
+      ],
+      "selection_reason": "카드를 가전 사이에서 꺼내기 위해 카드와 가전 제품을 선택해야 한다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.7,
+          "object_selection": 0.8,
+          "uncertain_about": [
+            "카드가 가전 사이에서 쉽게 꺼낼 수 있는 위치에 있는지"
+          ]
+        },
+        "after": {
+          "decomposition": 0.3,
+          "object_selection": 0.5,
+          "uncertain_about": [
+            "카드가 가전 사이에서 쉽게 꺼낼 수 있는 위치에 있는지",
+            "카드의 상단 노출 여부"
+          ],
+          "reason": "카드가 도달 불가능하고 상단 노출 여부도 확인되지 않아 신뢰도가 낮아졌습니다."
+        },
+        "delta": {
+          "decomposition": -0.4,
+          "object_selection": -0.3
+        }
+      },
+      "details": [
+        {
+          "detail_id": "SG1_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_card_card"
+          },
+          "group_id": "G_SG1",
+          "note": "obj_card_card 확보",
+          "pre": [
+            {
+              "id": "SG1_d1_p0",
+              "expr": "reachable(obj_card_card)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "node": "obj_card_card",
+                  "reachable": false,
+                  "margin_mm": -57.6
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p1",
+              "expr": "top_exposed(obj_card_card)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_card_card",
+                  "top_exposed": null
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p2",
+              "expr": "ee_usable(?EE, obj_card_card)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_card_card",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p3",
+              "expr": "batch_feasible(?EE, obj_card_card)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d1_e0",
+              "expr": "holding(obj_card_card)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_card_card",
+            "?r": "obj_appliance_left_appliance_left"
+          },
+          "group_id": "G_SG1",
+          "note": "obj_card_card를 obj_appliance_left_appliance_left로 운반",
+          "pre": [
+            {
+              "id": "SG1_d2_p0",
+              "expr": "holding(obj_card_card)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d2_p1",
+              "expr": "act_space_clear(?EE, obj_card_card, obj_appliance_left_appliance_left)",
+              "head": "act_space_clear",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d2_p2",
+              "expr": "path_clear(obj_card_card, obj_appliance_left_appliance_left)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d2_e0",
+              "expr": "above(obj_card_card, obj_appliance_left_appliance_left)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_card_card",
+            "?r": "obj_appliance_left_appliance_left"
+          },
+          "group_id": "G_SG1",
+          "note": "obj_card_card를 obj_appliance_left_appliance_left에 배치",
+          "pre": [
+            {
+              "id": "SG1_d3_p0",
+              "expr": "holding(obj_card_card)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p1",
+              "expr": "above(obj_card_card, obj_appliance_left_appliance_left)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p2",
+              "expr": "fits(obj_card_card, obj_appliance_left_appliance_left)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "check": "opening_190.3 - footprint_26.4",
+                  "value_mm": 163.9,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "id": "SG1_d3_p3",
+              "expr": "clear(obj_appliance_left_appliance_left)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "check": "container_depth_25.0 - target_height_0.0",
+                  "value_mm": 25.0,
+                  "pass": true
+                },
+                {
+                  "check": null,
+                  "value_mm": null,
+                  "pass": true
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d3_e0",
+              "expr": "in(obj_card_card, obj_appliance_left_appliance_left)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d3_d0",
+              "expr": "holding(obj_card_card)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_d1",
+              "expr": "above(obj_card_card, obj_appliance_left_appliance_left)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "m2_partial_order": [
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d2",
+      "why": "causal_link: holding(obj_card_card)"
+    },
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d3",
+      "why": "causal_link: holding(obj_card_card)"
+    },
+    {
+      "from": "SG1_d2",
+      "to": "SG1_d3",
+      "why": "causal_link: above(obj_card_card, obj_appliance_left_appliance_left)"
+    }
+  ],
+  "m2_mutex": [],
+  "m2_queries": [
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_card_card"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_card_card"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_card_card"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_card_card",
+        "b": "obj_appliance_left_appliance_left",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_card_card",
+        "b": "obj_appliance_left_appliance_left",
+        "relation": "clearance"
+      }
+    }
+  ],
+  "m2_invariants": [
+    {
+      "id": "INV_SG1",
+      "expr": "in(obj_card_card, obj_appliance_left_appliance_left)",
+      "check_at": "final"
+    }
+  ],
+  "m2_stats": {
+    "n_subgoals": 1,
+    "n_details": 3,
+    "n_edges": 3,
+    "n_mutex": 0,
+    "n_m3_queries": 5,
+    "llm_usage": {
+      "서브골 분해": {
+        "calls": 1,
+        "prompt_tokens": 534,
+        "completion_tokens": 81,
+        "tokens": 615,
+        "seconds": 1.97
+      },
+      "객체 선택": {
+        "calls": 1,
+        "prompt_tokens": 631,
+        "completion_tokens": 115,
+        "tokens": 746,
+        "seconds": 2.94
+      },
+      "confidence_update": {
+        "calls": 1,
+        "prompt_tokens": 645,
+        "completion_tokens": 86,
+        "tokens": 731,
+        "seconds": 2.08
+      }
+    },
+    "m3_predicates": {
+      "sat": 3,
+      "unsat": 1,
+      "unknown": 1,
+      "unanswered": 0,
+      "not_queried": 2
+    }
+  }
+}

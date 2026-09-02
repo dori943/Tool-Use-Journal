@@ -24,15 +24,23 @@ class TaskEnv:
     module: str            # environments 하위 모듈 파일명(stem)
     cls: str               # robosuite 환경 클래스명 (robosuite 는 클래스명으로 등록)
     robocasa: bool = False  # RoboCasa(KitchenBase) 의존 -> soft-import 대상
+    instruction: str = ""  # M2 서브골 분해에 넣는 자연어 지시문 (한국어 한 문장)
 
 
 TASKS = {
-    "c1_1": TaskEnv("c1_1_lego_sweep",              "C1_1_LegoSweep"),
-    "c2_1": TaskEnv("c2_1_object_sorting",          "C2_1_ObjectSorting"),
-    "c1_2": TaskEnv("c1_2_dough_flatten",           "C1_2_DoughFlatten",           robocasa=True),
-    "c2_2": TaskEnv("c2_2_sandwich_assembly",       "C2_2_SandwichAssembly",       robocasa=True),
-    "c4_1": TaskEnv("c4_1_interval_fit_extraction", "C4_1_IntervalFitExtraction",  robocasa=True),
-    "c4_2": TaskEnv("c4_2_diagonal_fit_packing",    "C4_2_DiagonalFitPacking",     robocasa=True),
+    "c1_1": TaskEnv("c1_1_lego_sweep",              "C1_1_LegoSweep",
+                    instruction="테이블에 흩어진 레고 블록을 수거 영역으로 쓸어 담아라"),
+    "c2_1": TaskEnv("c2_1_object_sorting",          "C2_1_ObjectSorting",
+                    instruction="사과와 빵은 초록 트레이, 머그는 파랑 트레이, "
+                                "접시와 숟가락은 빨강 트레이로 옮겨라"),
+    "c1_2": TaskEnv("c1_2_dough_flatten",           "C1_2_DoughFlatten",           robocasa=True,
+                    instruction="도마 위의 반죽을 평평하게 펴라"),
+    "c2_2": TaskEnv("c2_2_sandwich_assembly",       "C2_2_SandwichAssembly",       robocasa=True,
+                    instruction="재료를 순서대로 쌓아 샌드위치를 만들어라"),
+    "c4_1": TaskEnv("c4_1_interval_fit_extraction", "C4_1_IntervalFitExtraction",  robocasa=True,
+                    instruction="가전 사이 틈에 떨어진 카드를 꺼내라"),
+    "c4_2": TaskEnv("c4_2_diagonal_fit_packing",    "C4_2_DiagonalFitPacking",     robocasa=True,
+                    instruction="긴 물건들을 상자에 담고 뚜껑을 덮어라"),
 }
 
 # 편의 뷰: task id -> 환경 클래스명 (러너들이 참조).
@@ -42,3 +50,18 @@ TASK_ENVS = {tid: t.cls for tid, t in TASKS.items()}
 def env_name(task_id: str) -> str:
     """task id 에 대응하는 robosuite 환경 클래스명. 미등록이면 KeyError."""
     return TASKS[task_id].cls
+
+
+def instruction(task_id: str) -> str:
+    """task id 에 대응하는 자연어 지시문. 미등록/미기재면 KeyError.
+
+    M2 는 이 문장 하나로 서브골을 분해한다. 없는 채로 조용히 다른 태스크의
+    문장을 쓰면 장면에 없는 물체(예: 수거함)를 만들어내 검문에서 실패하므로,
+    비어 있으면 즉시 KeyError 로 알린다.
+    """
+    if task_id not in TASKS:
+        raise KeyError(f"'{task_id}' 는 task_registry 에 등록되지 않은 태스크다")
+    text = TASKS[task_id].instruction
+    if not text:
+        raise KeyError(f"'{task_id}' 의 instruction 이 비어 있다")
+    return text

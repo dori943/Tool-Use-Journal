@@ -1,0 +1,363 @@
+{
+  "task": "도마 위의 반죽을 평평하게 펴라",
+  "m2_subgoals": [
+    {
+      "subgoal_id": "SG1",
+      "goal": "도마 위의 반죽을 평평하게 펴라.",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_dough_dough"
+      ],
+      "container_id": "obj_cutting_board_cutting_board",
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_dough_dough",
+        "obj_cutting_board_cutting_board"
+      ],
+      "selection_reason": "반죽을 도마 위에 놓고 평평하게 펴기 위해 반죽과 도마가 필요하다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.7,
+          "object_selection": 0.8,
+          "uncertain_about": [
+            "반죽이 도마 위에 잘 놓일 수 있는지"
+          ]
+        },
+        "after": {
+          "decomposition": 0.7,
+          "object_selection": 0.5,
+          "uncertain_about": [
+            "반죽이 도마 위에 잘 놓일 수 있는지",
+            "도마 위가 비어 있는지"
+          ],
+          "reason": "반죽이 도마에 잘 놓일 수 있는지는 확인되었으나, 도마 위가 비어 있지 않아 객체 선택 신뢰도가 낮아졌습니다."
+        },
+        "delta": {
+          "decomposition": 0.0,
+          "object_selection": -0.3
+        }
+      },
+      "details": [
+        {
+          "detail_id": "SG1_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_dough_dough"
+          },
+          "group_id": "G_SG1",
+          "note": "obj_dough_dough 확보",
+          "pre": [
+            {
+              "id": "SG1_d1_p0",
+              "expr": "reachable(obj_dough_dough)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_dough_dough",
+                  "reachable": true,
+                  "margin_mm": 422.3
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p1",
+              "expr": "top_exposed(obj_dough_dough)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_dough_dough",
+                  "top_exposed": null
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p2",
+              "expr": "ee_usable(?EE, obj_dough_dough)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_dough_dough",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p3",
+              "expr": "batch_feasible(?EE, obj_dough_dough)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d1_e0",
+              "expr": "holding(obj_dough_dough)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_dough_dough",
+            "?r": "obj_cutting_board_cutting_board"
+          },
+          "group_id": "G_SG1",
+          "note": "obj_dough_dough를 obj_cutting_board_cutting_board로 운반",
+          "pre": [
+            {
+              "id": "SG1_d2_p0",
+              "expr": "holding(obj_dough_dough)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d2_p1",
+              "expr": "act_space_clear(?EE, obj_dough_dough, obj_cutting_board_cutting_board)",
+              "head": "act_space_clear",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d2_p2",
+              "expr": "path_clear(obj_dough_dough, obj_cutting_board_cutting_board)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d2_e0",
+              "expr": "above(obj_dough_dough, obj_cutting_board_cutting_board)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_dough_dough",
+            "?r": "obj_cutting_board_cutting_board"
+          },
+          "group_id": "G_SG1",
+          "note": "obj_dough_dough를 obj_cutting_board_cutting_board에 배치",
+          "pre": [
+            {
+              "id": "SG1_d3_p0",
+              "expr": "holding(obj_dough_dough)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p1",
+              "expr": "above(obj_dough_dough, obj_cutting_board_cutting_board)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p2",
+              "expr": "fits(obj_dough_dough, obj_cutting_board_cutting_board)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "check": "opening_137.8 - footprint_40.7",
+                  "value_mm": 97.1,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "id": "SG1_d3_p3",
+              "expr": "clear(obj_cutting_board_cutting_board)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "container_depth_12.7 - target_height_45.4",
+                  "value_mm": -32.7,
+                  "pass": false
+                },
+                {
+                  "check": null,
+                  "value_mm": null,
+                  "pass": false
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d3_e0",
+              "expr": "in(obj_dough_dough, obj_cutting_board_cutting_board)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d3_d0",
+              "expr": "holding(obj_dough_dough)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_d1",
+              "expr": "above(obj_dough_dough, obj_cutting_board_cutting_board)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "m2_partial_order": [
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d2",
+      "why": "causal_link: holding(obj_dough_dough)"
+    },
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d3",
+      "why": "causal_link: holding(obj_dough_dough)"
+    },
+    {
+      "from": "SG1_d2",
+      "to": "SG1_d3",
+      "why": "causal_link: above(obj_dough_dough, obj_cutting_board_cutting_board)"
+    }
+  ],
+  "m2_mutex": [],
+  "m2_queries": [
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_dough_dough"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_dough_dough"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_dough_dough"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_dough_dough",
+        "b": "obj_cutting_board_cutting_board",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_dough_dough",
+        "b": "obj_cutting_board_cutting_board",
+        "relation": "clearance"
+      }
+    }
+  ],
+  "m2_invariants": [
+    {
+      "id": "INV_SG1",
+      "expr": "in(obj_dough_dough, obj_cutting_board_cutting_board)",
+      "check_at": "final"
+    }
+  ],
+  "m2_stats": {
+    "n_subgoals": 1,
+    "n_details": 3,
+    "n_edges": 3,
+    "n_mutex": 0,
+    "n_m3_queries": 5,
+    "llm_usage": {
+      "서브골 분해": {
+        "calls": 1,
+        "prompt_tokens": 479,
+        "completion_tokens": 82,
+        "tokens": 561,
+        "seconds": 1.3
+      },
+      "객체 선택": {
+        "calls": 1,
+        "prompt_tokens": 545,
+        "completion_tokens": 117,
+        "tokens": 662,
+        "seconds": 2.12
+      },
+      "confidence_update": {
+        "calls": 1,
+        "prompt_tokens": 662,
+        "completion_tokens": 94,
+        "tokens": 756,
+        "seconds": 1.88
+      }
+    },
+    "m3_predicates": {
+      "sat": 3,
+      "unsat": 1,
+      "unknown": 1,
+      "unanswered": 0,
+      "not_queried": 2
+    }
+  }
+}

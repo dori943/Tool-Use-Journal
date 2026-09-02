@@ -1,0 +1,714 @@
+{
+  "task": "긴 물건들을 상자에 담고 뚜껑을 덮어라",
+  "m2_subgoals": [
+    {
+      "subgoal_id": "SG1",
+      "goal": "대상 5개를 obj_lid_lid로 옮긴다",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_baguette_baguette",
+        "obj_cereal_cereal",
+        "obj_rolling_pin_rolling_pin",
+        "obj_whisk_whisk",
+        "obj_lid_lid"
+      ],
+      "container_id": "obj_lid_lid",
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_baguette_baguette",
+        "obj_cereal_cereal",
+        "obj_rolling_pin_rolling_pin",
+        "obj_whisk_whisk",
+        "obj_lid_lid"
+      ],
+      "selection_reason": "대상과 목적지를 포함하여 물리적·기하학적 추론이 필요한 객체들을 선택했습니다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.7,
+          "object_selection": 0.7,
+          "uncertain_about": [
+            "대상 물체들이 obj_lid_lid에 실제로 들어갈 수 있는지 여부"
+          ]
+        },
+        "after": {
+          "decomposition": 0.3,
+          "object_selection": 0.5,
+          "uncertain_about": [
+            "대상 물체들이 obj_lid_lid에 실제로 들어갈 수 있는지 여부",
+            "top_exposed",
+            "batch_feasible",
+            "act_space_clear"
+          ],
+          "reason": "측정 결과, 물체들이 상자에 들어가지 않으며, 일부 조건에 대한 근거가 제공되지 않아 신뢰도가 낮아졌습니다."
+        },
+        "delta": {
+          "decomposition": -0.4,
+          "object_selection": -0.2
+        }
+      },
+      "details": [
+        {
+          "detail_id": "SG1_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "{obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}"
+          },
+          "group_id": "G_SG1",
+          "note": "{obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid} 확보",
+          "pre": [
+            {
+              "id": "SG1_d1_p0",
+              "expr": "reachable({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid})",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_baguette_baguette",
+                  "reachable": true,
+                  "margin_mm": 387.2
+                },
+                {
+                  "node": "obj_cereal_cereal",
+                  "reachable": true,
+                  "margin_mm": 408.5
+                },
+                {
+                  "node": "obj_rolling_pin_rolling_pin",
+                  "reachable": true,
+                  "margin_mm": 307.2
+                },
+                {
+                  "node": "obj_whisk_whisk",
+                  "reachable": true,
+                  "margin_mm": 473.1
+                },
+                {
+                  "node": "obj_lid_lid",
+                  "reachable": true,
+                  "margin_mm": 132.0
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p1",
+              "expr": "top_exposed({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid})",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_baguette_baguette",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_cereal_cereal",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_rolling_pin_rolling_pin",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_whisk_whisk",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_lid_lid",
+                  "top_exposed": null
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p2",
+              "expr": "ee_usable(?EE, {obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid})",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_baguette_baguette",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                },
+                {
+                  "node": "obj_cereal_cereal",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                },
+                {
+                  "node": "obj_rolling_pin_rolling_pin",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                },
+                {
+                  "node": "obj_whisk_whisk",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                },
+                {
+                  "node": "obj_lid_lid",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p3",
+              "expr": "batch_feasible(?EE, {obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid})",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "feasible": null,
+                  "binding_check": null,
+                  "partition": null
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d1_e0",
+              "expr": "holding({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid})",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "{obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}",
+            "?r": "obj_lid_lid"
+          },
+          "group_id": "G_SG1",
+          "note": "{obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}를 obj_lid_lid로 운반",
+          "pre": [
+            {
+              "id": "SG1_d2_p0",
+              "expr": "holding({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d2_p1",
+              "expr": "act_space_clear(?EE, {obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}, obj_lid_lid)",
+              "head": "act_space_clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "clear": null,
+                  "margin_mm": null,
+                  "blockers": []
+                }
+              ]
+            },
+            {
+              "id": "SG1_d2_p2",
+              "expr": "path_clear({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}, obj_lid_lid)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d2_e0",
+              "expr": "above({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}, obj_lid_lid)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "{obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}",
+            "?r": "obj_lid_lid"
+          },
+          "group_id": "G_SG1",
+          "note": "{obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}를 obj_lid_lid에 배치",
+          "pre": [
+            {
+              "id": "SG1_d3_p0",
+              "expr": "holding({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p1",
+              "expr": "above({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}, obj_lid_lid)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p2",
+              "expr": "fits({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}, obj_lid_lid)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "opening_197.5 - footprint_50.3",
+                  "value_mm": 147.2,
+                  "pass": true
+                },
+                {
+                  "check": "opening_197.5 - footprint_24.3",
+                  "value_mm": 173.2,
+                  "pass": true
+                },
+                {
+                  "check": "opening_197.5 - footprint_35.3",
+                  "value_mm": 162.2,
+                  "pass": true
+                },
+                {
+                  "check": "opening_197.5 - footprint_16.5",
+                  "value_mm": 181.0,
+                  "pass": true
+                },
+                {
+                  "check": "opening_197.5 - footprint_205.5",
+                  "value_mm": -8.0,
+                  "pass": false
+                },
+                {
+                  "check": "opening_27.3 - footprint_24.3",
+                  "value_mm": 3.0,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "id": "SG1_d3_p3",
+              "expr": "clear(obj_lid_lid)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "container_depth_5.8 - target_height_21.3",
+                  "value_mm": -15.5,
+                  "pass": false
+                },
+                {
+                  "check": "container_depth_5.8 - target_height_145.2",
+                  "value_mm": -139.4,
+                  "pass": false
+                },
+                {
+                  "check": "container_depth_5.8 - target_height_21.3",
+                  "value_mm": -15.5,
+                  "pass": false
+                },
+                {
+                  "check": "container_depth_5.8 - target_height_21.3",
+                  "value_mm": -15.5,
+                  "pass": false
+                },
+                {
+                  "check": "container_depth_5.8 - target_height_5.8",
+                  "value_mm": 0.0,
+                  "pass": false
+                },
+                {
+                  "check": null,
+                  "value_mm": null,
+                  "pass": true
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d3_e0",
+              "expr": "in({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}, obj_lid_lid)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d3_d0",
+              "expr": "holding({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_d1",
+              "expr": "above({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}, obj_lid_lid)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "m2_partial_order": [
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d2",
+      "why": "causal_link: holding({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid})"
+    },
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d3",
+      "why": "causal_link: holding({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid})"
+    },
+    {
+      "from": "SG1_d2",
+      "to": "SG1_d3",
+      "why": "causal_link: above({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}, obj_lid_lid)"
+    }
+  ],
+  "m2_mutex": [],
+  "m2_queries": [
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_baguette_baguette"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_cereal_cereal"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_rolling_pin_rolling_pin"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_whisk_whisk"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_lid_lid"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_baguette_baguette"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_cereal_cereal"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_rolling_pin_rolling_pin"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_whisk_whisk"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_lid_lid"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_baguette_baguette"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_cereal_cereal"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_rolling_pin_rolling_pin"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_whisk_whisk"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_lid_lid"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p3",
+      "m3_call": {
+        "kind": "batch",
+        "action_type": "relocate",
+        "member_ids": [
+          "obj_baguette_baguette",
+          "obj_cereal_cereal",
+          "obj_rolling_pin_rolling_pin",
+          "obj_whisk_whisk",
+          "obj_lid_lid"
+        ],
+        "actor": {
+          "type": "ee_pool"
+        }
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d2_p1",
+      "m3_call": {
+        "kind": "swept_space",
+        "action_type": "relocate",
+        "member_ids": [
+          "obj_baguette_baguette",
+          "obj_cereal_cereal",
+          "obj_rolling_pin_rolling_pin",
+          "obj_whisk_whisk",
+          "obj_lid_lid"
+        ],
+        "to": "obj_lid_lid",
+        "actor": {
+          "type": "ee_pool"
+        }
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_baguette_baguette",
+        "b": "obj_lid_lid",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_cereal_cereal",
+        "b": "obj_lid_lid",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_rolling_pin_rolling_pin",
+        "b": "obj_lid_lid",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_whisk_whisk",
+        "b": "obj_lid_lid",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_lid_lid",
+        "b": "obj_lid_lid",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_baguette_baguette",
+        "b": "obj_lid_lid",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_cereal_cereal",
+        "b": "obj_lid_lid",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_rolling_pin_rolling_pin",
+        "b": "obj_lid_lid",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_whisk_whisk",
+        "b": "obj_lid_lid",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_lid_lid",
+        "b": "obj_lid_lid",
+        "relation": "clearance"
+      }
+    }
+  ],
+  "m2_invariants": [
+    {
+      "id": "INV_SG1",
+      "expr": "all_in({obj_baguette_baguette,obj_cereal_cereal,obj_rolling_pin_rolling_pin,obj_whisk_whisk,obj_lid_lid}, obj_lid_lid)",
+      "check_at": "final"
+    }
+  ],
+  "m2_stats": {
+    "n_subgoals": 1,
+    "n_details": 3,
+    "n_edges": 3,
+    "n_mutex": 0,
+    "n_m3_queries": 27,
+    "llm_usage": {
+      "서브골 분해": {
+        "calls": 1,
+        "prompt_tokens": 485,
+        "completion_tokens": 184,
+        "tokens": 669,
+        "seconds": 3.42
+      },
+      "객체 선택": {
+        "calls": 1,
+        "prompt_tokens": 587,
+        "completion_tokens": 113,
+        "tokens": 700,
+        "seconds": 2.97
+      },
+      "confidence_update": {
+        "calls": 1,
+        "prompt_tokens": 841,
+        "completion_tokens": 101,
+        "tokens": 942,
+        "seconds": 3.48
+      }
+    },
+    "m3_predicates": {
+      "sat": 2,
+      "unsat": 2,
+      "unknown": 3,
+      "unanswered": 0,
+      "not_queried": 0
+    }
+  }
+}

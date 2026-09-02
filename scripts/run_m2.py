@@ -1,9 +1,9 @@
 # -*- coding: utf-8 -*-
-"""M2 실행기 — 예빈 태스크 2종(C1-T1, C2-T1)에 M2을 돌려 서브골 JSON을 산출.
+"""M2 실행기 — task_registry 에 등록된 태스크에 M2을 돌려 서브골 JSON을 산출.
 
 사용법:
   python scripts/run_m2.py c1_1              # output/c1_1/m1.json 있으면 그걸로, 없으면 mock
-  python scripts/run_m2.py c2_1
+  python scripts/run_m2.py c1_2              # 지시문은 task_registry 가 단일 출처
   python scripts/run_m2.py c1_1 --m1-json path.json   # M1 JSON 경로 직접 지정
 
 서브골 생성은 항상 LLM(gpt-4o)이다 → OPENAI_API_KEY 필수.
@@ -22,13 +22,16 @@ import json
 import os
 import sys
 
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
+_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
+sys.path.insert(0, os.path.join(_ROOT, "src"))
+sys.path.insert(0, _ROOT)                      # task_registry (단일 출처)
 
 import numpy as np
 
 from tuj.m1_scene.abstraction import build_m1, serialize
 from tuj.m2_subgoal.pipeline import run_m2
 from tuj.m2_subgoal.rough import LLMRough
+from task_registry import instruction as task_instruction
 
 RNG = np.random.default_rng(0)          # mock 점군 결정론
 
@@ -56,7 +59,7 @@ def scene_c1_1():
         ("bottle_distractor", "bottle", [150, 150, 860], [60, 60, 120]),
         ("collection_zone_visual", "collection_zone", [650, 0, 802], [250, 180, 4]),
     ]
-    task = "테이블에 흩어진 레고 블록을 수거 영역으로 쓸어 담아라"
+    task = task_instruction("c1_1")     # 지시문 출처: task_registry
     return task, spec
 
 
@@ -71,8 +74,12 @@ def scene_c2_1():
         ("blue_tray", "tray", [700, 0, 818], [250, 180, 35]),
         ("red_tray", "tray", [680, 200, 818], [250, 180, 35]),
     ]
-    task = "사과와 빵은 초록 트레이, 머그는 파랑 트레이, 접시와 숟가락은 빨강 트레이로 옮겨라"
+    task = task_instruction("c2_1")     # 지시문 출처: task_registry
     return task, spec
+
+
+# mock M1 을 만들 수 있는 태스크만 등록한다 (나머지는 실제 m1.json 필요).
+MOCK_SCENES = {"c1_1": scene_c1_1, "c2_1": scene_c2_1}
 
 
 def main():
@@ -85,13 +92,26 @@ def main():
     if not m1_json and os.path.exists(os.path.join(tdir, "m1.json")):
         m1_json = os.path.join(tdir, "m1.json")             # M1 모듈 출력 자동 사용
 
+    # 지시문은 task_registry 가 단일 출처다. 예전에는 c1_1 이 아니면 전부
+    # c2_1 문장으로 떨어져, 장면에 없는 물체(수거함·트레이)를 분해에 요구하다
+    # 검문에서 죽었다. 미등록이면 조용히 다른 문장을 쓰지 않고 즉시 멈춘다.
+    try:
+        task = task_instruction(name)
+    except KeyError as e:
+        sys.exit(f"[중단] {e}.\n"
+                 "  task_registry.py 의 TASKS 에 instruction 을 등록하십시오.")
+    print(f"[M2] 지시문: {task}")
+
     if m1_json:                          # 실제 M1 serialize() 출력으로
         with open(m1_json, encoding="utf-8") as f:
             m1s = json.load(f)
-        task, _ = scene_c1_1() if name == "c1_1" else scene_c2_1()
         print(f"[M1] {m1_json} 사용")
     else:                                # mock M1 (씬 근사 수치)
-        task, spec = scene_c1_1() if name == "c1_1" else scene_c2_1()
+        make_scene = MOCK_SCENES.get(name)
+        if make_scene is None:
+            sys.exit(f"[중단] '{name}' 은 mock 씬이 없습니다.\n"
+                     f"  먼저 run_m1 으로 output/{name}/m1.json 을 만드십시오.")
+        _, spec = make_scene()
         m1s = serialize(build_m1(spec_to_objects(spec)))
         print("[M1] mock 수치 사용 (실제 M1 JSON 없음)")
 

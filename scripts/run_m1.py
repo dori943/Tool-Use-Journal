@@ -646,7 +646,8 @@ def main():
     for sid in name_of_id:
         ov[seg == sid] = (0.5 * ov[seg == sid] + [127, 0, 0]).astype(np.uint8)
     Image.fromarray(ov).save(OUT / "frame_masks.png")
-    node_ids = {n["id"].split("_", 2)[-1]: n["id"] for n in m1["nodes"]}
+    # 크롭 파일명 = 노드 id. inst 이름을 그대로 키로 (multi-underscore 이름도 안전)
+    node_ids = {o["name"]: f"obj_{o['cls']}_{o['name']}" for o in objects}
     save_crops(rgb, seg, name_of_id, node_ids, OUT / "crops")
     print(f"[M1] nodes={len(m1['nodes'])} edges={len(m1['edges'])} "
           f"crops={len(list((OUT / 'crops').glob('*.png')))}")

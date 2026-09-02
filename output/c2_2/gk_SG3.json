@@ -1,0 +1,909 @@
+{
+  "subgoal_id": "SG3",
+  "nodes": {
+    "obj_cheese_cheese_1": {
+      "queried_by": [
+        "SG3_d1_p0",
+        "SG3_d1_p1",
+        "SG3_d1_p2"
+      ],
+      "geometry": {
+        "length_mm": 57.9,
+        "diameter_mm": null,
+        "extents_mm": [
+          57.9,
+          33.7,
+          3.0
+        ],
+        "height_z_mm": 2.4,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN
+      },
+      "material": "steel",
+      "density_kgm3": 5955.8,
+      "mass_kg": 0.009,
+      "youngs_gpa": 116.69,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "steel",
+        "rms_mm": NaN
+      },
+      "confidence": 0.308,
+      "mass_range_kg": [
+        0.004,
+        0.014
+      ],
+      "materials_topk": [
+        {
+          "name": "steel",
+          "prob": 0.308,
+          "density_kgm3": [
+            7850.0,
+            8050.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.5
+          ]
+        },
+        {
+          "name": "aluminum",
+          "prob": 0.231,
+          "density_kgm3": [
+            2700.0,
+            2800.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.5
+          ]
+        },
+        {
+          "name": "plastic",
+          "prob": 0.154,
+          "density_kgm3": [
+            900.0,
+            1200.0
+          ],
+          "thickness_cm": [
+            0.3,
+            1.0
+          ]
+        },
+        {
+          "name": "copper",
+          "prob": 0.192,
+          "density_kgm3": [
+            8900.0,
+            9000.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.5
+          ]
+        },
+        {
+          "name": "brass",
+          "prob": 0.115,
+          "density_kgm3": [
+            8500.0,
+            8700.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.5
+          ]
+        }
+      ],
+      "caption": "Curved metallic object",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.991,
+          "margin_unit": "kg",
+          "reason": "질량 0.009 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 33.7,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.009,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.098,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.491,
+          "margin_unit": "kg",
+          "reason": "질량 0.009 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 33.7,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.009,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.098,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": NaN,
+          "margin_unit": "mm",
+          "reason": "상면 RMS nan vs 허용 1.5",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": NaN,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.009,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 33.7,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 701.6,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 148.4
+      }
+    },
+    "obj_cheese_cheese_2": {
+      "queried_by": [
+        "SG3_d1_p0",
+        "SG3_d1_p1",
+        "SG3_d1_p2"
+      ],
+      "geometry": {
+        "length_mm": 57.3,
+        "diameter_mm": null,
+        "extents_mm": [
+          57.3,
+          33.0,
+          6.1
+        ],
+        "height_z_mm": 6.2,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN
+      },
+      "material": "gold",
+      "density_kgm3": 2007.5,
+      "mass_kg": 0.001,
+      "youngs_gpa": 107.33,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "gold",
+        "rms_mm": NaN
+      },
+      "confidence": 0.267,
+      "mass_range_kg": [
+        0.0,
+        0.002
+      ],
+      "materials_topk": [
+        {
+          "name": "gold",
+          "prob": 0.267,
+          "density_kgm3": [
+            1200.0,
+            1900.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.5
+          ]
+        },
+        {
+          "name": "silver",
+          "prob": 0.233,
+          "density_kgm3": [
+            900.0,
+            1050.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.5
+          ]
+        },
+        {
+          "name": "copper",
+          "prob": 0.2,
+          "density_kgm3": [
+            800.0,
+            900.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.5
+          ]
+        },
+        {
+          "name": "brass",
+          "prob": 0.167,
+          "density_kgm3": [
+            850.0,
+            870.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.5
+          ]
+        },
+        {
+          "name": "stainless steel",
+          "prob": 0.133,
+          "density_kgm3": [
+            7800.0,
+            8000.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.5
+          ]
+        }
+      ],
+      "caption": "Curved metallic object, possibly a pendant.",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.999,
+          "margin_unit": "kg",
+          "reason": "질량 0.001 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 6.1,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.001,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.011,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.499,
+          "margin_unit": "kg",
+          "reason": "질량 0.001 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 6.1,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.001,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.011,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": NaN,
+          "margin_unit": "mm",
+          "reason": "상면 RMS nan vs 허용 1.5",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": NaN,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.001,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 33.0,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 701.6,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 148.4
+      }
+    },
+    "obj_cheese_cheese_3": {
+      "queried_by": [
+        "SG3_d1_p0",
+        "SG3_d1_p1",
+        "SG3_d1_p2"
+      ],
+      "geometry": {
+        "length_mm": 53.4,
+        "diameter_mm": null,
+        "extents_mm": [
+          53.4,
+          51.2,
+          2.0
+        ],
+        "height_z_mm": 1.9,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.05
+      },
+      "material": "granite",
+      "density_kgm3": 2564.0,
+      "mass_kg": 0.007,
+      "youngs_gpa": 38.5,
+      "mu": {
+        "mu": 0.429,
+        "stage": 0,
+        "material": "granite",
+        "rms_mm": 0.05
+      },
+      "confidence": 0.28,
+      "mass_range_kg": [
+        0.004,
+        0.011
+      ],
+      "materials_topk": [
+        {
+          "name": "granite",
+          "prob": 0.28,
+          "density_kgm3": [
+            2500.0,
+            2700.0
+          ],
+          "thickness_cm": [
+            5.0,
+            10.0
+          ]
+        },
+        {
+          "name": "limestone",
+          "prob": 0.24,
+          "density_kgm3": [
+            2200.0,
+            2600.0
+          ],
+          "thickness_cm": [
+            5.0,
+            15.0
+          ]
+        },
+        {
+          "name": "sandstone",
+          "prob": 0.2,
+          "density_kgm3": [
+            2200.0,
+            3000.0
+          ],
+          "thickness_cm": [
+            5.0,
+            12.0
+          ]
+        },
+        {
+          "name": "shale",
+          "prob": 0.16,
+          "density_kgm3": [
+            2200.0,
+            2700.0
+          ],
+          "thickness_cm": [
+            5.0,
+            10.0
+          ]
+        },
+        {
+          "name": "basalt",
+          "prob": 0.12,
+          "density_kgm3": [
+            2800.0,
+            3000.0
+          ],
+          "thickness_cm": [
+            5.0,
+            10.0
+          ]
+        }
+      ],
+      "caption": "Rounded stone or rock fragment",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.993,
+          "margin_unit": "kg",
+          "reason": "질량 0.007 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 51.2,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.007,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.08,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.493,
+          "margin_unit": "kg",
+          "reason": "질량 0.007 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 51.2,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.007,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.08,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": true,
+          "margin": 0.493,
+          "margin_unit": "kg",
+          "reason": "질량 0.007 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.05,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.007,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 51.2,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 687.8,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 162.2
+      }
+    }
+  },
+  "edges": [
+    {
+      "queried_by": "SG3_d3_p2",
+      "from": "obj_cheese_cheese_1",
+      "to": "obj_turkey_turkey_1",
+      "type": "fits_inside",
+      "value_mm": -16.0,
+      "check": "opening_14.7 - footprint_30.7",
+      "pass": false
+    },
+    {
+      "queried_by": "SG3_d3_p2",
+      "from": "obj_cheese_cheese_2",
+      "to": "obj_turkey_turkey_1",
+      "type": "fits_inside",
+      "value_mm": -15.9,
+      "check": "opening_14.7 - footprint_30.6",
+      "pass": false
+    },
+    {
+      "queried_by": "SG3_d3_p2",
+      "from": "obj_cheese_cheese_3",
+      "to": "obj_turkey_turkey_1",
+      "type": "fits_inside",
+      "value_mm": -38.7,
+      "check": "opening_14.7 - footprint_53.4",
+      "pass": false
+    },
+    {
+      "queried_by": "SG3_d3_p3",
+      "from": "obj_cheese_cheese_1",
+      "to": "obj_turkey_turkey_1",
+      "type": "clearance",
+      "value_mm": 1.1,
+      "check": "container_depth_3.5 - target_height_2.4",
+      "pass": true
+    },
+    {
+      "queried_by": "SG3_d3_p3",
+      "from": "obj_cheese_cheese_2",
+      "to": "obj_turkey_turkey_1",
+      "type": "clearance",
+      "value_mm": -2.7,
+      "check": "container_depth_3.5 - target_height_6.2",
+      "pass": false
+    },
+    {
+      "queried_by": "SG3_d3_p3",
+      "from": "obj_cheese_cheese_3",
+      "to": "obj_turkey_turkey_1",
+      "type": "clearance",
+      "value_mm": 1.6,
+      "check": "container_depth_3.5 - target_height_1.9",
+      "pass": true
+    }
+  ],
+  "flags": {
+    "near_threshold": []
+  },
+  "task": "재료를 순서대로 쌓아 샌드위치를 만들어라",
+  "goal": "치즈 슬라이스를 칠면조 위에 놓는다.",
+  "subgoal_kind": "relocate",
+  "roles": {
+    "target": [
+      "obj_cheese_cheese_1",
+      "obj_cheese_cheese_2",
+      "obj_cheese_cheese_3"
+    ],
+    "container": "obj_turkey_turkey_1",
+    "tool_candidates": [],
+    "selected_tool": null,
+    "selection_evidence": null
+  },
+  "details": [
+    {
+      "detail_id": "SG3_d1",
+      "action_type": "acquire",
+      "binding": {
+        "?o": "{obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}"
+      },
+      "pre": [
+        {
+          "id": "SG3_d1_p0",
+          "expr": "reachable({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_cheese_cheese_1",
+              "reachable": true,
+              "margin_mm": 148.4
+            },
+            {
+              "node": "obj_cheese_cheese_2",
+              "reachable": true,
+              "margin_mm": 148.4
+            },
+            {
+              "node": "obj_cheese_cheese_3",
+              "reachable": true,
+              "margin_mm": 162.2
+            }
+          ]
+        },
+        {
+          "id": "SG3_d1_p1",
+          "expr": "top_exposed({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+          "eval_by": "m3",
+          "status": "unknown",
+          "evidence": [
+            {
+              "node": "obj_cheese_cheese_1",
+              "top_exposed": null
+            },
+            {
+              "node": "obj_cheese_cheese_2",
+              "top_exposed": null
+            },
+            {
+              "node": "obj_cheese_cheese_3",
+              "top_exposed": null
+            }
+          ]
+        },
+        {
+          "id": "SG3_d1_p2",
+          "expr": "ee_usable(?EE, {obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_cheese_cheese_1",
+              "feasible_ees": [
+                "2F",
+                "3F"
+              ]
+            },
+            {
+              "node": "obj_cheese_cheese_2",
+              "feasible_ees": [
+                "2F",
+                "3F"
+              ]
+            },
+            {
+              "node": "obj_cheese_cheese_3",
+              "feasible_ees": [
+                "2F",
+                "3F",
+                "vac"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SG3_d1_p3",
+          "expr": "batch_feasible(?EE, {obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+          "eval_by": "m3",
+          "status": "unknown",
+          "evidence": [
+            {
+              "actor": {
+                "type": "ee_pool"
+              },
+              "feasible": null,
+              "binding_check": null,
+              "partition": null
+            }
+          ]
+        },
+        {
+          "id": "SG3_d1_p4",
+          "expr": "hand_empty",
+          "eval_by": "m2"
+        }
+      ],
+      "establish": [
+        "holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})"
+      ],
+      "destroy": [
+        "hand_empty"
+      ]
+    },
+    {
+      "detail_id": "SG3_d2",
+      "action_type": "transport",
+      "binding": {
+        "?o": "{obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}",
+        "?r": "obj_turkey_turkey_1"
+      },
+      "pre": [
+        {
+          "id": "SG3_d2_p0",
+          "expr": "holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG3_d2_p1",
+          "expr": "act_space_clear(?EE, {obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+          "eval_by": "m3",
+          "status": "unknown",
+          "evidence": [
+            {
+              "actor": {
+                "type": "ee_pool"
+              },
+              "clear": null,
+              "margin_mm": null,
+              "blockers": []
+            }
+          ]
+        },
+        {
+          "id": "SG3_d2_p2",
+          "expr": "path_clear({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+          "eval_by": "motion"
+        }
+      ],
+      "establish": [
+        "above({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)"
+      ],
+      "destroy": []
+    },
+    {
+      "detail_id": "SG3_d3",
+      "action_type": "place",
+      "binding": {
+        "?o": "{obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}",
+        "?r": "obj_turkey_turkey_1"
+      },
+      "pre": [
+        {
+          "id": "SG3_d3_p0",
+          "expr": "holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG3_d3_p1",
+          "expr": "above({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG3_d3_p2",
+          "expr": "fits({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+          "eval_by": "m3",
+          "status": "unsat",
+          "evidence": [
+            {
+              "check": "opening_14.7 - footprint_30.7",
+              "value_mm": -16.0,
+              "pass": false
+            },
+            {
+              "check": "opening_14.7 - footprint_30.6",
+              "value_mm": -15.9,
+              "pass": false
+            },
+            {
+              "check": "opening_14.7 - footprint_53.4",
+              "value_mm": -38.7,
+              "pass": false
+            }
+          ]
+        },
+        {
+          "id": "SG3_d3_p3",
+          "expr": "clear(obj_turkey_turkey_1)",
+          "eval_by": "m3",
+          "status": "unsat",
+          "evidence": [
+            {
+              "check": "container_depth_3.5 - target_height_2.4",
+              "value_mm": 1.1,
+              "pass": true
+            },
+            {
+              "check": "container_depth_3.5 - target_height_6.2",
+              "value_mm": -2.7,
+              "pass": false
+            },
+            {
+              "check": "container_depth_3.5 - target_height_1.9",
+              "value_mm": 1.6,
+              "pass": true
+            },
+            {
+              "check": null,
+              "value_mm": null,
+              "pass": false
+            }
+          ]
+        }
+      ],
+      "establish": [
+        "in({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+        "hand_empty"
+      ],
+      "destroy": [
+        "holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+        "above({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)"
+      ]
+    }
+  ],
+  "partial_order": [
+    {
+      "from": "SG3_d1",
+      "to": "SG3_d2",
+      "why": "causal_link: holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})"
+    },
+    {
+      "from": "SG3_d1",
+      "to": "SG3_d3",
+      "why": "causal_link: holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})"
+    },
+    {
+      "from": "SG3_d2",
+      "to": "SG3_d3",
+      "why": "causal_link: above({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)"
+    }
+  ],
+  "mutex": [],
+  "invariants": [
+    {
+      "id": "INV_SG3",
+      "expr": "all_in({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+      "check_at": "final"
+    }
+  ],
+  "batch": [
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p3",
+      "kind": "batch",
+      "actor": {
+        "type": "ee_pool"
+      },
+      "feasible": null,
+      "checks": [],
+      "binding_check": null,
+      "partition": null
+    }
+  ],
+  "swept_space": [
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d2_p1",
+      "kind": "swept_space",
+      "actor": {
+        "type": "ee_pool"
+      },
+      "clear": null,
+      "margin_mm": null,
+      "blockers": []
+    }
+  ]
+}
