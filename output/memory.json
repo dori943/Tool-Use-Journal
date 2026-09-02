@@ -1,133 +1,868 @@
 {
-  "objects": {
-    "obj_plate_light_plate": {
-      "props": {
-        "geometry": {
-          "length_mm": 178.5,
-          "diameter_mm": null,
-          "extents_mm": [
-            178.5,
-            176.2,
-            9.5
-          ],
-          "height_z_mm": 9.4,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.3
-        },
-        "material": "plastic",
-        "density_kgm3": 950,
-        "mass_kg": 0.279,
-        "youngs_gpa": 2.0,
-        "mu": {
-          "mu": 0.338,
-          "stage": 0,
-          "material": "plastic",
-          "rms_mm": 0.3
-        },
-        "confidence": 0.85
-      },
-      "stage": 0,
-      "source": "mock",
-      "episodes_seen": 2,
-      "updated_at": "2026-08-29T09:13:02+00:00"
-    },
-    "obj_ladle_ladle": {
-      "props": {
-        "geometry": {
-          "length_mm": 62.1,
-          "diameter_mm": null,
-          "extents_mm": [
-            62.1,
-            58.4,
-            18.6
-          ],
-          "height_z_mm": 59.4,
-          "cylinder_like": false,
-          "surface_rms_mm": 1.38
-        },
-        "material": "steel",
-        "density_kgm3": 7151.9,
-        "mass_kg": 0.243,
-        "youngs_gpa": 159.07,
-        "mu": {
-          "mu": 0.459,
-          "stage": 0,
-          "material": "steel",
-          "rms_mm": 1.38
-        },
-        "confidence": 0.296,
-        "mass_range_kg": [
-          0.079,
-          0.407
-        ],
-        "materials_topk": [
-          {
-            "name": "steel",
-            "prob": 0.296,
-            "density_kgm3": [
-              7850.0,
-              8050.0
-            ],
-            "thickness_cm": [
-              1.0,
-              5.0
-            ]
-          },
-          {
-            "name": "iron",
-            "prob": 0.259,
-            "density_kgm3": [
-              7800.0,
-              7900.0
-            ],
-            "thickness_cm": [
-              1.0,
-              5.0
-            ]
-          },
-          {
-            "name": "aluminum",
-            "prob": 0.185,
-            "density_kgm3": [
-              2600.0,
-              2700.0
-            ],
-            "thickness_cm": [
-              1.0,
-              5.0
-            ]
-          },
-          {
-            "name": "copper",
-            "prob": 0.148,
-            "density_kgm3": [
-              8900.0,
-              9000.0
-            ],
-            "thickness_cm": [
-              1.0,
-              5.0
-            ]
-          },
-          {
-            "name": "bronze",
-            "prob": 0.111,
-            "density_kgm3": [
-              8000.0,
-              9000.0
-            ],
-            "thickness_cm": [
-              1.0,
-              5.0
-            ]
-          }
-        ],
-        "caption": "metallic sphere"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 4,
-      "updated_at": "2026-08-31T05:24:19+00:00"
+  "physical_knowledge": {
+    "objects": {
+      
     }
+  },
+
+  "failure_recovery_experience": {
+    "experiences": [
+      {
+  "experience_id": "VF-SPAT-007",
+
+  "context_signature": {
+    "task_id": null,
+    "subgoal_id": null,
+    "subgoal_description": "Move the left arm to approach and align the wooden spatula.",
+    "action_type": "acquire",
+
+    "target": {
+      "object_id": null,
+      "object_class": "spatula"
+    },
+
+    "violated_predicates": [],
+
+    "selected_ee": null,
+    "selected_tool": null,
+
+    "execution_signature": {
+      "motion_planning_status": null,
+      "controller_status": null
+    }
+  },
+
+  "diagnosis_summary": {
+    "source_failure_type": "gripper 6d-pose",
+
+    "failure_type": "PLANNING",
+
+    "failure_cause": {
+      "code": "INVALID_APPROACH",
+      "description": "The gripper pose was not properly aligned with the target object."
+    },
+
+    "affected_module": "M5",
+    "confidence": 0.95
+  },
+
+  "recovery_summary": {
+    "recovery_category": "REPLAN_MOTION",
+
+    "action": {
+      "action_type": "CHANGE_APPROACH",
+
+      "target": {
+        "subgoal_id": null,
+        "object_id": null,
+        "property": null,
+        "relation": null,
+        "ee_id": null,
+        "tool_id": null
+      },
+
+      "parameters": {
+        "source_correction": "Move the left gripper to the left significantly and downward significantly."
+      }
+    },
+
+    "changes": [],
+
+    "routing": {
+      "restart_from": null,
+      "rerun_modules": [],
+      "invalidate": []
+    },
+
+    "outcome": {
+      "status": "NOT_EXECUTED",
+      "verification_result": null
+    }
+  },
+
+  "metadata": {
+    "source": "offline_seed",
+    "dataset": "ViFailback",
+    "source_episode": 7,
+    "created_at": null,
+    "updated_at": null,
+    "reuse_count": 0
+  }
+},
+{
+  "experience_id": "VF-SPAT-015",
+
+  "context_signature": {
+    "task_id": null,
+    "subgoal_id": null,
+    "subgoal_description": "Release the gripper to place the wooden spatula into the blue basket.",
+    "action_type": "place",
+
+    "target": {
+      "object_id": null,
+      "object_class": "spatula"
+    },
+
+    "violated_predicates": [],
+
+    "selected_ee": null,
+    "selected_tool": null,
+
+    "execution_signature": {
+      "motion_planning_status": null,
+      "controller_status": null
+    }
+  },
+
+  "diagnosis_summary": {
+    "source_failure_type": "gripper state",
+
+    "failure_type": "EXECUTION_CONTROL",
+
+    "failure_cause": {
+      "code": "RELEASE_FAILURE",
+      "description": "The gripper failed to properly release the target object during placement."
+    },
+
+    "affected_module": "Controller",
+    "confidence": 0.95
+  },
+
+  "recovery_summary": {
+    "recovery_category": "RETRY_EXECUTION",
+
+    "action": {
+      "action_type": "RETRY_ACTION",
+
+      "target": {
+        "subgoal_id": null,
+        "object_id": null,
+        "property": null,
+        "relation": null,
+        "ee_id": null,
+        "tool_id": null
+      },
+
+      "parameters": {
+        "source_correction": "Open the left gripper"
+      }
+    },
+
+    "changes": [],
+
+    "routing": {
+      "restart_from": null,
+      "rerun_modules": [],
+      "invalidate": []
+    },
+
+    "outcome": {
+      "status": "NOT_EXECUTED",
+      "verification_result": null
+    }
+  },
+
+  "metadata": {
+    "source": "offline_seed",
+    "dataset": "ViFailback",
+    "source_episode": 15,
+    "created_at": null,
+    "updated_at": null,
+    "reuse_count": 0
+  }
+}, 
+{
+  "experience_id": "VF-SPOON-007",
+
+  "context_signature": {
+    "task_id": null,
+    "subgoal_id": null,
+    "subgoal_description": "Move the left arm to approach and align the spoon.",
+    "action_type": "acquire",
+
+    "target": {
+      "object_id": null,
+      "object_class": "spoon"
+    },
+
+    "violated_predicates": [],
+
+    "selected_ee": null,
+    "selected_tool": null,
+
+    "execution_signature": {
+      "motion_planning_status": null,
+      "controller_status": null
+    }
+  },
+
+  "diagnosis_summary": {
+    "source_failure_type": "gripper 6d-pose",
+
+    "failure_type": "PLANNING",
+
+    "failure_cause": {
+      "code": "INVALID_APPROACH",
+      "description": "The gripper pose was not properly aligned with the spoon during approach."
+    },
+
+    "affected_module": "M5",
+    "confidence": 0.95
+  },
+
+  "recovery_summary": {
+    "recovery_category": "REPLAN_MOTION",
+
+    "action": {
+      "action_type": "CHANGE_APPROACH",
+
+      "target": {
+        "subgoal_id": null,
+        "object_id": null,
+        "property": null,
+        "relation": null,
+        "ee_id": null,
+        "tool_id": null
+      },
+
+      "parameters": {
+        "source_correction": "Move the left gripper to the backward significantly and downward slightly."
+      }
+    },
+
+    "changes": [],
+
+    "routing": {
+      "restart_from": null,
+      "rerun_modules": [],
+      "invalidate": []
+    },
+
+    "outcome": {
+      "status": "NOT_EXECUTED",
+      "verification_result": null
+    }
+  },
+
+  "metadata": {
+    "source": "offline_seed",
+    "dataset": "ViFailback",
+    "source_episode": 7,
+    "created_at": null,
+    "updated_at": null,
+    "reuse_count": 0
+  }
+},
+{
+  "experience_id": "RLBF-LB-092-WO",
+
+  "context_signature": {
+    "task_id": null,
+    "subgoal_id": null,
+    "subgoal_description": "The task plan attempts to move the grasped light bulb to the lamp before grasping the light bulb.",
+    "action_type": null,
+
+    "target": {
+      "object_id": null,
+      "object_class": "light bulb"
+    },
+
+    "violated_predicates": [],
+
+    "selected_ee": null,
+    "selected_tool": null,
+
+    "execution_signature": {
+      "motion_planning_status": null,
+      "controller_status": null
+    }
+  },
+
+  "diagnosis_summary": {
+    "source_failure_type": "wrong order",
+
+    "failure_type": "TASK_DECOMPOSITION",
+
+    "failure_cause": {
+      "code": "WRONG_SUBGOAL_ORDER",
+      "description": "The plan attempts to move the light bulb before grasping it, violating the causal dependency between the subtasks."
+    },
+
+    "affected_module": "M2",
+    "confidence": 0.99
+  },
+
+  "recovery_summary": {
+    "recovery_category": "REPLAN_SUBGOAL",
+
+    "action": {
+      "action_type": "REORDER_SUBGOALS",
+
+      "target": {
+        "subgoal_id": null,
+        "object_id": null,
+        "property": null,
+        "relation": null,
+        "ee_id": null,
+        "tool_id": null
+      },
+
+      "parameters": {
+        "source_failed_plan": [
+          "move the grasped object to the brown lamp",
+          "grasp the rose light bulb",
+          "rotate_grasped_object",
+          "release"
+        ],
+
+        "source_correct_plan": [
+          "grasp the rose light bulb",
+          "move the grasped object to the brown lamp",
+          "rotate_grasped_object",
+          "release"
+        ]
+      }
+    },
+
+    "changes": [],
+
+    "routing": {
+      "restart_from": null,
+      "rerun_modules": [],
+      "invalidate": []
+    },
+
+    "outcome": {
+      "status": "NOT_EXECUTED",
+      "verification_result": null
+    }
+  },
+
+  "metadata": {
+    "source": "offline_seed",
+    "dataset": "RLBench-Fail",
+    "source_episode": 92,
+    "created_at": null,
+    "updated_at": null,
+    "reuse_count": 0
+  }
+},
+{
+  "experience_id": "RLBF-RD-022-CS",
+
+  "context_signature": {
+    "task_id": null,
+    "subgoal_id": null,
+    "subgoal_description": "The plan releases the stick immediately after grasping it, before using the stick to push the gray cube.",
+    "action_type": null,
+
+    "target": {
+      "object_id": null,
+      "object_class": "stick"
+    },
+
+    "violated_predicates": [],
+
+    "selected_ee": null,
+    "selected_tool": null,
+
+    "execution_signature": {
+      "motion_planning_status": null,
+      "controller_status": null
+    }
+  },
+
+  "diagnosis_summary": {
+    "source_failure_type": "contradictory subtasks",
+
+    "failure_type": "TASK_DECOMPOSITION",
+
+    "failure_cause": {
+      "code": "WRONG_ACTION_TYPE",
+      "description": "The plan introduces an inappropriate release action immediately after grasping the stick, preventing the stick from being used to push the target object."
+    },
+
+    "affected_module": "M2",
+    "confidence": 0.95
+  },
+
+  "recovery_summary": {
+    "recovery_category": "REPLAN_SUBGOAL",
+
+    "action": {
+      "action_type": "REDECOMPOSE_SUBGOAL",
+
+      "target": {
+        "subgoal_id": null,
+        "object_id": null,
+        "property": null,
+        "relation": null,
+        "ee_id": null,
+        "tool_id": null
+      },
+
+      "parameters": {
+        "source_failed_plan": [
+          "grasp the stick",
+          "release the stick",
+          "push the gray cube forward"
+        ],
+
+        "source_correct_plan": [
+          "grasp the stick",
+          "push the gray cube forward"
+        ]
+      }
+    },
+
+    "changes": [],
+
+    "routing": {
+      "restart_from": null,
+      "rerun_modules": [],
+      "invalidate": []
+    },
+
+    "outcome": {
+      "status": "NOT_EXECUTED",
+      "verification_result": null
+    }
+  },
+
+  "metadata": {
+    "source": "offline_seed",
+    "dataset": "RLBench-Fail",
+    "source_episode": 22,
+    "created_at": null,
+    "updated_at": null,
+    "reuse_count": 0
+  }
+},
+{
+  "experience_id": "RLBF-GROC-071-WP",
+
+  "context_signature": {
+    "task_id": null,
+    "subgoal_id": null,
+
+    "subgoal_description": "Place the crackers box in the cupboard, remove it, and then place the mustard bottle in the cupboard.",
+
+    "action_type": null,
+
+    "target": {
+      "object_id": null,
+      "object_class": "cupboard"
+    },
+
+    "violated_predicates": [],
+
+    "selected_ee": null,
+    "selected_tool": null,
+
+    "execution_signature": {
+      "motion_planning_status": null,
+      "controller_status": null
+    }
+  },
+
+  "diagnosis_summary": {
+    "source_failure_type": "wrong object state or placement",
+
+    "failure_type": "TASK_DECOMPOSITION",
+
+    "failure_cause": {
+      "code": "INVALID_CONDITION",
+      "description": "The plan specifies the soup can as the placement target instead of the required cupboard for both the crackers box and the mustard bottle."
+    },
+
+    "affected_module": "M2",
+    "confidence": 0.90
+  },
+
+  "recovery_summary": {
+    "recovery_category": "REPLAN_SUBGOAL",
+
+    "action": {
+      "action_type": "UPDATE_CONDITION",
+
+      "target": {
+        "subgoal_id": null,
+        "object_id": null,
+        "property": null,
+        "relation": null,
+        "ee_id": null,
+        "tool_id": null
+      },
+
+      "parameters": {
+        "source_failed_plan": [
+          "grasp crackers box",
+          "move grasped crackers box to soup can",
+          "release crackers box",
+          "grasp crackers box",
+          "move grasped crackers box out of soup can",
+          "release crackers box",
+          "grasp mustard bottle",
+          "move grasped mustard bottle to soup can",
+          "release mustard bottle"
+        ],
+
+        "source_correct_plan": [
+          "grasp crackers box",
+          "move grasped crackers box to cupboard",
+          "release crackers box",
+          "grasp crackers box",
+          "move grasped crackers box out of cupboard",
+          "release crackers box",
+          "grasp mustard bottle",
+          "move grasped mustard bottle to cupboard",
+          "release mustard bottle"
+        ]
+      }
+    },
+
+    "changes": [],
+
+    "routing": {
+      "restart_from": null,
+      "rerun_modules": [],
+      "invalidate": []
+    },
+
+    "outcome": {
+      "status": "NOT_EXECUTED",
+      "verification_result": null
+    }
+  },
+
+  "metadata": {
+    "source": "offline_seed",
+    "dataset": "RLBench-Fail",
+    "source_episode": 71,
+    "created_at": null,
+    "updated_at": null,
+    "reuse_count": 0
+  }
+},
+{
+  "experience_id": "RLBF-LAP-014-MS",
+
+  "context_signature": {
+    "task_id": null,
+    "subgoal_id": null,
+
+    "subgoal_description": "Shut the laptop lid, open it, close it again, and finally move it to the side.",
+
+    "action_type": null,
+
+    "target": {
+      "object_id": null,
+      "object_class": "laptop lid"
+    },
+
+    "violated_predicates": [],
+
+    "selected_ee": null,
+    "selected_tool": null,
+
+    "execution_signature": {
+      "motion_planning_status": null,
+      "controller_status": null
+    }
+  },
+
+  "diagnosis_summary": {
+    "source_failure_type": "missing subtask",
+
+    "failure_type": "TASK_DECOMPOSITION",
+
+    "failure_cause": {
+      "code": "MISSING_SUBGOAL",
+      "description": "The plan omits the required grasp actions before reopening and reclosing the laptop lid."
+    },
+
+    "affected_module": "M2",
+    "confidence": 0.99
+  },
+
+  "recovery_summary": {
+    "recovery_category": "REPLAN_SUBGOAL",
+
+    "action": {
+      "action_type": "REDECOMPOSE_SUBGOAL",
+
+      "target": {
+        "subgoal_id": null,
+        "object_id": null,
+        "property": null,
+        "relation": null,
+        "ee_id": null,
+        "tool_id": null
+      },
+
+      "parameters": {
+        "source_failed_plan": [
+          "grasp laptop lid",
+          "move grasped laptop lid down",
+          "release laptop lid",
+          "move grasped laptop lid up",
+          "release laptop lid",
+          "move grasped laptop lid down",
+          "release laptop lid",
+          "grasp laptop lid",
+          "move grasped laptop lid to the side",
+          "release laptop lid"
+        ],
+
+        "source_correct_plan": [
+          "grasp laptop lid",
+          "move grasped laptop lid down",
+          "release laptop lid",
+          "grasp laptop lid",
+          "move grasped laptop lid up",
+          "release laptop lid",
+          "grasp laptop lid",
+          "move grasped laptop lid down",
+          "release laptop lid",
+          "grasp laptop lid",
+          "move grasped laptop lid to the side",
+          "release laptop lid"
+        ]
+      }
+    },
+
+    "changes": [],
+
+    "routing": {
+      "restart_from": null,
+      "rerun_modules": [],
+      "invalidate": []
+    },
+
+    "outcome": {
+      "status": "NOT_EXECUTED",
+      "verification_result": null
+    }
+  },
+
+  "metadata": {
+    "source": "offline_seed",
+    "dataset": "RLBench-Fail",
+    "source_episode": 14,
+    "created_at": null,
+    "updated_at": null,
+    "reuse_count": 0
+  }
+},
+{
+  "experience_id": "RLBF-BTN-005-TR",
+  "context_signature": {
+    "task_id": null,
+    "subgoal_id": null,
+    "subgoal_description": "push the azure button down",
+    "action_type": "push_down",
+    "target": {
+      "object_id": null,
+      "object_class": "button"
+    },
+    "violated_predicates": [],
+    "selected_ee": null,
+    "selected_tool": null,
+    "execution_signature": {
+      "motion_planning_status": null,
+      "controller_status": "FAIL"
+    }
+  },
+  "diagnosis_summary": {
+    "source_failure_type": "translation",
+    "failure_type": "EXECUTION_CONTROL",
+    "failure_cause": {
+      "code": "CONTROL_ERROR",
+      "description": "The button push failed because of a translation error in the end-effector positioning relative to the button."
+    },
+    "affected_module": "Controller",
+    "confidence": 0.95
+  },
+  "recovery_summary": {
+    "recovery_category": "RETRY_EXECUTION",
+    "action": {
+      "action_type": "APPLY_OFFSET",
+      "target": {
+        "subgoal_id": null,
+        "object_id": null,
+        "property": null,
+        "relation": null,
+        "ee_id": null,
+        "tool_id": null
+      },
+      "parameters": {}
+    },
+    "changes": [],
+    "routing": {
+      "restart_from": null,
+      "rerun_modules": [],
+      "invalidate": []
+    },
+    "outcome": {
+      "status": "NOT_EXECUTED",
+      "verification_result": null
+    }
+  },
+  "metadata": {
+    "source": "offline_seed",
+    "dataset": "RLBench-Fail",
+    "source_episode": 5,
+    "created_at": null,
+    "updated_at": null,
+    "reuse_count": 0
+  }
+},
+{
+  "experience_id": "RLBF-DOOR-032-TR",
+
+  "context_signature": {
+    "task_id": null,
+    "subgoal_id": null,
+
+    "subgoal_description": "grasp the door handle",
+    "action_type": "acquire",
+
+    "target": {
+      "object_id": null,
+      "object_class": "door handle"
+    },
+
+    "violated_predicates": [],
+
+    "selected_ee": null,
+    "selected_tool": null,
+
+    "execution_signature": {
+      "motion_planning_status": null,
+      "controller_status": "FAIL"
+    }
+  },
+
+  "diagnosis_summary": {
+    "source_failure_type": "translation",
+
+    "failure_type": "EXECUTION_CONTROL",
+
+    "failure_cause": {
+      "code": "GRASP_FAILURE",
+      "description": "The gripper missed the door handle because of a translation error in its positioning."
+    },
+
+    "affected_module": "Controller",
+    "confidence": 0.97
+  },
+
+  "recovery_summary": {
+    "recovery_category": "RETRY_EXECUTION",
+
+    "action": {
+      "action_type": "APPLY_OFFSET",
+
+      "target": {
+        "subgoal_id": null,
+        "object_id": null,
+        "property": null,
+        "relation": null,
+        "ee_id": null,
+        "tool_id": null
+      },
+
+      "parameters": {}
+    },
+
+    "changes": [],
+
+    "routing": {
+      "restart_from": null,
+      "rerun_modules": [],
+      "invalidate": []
+    },
+
+    "outcome": {
+      "status": "NOT_EXECUTED",
+      "verification_result": null
+    }
+  },
+
+  "metadata": {
+    "source": "offline_seed",
+    "dataset": "RLBench-Fail",
+    "source_episode": 32,
+    "created_at": null,
+    "updated_at": null,
+    "reuse_count": 0
+  }
+},
+{
+  "experience_id": "RLBF-LIFT-036-SL",
+  "context_signature": {
+    "task_id": null,
+    "subgoal_id": null,
+    "subgoal_description": "move the grasped object to the red ball",
+    "action_type": "transport",
+    "target": {
+      "object_id": null,
+      "object_class": "red cube"
+    },
+    "violated_predicates": [],
+    "selected_ee": null,
+    "selected_tool": null,
+    "execution_signature": {
+      "motion_planning_status": null,
+      "controller_status": "FAIL"
+    }
+  },
+  "diagnosis_summary": {
+    "source_failure_type": "slip",
+    "failure_type": "EXECUTION_CONTROL",
+    "failure_cause": {
+      "code": "SLIP",
+      "description": "The red cube slipped from the gripper while it was being moved toward the target."
+    },
+    "affected_module": "Controller",
+    "confidence": 1.0
+  },
+  "recovery_summary": {
+    "recovery_category": "RETRY_EXECUTION",
+    "action": {
+      "action_type": "RETRY_ACTION",
+      "target": {
+        "subgoal_id": null,
+        "object_id": null,
+        "property": null,
+        "relation": null,
+        "ee_id": null,
+        "tool_id": null
+      },
+      "parameters": {
+        "failed_primitive": "move_grasped_object"
+      }
+    },
+    "changes": [],
+    "routing": {
+      "restart_from": null,
+      "rerun_modules": [],
+      "invalidate": []
+    },
+    "outcome": {
+      "status": "NOT_EXECUTED",
+      "verification_result": null
+    }
+  },
+  "metadata": {
+    "source": "offline_seed",
+    "dataset": "RLBench-Fail",
+    "source_episode": 36,
+    "created_at": null,
+    "updated_at": null,
+    "reuse_count": 0
+  }
+}
+    ]
   }
 }
