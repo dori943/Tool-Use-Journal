@@ -287,6 +287,101 @@
     },
     {
       "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "node_id": "obj_tongs_tongs",
+      "geometry": {
+        "length_mm": 251.7,
+        "diameter_mm": null,
+        "extents_mm": [
+          251.7,
+          25.5,
+          16.7
+        ],
+        "height_z_mm": 20.9,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.66
+      },
+      "material": "stainless steel",
+      "density_kgm3": 7925.0,
+      "mass_kg": 0.015,
+      "youngs_gpa": 200.0,
+      "mu": {
+        "mu": 0.442,
+        "stage": 0,
+        "material": "stainless steel",
+        "rms_mm": 0.66
+      },
+      "confidence": 0.5,
+      "mass_range_kg": [
+        0.01,
+        0.021
+      ],
+      "materials_topk": [
+        {
+          "name": "stainless steel",
+          "prob": 0.5,
+          "density_kgm3": [
+            7750.0,
+            8100.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.2
+          ]
+        },
+        {
+          "name": "aluminum",
+          "prob": 0.2,
+          "density_kgm3": [
+            2600.0,
+            2800.0
+          ],
+          "thickness_cm": [
+            0.2,
+            0.4
+          ]
+        },
+        {
+          "name": "carbon steel",
+          "prob": 0.15,
+          "density_kgm3": [
+            7800.0,
+            7900.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.2
+          ]
+        },
+        {
+          "name": "titanium",
+          "prob": 0.1,
+          "density_kgm3": [
+            4400.0,
+            4500.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.2
+          ]
+        },
+        {
+          "name": "brass",
+          "prob": 0.05,
+          "density_kgm3": [
+            8400.0,
+            8700.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.2
+          ]
+        }
+      ],
+      "caption": "A pair of metallic kitchen serving tongs."
+    },
+    {
+      "subgoal_id": "SG1",
       "queried_by": "SG1_d1_p1",
       "node_id": "obj_bottle_bottle",
       "geometry": {
@@ -572,6 +667,101 @@
     },
     {
       "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "node_id": "obj_tongs_tongs",
+      "geometry": {
+        "length_mm": 251.7,
+        "diameter_mm": null,
+        "extents_mm": [
+          251.7,
+          25.5,
+          16.7
+        ],
+        "height_z_mm": 20.9,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.66
+      },
+      "material": "stainless steel",
+      "density_kgm3": 7925.0,
+      "mass_kg": 0.015,
+      "youngs_gpa": 200.0,
+      "mu": {
+        "mu": 0.442,
+        "stage": 0,
+        "material": "stainless steel",
+        "rms_mm": 0.66
+      },
+      "confidence": 0.5,
+      "mass_range_kg": [
+        0.01,
+        0.021
+      ],
+      "materials_topk": [
+        {
+          "name": "stainless steel",
+          "prob": 0.5,
+          "density_kgm3": [
+            7750.0,
+            8100.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.2
+          ]
+        },
+        {
+          "name": "aluminum",
+          "prob": 0.2,
+          "density_kgm3": [
+            2600.0,
+            2800.0
+          ],
+          "thickness_cm": [
+            0.2,
+            0.4
+          ]
+        },
+        {
+          "name": "carbon steel",
+          "prob": 0.15,
+          "density_kgm3": [
+            7800.0,
+            7900.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.2
+          ]
+        },
+        {
+          "name": "titanium",
+          "prob": 0.1,
+          "density_kgm3": [
+            4400.0,
+            4500.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.2
+          ]
+        },
+        {
+          "name": "brass",
+          "prob": 0.05,
+          "density_kgm3": [
+            8400.0,
+            8700.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.2
+          ]
+        }
+      ],
+      "caption": "A pair of metallic kitchen serving tongs."
+    },
+    {
+      "subgoal_id": "SG1",
       "queried_by": "SG1_d1_p2",
       "node_id": "obj_bottle_bottle",
       "ee": {
@@ -841,6 +1031,97 @@
         "reach_mm": 850,
         "reachable": true,
         "margin_mm": 131.1
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "node_id": "obj_tongs_tongs",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.985,
+          "margin_unit": "kg",
+          "reason": "질량 0.015 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 16.7,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.015,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.166,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.485,
+          "margin_unit": "kg",
+          "reason": "질량 0.015 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 16.7,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.015,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.166,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": -4.5,
+          "margin_unit": "mm",
+          "reason": "접촉면 폭 26 vs seal 직경 30mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.66,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.015,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 25.5,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 704.3,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 145.7
       }
     },
     {

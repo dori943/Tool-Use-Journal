@@ -1,58 +1,424 @@
 {
   "subgoal_id": "SG1",
   "nodes": {
-    "obj_dough_dough": {
+    "obj_bottle_bottle": {
       "queried_by": [
         "SG1_d1_p0",
         "SG1_d1_p1",
         "SG1_d1_p2"
       ],
       "geometry": {
-        "length_mm": 56.9,
+        "length_mm": 135.6,
         "diameter_mm": null,
         "extents_mm": [
-          56.9,
-          54.2,
-          22.2
+          135.6,
+          46.3,
+          35.5
         ],
-        "height_z_mm": 45.4,
+        "height_z_mm": 131.7,
         "cylinder_like": false,
-        "surface_rms_mm": 1.23
+        "surface_rms_mm": 3.63
+      },
+      "material": "aluminum",
+      "density_kgm3": 2700.0,
+      "mass_kg": 0.001,
+      "youngs_gpa": 69.0,
+      "mu": {
+        "mu": 0.509,
+        "stage": 0,
+        "material": "aluminum",
+        "rms_mm": 3.63
+      },
+      "confidence": 0.435,
+      "mass_range_kg": [
+        0.001,
+        0.002
+      ],
+      "materials_topk": [
+        {
+          "name": "aluminum",
+          "prob": 0.435,
+          "density_kgm3": [
+            2700.0,
+            2700.0
+          ],
+          "thickness_cm": [
+            0.01,
+            0.02
+          ]
+        },
+        {
+          "name": "steel",
+          "prob": 0.261,
+          "density_kgm3": [
+            7700.0,
+            8000.0
+          ],
+          "thickness_cm": [
+            0.01,
+            0.015
+          ]
+        },
+        {
+          "name": "polyethylene",
+          "prob": 0.087,
+          "density_kgm3": [
+            900.0,
+            960.0
+          ],
+          "thickness_cm": [
+            0.01,
+            0.03
+          ]
+        },
+        {
+          "name": "tin",
+          "prob": 0.13,
+          "density_kgm3": [
+            7200.0,
+            7300.0
+          ],
+          "thickness_cm": [
+            0.01,
+            0.02
+          ]
+        },
+        {
+          "name": "polypropylene",
+          "prob": 0.087,
+          "density_kgm3": [
+            850.0,
+            920.0
+          ],
+          "thickness_cm": [
+            0.02,
+            0.05
+          ]
+        }
+      ],
+      "caption": "A cylindrical metal soda or beverage drink can.",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.999,
+          "margin_unit": "kg",
+          "reason": "질량 0.001 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 35.5,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.001,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.01,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.499,
+          "margin_unit": "kg",
+          "reason": "질량 0.001 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 35.5,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.001,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.01,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": -2.13,
+          "margin_unit": "mm",
+          "reason": "상면 RMS 3.63 vs 허용 1.5",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 3.63,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.001,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 46.3,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 707.4,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 142.6
+      }
+    },
+    "obj_spatula_spatula": {
+      "queried_by": [
+        "SG1_d1_p0",
+        "SG1_d1_p1",
+        "SG1_d1_p2"
+      ],
+      "geometry": {
+        "length_mm": 215.4,
+        "diameter_mm": null,
+        "extents_mm": [
+          215.4,
+          43.1,
+          1.4
+        ],
+        "height_z_mm": 1.9,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.01
       },
       "material": "wood",
-      "density_kgm3": 1145.0,
-      "mass_kg": 0.036,
-      "youngs_gpa": 14.33,
+      "density_kgm3": 557.8,
+      "mass_kg": 0.003,
+      "youngs_gpa": 9.53,
       "mu": {
-        "mu": 0.506,
+        "mu": 0.475,
         "stage": 0,
         "material": "wood",
-        "rms_mm": 1.23
+        "rms_mm": 0.01
       },
-      "confidence": 0.3,
+      "confidence": 0.281,
       "mass_range_kg": [
-        0.008,
-        0.065
+        0.001,
+        0.006
       ],
       "materials_topk": [
         {
           "name": "wood",
-          "prob": 0.3,
+          "prob": 0.281,
           "density_kgm3": [
-            300.0,
-            900.0
+            400.0,
+            800.0
           ],
           "thickness_cm": [
-            1.0,
+            2.0,
             5.0
           ]
         },
         {
-          "name": "ceramic",
-          "prob": 0.2,
+          "name": "straw",
+          "prob": 0.25,
           "density_kgm3": [
-            2000.0,
-            3000.0
+            100.0,
+            300.0
+          ],
+          "thickness_cm": [
+            5.0,
+            15.0
+          ]
+        },
+        {
+          "name": "bamboo",
+          "prob": 0.188,
+          "density_kgm3": [
+            500.0,
+            900.0
+          ],
+          "thickness_cm": [
+            2.0,
+            4.0
+          ]
+        },
+        {
+          "name": "hemp",
+          "prob": 0.125,
+          "density_kgm3": [
+            800.0,
+            1400.0
+          ],
+          "thickness_cm": [
+            0.5,
+            2.0
+          ]
+        },
+        {
+          "name": "wicker",
+          "prob": 0.156,
+          "density_kgm3": [
+            300.0,
+            600.0
+          ],
+          "thickness_cm": [
+            1.0,
+            3.0
+          ]
+        }
+      ],
+      "caption": "A rustic wooden broom or sweeping tool",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.997,
+          "margin_unit": "kg",
+          "reason": "질량 0.003 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 43.1,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.031,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.497,
+          "margin_unit": "kg",
+          "reason": "질량 0.003 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 43.1,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.031,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": true,
+          "margin": 0.497,
+          "margin_unit": "kg",
+          "reason": "질량 0.003 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.01,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 43.1,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 696.1,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 153.9
+      }
+    },
+    "obj_spoon_spoon": {
+      "queried_by": [
+        "SG1_d1_p0",
+        "SG1_d1_p1",
+        "SG1_d1_p2"
+      ],
+      "geometry": {
+        "length_mm": 86.9,
+        "diameter_mm": null,
+        "extents_mm": [
+          86.9,
+          51.3,
+          29.6
+        ],
+        "height_z_mm": 26.8,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.34
+      },
+      "material": "wood",
+      "density_kgm3": 2938.9,
+      "mass_kg": 0.029,
+      "youngs_gpa": 47.19,
+      "mu": {
+        "mu": 0.483,
+        "stage": 0,
+        "material": "wood",
+        "rms_mm": 0.34
+      },
+      "confidence": 0.333,
+      "mass_range_kg": [
+        0.015,
+        0.042
+      ],
+      "materials_topk": [
+        {
+          "name": "metal",
+          "prob": 0.296,
+          "density_kgm3": [
+            7000.0,
+            8000.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.0
+          ]
+        },
+        {
+          "name": "wood",
+          "prob": 0.333,
+          "density_kgm3": [
+            500.0,
+            800.0
           ],
           "thickness_cm": [
             0.5,
@@ -61,64 +427,64 @@
         },
         {
           "name": "plastic",
-          "prob": 0.25,
+          "prob": 0.185,
           "density_kgm3": [
             900.0,
-            1300.0
-          ],
-          "thickness_cm": [
-            0.5,
-            3.0
-          ]
-        },
-        {
-          "name": "rubber",
-          "prob": 0.15,
-          "density_kgm3": [
-            400.0,
             1200.0
           ],
           "thickness_cm": [
-            0.5,
-            2.0
+            0.3,
+            1.0
           ]
         },
         {
-          "name": "fiberboard",
-          "prob": 0.1,
+          "name": "ceramic",
+          "prob": 0.074,
           "density_kgm3": [
-            600.0,
-            800.0
+            1500.0,
+            3000.0
           ],
           "thickness_cm": [
-            1.0,
-            4.0
+            0.5,
+            1.5
+          ]
+        },
+        {
+          "name": "silicone",
+          "prob": 0.111,
+          "density_kgm3": [
+            1100.0,
+            1400.0
+          ],
+          "thickness_cm": [
+            0.3,
+            1.0
           ]
         }
       ],
-      "caption": "Round brown object",
+      "caption": "Ladle with a wooden handle",
       "ee": {
         "2F": {
           "feasible": true,
-          "margin": 4.964,
+          "margin": 4.971,
           "margin_unit": "kg",
-          "reason": "질량 0.036 vs 페이로드 5.0kg",
+          "reason": "질량 0.029 vs 페이로드 5.0kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 22.2,
+              "value": 29.6,
               "limit": 85.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.036,
+              "value": 0.029,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.349,
+              "value": 0.295,
               "limit": 235.0,
               "pass": true
             }
@@ -126,25 +492,25 @@
         },
         "3F": {
           "feasible": true,
-          "margin": 2.464,
+          "margin": 2.471,
           "margin_unit": "kg",
-          "reason": "질량 0.036 vs 페이로드 2.5kg",
+          "reason": "질량 0.029 vs 페이로드 2.5kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 22.2,
+              "value": 29.6,
               "limit": 140.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.036,
+              "value": 0.029,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.349,
+              "value": 0.295,
               "limit": 60.0,
               "pass": true
             }
@@ -152,115 +518,163 @@
         },
         "vac": {
           "feasible": true,
-          "margin": 0.27,
-          "margin_unit": "mm",
-          "reason": "상면 RMS 1.23 vs 허용 1.5",
+          "margin": 0.471,
+          "margin_unit": "kg",
+          "reason": "질량 0.029 vs 페이로드 0.5kg",
           "checks": [
             {
               "rule": "flatness",
-              "value": 1.23,
+              "value": 0.34,
               "limit": 1.5,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.036,
+              "value": 0.029,
               "limit": 0.5,
               "pass": true
             },
             {
               "rule": "seal_contact",
               "value": 30.0,
-              "limit": 54.2,
+              "limit": 51.3,
               "pass": true
             }
           ]
         }
       },
       "reachability": {
-        "distance_mm": 427.7,
+        "distance_mm": 718.9,
         "reach_mm": 850,
         "reachable": true,
-        "margin_mm": 422.3
+        "margin_mm": 131.1
       }
     }
   },
-  "edges": [
-    {
-      "queried_by": "SG1_d3_p2",
-      "from": "obj_dough_dough",
-      "to": "obj_cutting_board_cutting_board",
-      "type": "fits_inside",
-      "value_mm": 97.1,
-      "check": "opening_137.8 - footprint_40.7",
-      "pass": true
-    },
-    {
-      "queried_by": "SG1_d3_p3",
-      "from": "obj_dough_dough",
-      "to": "obj_cutting_board_cutting_board",
-      "type": "clearance",
-      "value_mm": -32.7,
-      "check": "container_depth_12.7 - target_height_45.4",
-      "pass": false
-    }
-  ],
+  "edges": [],
   "flags": {
     "near_threshold": []
   },
   "task": "도마 위의 반죽을 평평하게 펴라",
-  "goal": "도마 위의 반죽을 평평하게 펴라.",
-  "subgoal_kind": "relocate",
+  "goal": "도마 위의 반죽을 평평하게 편다.",
+  "subgoal_kind": "flatten",
   "roles": {
     "target": [
       "obj_dough_dough"
     ],
     "container": "obj_cutting_board_cutting_board",
-    "tool_candidates": [],
-    "selected_tool": null,
-    "selection_evidence": null
+    "tool_candidates": [
+      "obj_bottle_bottle",
+      "obj_spatula_spatula",
+      "obj_spoon_spoon"
+    ],
+    "selected_tool": "obj_spatula_spatula",
+    "selection_evidence": [
+      {
+        "node": "obj_spatula_spatula",
+        "feasible_ees": [
+          "2F",
+          "3F",
+          "vac"
+        ],
+        "reach_margin_mm": 153.9,
+        "batch_groups": null
+      },
+      {
+        "node": "obj_spoon_spoon",
+        "feasible_ees": [
+          "2F",
+          "3F",
+          "vac"
+        ],
+        "reach_margin_mm": 131.1,
+        "batch_groups": null
+      },
+      {
+        "node": "obj_bottle_bottle",
+        "feasible_ees": [
+          "2F",
+          "3F"
+        ],
+        "reach_margin_mm": 142.6,
+        "batch_groups": null
+      }
+    ]
   },
   "details": [
     {
       "detail_id": "SG1_d1",
       "action_type": "acquire",
       "binding": {
-        "?o": "obj_dough_dough"
+        "?o": "?tool"
       },
       "pre": [
         {
           "id": "SG1_d1_p0",
-          "expr": "reachable(obj_dough_dough)",
+          "expr": "reachable(?tool)",
           "eval_by": "m3",
           "status": "sat",
           "evidence": [
             {
-              "node": "obj_dough_dough",
+              "node": "obj_bottle_bottle",
               "reachable": true,
-              "margin_mm": 422.3
+              "margin_mm": 142.6
+            },
+            {
+              "node": "obj_spatula_spatula",
+              "reachable": true,
+              "margin_mm": 153.9
+            },
+            {
+              "node": "obj_spoon_spoon",
+              "reachable": true,
+              "margin_mm": 131.1
             }
           ]
         },
         {
           "id": "SG1_d1_p1",
-          "expr": "top_exposed(obj_dough_dough)",
+          "expr": "top_exposed(?tool)",
           "eval_by": "m3",
           "status": "unknown",
           "evidence": [
             {
-              "node": "obj_dough_dough",
+              "node": "obj_bottle_bottle",
+              "top_exposed": null
+            },
+            {
+              "node": "obj_spatula_spatula",
+              "top_exposed": null
+            },
+            {
+              "node": "obj_spoon_spoon",
               "top_exposed": null
             }
           ]
         },
         {
           "id": "SG1_d1_p2",
-          "expr": "ee_usable(?EE, obj_dough_dough)",
+          "expr": "ee_usable(?EE, ?tool)",
           "eval_by": "m3",
           "status": "sat",
           "evidence": [
             {
-              "node": "obj_dough_dough",
+              "node": "obj_bottle_bottle",
+              "feasible_ees": [
+                "2F",
+                "3F"
+              ]
+            },
+            {
+              "node": "obj_spatula_spatula",
+              "feasible_ees": [
+                "2F",
+                "3F",
+                "vac"
+              ]
+            },
+            {
+              "node": "obj_spoon_spoon",
               "feasible_ees": [
                 "2F",
                 "3F",
@@ -271,7 +685,7 @@
         },
         {
           "id": "SG1_d1_p3",
-          "expr": "batch_feasible(?EE, obj_dough_dough)",
+          "expr": "batch_feasible(?EE, ?tool)",
           "eval_by": "m3",
           "status": "not_queried",
           "evidence": []
@@ -283,7 +697,7 @@
         }
       ],
       "establish": [
-        "holding(obj_dough_dough)"
+        "holding(?tool)"
       ],
       "destroy": [
         "hand_empty"
@@ -291,32 +705,76 @@
     },
     {
       "detail_id": "SG1_d2",
-      "action_type": "transport",
+      "action_type": "tool_act:flatten",
       "binding": {
-        "?o": "obj_dough_dough",
-        "?r": "obj_cutting_board_cutting_board"
+        "?t": "?tool",
+        "?targets": "{obj_dough_dough}",
+        "?work": "obj_cutting_board_cutting_board"
       },
       "pre": [
         {
           "id": "SG1_d2_p0",
-          "expr": "holding(obj_dough_dough)",
+          "expr": "holding(?tool)",
           "eval_by": "m2"
         },
         {
           "id": "SG1_d2_p1",
-          "expr": "act_space_clear(?EE, obj_dough_dough, obj_cutting_board_cutting_board)",
+          "expr": "flat_face(?tool)",
           "eval_by": "m3",
           "status": "not_queried",
           "evidence": []
         },
         {
           "id": "SG1_d2_p2",
-          "expr": "path_clear(obj_dough_dough, obj_cutting_board_cutting_board)",
+          "expr": "act_space_clear(?tool, {obj_dough_dough}, obj_cutting_board_cutting_board)",
+          "eval_by": "m3",
+          "status": "not_queried",
+          "evidence": []
+        },
+        {
+          "id": "SG1_d2_p3",
+          "expr": "path_clear(?tool, obj_cutting_board_cutting_board)",
           "eval_by": "motion"
         }
       ],
       "establish": [
-        "above(obj_dough_dough, obj_cutting_board_cutting_board)"
+        "flattened({obj_dough_dough})"
+      ],
+      "destroy": []
+    },
+    {
+      "detail_id": "SG1_d2b",
+      "action_type": "transport",
+      "binding": {
+        "?o": "?tool",
+        "?r": "tool_rest"
+      },
+      "pre": [
+        {
+          "id": "SG1_d2b_p0",
+          "expr": "holding(?tool)",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG1_d2b_p1",
+          "expr": "act_space_clear(?EE, ?tool, tool_rest)",
+          "eval_by": "m3",
+          "status": "not_queried",
+          "evidence": []
+        },
+        {
+          "id": "SG1_d2b_p2",
+          "expr": "path_clear(?tool, tool_rest)",
+          "eval_by": "motion"
+        },
+        {
+          "id": "SG1_d2b_p3",
+          "expr": "flattened({obj_dough_dough})",
+          "eval_by": "m2"
+        }
+      ],
+      "establish": [
+        "above(?tool, tool_rest)"
       ],
       "destroy": []
     },
@@ -324,59 +782,42 @@
       "detail_id": "SG1_d3",
       "action_type": "place",
       "binding": {
-        "?o": "obj_dough_dough",
-        "?r": "obj_cutting_board_cutting_board"
+        "?o": "?tool",
+        "?r": "tool_rest"
       },
       "pre": [
         {
           "id": "SG1_d3_p0",
-          "expr": "holding(obj_dough_dough)",
+          "expr": "holding(?tool)",
           "eval_by": "m2"
         },
         {
           "id": "SG1_d3_p1",
-          "expr": "above(obj_dough_dough, obj_cutting_board_cutting_board)",
+          "expr": "above(?tool, tool_rest)",
           "eval_by": "m2"
         },
         {
           "id": "SG1_d3_p2",
-          "expr": "fits(obj_dough_dough, obj_cutting_board_cutting_board)",
+          "expr": "fits(?tool, tool_rest)",
           "eval_by": "m3",
-          "status": "sat",
-          "evidence": [
-            {
-              "check": "opening_137.8 - footprint_40.7",
-              "value_mm": 97.1,
-              "pass": true
-            }
-          ]
+          "status": "not_queried",
+          "evidence": []
         },
         {
           "id": "SG1_d3_p3",
-          "expr": "clear(obj_cutting_board_cutting_board)",
+          "expr": "clear(tool_rest)",
           "eval_by": "m3",
-          "status": "unsat",
-          "evidence": [
-            {
-              "check": "container_depth_12.7 - target_height_45.4",
-              "value_mm": -32.7,
-              "pass": false
-            },
-            {
-              "check": null,
-              "value_mm": null,
-              "pass": false
-            }
-          ]
+          "status": "not_queried",
+          "evidence": []
         }
       ],
       "establish": [
-        "in(obj_dough_dough, obj_cutting_board_cutting_board)",
+        "in(?tool, tool_rest)",
         "hand_empty"
       ],
       "destroy": [
-        "holding(obj_dough_dough)",
-        "above(obj_dough_dough, obj_cutting_board_cutting_board)"
+        "holding(?tool)",
+        "above(?tool, tool_rest)"
       ]
     }
   ],
@@ -384,24 +825,39 @@
     {
       "from": "SG1_d1",
       "to": "SG1_d2",
-      "why": "causal_link: holding(obj_dough_dough)"
+      "why": "causal_link: holding(?tool)"
+    },
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d2b",
+      "why": "causal_link: holding(?tool)"
+    },
+    {
+      "from": "SG1_d2",
+      "to": "SG1_d2b",
+      "why": "causal_link: flattened({obj_dough_dough})"
     },
     {
       "from": "SG1_d1",
       "to": "SG1_d3",
-      "why": "causal_link: holding(obj_dough_dough)"
+      "why": "causal_link: holding(?tool)"
+    },
+    {
+      "from": "SG1_d2b",
+      "to": "SG1_d3",
+      "why": "causal_link: above(?tool, tool_rest)"
     },
     {
       "from": "SG1_d2",
       "to": "SG1_d3",
-      "why": "causal_link: above(obj_dough_dough, obj_cutting_board_cutting_board)"
+      "why": "threat: SG1_d3가 holding(?tool)를 파괴"
     }
   ],
   "mutex": [],
   "invariants": [
     {
       "id": "INV_SG1",
-      "expr": "in(obj_dough_dough, obj_cutting_board_cutting_board)",
+      "expr": "flattened({obj_dough_dough})",
       "check_at": "final"
     }
   ],

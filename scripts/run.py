@@ -415,7 +415,10 @@ def build_parser():
                    help="씬 배치 난수 시드 — M1 과 M5 환경 생성에 동일 적용")
     p.add_argument("--backend", default="siphy", choices=("siphy", "mock"),
                    help="M3 물성 백엔드")
-    p.add_argument("--model", default="gpt-4o-mini", help="M3 백엔드 VLM 모델")
+    p.add_argument("--model", default=None,
+                   help="M2·M3 공통 LLM 모델 (미지정 시 provider 기본값). 예: gemini-2.5-flash, gpt-4o")
+    p.add_argument("--provider", choices=("gemini", "openai"), default=None,
+                   help="LLM 제공자 (미지정 시 --model 접두어로 추론, 그래도 없으면 gemini)")
     p.add_argument("--memory", default=str(ROOT / "output" / "memory.json"),
                    help="M3 물성 메모리 경로 ('none' 이면 사용 안 함)")
     p.add_argument("--robot-spec", default=str(ROOT / "configs" / "robot_spec.json"),
@@ -444,8 +447,35 @@ def build_parser():
     return p
 
 
+def _infer_provider(model):
+    m = (model or "").lower()
+    if m.startswith("gemini"):
+        return "gemini"
+    if m.startswith(("gpt", "o1", "o3", "o4", "chatgpt", "text-")):
+        return "openai"
+    return None
+
+
+def _resolve_llm(args):
+    """--model/--provider 를 M2·M3 양쪽에 일관 적용한다.
+
+    M2(run_m2/LLMRough)는 TUJ_LLM_PROVIDER·TUJ_M2_MODEL 환경변수를, M3(SiPhyBackend)는
+    --model 인자와 TUJ_LLM_PROVIDER 를 읽는다. 여기서 둘의 제공자·모델을 맞춘다.
+    같은 프로세스에서 모듈 main() 을 호출하므로 os.environ 설정이 그대로 전달된다.
+    """
+    provider = (args.provider or _infer_provider(args.model)
+                or os.environ.get("TUJ_LLM_PROVIDER") or "gemini")
+    os.environ["TUJ_LLM_PROVIDER"] = provider
+    if args.model:                              # 명시 모델 → M2·M3 동일 모델
+        os.environ["TUJ_M2_MODEL"] = args.model
+    else:                                       # 미지정 → 제공자 기본값(M3용), M2 는 자체 기본
+        args.model = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini"}[provider]
+    print(f"[run] LLM provider={provider} model={args.model}")
+
+
 def main():
     args = build_parser().parse_args()
+    _resolve_llm(args)
     task = args.task
     out = ROOT / "output" / task
     out.mkdir(parents=True, exist_ok=True)

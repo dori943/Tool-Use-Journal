@@ -14,7 +14,7 @@
       output/<task>/gk_<SG>.json     — 서브골별 G_k (M4 입력)
       output/<task>/m3_intrinsic.json — Tier-2 접지 캐시
 
-siphy 백엔드: OPENAI_API_KEY 환경변수 또는 레포 루트 my_api_key.py (SiPhy 관례).
+siphy 백엔드: OPENAI_API_KEY(우선) 또는 GEMINI_API_KEY/GOOGLE_API_KEY 환경변수, 혹은 레포 루트 my_api_key.py.
 """
 from __future__ import annotations
 
