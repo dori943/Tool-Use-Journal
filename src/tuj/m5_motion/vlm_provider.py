@@ -102,7 +102,10 @@ class OpenAIKeyframeProviderConfig:
     model: str = "gpt-5.4-mini"
     candidate_count: int = 4
     reasoning_effort: Literal["none", "low", "medium", "high"] = "medium"
-    max_output_tokens: int = 8_000
+    # 0831: 8_000 -> 16_000. 추론형 모델은 생각 토큰도 이 상한에서 소모하므로
+    # 8k로는 답변 JSON이 중간에 잘려 ValidationError로 죽는 일이 반복됨
+    # (gpt-5.4-mini, effort medium 기준 2회 연속 재현).
+    max_output_tokens: int = 16_000
     timeout_s: float = 90.0
     cache_dir: Path | None = None
 

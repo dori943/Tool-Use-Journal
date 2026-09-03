@@ -442,12 +442,60 @@ unlock/lock event 전후의 collision context가 분리되므로, 기존 EE가 �
 bare flange, 새 EE 장착 형상이 같은 segment 상태로 섞이지 않는다.
 
 초기 `current_ee`가 `null`이면 Task Planner는 `DETACH_EE` 없이 첫 `ATTACH_EE`만
-생성한다. 이때 Motion Planner는 아래처럼 bare flange에서 시작하는 4-keyframe 초기
-장착 macro를 사용한다. 첫 장착을 기존 EE와의 교체로 잘못 처리하지 않는다.
+생성한다. 운영 Motion Planner는 이 요청을 일반 keyframe/IK/RRT pipeline 전에
+가로채고 `configs/precomputed_ee_paths/<environment>/bare_to_<EE>.json`의 검증 완료
+관절 궤적을 사용한다. 저장 궤적은 시작 관절, UR5e base, rack/dock, collision model
+version, lock/verify event, 동역학 limit, 현재 scene의 보간 전 구간 collision을 모두
+통과해야 새 요청의 `MotionPlan`으로 바인딩된다.
 
 ```text
-new staging → new pre-dock → new dock → lock/verify → retreat
+EE_ATTACH → registry lookup → static/start validation
+→ dense current-scene collision validation → request-bound MotionPlan
 ```
+
+일반 `EE_EXCHANGE`도 pipeline 전에 가로챈다. EE별 반납 파일 3개와 기존 장착
+파일 3개를 사용하므로 pairwise EE→EE 파일 6개는 필요 없다.
+
+```text
+EE_EXCHANGE_ENTRY(from)
+→ load and validate from→bare.exchange-entry joint target
+→ direct joint path under ee-attached:<from>, else bounded RRT-Connect
+→ dense + final timed collision validation
+→ expected final joints = stored exchange-entry
+
+EE_EXCHANGE(from, to)
+→ from→bare registry lookup + bare→to registry lookup
+→ return start/workcell/dense collision validation
+→ exact bare-home joint seam validation
+→ attach validation
+→ timeline/event offset
+→ one request-bound MotionPlan
+```
+
+합성 계획의 event 순서는 `TOOL_UNLOCK`, `VERIFY_TOOL_RELEASE`, `TOOL_LOCK`,
+`VERIFY_TOOL_LOCK`이며 `dynamic_planner_invoked=false`다. 반납 시작 자세는 해당
+`bare→EE` 장착 궤적의 마지막 exchange-entry 자세로 고정된다. Selected Plan
+orchestrator는 교환 전 `EE_EXCHANGE_ENTRY`를 자동 삽입하며, 현재 자세에서 저장된
+EE별 entry까지 장착 상태 collision model로 동적 계획한다. 이 선행 계획이 성공한
+경우에만 반납·재장착 사전 궤적을 실행한다. 선행 요청 없이 `EE_EXCHANGE`를 직접
+호출하거나 controller가 entry 허용 오차에 도달하지 못하면 `START_STATE_MISMATCH`로
+fail-closed 한다.
+
+기본 `--ee-attach-policy precomputed-required`에서는 miss나 검증 실패를 명시적
+failure code로 종료하고 일반 planner로 조용히 fallback하지 않는다. 개발 commissioning
+시에만 `precomputed-or-plan`을 사용할 수 있다. 저장 경로 생성과 fresh bare runtime
+반복 재생은 `scripts/generate_precomputed_ee_attach.py`가 담당한다. 이때 사용하는
+4-keyframe macro는 저장 경로를 최초 생성하기 위한 도구이며 운영 attach 경로가 아니다.
+반납 후보 생성, return-only 재생, 두 pairwise 합성 교환 검증은
+`scripts/generate_precomputed_ee_return.py`가 담당한다.
+
+lock 직후에는 장착 EE가 rack support에서 빠져나올 때까지
+`ee-attached-dock-contact:<EE>`를 사용하고, retreat 완료 후 자유공간
+`ee-attached:<EE>`로 전환한다. 이 경계가 없으면 정상적인 dock 이탈 접촉을 collision으로
+오판한다.
+
+unlock 직후에도 QC master가 rack의 기존 EE에서 빠져나올 때까지
+`bare-flange-dock-contact:<old-EE>`를 사용하고, retreat 뒤 `bare-flange`로 전환한다.
 
 ## Trajectory processing
 

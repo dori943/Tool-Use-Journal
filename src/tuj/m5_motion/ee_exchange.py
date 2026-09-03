@@ -148,11 +148,17 @@ class EEExchangeTemplateGenerator:
 
         new_dock_contact_context = f"bare-flange-dock-contact:{to_ee}"
         new_attached_context = f"ee-attached:{to_ee}"
+        new_attached_dock_contact_context = (
+            f"ee-attached-dock-contact:{to_ee}"
+        )
 
         keyframes: list[RelativeKeyframeSpec] = []
         if from_ee is not None:
             old_attached_context = f"ee-attached:{from_ee}"
             old_dock_contact_context = f"ee-attached-dock-contact:{from_ee}"
+            old_bare_dock_contact_context = (
+                f"bare-flange-dock-contact:{from_ee}"
+            )
             keyframes.extend(
                 [
                     keyframe(
@@ -185,7 +191,7 @@ class EEExchangeTemplateGenerator:
                             KeyframeEventType.VERIFY_TOOL_RELEASE,
                         ),
                         context=old_dock_contact_context,
-                        context_after_events="bare-flange",
+                        context_after_events=old_bare_dock_contact_context,
                     ),
                     keyframe(
                         "old-retreat",
@@ -194,7 +200,8 @@ class EEExchangeTemplateGenerator:
                         old_axis,
                         -old_staging,
                         KeyframePlannerType.CARTESIAN,
-                        context="bare-flange",
+                        context=old_bare_dock_contact_context,
+                        context_after_events="bare-flange",
                     ),
                 ]
             )
@@ -230,7 +237,7 @@ class EEExchangeTemplateGenerator:
                         KeyframeEventType.VERIFY_TOOL_LOCK,
                     ),
                     context=new_dock_contact_context,
-                    context_after_events=new_attached_context,
+                    context_after_events=new_attached_dock_contact_context,
                 ),
                 keyframe(
                     "new-retreat",
@@ -239,7 +246,8 @@ class EEExchangeTemplateGenerator:
                     new_axis,
                     -new_staging,
                     KeyframePlannerType.CARTESIAN,
-                    context=new_attached_context,
+                    context=new_attached_dock_contact_context,
+                    context_after_events=new_attached_context,
                 ),
             ]
         )
@@ -323,6 +331,15 @@ class EEExchangeTemplateGenerator:
             active_ee=to_ee,
             collision_model_version=attached_version(to_ee),
         )
+        new_attached_contact = CollisionContext(
+            context_id=f"ee-attached-dock-contact:{to_ee}",
+            scene_state_id=new_attached.scene_state_id,
+            active_ee=to_ee,
+            allowed_collision_pairs=[
+                (to_ee, f"{rack_support_prefix}{to_ee}")
+            ],
+            collision_model_version=new_attached.collision_model_version,
+        )
         contexts = [bare]
         if from_ee is not None:
             old_attached = CollisionContext(
@@ -340,8 +357,14 @@ class EEExchangeTemplateGenerator:
                 ],
                 collision_model_version=old_attached.collision_model_version,
             )
-            contexts.extend((old_attached, old_contact))
-        contexts.extend((new_contact, new_attached))
+            old_bare_contact = CollisionContext(
+                context_id=f"bare-flange-dock-contact:{from_ee}",
+                scene_state_id=bare.scene_state_id,
+                allowed_collision_pairs=[(qc_master_entity, from_ee)],
+                collision_model_version=bare.collision_model_version,
+            )
+            contexts.extend((old_attached, old_contact, old_bare_contact))
+        contexts.extend((new_contact, new_attached_contact, new_attached))
         return {context.context_id: context for context in contexts}
 
 
@@ -391,13 +414,21 @@ class EEExchangeKeyframeProvider:
 class RoutedKeyframeStrategyProvider:
     """Use deterministic templates for resource transitions and VLM otherwise."""
 
-    def __init__(self, default_provider: object) -> None:
+    def __init__(
+        self,
+        default_provider: object,
+        *,
+        ee_exchange_provider: object | None = None,
+    ) -> None:
         self._default = default_provider
-        self._ee_exchange = EEExchangeKeyframeProvider()
+        self._ee_exchange = ee_exchange_provider or EEExchangeKeyframeProvider()
 
     def generate(self, request: MotionPlanRequest) -> KeyframePlanArtifact:
         if is_ee_exchange_task(request.task):
-            return self._ee_exchange.generate(request)
+            generate = getattr(self._ee_exchange, "generate", None)
+            if not callable(generate):
+                raise TypeError("EE exchange provider must implement generate()")
+            return generate(request)
         generate = getattr(self._default, "generate", None)
         if not callable(generate):
             raise TypeError("default keyframe provider must implement generate()")

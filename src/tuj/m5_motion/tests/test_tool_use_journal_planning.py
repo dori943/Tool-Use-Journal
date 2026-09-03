@@ -178,6 +178,26 @@ def _request(
     )
 
 
+def _exchange_entry_request() -> MotionPlanRequest:
+    request = _request(
+        MotionGoal(goal_type=GoalType.POSE, target_object_id="2F")
+    )
+    request.task = MotionTask(
+        task_id="exchange-entry-2F",
+        subgoal_id="exchange-entry-2F",
+        action_type="EE_EXCHANGE_ENTRY",
+        ee="2F",
+        target_ids=["2F"],
+        goal=MotionGoal(goal_type=GoalType.POSE),
+        metadata={
+            "entry_ee": "2F",
+            "from_ee": "2F",
+            "next_ee": "3F",
+        },
+    )
+    return request
+
+
 def _keyframe(
     identifier: str,
     kind: KeyframeType,
@@ -412,9 +432,22 @@ def test_initial_ee_attach_binds_bare_flange_as_initial_context() -> None:
     assert set(setup.collision_contexts) == {
         "bare-flange",
         "bare-flange-dock-contact:2F",
+        "ee-attached-dock-contact:2F",
         "ee-attached:2F",
     }
     assert compiler.calls[0][1]["default_active_ee"] is None
+
+
+def test_exchange_entry_uses_only_the_current_attached_ee_for_motion() -> None:
+    request = _exchange_entry_request()
+    compiler = _Compiler()
+
+    contexts, registry = _factory(compiler).prepare_ee_exchange_entry(request)
+
+    assert "ee-attached:2F" in contexts
+    assert contexts["ee-attached:2F"].active_ee == "2F"
+    assert compiler.calls[0][1]["default_active_ee"] == "2F"
+    assert registry is not None
 
 
 def test_workcell_router_selects_environment_binding() -> None:

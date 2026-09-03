@@ -322,6 +322,30 @@ def _resource_transition_requests(
             raise SelectedPlanAdapterError(
                 f"EE transition before {parent_subgoal_id!r} lacks required EE"
             )
+        if not initial_attach:
+            requests.append(
+                _transition_request(
+                    parent_subgoal_id=parent_subgoal_id,
+                    transition_index=len(requests),
+                    action_type="EE_EXCHANGE_ENTRY",
+                    world=world,
+                    constraints=constraints,
+                    options=options,
+                    ee=from_ee,
+                    target_ids=[from_ee],
+                    goal=MotionGoal(goal_type=GoalType.POSE),
+                    metadata={
+                        "entry_ee": from_ee,
+                        "from_ee": from_ee,
+                        "next_ee": to_ee,
+                        "task_planner_steps": [
+                            step.model_dump(mode="json")
+                            for step in exchange_steps
+                        ],
+                    },
+                    selected_plan_artifact_id=selected_plan_artifact_id,
+                )
+            )
         requests.append(
             _transition_request(
                 parent_subgoal_id=parent_subgoal_id,
@@ -452,8 +476,11 @@ def _predicted_world(
     if completed_subgoal is not None and completed_subgoal not in completed:
         completed.append(completed_subgoal)
     if is_ee_exchange_task(request.task):
-        result.metadata["physical_active_ee"] = request.task.ee
-        result.metadata["declared_active_ee"] = request.task.ee
+        final_active_ee = plan.metadata.get(
+            "target_active_ee", request.task.ee
+        )
+        result.metadata["physical_active_ee"] = final_active_ee
+        result.metadata["declared_active_ee"] = final_active_ee
     operation = request.task.metadata.get("operation")
     if operation in {"PICK_TOOL"}:
         result.metadata["held_tool"] = request.task.metadata.get("tool_id")

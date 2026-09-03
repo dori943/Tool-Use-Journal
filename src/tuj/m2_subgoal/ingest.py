@@ -205,6 +205,46 @@ def update_confidence(m2_out: dict, client, model: str = "gpt-4o",
     return logs
 
 
+def measurement_feedback(m2_out: dict) -> str | None:
+    """직전 왕복에서 unsat 난 술어를 사실 요약 텍스트로 만든다 (재분해 프롬프트 주입용).
+
+    0831 설계: 해법("도구를 써라")은 절대 넣지 않는다 — 측정 사실만 전달하고,
+    대안 도출은 분해 LLM의 몫으로 남긴다. 그래야 도구 사용이 창발로 성립한다.
+    """
+    lines = []
+    for s in m2_out.get("m2_subgoals", []):
+        for d in s.get("details", []):
+            for p in d.get("pre", []):
+                if p.get("status") != "unsat":
+                    continue
+                # batch/act_space는 unsat이어도 분할(partition)과 제외 목록으로
+                # 해소되는 신호라 재분해 사유가 아니다 (0831 — kind 진동 방지)
+                if p.get("head") in ("batch_feasible", "act_space_clear"):
+                    continue
+                ev = p.get("evidence") or []
+                detail = ""
+                falsy = [e for e in ev if e.get("reachable") is False]
+                if falsy:
+                    margins = [e.get("margin_mm") for e in falsy
+                               if e.get("margin_mm") is not None]
+                    detail = f" (대상 {len(ev)}개 중 {len(falsy)}개는 로봇 팔이 닿지 않음"
+                    if margins:
+                        detail += f", 최대 {abs(min(margins)):.1f}mm 부족"
+                    detail += ")"
+                elif ev and all("pass" in e for e in ev):
+                    n_f = sum(1 for e in ev if not e.get("pass"))
+                    detail = f" (검사 {len(ev)}건 중 {n_f}건 불충족)"
+                lines.append(f"- {p['expr']} -> 불충족{detail}")
+    if not lines:
+        return None
+    return ("직전 계획 평가: 아래 조건이 실측에서 충족되지 않아 직전 분해는 실행 불가로"
+            " 판정되었다.\n"
+            + "\n".join(lines)
+            + "\n위 제약은 로봇과 장면의 물리적 사실이므로, 같은 kind의 분해를 반복하면"
+              " 동일하게 실행 불가로 판정된다. 위 제약이 적용되지 않는 다른 수행 방식"
+              "(kind)의 분해를 출력하라.")
+
+
 def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
     """M3 응답을 M2 출력의 m3 술어에 반영하고 로그 라인을 돌려준다. (m2_out은 제자리 수정)"""
     by_q: dict[str, list[dict]] = {}
@@ -232,8 +272,16 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
                 if p["eval_by"] != "m3":
                     continue
                 rs = by_q.get(p["id"], [])
-                rels = [r for r in rs if "pass" in r or "check" in r]
-                answered_nodes = [r["node_id"] for r in rs if "node_id" in r]
+                expected = set(q_nodes.get(p["id"], []))
+                # 관계 응답은 from/to 키를 쓴다. 접지 쪽 컴파일 보충이 만든 예상 밖 쌍
+                # (예: fits({집합}, 영역)을 (원소, 원소)로 오파싱)이 판정을 오염시키지
+                # 않도록, 우리가 질의를 발행한 노드(from)의 응답만 판정에 쓴다 (0831).
+                rels = [r for r in rs if ("pass" in r or "check" in r)
+                        and (not expected or r.get("from") in expected
+                             or r.get("node_id") in expected)]
+                answered_nodes = [r.get("node_id") or r.get("from")
+                                  for r in rs
+                                  if (r.get("node_id") or r.get("from"))]
                 nodes = q_nodes.get(p["id"], []) or answered_nodes
                 if p["id"] not in q_nodes:      # 질의 자체를 안 낸 술어 (예: tool_rest는 측정 대상 아님)
                     status, ev = "not_queried", []
@@ -283,13 +331,20 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
                 continue                      # 팔이 안 닿는 후보 탈락
             b = batch_by.get(s["subgoal_id"], {}).get(c)
             part = b.get("partition") if b else None
+            # 측정값이 하나도 없는 후보는 채점 대상이 아니다 (0831 — 무데이터 동점이
+            # id 정렬로 갈리는 오확정 방지. 전략 전환 직후 라운드가 이 경우다)
+            if not ee and not reach and b is None:
+                continue
             # 필요한 액션 횟수(그룹 수)가 적을수록 우선. batch 응답이 없으면 최하위
             # (batch 질의가 아예 없던 기존 실행에서는 전원이 같아 순위 변화 없음)
             batch_rank = -len(part) if part else float("-inf")
             scored.append((len(feasible), batch_rank,
                            float(reach.get("margin_mm") or 0.0), c, feasible, part))
         if not scored:
-            logs.append(f"  [도구 확정] {s['subgoal_id']}: 통과한 후보 없음")
+            s.pop("selected_tool_id", None)      # 이전 라운드의 무근거 확정 잔재 제거
+            s.pop("selection_evidence", None)
+            logs.append(f"  [도구 확정] {s['subgoal_id']}: 측정된 후보 없음 — 확정 보류"
+                        " (다음 접지 응답 후 확정)")
             continue
         scored.sort(reverse=True)   # EE 수 최대 → 액션 횟수 최소 → 리치 여유 최대 (0828 개정)
         n_ee, batch_rank, margin, chosen, _, part = scored[0]
