@@ -29,10 +29,9 @@ class TaskEnv:
 
 TASKS = {
     "c1_1": TaskEnv("c1_1_lego_sweep",              "C1_1_LegoSweep",
-                    instruction="테이블에 흩어진 레고 블록을 수거 영역으로 쓸어 담아라"),
+                    instruction="도구를 골라 흩어진 레고 블록을 수집 구역으로 쓸어 담아라"),
     "c2_1": TaskEnv("c2_1_object_sorting",          "C2_1_ObjectSorting",
-                    instruction="사과와 빵은 초록 트레이, 머그는 파랑 트레이, "
-                                "접시와 숟가락은 빨강 트레이로 옮겨라"),
+                    instruction="테이블 위 물체(사과·빵·머그·접시·숟가락)를 모두 파란 트레이로 옮겨라"),
     "c1_2": TaskEnv("c1_2_dough_flatten",           "C1_2_DoughFlatten",           robocasa=True,
                     instruction="도마 위의 반죽을 평평하게 펴라"),
     "c2_2": TaskEnv("c2_2_sandwich_assembly",       "C2_2_SandwichAssembly",       robocasa=True,
