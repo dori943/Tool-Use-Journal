@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pytest
+
 from tuj.m5_motion.orchestration import (
     MotionPlanStore,
     SelectedPlanMotionOrchestrator,
@@ -175,19 +177,28 @@ def test_orchestrator_plans_transition_then_subgoal_and_persists(tmp_path) -> No
     assert [request.task.goal.goal_type for request in result.requests] == [
         GoalType.POSE,
         GoalType.POSE,
+        GoalType.POSE,
     ]
     assert [request.task.action_type for request in result.requests] == [
+        "EE_EXCHANGE_ENTRY",
         "EE_EXCHANGE",
         "acquire",
     ]
+    entry = result.requests[0]
+    assert entry.task.ee == "2F"
+    assert entry.task.metadata["entry_ee"] == "2F"
+    assert entry.task.metadata["next_ee"] == "3F"
     assert result.requests[1].world.robot_state.joint_positions_rad == [0.1]
-    assert result.requests[1].world.scene.signature.startswith("predicted:")
-    assert result.final_world.robot_state.joint_positions_rad == [0.2]
+    assert result.requests[1].world.metadata["physical_active_ee"] == "2F"
+    assert result.requests[2].world.robot_state.joint_positions_rad == [0.2]
+    assert result.requests[2].world.metadata["physical_active_ee"] == "3F"
+    assert result.requests[2].world.scene.signature.startswith("predicted:")
+    assert result.final_world.robot_state.joint_positions_rad == pytest.approx([0.3])
     assert result.final_world.robot_state.attached_object_id == "part"
     assert result.final_world.scene.completed_subgoals == ["pick-part"]
-    assert len(result.request_paths) == 2
+    assert len(result.request_paths) == 3
     assert all(path.is_file() for path in result.request_paths)
-    assert len(result.plan_paths) == 2
+    assert len(result.plan_paths) == 3
     assert all(path.is_file() for path in result.plan_paths)
     assert result.manifest_path is not None
     assert result.manifest_path.is_file()

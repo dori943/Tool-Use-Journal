@@ -142,7 +142,30 @@ def main():
                      "  다음 단계로 진행하거나, 처음부터 다시 돌리려면 m2.json을 지운 뒤 실행하십시오.")
 
     rough = LLMRough()                          # 서브골 생성은 항상 LLM
-    out = run_m2(task, m1s, rough=rough)
+
+    # ── 0831 측정 피드백: 직전 왕복(m2.json+m3.json)이 있으면 unsat 판정 요약을
+    #    재분해 프롬프트에 사실로 첨부한다 (호출 추가 없음). 해법은 넣지 않는다.
+    if m3_json and os.path.exists(prev_path):
+        import copy as _copy
+        from tuj.m2_subgoal.ingest import apply_m3 as _apply_prev, measurement_feedback
+        judged = _copy.deepcopy(prev)
+        _apply_prev(judged, raw0["responses"] if isinstance(raw0, dict) else raw0)
+        fb = measurement_feedback(judged)
+        if fb:
+            rough.feedback = fb
+            print("[M2] 직전 측정 피드백을 재분해에 반영:")
+            for ln in fb.splitlines():
+                print("    " + ln)
+        else:
+            # 0831: 기각 사유가 없으면 직전 분해를 유지한다 — 분해 LLM 생략.
+            # (재분해는 측정이 계획을 기각했을 때만. 불필요한 재분해는 결과가
+            #  되돌아갈 수 있고(kind 진동) 호출 낭비다.)
+            keep = _copy.deepcopy(prev)
+            print("[M2] 직전 측정에서 재분해 사유 없음 — 기존 분해 유지 (분해 LLM 생략)")
+
+    out = locals().get("keep")
+    if out is None:
+        out = run_m2(task, m1s, rough=rough)
 
     if m3_json:
         from tuj.m2_subgoal.ingest import apply_m3, update_confidence
@@ -158,6 +181,9 @@ def main():
         for line in apply_m3(out, responses):
             print(line)
         # 측정 반영 후 자기보고 신뢰도 갱신 (LLM 3차 호출)
+        if rough._client is None:               # 분해 생략 경로에서도 클라이언트 보장
+            from openai import OpenAI
+            rough._client = OpenAI()
         for line in update_confidence(out, rough._client, rough.model,
                                       usage_acc=rough.usage):
             print(line)

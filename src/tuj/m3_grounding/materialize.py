@@ -198,7 +198,10 @@ class Materializer:
             return res | {"clear": None, "margin_mm": None, "blockers": []}
         tool = self.nodes[actor["id"]]
         width = min(tool["bbox_mm"][0], tool["bbox_mm"][1])
-        exclude = set(call.get("member_ids", [])) | {actor["id"], call.get("to")}
+        # ignore_ids (0831, M2 협의): 형제 서브골에서 같은 목적지로 처리될 대상은
+        # 실제 방해물이 아니므로 계획 모듈이 명시한 목록을 판정에서 제외한다.
+        exclude = (set(call.get("member_ids", [])) | {actor["id"], call.get("to")}
+                   | set(call.get("ignore_ids", [])))
         others = [n for n in self.nodes.values() if n["id"] not in exclude]
         r = relational.corridor_blockers(members, to, width, others)
         self.log(module="m3", event="swept_space", actor=actor.get("id"), clear=r["clear"])

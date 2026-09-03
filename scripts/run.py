@@ -200,6 +200,23 @@ def stage_m3(task, out, args, label="M3"):
     return fresh
 
 
+def _m2_plan_complete(out):
+    """m2.json이 M4로 넘길 수 있는 상태인지 — 도구가 필요한 서브골은 전부 확정됐는가.
+
+    0831: 왕복을 고정 2회가 아니라 완성될 때까지 반복하기 위한 판정.
+    전략 전환(예: relocate -> 도구 사용)이 일어나면 새 질의의 측정과 확정에
+    한 왕복이 더 필요하다 — 미확정 상태로 M4에 가면 invalid input으로 멈춘다.
+    """
+    try:
+        m2 = json.loads((out / "m2.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    for s in m2.get("m2_subgoals", []):
+        if s.get("tool_candidate_ids") and not s.get("selected_tool_id"):
+            return False
+    return True
+
+
 def build_gk_bundle(out, gk_paths=None):
     """M3 의 gk_<SG>.json 을 M4 입력 형식(gk_by_subgoal)으로 묶는다.
 
@@ -463,12 +480,21 @@ def main():
         stage_m2(task, out, args, pass_no=1)
         if stop < 2:
             return
-        banner("M3  Metric & Physical Grounding (1차 — M2 반영용)")
-        stage_m3(task, out, args, label="M3.1")
-        banner("M2  재분해 + 측정 반영 + 서브골 분할 (2차)")
-        stage_m2(task, out, args, pass_no=2)
-        banner("M3  Metric & Physical Grounding (2차 — 최종)")
-        gk_paths = stage_m3(task, out, args, label="M3.2")
+        # 0831: 왕복을 계획 완성까지 반복. 전략 전환(직접 이동 기각 -> 도구 사용)이
+        # 일어나면 새 도구 질의의 측정·확정에 한 왕복이 더 필요하다. 상한은 안전장치.
+        max_rounds = 4
+        for rnd in range(1, max_rounds + 1):
+            banner(f"M3  Metric & Physical Grounding ({rnd}차)")
+            stage_m3(task, out, args, label=f"M3.{rnd}")
+            banner(f"M2  재분해 + 측정 반영 ({rnd + 1}차)")
+            stage_m2(task, out, args, pass_no=2)
+            if _m2_plan_complete(out):
+                break
+            print(f"[run] 계획 미완성(도구 미확정) — 왕복 {rnd + 1}회차 진행")
+        else:
+            print(f"[run] 왕복 상한({max_rounds}회) 도달 — 현재 계획으로 진행")
+        banner("M3  Metric & Physical Grounding (최종 — 서브그래프 조립)")
+        gk_paths = stage_m3(task, out, args, label="M3.final")
     if stop < 3:
         return
 

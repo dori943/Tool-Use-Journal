@@ -61,6 +61,31 @@ from tuj.m5_motion.mujoco_collision import (
     PathCollisionCheckResult,
 )
 from tuj.m5_motion.plan_builder import MotionPlanBuilder
+from tuj.m5_motion.precomputed_ee_attach import (
+    EEAttachPathFailureCode,
+    EEAttachPolicy,
+    EEAttachTrajectoryTemplate,
+    PrecomputedEEAttachPlanner,
+    PrecomputedEEAttachRegistry,
+    PrecomputedEEPathError,
+    compute_rack_signature,
+    compute_workcell_signature,
+    save_ee_attach_template,
+)
+from tuj.m5_motion.ee_exchange_entry import (
+    EEExchangeEntryFailureCode,
+    EEExchangeEntryPlanner,
+    EEExchangeEntryPlanningError,
+    is_ee_exchange_entry_request,
+)
+from tuj.m5_motion.precomputed_ee_exchange import (
+    EEReturnTrajectoryTemplate,
+    PrecomputedEEExchangePlanner,
+    PrecomputedEEReturnRegistry,
+    derive_return_template_from_attach,
+    is_ee_exchange_request,
+    save_ee_return_template,
+)
 from tuj.m5_motion.orchestration import (
     MotionPlanStore,
     SelectedPlanMotionOrchestrator,
@@ -192,6 +217,9 @@ __all__ = [
     "ArtifactLineageIndex",
     "EEExchangeTemplateGenerator",
     "EEExchangeKeyframeProvider",
+    "EEAttachPathFailureCode",
+    "EEAttachPolicy",
+    "EEAttachTrajectoryTemplate",
     "AttachedObjectState",
     "BreakableWeldConfig",
     "EERuntimeTransition",
@@ -223,6 +251,9 @@ __all__ = [
     "MotionPlanningPipeline",
     "MotionPlanningPipelineError",
     "MotionPlanningResult",
+    "PrecomputedEEAttachPlanner",
+    "PrecomputedEEAttachRegistry",
+    "PrecomputedEEPathError",
     "OpenAIKeyframeProvider",
     "OpenAIKeyframeProviderConfig",
     "OpenAIKeyframeProviderError",
@@ -244,6 +275,9 @@ __all__ = [
     "PlannerDispatchEdgePlanner",
     "RRTConnectEdgePlanner",
     "KinematicSafetyValidator",
+    "compute_rack_signature",
+    "compute_workcell_signature",
+    "save_ee_attach_template",
     "SelectedPlanAdapterError",
     "SelectedPlanMotionRequestAdapter",
     "SelectedPlanMotionOrchestrator",

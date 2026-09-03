@@ -24,8 +24,8 @@ from tuj.m2_subgoal.pipeline import run_m2
 from tuj.m2_subgoal.rough import LLMRough
 
 TASKS = {
-    "c1_1": "테이블에 흩어진 레고 블록을 수거 영역으로 쓸어 담아라",
-    "c2_1": "사과와 빵은 초록 트레이, 머그는 파랑 트레이, 접시와 숟가락은 빨강 트레이로 옮겨라",
+    "c1_1": "모든 레고 블록을 초록색 영역 내부로 이동시켜라",
+    "c2_1": "테이블 위 물건을 전부 수거함에 담아라",
 }
 
 ASPECTS = ["decomposition", "object_selection", "overall"]
