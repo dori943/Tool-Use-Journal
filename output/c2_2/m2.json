@@ -1,0 +1,2087 @@
+{
+  "task": "재료를 순서대로 쌓아 샌드위치를 만들어라",
+  "m2_subgoals": [
+    {
+      "subgoal_id": "SG1",
+      "goal": "빵 한 조각을 서빙 접시에 놓는다.",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_bread_a_bread_a"
+      ],
+      "container_id": "obj_serving_plate_serving_plate",
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_bread_a_bread_a",
+        "obj_serving_plate_serving_plate"
+      ],
+      "selection_reason": "빵 한 조각을 서빙 접시에 놓기 위해 빵과 서빙 접시가 필요하다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.8,
+          "object_selection": 0.9,
+          "uncertain_about": [
+            "빵이 서빙 접시에 잘 놓일지"
+          ]
+        },
+        "after": {
+          "decomposition": 0.3,
+          "object_selection": 0.6,
+          "uncertain_about": [
+            "빵이 서빙 접시에 잘 놓일지",
+            "obj_serving_plate_serving_plate의 clear 상태"
+          ],
+          "reason": "서빙 접시가 clear하지 않아 빵을 놓는 데 실패할 가능성이 높고, 객체 선택은 일부 조건이 충족되었으나 불확실성이 남아 있다."
+        },
+        "delta": {
+          "decomposition": -0.5,
+          "object_selection": -0.3
+        }
+      },
+      "details": [
+        {
+          "detail_id": "SG1_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_bread_a_bread_a"
+          },
+          "group_id": "G_SG1",
+          "note": "obj_bread_a_bread_a 확보",
+          "pre": [
+            {
+              "id": "SG1_d1_p0",
+              "expr": "reachable(obj_bread_a_bread_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_bread_a_bread_a",
+                  "reachable": true,
+                  "margin_mm": 233.3
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p1",
+              "expr": "top_exposed(obj_bread_a_bread_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_bread_a_bread_a",
+                  "top_exposed": null
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p2",
+              "expr": "ee_usable(?EE, obj_bread_a_bread_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_bread_a_bread_a",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p3",
+              "expr": "batch_feasible(?EE, obj_bread_a_bread_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d1_e0",
+              "expr": "holding(obj_bread_a_bread_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_bread_a_bread_a",
+            "?r": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1",
+          "note": "obj_bread_a_bread_a를 obj_serving_plate_serving_plate로 운반",
+          "pre": [
+            {
+              "id": "SG1_d2_p0",
+              "expr": "holding(obj_bread_a_bread_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d2_p1",
+              "expr": "act_space_clear(?EE, obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "act_space_clear",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d2_p2",
+              "expr": "path_clear(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d2_e0",
+              "expr": "above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_bread_a_bread_a",
+            "?r": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1",
+          "note": "obj_bread_a_bread_a를 obj_serving_plate_serving_plate에 배치",
+          "pre": [
+            {
+              "id": "SG1_d3_p0",
+              "expr": "holding(obj_bread_a_bread_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p1",
+              "expr": "above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p2",
+              "expr": "fits(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "check": "opening_167.0 - footprint_6.5",
+                  "value_mm": 160.5,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "id": "SG1_d3_p3",
+              "expr": "clear(obj_serving_plate_serving_plate)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "container_depth_9.8 - target_height_9.9",
+                  "value_mm": -0.1,
+                  "pass": false
+                },
+                {
+                  "check": null,
+                  "value_mm": null,
+                  "pass": true
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d3_e0",
+              "expr": "in(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d3_d0",
+              "expr": "holding(obj_bread_a_bread_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_d1",
+              "expr": "above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "subgoal_id": "SG2",
+      "goal": "칠면조 슬라이스를 빵 위에 놓는다.",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_turkey_turkey_1",
+        "obj_turkey_turkey_2",
+        "obj_turkey_turkey_3"
+      ],
+      "container_id": "obj_bread_a_bread_a",
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_turkey_turkey_1",
+        "obj_bread_a_bread_a"
+      ],
+      "selection_reason": "칠면조 슬라이스를 빵 위에 놓기 위해 칠면조와 빵이 필요하다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.7,
+          "object_selection": 0.8,
+          "uncertain_about": [
+            "칠면조 슬라이스가 빵 위에 안정적으로 놓일지"
+          ]
+        },
+        "after": {
+          "decomposition": 0.3,
+          "object_selection": 0.5,
+          "uncertain_about": [
+            "칠면조 슬라이스가 빵 위에 안정적으로 놓일지",
+            "top_exposed 조건",
+            "batch_feasible 조건",
+            "act_space_clear 조건"
+          ],
+          "reason": "측정 결과 일부 조건이 불충족되었고, 근거 미제공 조건이 있어 신뢰도를 높게 평가할 수 없습니다."
+        },
+        "delta": {
+          "decomposition": -0.4,
+          "object_selection": -0.3
+        }
+      },
+      "details": [
+        {
+          "detail_id": "SG2_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "{obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}"
+          },
+          "group_id": "G_SG2",
+          "note": "{obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3} 확보",
+          "pre": [
+            {
+              "id": "SG2_d1_p0",
+              "expr": "reachable({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3})",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_turkey_turkey_1",
+                  "reachable": true,
+                  "margin_mm": 75.1
+                },
+                {
+                  "node": "obj_turkey_turkey_2",
+                  "reachable": true,
+                  "margin_mm": 76.0
+                },
+                {
+                  "node": "obj_turkey_turkey_3",
+                  "reachable": true,
+                  "margin_mm": 98.3
+                }
+              ]
+            },
+            {
+              "id": "SG2_d1_p1",
+              "expr": "top_exposed({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3})",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_turkey_turkey_1",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_turkey_turkey_2",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_turkey_turkey_3",
+                  "top_exposed": null
+                }
+              ]
+            },
+            {
+              "id": "SG2_d1_p2",
+              "expr": "ee_usable(?EE, {obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3})",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_turkey_turkey_1",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                },
+                {
+                  "node": "obj_turkey_turkey_2",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                },
+                {
+                  "node": "obj_turkey_turkey_3",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG2_d1_p3",
+              "expr": "batch_feasible(?EE, {obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3})",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "feasible": null,
+                  "binding_check": null,
+                  "partition": null
+                }
+              ]
+            },
+            {
+              "id": "SG2_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG2_d1_e0",
+              "expr": "holding({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3})",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG2_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG2_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "{obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}",
+            "?r": "obj_bread_a_bread_a"
+          },
+          "group_id": "G_SG2",
+          "note": "{obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}를 obj_bread_a_bread_a로 운반",
+          "pre": [
+            {
+              "id": "SG2_d2_p0",
+              "expr": "holding({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_d2_p1",
+              "expr": "act_space_clear(?EE, {obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}, obj_bread_a_bread_a)",
+              "head": "act_space_clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "clear": null,
+                  "margin_mm": null,
+                  "blockers": []
+                }
+              ]
+            },
+            {
+              "id": "SG2_d2_p2",
+              "expr": "path_clear({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}, obj_bread_a_bread_a)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG2_d2_e0",
+              "expr": "above({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}, obj_bread_a_bread_a)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG2_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "{obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}",
+            "?r": "obj_bread_a_bread_a"
+          },
+          "group_id": "G_SG2",
+          "note": "{obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}를 obj_bread_a_bread_a에 배치",
+          "pre": [
+            {
+              "id": "SG2_d3_p0",
+              "expr": "holding({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_d3_p1",
+              "expr": "above({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}, obj_bread_a_bread_a)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_d3_p2",
+              "expr": "fits({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}, obj_bread_a_bread_a)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "opening_-1.5 - footprint_22.7",
+                  "value_mm": -24.2,
+                  "pass": false
+                },
+                {
+                  "check": "opening_-1.5 - footprint_25.2",
+                  "value_mm": -26.7,
+                  "pass": false
+                },
+                {
+                  "check": "opening_-1.5 - footprint_44.0",
+                  "value_mm": -45.5,
+                  "pass": false
+                }
+              ]
+            },
+            {
+              "id": "SG2_d3_p3",
+              "expr": "clear(obj_bread_a_bread_a)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "container_depth_9.9 - target_height_3.5",
+                  "value_mm": 6.4,
+                  "pass": true
+                },
+                {
+                  "check": "container_depth_9.9 - target_height_5.6",
+                  "value_mm": 4.3,
+                  "pass": true
+                },
+                {
+                  "check": "container_depth_9.9 - target_height_0.8",
+                  "value_mm": 9.1,
+                  "pass": true
+                },
+                {
+                  "check": null,
+                  "value_mm": null,
+                  "pass": false
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG2_d3_e0",
+              "expr": "in({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}, obj_bread_a_bread_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG2_d3_d0",
+              "expr": "holding({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_d3_d1",
+              "expr": "above({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}, obj_bread_a_bread_a)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "subgoal_id": "SG3",
+      "goal": "치즈 슬라이스를 칠면조 위에 놓는다.",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_cheese_cheese_1",
+        "obj_cheese_cheese_2",
+        "obj_cheese_cheese_3"
+      ],
+      "container_id": "obj_turkey_turkey_1",
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_cheese_cheese_1",
+        "obj_turkey_turkey_1"
+      ],
+      "selection_reason": "치즈 슬라이스를 칠면조 위에 놓기 위해 치즈와 칠면조가 필요하다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.7,
+          "object_selection": 0.8,
+          "uncertain_about": [
+            "치즈 슬라이스가 칠면조 위에 잘 놓일지"
+          ]
+        },
+        "after": {
+          "decomposition": 0.3,
+          "object_selection": 0.5,
+          "uncertain_about": [
+            "치즈 슬라이스가 칠면조 위에 잘 놓일지",
+            "치즈가 공간에 맞는지"
+          ],
+          "reason": "측정 결과 치즈가 공간에 맞지 않아 서브골 달성에 실패 가능성이 높고, 객체 선택의 일부 조건이 충족되지 않았습니다."
+        },
+        "delta": {
+          "decomposition": -0.4,
+          "object_selection": -0.3
+        }
+      },
+      "details": [
+        {
+          "detail_id": "SG3_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "{obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}"
+          },
+          "group_id": "G_SG3",
+          "note": "{obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3} 확보",
+          "pre": [
+            {
+              "id": "SG3_d1_p0",
+              "expr": "reachable({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_cheese_cheese_1",
+                  "reachable": true,
+                  "margin_mm": 148.4
+                },
+                {
+                  "node": "obj_cheese_cheese_2",
+                  "reachable": true,
+                  "margin_mm": 148.4
+                },
+                {
+                  "node": "obj_cheese_cheese_3",
+                  "reachable": true,
+                  "margin_mm": 162.2
+                }
+              ]
+            },
+            {
+              "id": "SG3_d1_p1",
+              "expr": "top_exposed({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_cheese_cheese_1",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_cheese_cheese_2",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_cheese_cheese_3",
+                  "top_exposed": null
+                }
+              ]
+            },
+            {
+              "id": "SG3_d1_p2",
+              "expr": "ee_usable(?EE, {obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_cheese_cheese_1",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                },
+                {
+                  "node": "obj_cheese_cheese_2",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                },
+                {
+                  "node": "obj_cheese_cheese_3",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG3_d1_p3",
+              "expr": "batch_feasible(?EE, {obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "feasible": null,
+                  "binding_check": null,
+                  "partition": null
+                }
+              ]
+            },
+            {
+              "id": "SG3_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG3_d1_e0",
+              "expr": "holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG3_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG3_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "{obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}",
+            "?r": "obj_turkey_turkey_1"
+          },
+          "group_id": "G_SG3",
+          "note": "{obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}를 obj_turkey_turkey_1로 운반",
+          "pre": [
+            {
+              "id": "SG3_d2_p0",
+              "expr": "holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_d2_p1",
+              "expr": "act_space_clear(?EE, {obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+              "head": "act_space_clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "clear": null,
+                  "margin_mm": null,
+                  "blockers": []
+                }
+              ]
+            },
+            {
+              "id": "SG3_d2_p2",
+              "expr": "path_clear({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG3_d2_e0",
+              "expr": "above({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG3_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "{obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}",
+            "?r": "obj_turkey_turkey_1"
+          },
+          "group_id": "G_SG3",
+          "note": "{obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}를 obj_turkey_turkey_1에 배치",
+          "pre": [
+            {
+              "id": "SG3_d3_p0",
+              "expr": "holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_d3_p1",
+              "expr": "above({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_d3_p2",
+              "expr": "fits({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "opening_14.7 - footprint_30.7",
+                  "value_mm": -16.0,
+                  "pass": false
+                },
+                {
+                  "check": "opening_14.7 - footprint_30.6",
+                  "value_mm": -15.9,
+                  "pass": false
+                },
+                {
+                  "check": "opening_14.7 - footprint_53.4",
+                  "value_mm": -38.7,
+                  "pass": false
+                }
+              ]
+            },
+            {
+              "id": "SG3_d3_p3",
+              "expr": "clear(obj_turkey_turkey_1)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "container_depth_3.5 - target_height_2.4",
+                  "value_mm": 1.1,
+                  "pass": true
+                },
+                {
+                  "check": "container_depth_3.5 - target_height_6.2",
+                  "value_mm": -2.7,
+                  "pass": false
+                },
+                {
+                  "check": "container_depth_3.5 - target_height_1.9",
+                  "value_mm": 1.6,
+                  "pass": true
+                },
+                {
+                  "check": null,
+                  "value_mm": null,
+                  "pass": false
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG3_d3_e0",
+              "expr": "in({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG3_d3_d0",
+              "expr": "holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_d3_d1",
+              "expr": "above({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "subgoal_id": "SG4",
+      "goal": "토마토 슬라이스를 치즈 위에 놓는다.",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_tomato_slice_tomato_slice"
+      ],
+      "container_id": "obj_cheese_cheese_1",
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_tomato_slice_tomato_slice",
+        "obj_cheese_cheese_1"
+      ],
+      "selection_reason": "토마토 슬라이스를 치즈 위에 놓기 위해 토마토와 치즈가 필요하다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.7,
+          "object_selection": 0.8,
+          "uncertain_about": [
+            "토마토 슬라이스가 치즈 위에 안정적으로 놓일지"
+          ]
+        },
+        "after": {
+          "decomposition": 0.3,
+          "object_selection": 0.5,
+          "uncertain_about": [
+            "토마토 슬라이스가 치즈 위에 안정적으로 놓일지",
+            "top_exposed(obj_tomato_slice_tomato_slice)"
+          ],
+          "reason": "토마토 슬라이스가 치즈 위에 맞지 않으며, top_exposed 조건의 근거가 없어 신뢰도가 낮아졌습니다."
+        },
+        "delta": {
+          "decomposition": -0.4,
+          "object_selection": -0.3
+        }
+      },
+      "details": [
+        {
+          "detail_id": "SG4_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_tomato_slice_tomato_slice"
+          },
+          "group_id": "G_SG4",
+          "note": "obj_tomato_slice_tomato_slice 확보",
+          "pre": [
+            {
+              "id": "SG4_d1_p0",
+              "expr": "reachable(obj_tomato_slice_tomato_slice)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tomato_slice_tomato_slice",
+                  "reachable": true,
+                  "margin_mm": 157.8
+                }
+              ]
+            },
+            {
+              "id": "SG4_d1_p1",
+              "expr": "top_exposed(obj_tomato_slice_tomato_slice)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_tomato_slice_tomato_slice",
+                  "top_exposed": null
+                }
+              ]
+            },
+            {
+              "id": "SG4_d1_p2",
+              "expr": "ee_usable(?EE, obj_tomato_slice_tomato_slice)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tomato_slice_tomato_slice",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG4_d1_p3",
+              "expr": "batch_feasible(?EE, obj_tomato_slice_tomato_slice)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG4_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG4_d1_e0",
+              "expr": "holding(obj_tomato_slice_tomato_slice)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG4_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG4_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_tomato_slice_tomato_slice",
+            "?r": "obj_cheese_cheese_1"
+          },
+          "group_id": "G_SG4",
+          "note": "obj_tomato_slice_tomato_slice를 obj_cheese_cheese_1로 운반",
+          "pre": [
+            {
+              "id": "SG4_d2_p0",
+              "expr": "holding(obj_tomato_slice_tomato_slice)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_d2_p1",
+              "expr": "act_space_clear(?EE, obj_tomato_slice_tomato_slice, obj_cheese_cheese_1)",
+              "head": "act_space_clear",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG4_d2_p2",
+              "expr": "path_clear(obj_tomato_slice_tomato_slice, obj_cheese_cheese_1)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG4_d2_e0",
+              "expr": "above(obj_tomato_slice_tomato_slice, obj_cheese_cheese_1)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG4_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_tomato_slice_tomato_slice",
+            "?r": "obj_cheese_cheese_1"
+          },
+          "group_id": "G_SG4",
+          "note": "obj_tomato_slice_tomato_slice를 obj_cheese_cheese_1에 배치",
+          "pre": [
+            {
+              "id": "SG4_d3_p0",
+              "expr": "holding(obj_tomato_slice_tomato_slice)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_d3_p1",
+              "expr": "above(obj_tomato_slice_tomato_slice, obj_cheese_cheese_1)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_d3_p2",
+              "expr": "fits(obj_tomato_slice_tomato_slice, obj_cheese_cheese_1)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "opening_22.7 - footprint_54.1",
+                  "value_mm": -31.4,
+                  "pass": false
+                }
+              ]
+            },
+            {
+              "id": "SG4_d3_p3",
+              "expr": "clear(obj_cheese_cheese_1)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "container_depth_2.4 - target_height_1.5",
+                  "value_mm": 0.9,
+                  "pass": true
+                },
+                {
+                  "check": null,
+                  "value_mm": null,
+                  "pass": false
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG4_d3_e0",
+              "expr": "in(obj_tomato_slice_tomato_slice, obj_cheese_cheese_1)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG4_d3_d0",
+              "expr": "holding(obj_tomato_slice_tomato_slice)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_d3_d1",
+              "expr": "above(obj_tomato_slice_tomato_slice, obj_cheese_cheese_1)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "subgoal_id": "SG5",
+      "goal": "빵 한 조각을 샌드위치 위에 덮는다.",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_bread_b_bread_b"
+      ],
+      "container_id": "obj_tomato_slice_tomato_slice",
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_bread_b_bread_b",
+        "obj_tomato_slice_tomato_slice"
+      ],
+      "selection_reason": "빵 한 조각을 샌드위치 위에 덮기 위해 빵과 토마토 슬라이스가 필요하다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.8,
+          "object_selection": 0.8,
+          "uncertain_about": [
+            "빵이 샌드위치 위에 잘 덮일지"
+          ]
+        },
+        "after": {
+          "decomposition": 0.3,
+          "object_selection": 0.5,
+          "uncertain_about": [
+            "빵이 샌드위치 위에 잘 덮일지",
+            "obj_bread_b_bread_b가 obj_tomato_slice_tomato_slice에 맞는지"
+          ],
+          "reason": "측정 결과, 선택한 빵이 토마토 슬라이스에 맞지 않으며, 토마토 슬라이스 위가 명확히 비어있지 않음이 확인되어 신뢰도가 낮아졌습니다."
+        },
+        "delta": {
+          "decomposition": -0.5,
+          "object_selection": -0.3
+        }
+      },
+      "details": [
+        {
+          "detail_id": "SG5_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_bread_b_bread_b"
+          },
+          "group_id": "G_SG5",
+          "note": "obj_bread_b_bread_b 확보",
+          "pre": [
+            {
+              "id": "SG5_d1_p0",
+              "expr": "reachable(obj_bread_b_bread_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_bread_b_bread_b",
+                  "reachable": true,
+                  "margin_mm": 273.2
+                }
+              ]
+            },
+            {
+              "id": "SG5_d1_p1",
+              "expr": "top_exposed(obj_bread_b_bread_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_bread_b_bread_b",
+                  "top_exposed": null
+                }
+              ]
+            },
+            {
+              "id": "SG5_d1_p2",
+              "expr": "ee_usable(?EE, obj_bread_b_bread_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_bread_b_bread_b",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG5_d1_p3",
+              "expr": "batch_feasible(?EE, obj_bread_b_bread_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG5_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG5_d1_e0",
+              "expr": "holding(obj_bread_b_bread_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG5_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG5_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_bread_b_bread_b",
+            "?r": "obj_tomato_slice_tomato_slice"
+          },
+          "group_id": "G_SG5",
+          "note": "obj_bread_b_bread_b를 obj_tomato_slice_tomato_slice로 운반",
+          "pre": [
+            {
+              "id": "SG5_d2_p0",
+              "expr": "holding(obj_bread_b_bread_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG5_d2_p1",
+              "expr": "act_space_clear(?EE, obj_bread_b_bread_b, obj_tomato_slice_tomato_slice)",
+              "head": "act_space_clear",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG5_d2_p2",
+              "expr": "path_clear(obj_bread_b_bread_b, obj_tomato_slice_tomato_slice)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG5_d2_e0",
+              "expr": "above(obj_bread_b_bread_b, obj_tomato_slice_tomato_slice)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG5_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_bread_b_bread_b",
+            "?r": "obj_tomato_slice_tomato_slice"
+          },
+          "group_id": "G_SG5",
+          "note": "obj_bread_b_bread_b를 obj_tomato_slice_tomato_slice에 배치",
+          "pre": [
+            {
+              "id": "SG5_d3_p0",
+              "expr": "holding(obj_bread_b_bread_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG5_d3_p1",
+              "expr": "above(obj_bread_b_bread_b, obj_tomato_slice_tomato_slice)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG5_d3_p2",
+              "expr": "fits(obj_bread_b_bread_b, obj_tomato_slice_tomato_slice)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "opening_46.1 - footprint_101.1",
+                  "value_mm": -55.0,
+                  "pass": false
+                }
+              ]
+            },
+            {
+              "id": "SG5_d3_p3",
+              "expr": "clear(obj_tomato_slice_tomato_slice)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "container_depth_1.5 - target_height_14.6",
+                  "value_mm": -13.1,
+                  "pass": false
+                },
+                {
+                  "check": null,
+                  "value_mm": null,
+                  "pass": false
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG5_d3_e0",
+              "expr": "in(obj_bread_b_bread_b, obj_tomato_slice_tomato_slice)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG5_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG5_d3_d0",
+              "expr": "holding(obj_bread_b_bread_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG5_d3_d1",
+              "expr": "above(obj_bread_b_bread_b, obj_tomato_slice_tomato_slice)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "m2_partial_order": [
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d2",
+      "why": "causal_link: holding(obj_bread_a_bread_a)"
+    },
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d3",
+      "why": "causal_link: holding(obj_bread_a_bread_a)"
+    },
+    {
+      "from": "SG1_d2",
+      "to": "SG1_d3",
+      "why": "causal_link: above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)"
+    },
+    {
+      "from": "SG2_d1",
+      "to": "SG2_d2",
+      "why": "causal_link: holding({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3})"
+    },
+    {
+      "from": "SG2_d1",
+      "to": "SG2_d3",
+      "why": "causal_link: holding({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3})"
+    },
+    {
+      "from": "SG2_d2",
+      "to": "SG2_d3",
+      "why": "causal_link: above({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}, obj_bread_a_bread_a)"
+    },
+    {
+      "from": "SG3_d1",
+      "to": "SG3_d2",
+      "why": "causal_link: holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})"
+    },
+    {
+      "from": "SG3_d1",
+      "to": "SG3_d3",
+      "why": "causal_link: holding({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3})"
+    },
+    {
+      "from": "SG3_d2",
+      "to": "SG3_d3",
+      "why": "causal_link: above({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)"
+    },
+    {
+      "from": "SG4_d1",
+      "to": "SG4_d2",
+      "why": "causal_link: holding(obj_tomato_slice_tomato_slice)"
+    },
+    {
+      "from": "SG4_d1",
+      "to": "SG4_d3",
+      "why": "causal_link: holding(obj_tomato_slice_tomato_slice)"
+    },
+    {
+      "from": "SG4_d2",
+      "to": "SG4_d3",
+      "why": "causal_link: above(obj_tomato_slice_tomato_slice, obj_cheese_cheese_1)"
+    },
+    {
+      "from": "SG5_d1",
+      "to": "SG5_d2",
+      "why": "causal_link: holding(obj_bread_b_bread_b)"
+    },
+    {
+      "from": "SG5_d1",
+      "to": "SG5_d3",
+      "why": "causal_link: holding(obj_bread_b_bread_b)"
+    },
+    {
+      "from": "SG5_d2",
+      "to": "SG5_d3",
+      "why": "causal_link: above(obj_bread_b_bread_b, obj_tomato_slice_tomato_slice)"
+    }
+  ],
+  "m2_mutex": [
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1",
+        "G_SG2"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1",
+        "G_SG3"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1",
+        "G_SG4"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1",
+        "G_SG5"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG2",
+        "G_SG3"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG2",
+        "G_SG4"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG2",
+        "G_SG5"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG3",
+        "G_SG4"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG3",
+        "G_SG5"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG4",
+        "G_SG5"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    }
+  ],
+  "m2_queries": [
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_bread_a_bread_a"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_bread_a_bread_a"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_bread_a_bread_a"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_bread_a_bread_a",
+        "b": "obj_serving_plate_serving_plate",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_bread_a_bread_a",
+        "b": "obj_serving_plate_serving_plate",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_turkey_turkey_1"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_turkey_turkey_2"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_turkey_turkey_3"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_turkey_turkey_1"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_turkey_turkey_2"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_turkey_turkey_3"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_turkey_turkey_1"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_turkey_turkey_2"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_turkey_turkey_3"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p3",
+      "m3_call": {
+        "kind": "batch",
+        "action_type": "relocate",
+        "member_ids": [
+          "obj_turkey_turkey_1",
+          "obj_turkey_turkey_2",
+          "obj_turkey_turkey_3"
+        ],
+        "actor": {
+          "type": "ee_pool"
+        }
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d2_p1",
+      "m3_call": {
+        "kind": "swept_space",
+        "action_type": "relocate",
+        "member_ids": [
+          "obj_turkey_turkey_1",
+          "obj_turkey_turkey_2",
+          "obj_turkey_turkey_3"
+        ],
+        "to": "obj_bread_a_bread_a",
+        "actor": {
+          "type": "ee_pool"
+        }
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_turkey_turkey_1",
+        "b": "obj_bread_a_bread_a",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_turkey_turkey_2",
+        "b": "obj_bread_a_bread_a",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_turkey_turkey_3",
+        "b": "obj_bread_a_bread_a",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_turkey_turkey_1",
+        "b": "obj_bread_a_bread_a",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_turkey_turkey_2",
+        "b": "obj_bread_a_bread_a",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_turkey_turkey_3",
+        "b": "obj_bread_a_bread_a",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_cheese_cheese_1"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_cheese_cheese_2"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_cheese_cheese_3"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_cheese_cheese_1"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_cheese_cheese_2"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_cheese_cheese_3"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_cheese_cheese_1"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_cheese_cheese_2"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_cheese_cheese_3"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p3",
+      "m3_call": {
+        "kind": "batch",
+        "action_type": "relocate",
+        "member_ids": [
+          "obj_cheese_cheese_1",
+          "obj_cheese_cheese_2",
+          "obj_cheese_cheese_3"
+        ],
+        "actor": {
+          "type": "ee_pool"
+        }
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d2_p1",
+      "m3_call": {
+        "kind": "swept_space",
+        "action_type": "relocate",
+        "member_ids": [
+          "obj_cheese_cheese_1",
+          "obj_cheese_cheese_2",
+          "obj_cheese_cheese_3"
+        ],
+        "to": "obj_turkey_turkey_1",
+        "actor": {
+          "type": "ee_pool"
+        }
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_cheese_cheese_1",
+        "b": "obj_turkey_turkey_1",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_cheese_cheese_2",
+        "b": "obj_turkey_turkey_1",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_cheese_cheese_3",
+        "b": "obj_turkey_turkey_1",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_cheese_cheese_1",
+        "b": "obj_turkey_turkey_1",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_cheese_cheese_2",
+        "b": "obj_turkey_turkey_1",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_cheese_cheese_3",
+        "b": "obj_turkey_turkey_1",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG4",
+      "queried_by": "SG4_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_tomato_slice_tomato_slice"
+      }
+    },
+    {
+      "subgoal_id": "SG4",
+      "queried_by": "SG4_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_tomato_slice_tomato_slice"
+      }
+    },
+    {
+      "subgoal_id": "SG4",
+      "queried_by": "SG4_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_tomato_slice_tomato_slice"
+      }
+    },
+    {
+      "subgoal_id": "SG4",
+      "queried_by": "SG4_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_tomato_slice_tomato_slice",
+        "b": "obj_cheese_cheese_1",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG4",
+      "queried_by": "SG4_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_tomato_slice_tomato_slice",
+        "b": "obj_cheese_cheese_1",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG5",
+      "queried_by": "SG5_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_bread_b_bread_b"
+      }
+    },
+    {
+      "subgoal_id": "SG5",
+      "queried_by": "SG5_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_bread_b_bread_b"
+      }
+    },
+    {
+      "subgoal_id": "SG5",
+      "queried_by": "SG5_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_bread_b_bread_b"
+      }
+    },
+    {
+      "subgoal_id": "SG5",
+      "queried_by": "SG5_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_bread_b_bread_b",
+        "b": "obj_tomato_slice_tomato_slice",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG5",
+      "queried_by": "SG5_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_bread_b_bread_b",
+        "b": "obj_tomato_slice_tomato_slice",
+        "relation": "clearance"
+      }
+    }
+  ],
+  "m2_invariants": [
+    {
+      "id": "INV_SG1",
+      "expr": "in(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG2",
+      "expr": "all_in({obj_turkey_turkey_1,obj_turkey_turkey_2,obj_turkey_turkey_3}, obj_bread_a_bread_a)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG3",
+      "expr": "all_in({obj_cheese_cheese_1,obj_cheese_cheese_2,obj_cheese_cheese_3}, obj_turkey_turkey_1)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG4",
+      "expr": "in(obj_tomato_slice_tomato_slice, obj_cheese_cheese_1)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG5",
+      "expr": "in(obj_bread_b_bread_b, obj_tomato_slice_tomato_slice)",
+      "check_at": "final"
+    }
+  ],
+  "m2_stats": {
+    "n_subgoals": 5,
+    "n_details": 15,
+    "n_edges": 15,
+    "n_mutex": 10,
+    "n_m3_queries": 49,
+    "llm_usage": {
+      "서브골 분해": {
+        "calls": 1,
+        "prompt_tokens": 592,
+        "completion_tokens": 447,
+        "tokens": 1039,
+        "seconds": 4.56
+      },
+      "객체 선택": {
+        "calls": 1,
+        "prompt_tokens": 1050,
+        "completion_tokens": 572,
+        "tokens": 1622,
+        "seconds": 7.14
+      },
+      "confidence_update": {
+        "calls": 5,
+        "prompt_tokens": 3795,
+        "completion_tokens": 516,
+        "tokens": 4311,
+        "seconds": 9.71
+      }
+    },
+    "m3_predicates": {
+      "sat": 11,
+      "unsat": 9,
+      "unknown": 9,
+      "unanswered": 0,
+      "not_queried": 6
+    }
+  }
+}

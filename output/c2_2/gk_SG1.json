@@ -1,0 +1,409 @@
+{
+  "subgoal_id": "SG1",
+  "nodes": {
+    "obj_bread_a_bread_a": {
+      "queried_by": [
+        "SG1_d1_p0",
+        "SG1_d1_p1",
+        "SG1_d1_p2"
+      ],
+      "geometry": {
+        "length_mm": 97.6,
+        "diameter_mm": null,
+        "extents_mm": [
+          97.6,
+          9.9,
+          6.6
+        ],
+        "height_z_mm": 9.9,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN
+      },
+      "material": "wood",
+      "density_kgm3": 2771.9,
+      "mass_kg": 0.004,
+      "youngs_gpa": 78.89,
+      "mu": {
+        "mu": 0.5,
+        "stage": 0,
+        "material": "wood",
+        "rms_mm": NaN
+      },
+      "confidence": 0.375,
+      "mass_range_kg": [
+        0.001,
+        0.006
+      ],
+      "materials_topk": [
+        {
+          "name": "wood",
+          "prob": 0.375,
+          "density_kgm3": [
+            350.0,
+            800.0
+          ],
+          "thickness_cm": [
+            1.0,
+            3.0
+          ]
+        },
+        {
+          "name": "metal",
+          "prob": 0.25,
+          "density_kgm3": [
+            7800.0,
+            8900.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.5
+          ]
+        },
+        {
+          "name": "plastic",
+          "prob": 0.167,
+          "density_kgm3": [
+            800.0,
+            1300.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.3
+          ]
+        },
+        {
+          "name": "rubber",
+          "prob": 0.125,
+          "density_kgm3": [
+            500.0,
+            1200.0
+          ],
+          "thickness_cm": [
+            0.2,
+            0.5
+          ]
+        },
+        {
+          "name": "ceramic",
+          "prob": 0.083,
+          "density_kgm3": [
+            1500.0,
+            3000.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.0
+          ]
+        }
+      ],
+      "caption": "Wooden carving tool",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.996,
+          "margin_unit": "kg",
+          "reason": "질량 0.004 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 6.6,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.004,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.039,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.496,
+          "margin_unit": "kg",
+          "reason": "질량 0.004 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 6.6,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.004,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.039,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": NaN,
+          "margin_unit": "mm",
+          "reason": "상면 RMS nan vs 허용 1.5; 접촉면 폭 10 vs seal 직경 30mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": NaN,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.004,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 9.9,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 616.7,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 233.3
+      }
+    }
+  },
+  "edges": [
+    {
+      "queried_by": "SG1_d3_p2",
+      "from": "obj_bread_a_bread_a",
+      "to": "obj_serving_plate_serving_plate",
+      "type": "fits_inside",
+      "value_mm": 160.5,
+      "check": "opening_167.0 - footprint_6.5",
+      "pass": true
+    },
+    {
+      "queried_by": "SG1_d3_p3",
+      "from": "obj_bread_a_bread_a",
+      "to": "obj_serving_plate_serving_plate",
+      "type": "clearance",
+      "value_mm": -0.1,
+      "check": "container_depth_9.8 - target_height_9.9",
+      "pass": false
+    }
+  ],
+  "flags": {
+    "near_threshold": []
+  },
+  "task": "재료를 순서대로 쌓아 샌드위치를 만들어라",
+  "goal": "빵 한 조각을 서빙 접시에 놓는다.",
+  "subgoal_kind": "relocate",
+  "roles": {
+    "target": [
+      "obj_bread_a_bread_a"
+    ],
+    "container": "obj_serving_plate_serving_plate",
+    "tool_candidates": [],
+    "selected_tool": null,
+    "selection_evidence": null
+  },
+  "details": [
+    {
+      "detail_id": "SG1_d1",
+      "action_type": "acquire",
+      "binding": {
+        "?o": "obj_bread_a_bread_a"
+      },
+      "pre": [
+        {
+          "id": "SG1_d1_p0",
+          "expr": "reachable(obj_bread_a_bread_a)",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_bread_a_bread_a",
+              "reachable": true,
+              "margin_mm": 233.3
+            }
+          ]
+        },
+        {
+          "id": "SG1_d1_p1",
+          "expr": "top_exposed(obj_bread_a_bread_a)",
+          "eval_by": "m3",
+          "status": "unknown",
+          "evidence": [
+            {
+              "node": "obj_bread_a_bread_a",
+              "top_exposed": null
+            }
+          ]
+        },
+        {
+          "id": "SG1_d1_p2",
+          "expr": "ee_usable(?EE, obj_bread_a_bread_a)",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_bread_a_bread_a",
+              "feasible_ees": [
+                "2F",
+                "3F"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SG1_d1_p3",
+          "expr": "batch_feasible(?EE, obj_bread_a_bread_a)",
+          "eval_by": "m3",
+          "status": "not_queried",
+          "evidence": []
+        },
+        {
+          "id": "SG1_d1_p4",
+          "expr": "hand_empty",
+          "eval_by": "m2"
+        }
+      ],
+      "establish": [
+        "holding(obj_bread_a_bread_a)"
+      ],
+      "destroy": [
+        "hand_empty"
+      ]
+    },
+    {
+      "detail_id": "SG1_d2",
+      "action_type": "transport",
+      "binding": {
+        "?o": "obj_bread_a_bread_a",
+        "?r": "obj_serving_plate_serving_plate"
+      },
+      "pre": [
+        {
+          "id": "SG1_d2_p0",
+          "expr": "holding(obj_bread_a_bread_a)",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG1_d2_p1",
+          "expr": "act_space_clear(?EE, obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+          "eval_by": "m3",
+          "status": "not_queried",
+          "evidence": []
+        },
+        {
+          "id": "SG1_d2_p2",
+          "expr": "path_clear(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+          "eval_by": "motion"
+        }
+      ],
+      "establish": [
+        "above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)"
+      ],
+      "destroy": []
+    },
+    {
+      "detail_id": "SG1_d3",
+      "action_type": "place",
+      "binding": {
+        "?o": "obj_bread_a_bread_a",
+        "?r": "obj_serving_plate_serving_plate"
+      },
+      "pre": [
+        {
+          "id": "SG1_d3_p0",
+          "expr": "holding(obj_bread_a_bread_a)",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG1_d3_p1",
+          "expr": "above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG1_d3_p2",
+          "expr": "fits(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "check": "opening_167.0 - footprint_6.5",
+              "value_mm": 160.5,
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "SG1_d3_p3",
+          "expr": "clear(obj_serving_plate_serving_plate)",
+          "eval_by": "m3",
+          "status": "unsat",
+          "evidence": [
+            {
+              "check": "container_depth_9.8 - target_height_9.9",
+              "value_mm": -0.1,
+              "pass": false
+            },
+            {
+              "check": null,
+              "value_mm": null,
+              "pass": true
+            }
+          ]
+        }
+      ],
+      "establish": [
+        "in(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+        "hand_empty"
+      ],
+      "destroy": [
+        "holding(obj_bread_a_bread_a)",
+        "above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)"
+      ]
+    }
+  ],
+  "partial_order": [
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d2",
+      "why": "causal_link: holding(obj_bread_a_bread_a)"
+    },
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d3",
+      "why": "causal_link: holding(obj_bread_a_bread_a)"
+    },
+    {
+      "from": "SG1_d2",
+      "to": "SG1_d3",
+      "why": "causal_link: above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)"
+    }
+  ],
+  "mutex": [],
+  "invariants": [
+    {
+      "id": "INV_SG1",
+      "expr": "in(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+      "check_at": "final"
+    }
+  ],
+  "batch": [],
+  "swept_space": []
+}

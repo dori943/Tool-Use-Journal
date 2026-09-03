@@ -1,0 +1,714 @@
+{
+  "task": "사과와 빵은 초록 트레이, 머그는 파랑 트레이, 접시와 숟가락은 빨강 트레이로 옮겨라",
+  "m2_subgoals": [
+    {
+      "subgoal_id": "SG1",
+      "goal": "대상 5개를 obj_tray_blue_tray로 옮긴다",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_apple_apple",
+        "obj_bread_bread",
+        "obj_mug_mug",
+        "obj_plate_plate",
+        "obj_spoon_spoon"
+      ],
+      "container_id": "obj_tray_blue_tray",
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_apple_apple",
+        "obj_bread_bread",
+        "obj_mug_mug",
+        "obj_plate_plate",
+        "obj_spoon_spoon",
+        "obj_tray_blue_tray"
+      ],
+      "selection_reason": "대상인 사과, 빵, 머그, 접시, 숟가락과 목적지인 파랑 트레이를 포함하여 옮기는 작업을 수행해야 한다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.8,
+          "object_selection": 0.7,
+          "uncertain_about": [
+            "트레이에 모든 물체가 들어갈 수 있는지"
+          ]
+        },
+        "after": {
+          "decomposition": 0.3,
+          "object_selection": 0.5,
+          "uncertain_about": [
+            "트레이에 모든 물체가 들어갈 수 있는지",
+            "top_exposed",
+            "batch_feasible",
+            "act_space_clear"
+          ],
+          "reason": "측정 결과 트레이에 모든 물체가 들어가지 않으며, 일부 조건에 대한 근거가 제공되지 않았습니다."
+        },
+        "delta": {
+          "decomposition": -0.5,
+          "object_selection": -0.2
+        }
+      },
+      "details": [
+        {
+          "detail_id": "SG1_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}"
+          },
+          "group_id": "G_SG1",
+          "note": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon} 확보",
+          "pre": [
+            {
+              "id": "SG1_d1_p0",
+              "expr": "reachable({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_apple_apple",
+                  "reachable": true,
+                  "margin_mm": 180.2
+                },
+                {
+                  "node": "obj_bread_bread",
+                  "reachable": true,
+                  "margin_mm": 202.1
+                },
+                {
+                  "node": "obj_mug_mug",
+                  "reachable": true,
+                  "margin_mm": 186.3
+                },
+                {
+                  "node": "obj_plate_plate",
+                  "reachable": true,
+                  "margin_mm": 120.1
+                },
+                {
+                  "node": "obj_spoon_spoon",
+                  "reachable": true,
+                  "margin_mm": 19.7
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p1",
+              "expr": "top_exposed({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_apple_apple",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_bread_bread",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_mug_mug",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_plate_plate",
+                  "top_exposed": null
+                },
+                {
+                  "node": "obj_spoon_spoon",
+                  "top_exposed": null
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p2",
+              "expr": "ee_usable(?EE, {obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_apple_apple",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                },
+                {
+                  "node": "obj_bread_bread",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                },
+                {
+                  "node": "obj_mug_mug",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                },
+                {
+                  "node": "obj_plate_plate",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                },
+                {
+                  "node": "obj_spoon_spoon",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p3",
+              "expr": "batch_feasible(?EE, {obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "feasible": null,
+                  "binding_check": null,
+                  "partition": null
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d1_e0",
+              "expr": "holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}",
+            "?r": "obj_tray_blue_tray"
+          },
+          "group_id": "G_SG1",
+          "note": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}를 obj_tray_blue_tray로 운반",
+          "pre": [
+            {
+              "id": "SG1_d2_p0",
+              "expr": "holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d2_p1",
+              "expr": "act_space_clear(?EE, {obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "head": "act_space_clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "clear": null,
+                  "margin_mm": null,
+                  "blockers": []
+                }
+              ]
+            },
+            {
+              "id": "SG1_d2_p2",
+              "expr": "path_clear({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d2_e0",
+              "expr": "above({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}",
+            "?r": "obj_tray_blue_tray"
+          },
+          "group_id": "G_SG1",
+          "note": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}를 obj_tray_blue_tray에 배치",
+          "pre": [
+            {
+              "id": "SG1_d3_p0",
+              "expr": "holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p1",
+              "expr": "above({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p2",
+              "expr": "fits({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "opening_295.1 - footprint_60.4",
+                  "value_mm": 234.7,
+                  "pass": true
+                },
+                {
+                  "check": "opening_295.1 - footprint_65.3",
+                  "value_mm": 229.8,
+                  "pass": true
+                },
+                {
+                  "check": "opening_295.1 - footprint_68.4",
+                  "value_mm": 226.7,
+                  "pass": true
+                },
+                {
+                  "check": "opening_295.1 - footprint_178.4",
+                  "value_mm": 116.7,
+                  "pass": true
+                },
+                {
+                  "check": "opening_295.1 - footprint_50.8",
+                  "value_mm": 244.3,
+                  "pass": true
+                },
+                {
+                  "check": "opening_60.4 - footprint_65.3",
+                  "value_mm": -4.9,
+                  "pass": false
+                }
+              ]
+            },
+            {
+              "id": "SG1_d3_p3",
+              "expr": "clear(obj_tray_blue_tray)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "container_depth_25.0 - target_height_50.0",
+                  "value_mm": -25.0,
+                  "pass": false
+                },
+                {
+                  "check": "container_depth_25.0 - target_height_53.2",
+                  "value_mm": -28.2,
+                  "pass": false
+                },
+                {
+                  "check": "container_depth_25.0 - target_height_77.4",
+                  "value_mm": -52.4,
+                  "pass": false
+                },
+                {
+                  "check": "container_depth_25.0 - target_height_9.8",
+                  "value_mm": 15.2,
+                  "pass": true
+                },
+                {
+                  "check": "container_depth_25.0 - target_height_26.8",
+                  "value_mm": -1.8,
+                  "pass": false
+                },
+                {
+                  "check": null,
+                  "value_mm": null,
+                  "pass": true
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d3_e0",
+              "expr": "in({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d3_d0",
+              "expr": "holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_d1",
+              "expr": "above({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "m2_partial_order": [
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d2",
+      "why": "causal_link: holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})"
+    },
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d3",
+      "why": "causal_link: holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})"
+    },
+    {
+      "from": "SG1_d2",
+      "to": "SG1_d3",
+      "why": "causal_link: above({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)"
+    }
+  ],
+  "m2_mutex": [],
+  "m2_queries": [
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_apple_apple"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_bread_bread"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_mug_mug"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_plate_plate"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_spoon_spoon"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_apple_apple"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_bread_bread"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_mug_mug"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_plate_plate"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "m3_call": {
+        "kind": "intrinsic",
+        "node_id": "obj_spoon_spoon"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_apple_apple"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_bread_bread"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_mug_mug"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_plate_plate"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "m3_call": {
+        "kind": "ee",
+        "node_id": "obj_spoon_spoon"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p3",
+      "m3_call": {
+        "kind": "batch",
+        "action_type": "relocate",
+        "member_ids": [
+          "obj_apple_apple",
+          "obj_bread_bread",
+          "obj_mug_mug",
+          "obj_plate_plate",
+          "obj_spoon_spoon"
+        ],
+        "actor": {
+          "type": "ee_pool"
+        }
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d2_p1",
+      "m3_call": {
+        "kind": "swept_space",
+        "action_type": "relocate",
+        "member_ids": [
+          "obj_apple_apple",
+          "obj_bread_bread",
+          "obj_mug_mug",
+          "obj_plate_plate",
+          "obj_spoon_spoon"
+        ],
+        "to": "obj_tray_blue_tray",
+        "actor": {
+          "type": "ee_pool"
+        }
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_apple_apple",
+        "b": "obj_tray_blue_tray",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_bread_bread",
+        "b": "obj_tray_blue_tray",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_mug_mug",
+        "b": "obj_tray_blue_tray",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_plate_plate",
+        "b": "obj_tray_blue_tray",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_spoon_spoon",
+        "b": "obj_tray_blue_tray",
+        "relation": "fits_inside"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_apple_apple",
+        "b": "obj_tray_blue_tray",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_bread_bread",
+        "b": "obj_tray_blue_tray",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_mug_mug",
+        "b": "obj_tray_blue_tray",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_plate_plate",
+        "b": "obj_tray_blue_tray",
+        "relation": "clearance"
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "m3_call": {
+        "kind": "relational",
+        "a": "obj_spoon_spoon",
+        "b": "obj_tray_blue_tray",
+        "relation": "clearance"
+      }
+    }
+  ],
+  "m2_invariants": [
+    {
+      "id": "INV_SG1",
+      "expr": "all_in({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+      "check_at": "final"
+    }
+  ],
+  "m2_stats": {
+    "n_subgoals": 1,
+    "n_details": 3,
+    "n_edges": 3,
+    "n_mutex": 0,
+    "n_m3_queries": 27,
+    "llm_usage": {
+      "서브골 분해": {
+        "calls": 1,
+        "prompt_tokens": 523,
+        "completion_tokens": 248,
+        "tokens": 771,
+        "seconds": 3.48
+      },
+      "객체 선택": {
+        "calls": 1,
+        "prompt_tokens": 625,
+        "completion_tokens": 155,
+        "tokens": 780,
+        "seconds": 2.22
+      },
+      "confidence_update": {
+        "calls": 1,
+        "prompt_tokens": 862,
+        "completion_tokens": 88,
+        "tokens": 950,
+        "seconds": 1.48
+      }
+    },
+    "m3_predicates": {
+      "sat": 2,
+      "unsat": 2,
+      "unknown": 3,
+      "unanswered": 0,
+      "not_queried": 0
+    }
+  }
+}

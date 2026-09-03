@@ -1,0 +1,104 @@
+{
+  "status": "INFEASIBLE_NO_PLAN",
+  "task": {
+    "instruction": "\uc7ac\ub8cc\ub97c \uc21c\uc11c\ub300\ub85c \uc313\uc544 \uc0cc\ub4dc\uc704\uce58\ub97c \ub9cc\ub4e4\uc5b4\ub77c"
+  },
+  "planner_version": "task-planner-state-space-v3",
+  "optimality_scope": {
+    "candidate_set": "after threshold, top-k, and hard pruning",
+    "search": "lexicographically optimal among retained feasible candidates"
+  },
+  "selected_plan": null,
+  "search_stats": {
+    "states_popped": 29,
+    "states_expanded": 29,
+    "edges_generated": 28,
+    "dominated_states_pruned": 0,
+    "static_candidates_rejected": 0,
+    "lazy_checks_executed": 0,
+    "lazy_cache_hits": 0,
+    "elapsed_ms": 0
+  },
+  "rejections": [
+    {
+      "scope": "search",
+      "reason_code": "FRONTIER_EXHAUSTED",
+      "message": "the feasible search frontier was exhausted without a complete plan",
+      "subgoal_id": null,
+      "candidate_id": null,
+      "group_id": null
+    }
+  ],
+  "diagnostics": {
+    "blocked_subgoals": [
+      "SG1_d3",
+      "SG2_d3",
+      "SG3_d3",
+      "SG4_d3",
+      "SG5_d3"
+    ],
+    "groups_without_common_ee": [],
+    "unmet_preconditions": [
+      {
+        "subgoal_id": "SG1_d1",
+        "fluent": "hand_empty()"
+      },
+      {
+        "subgoal_id": "SG1_d3",
+        "fluent": "clear(plate_serving_plate)"
+      },
+      {
+        "subgoal_id": "SG2_d1",
+        "fluent": "hand_empty()"
+      },
+      {
+        "subgoal_id": "SG2_d3",
+        "fluent": "clear(a_bread_a)"
+      },
+      {
+        "subgoal_id": "SG2_d3",
+        "fluent": "fits({turkey_1,turkey_2,turkey_3}, a_bread_a)"
+      },
+      {
+        "subgoal_id": "SG3_d1",
+        "fluent": "hand_empty()"
+      },
+      {
+        "subgoal_id": "SG3_d3",
+        "fluent": "clear(turkey_1)"
+      },
+      {
+        "subgoal_id": "SG3_d3",
+        "fluent": "fits({cheese_1,cheese_2,cheese_3}, turkey_1)"
+      },
+      {
+        "subgoal_id": "SG4_d1",
+        "fluent": "hand_empty()"
+      },
+      {
+        "subgoal_id": "SG4_d3",
+        "fluent": "clear(cheese_1)"
+      },
+      {
+        "subgoal_id": "SG4_d3",
+        "fluent": "fits(slice_tomato_slice, cheese_1)"
+      },
+      {
+        "subgoal_id": "SG5_d1",
+        "fluent": "hand_empty()"
+      },
+      {
+        "subgoal_id": "SG5_d3",
+        "fluent": "clear(slice_tomato_slice)"
+      },
+      {
+        "subgoal_id": "SG5_d3",
+        "fluent": "fits(b_bread_b, slice_tomato_slice)"
+      }
+    ],
+    "constraint_blockers": [],
+    "frontier_exhausted": true,
+    "notes": []
+  },
+  "replan_trace": null
+}

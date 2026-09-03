@@ -1,0 +1,414 @@
+{
+  "gk_by_subgoal": [
+    {
+      "subgoal_id": "SG1",
+      "nodes": {
+        "obj_dough_dough": {
+          "queried_by": [
+            "SG1_d1_p0",
+            "SG1_d1_p1",
+            "SG1_d1_p2"
+          ],
+          "geometry": {
+            "length_mm": 56.9,
+            "diameter_mm": null,
+            "extents_mm": [
+              56.9,
+              54.2,
+              22.2
+            ],
+            "height_z_mm": 45.4,
+            "cylinder_like": false,
+            "surface_rms_mm": 1.23
+          },
+          "material": "wood",
+          "density_kgm3": 1145.0,
+          "mass_kg": 0.036,
+          "youngs_gpa": 14.33,
+          "mu": {
+            "mu": 0.506,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 1.23
+          },
+          "confidence": 0.3,
+          "mass_range_kg": [
+            0.008,
+            0.065
+          ],
+          "materials_topk": [
+            {
+              "name": "wood",
+              "prob": 0.3,
+              "density_kgm3": [
+                300.0,
+                900.0
+              ],
+              "thickness_cm": [
+                1.0,
+                5.0
+              ]
+            },
+            {
+              "name": "ceramic",
+              "prob": 0.2,
+              "density_kgm3": [
+                2000.0,
+                3000.0
+              ],
+              "thickness_cm": [
+                0.5,
+                2.0
+              ]
+            },
+            {
+              "name": "plastic",
+              "prob": 0.25,
+              "density_kgm3": [
+                900.0,
+                1300.0
+              ],
+              "thickness_cm": [
+                0.5,
+                3.0
+              ]
+            },
+            {
+              "name": "rubber",
+              "prob": 0.15,
+              "density_kgm3": [
+                400.0,
+                1200.0
+              ],
+              "thickness_cm": [
+                0.5,
+                2.0
+              ]
+            },
+            {
+              "name": "fiberboard",
+              "prob": 0.1,
+              "density_kgm3": [
+                600.0,
+                800.0
+              ],
+              "thickness_cm": [
+                1.0,
+                4.0
+              ]
+            }
+          ],
+          "caption": "Round brown object",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.964,
+              "margin_unit": "kg",
+              "reason": "질량 0.036 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 22.2,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.036,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.349,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.464,
+              "margin_unit": "kg",
+              "reason": "질량 0.036 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 22.2,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.036,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.349,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.27,
+              "margin_unit": "mm",
+              "reason": "상면 RMS 1.23 vs 허용 1.5",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 1.23,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.036,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 54.2,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 427.7,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 422.3
+          }
+        }
+      },
+      "edges": [
+        {
+          "queried_by": "SG1_d3_p2",
+          "from": "obj_dough_dough",
+          "to": "obj_cutting_board_cutting_board",
+          "type": "fits_inside",
+          "value_mm": 97.1,
+          "check": "opening_137.8 - footprint_40.7",
+          "pass": true
+        },
+        {
+          "queried_by": "SG1_d3_p3",
+          "from": "obj_dough_dough",
+          "to": "obj_cutting_board_cutting_board",
+          "type": "clearance",
+          "value_mm": -32.7,
+          "check": "container_depth_12.7 - target_height_45.4",
+          "pass": false
+        }
+      ],
+      "flags": {
+        "near_threshold": []
+      },
+      "task": "도마 위의 반죽을 평평하게 펴라",
+      "goal": "도마 위의 반죽을 평평하게 펴라.",
+      "subgoal_kind": "relocate",
+      "roles": {
+        "target": [
+          "obj_dough_dough"
+        ],
+        "container": "obj_cutting_board_cutting_board",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG1_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_dough_dough"
+          },
+          "pre": [
+            {
+              "id": "SG1_d1_p0",
+              "expr": "reachable(obj_dough_dough)",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_dough_dough",
+                  "reachable": true,
+                  "margin_mm": 422.3
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p1",
+              "expr": "top_exposed(obj_dough_dough)",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_dough_dough",
+                  "top_exposed": null
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p2",
+              "expr": "ee_usable(?EE, obj_dough_dough)",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_dough_dough",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p3",
+              "expr": "batch_feasible(?EE, obj_dough_dough)",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d1_p4",
+              "expr": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_dough_dough)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG1_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_dough_dough",
+            "?r": "obj_cutting_board_cutting_board"
+          },
+          "pre": [
+            {
+              "id": "SG1_d2_p0",
+              "expr": "holding(obj_dough_dough)",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d2_p1",
+              "expr": "act_space_clear(?EE, obj_dough_dough, obj_cutting_board_cutting_board)",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d2_p2",
+              "expr": "path_clear(obj_dough_dough, obj_cutting_board_cutting_board)",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_dough_dough, obj_cutting_board_cutting_board)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_dough_dough",
+            "?r": "obj_cutting_board_cutting_board"
+          },
+          "pre": [
+            {
+              "id": "SG1_d3_p0",
+              "expr": "holding(obj_dough_dough)",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p1",
+              "expr": "above(obj_dough_dough, obj_cutting_board_cutting_board)",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p2",
+              "expr": "fits(obj_dough_dough, obj_cutting_board_cutting_board)",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "check": "opening_137.8 - footprint_40.7",
+                  "value_mm": 97.1,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "id": "SG1_d3_p3",
+              "expr": "clear(obj_cutting_board_cutting_board)",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "check": "container_depth_12.7 - target_height_45.4",
+                  "value_mm": -32.7,
+                  "pass": false
+                },
+                {
+                  "check": null,
+                  "value_mm": null,
+                  "pass": false
+                }
+              ]
+            }
+          ],
+          "establish": [
+            "in(obj_dough_dough, obj_cutting_board_cutting_board)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_dough_dough)",
+            "above(obj_dough_dough, obj_cutting_board_cutting_board)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_d1",
+          "to": "SG1_d2",
+          "why": "causal_link: holding(obj_dough_dough)"
+        },
+        {
+          "from": "SG1_d1",
+          "to": "SG1_d3",
+          "why": "causal_link: holding(obj_dough_dough)"
+        },
+        {
+          "from": "SG1_d2",
+          "to": "SG1_d3",
+          "why": "causal_link: above(obj_dough_dough, obj_cutting_board_cutting_board)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG1",
+          "expr": "in(obj_dough_dough, obj_cutting_board_cutting_board)",
+          "check_at": "final"
+        }
+      ],
+      "batch": [],
+      "swept_space": []
+    }
+  ]
+}

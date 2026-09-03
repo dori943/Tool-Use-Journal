@@ -45,13 +45,19 @@ from tuj.m1_scene import build_m1, points_from_frame, serialize
 
 _DEFAULT_CAM = "agentview"
 _ROBOCASA_CAM_PREFERENCES = ("robot0_robotview", "robot0_eye_in_hand")
+
+# RoboCasa 공통 third-person scene camera
+# 모든 RoboCasa 태스크에서 동일한 방향을 사용하고,
+# lookat / distance만 장면 범위에 맞춰 자동 조정한다.
+_ROBOCASA_SCENE_CAM_AZIMUTH = 180.0
+_ROBOCASA_SCENE_CAM_ELEVATION = -55.0
+_ROBOCASA_SCENE_CAM_MIN_DIST = 0.9
 H, W = 512, 512
 FOVY_OVERRIDE = 60.0        # None이면 씬 기본값(45°)
 AUTO_FIT = True             # True: 추적 객체 전부 프레임에 들어가게 카메라 위치 자동 조정
 AUTO_FIT_MARGIN = 0.85      # 프레임 여백 (85% 안에 맞춤)
-# RoboCasa offscreen free camera — view_c4_1.py 검증값 + frustum fit distance
-_ROBOCASA_FREE_CAM = dict(azimuth=90.0, elevation=-30.0)
-_ROBOCASA_FREE_CAM_MIN_DIST = 0.9
+# RoboCasa는 환경에 미리 정의된 고정 observation camera를 그대로 사용한다.
+# agentview가 없는 RoboCasa에서는 robot0_robotview를 우선 사용한다.
 
 
 # ── 태스크별 어댑터 ─────────────────────────────────────────────
@@ -117,132 +123,13 @@ def _object_visual_geom_ids(env, model) -> tuple[int, ...]:
     return tuple(_subtree_geom_ids_by_group(m, body_id, group=1))
 
 
-def _robocasa_task_bound_points(env) -> np.ndarray:
-    """Task object 월드 바운드 점 — free camera lookat/distance 계산용."""
-    m, d = env.sim.model, env.sim.data
-    pts = []
-    for name in _robocasa_task_object_names(env):
-        model = env.objects[name]
-        root = m.body_name2id(model.root_body)
-        for gid in range(m.ngeom):
-            bid = m.geom_bodyid[gid]
-            while bid not in (0, root):
-                bid = m.body_parentid[bid]
-            if bid == root:
-                c, r = d.geom_xpos[gid], m.geom_rbound[gid]
-                for k in range(3):
-                    e = np.zeros(3); e[k] = r
-                    pts += [c + e, c - e]
-    return np.asarray(pts) if pts else np.zeros((0, 3))
 
 
-def _robocasa_task_bound_center(env) -> np.ndarray:
-    """Task objects bounding center (world)."""
-    pts = _robocasa_task_bound_points(env)
-    if len(pts) == 0:
-        return np.array([0.0, 0.0, 0.8])
-    return pts.mean(axis=0)
 
 
-def _robocasa_free_camera_distance(env, center: np.ndarray, fovy: float, h: int, w: int,
-                                   azimuth: float, elevation: float,
-                                   margin: float = AUTO_FIT_MARGIN) -> float:
-    """모든 task object가 프레임에 들어가는 최소 distance (free camera frustum fit)."""
-    import mujoco
-    from robosuite.utils import transform_utils as T
-    ctx = env.sim._render_context_offscreen
-    cam = ctx.cam
-    cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-    cam.lookat[:] = center
-    cam.azimuth = float(azimuth)
-    cam.elevation = float(elevation)
-    env.sim.model.vis.global_.fovy = float(fovy)
-    pts = _robocasa_task_bound_points(env)
-    if len(pts) == 0:
-        return _ROBOCASA_FREE_CAM_MIN_DIST
-    ty = np.tan(np.radians(fovy) / 2)
-    tx = ty * w / h
-    pts_h = np.hstack([pts, np.ones((len(pts), 1))])
-
-    def fits(dist: float) -> bool:
-        cam.distance = float(dist)
-        env.sim.forward()
-        mujoco.mjv_updateScene(
-            env.sim.model._model, env.sim.data._data,
-            ctx.vopt, ctx.pert, cam, mujoco.mjtCatBit.mjCAT_ALL, ctx.scn)
-        w2c = T.pose_inv(_free_camera_extrinsic_from_scene(ctx))
-        P = (w2c @ pts_h.T).T[:, :3]
-        z = P[:, 2]
-        if np.any(z <= 1e-3):
-            return False
-        u, v = P[:, 0] / z, P[:, 1] / z
-        return (np.abs(u).max() <= tx * margin and np.abs(v).max() <= ty * margin)
-
-    lo, hi = 0.9, 6.0
-    if not fits(hi):
-        return hi
-    for _ in range(24):
-        mid = (lo + hi) / 2
-        if fits(mid):
-            hi = mid
-        else:
-            lo = mid
-    return max(hi, _ROBOCASA_FREE_CAM_MIN_DIST)
 
 
-def _setup_robocasa_free_camera(env, *, lookat, distance, azimuth, elevation, fovy):
-    """Offscreen render context에 free camera 설정."""
-    import mujoco
-    ctx = env.sim._render_context_offscreen
-    cam = ctx.cam
-    cam.type = mujoco.mjtCamera.mjCAMERA_FREE
-    cam.lookat[:] = lookat
-    cam.distance = float(distance)
-    cam.azimuth = float(azimuth)
-    cam.elevation = float(elevation)
-    env.sim.model.vis.global_.fovy = float(fovy)
 
-
-def _free_camera_intrinsic(h: int, w: int, fovy: float) -> np.ndarray:
-    f = 0.5 * h / np.tan(np.radians(fovy) / 2)
-    return np.array([[f, 0, w / 2], [0, f, h / 2], [0, 0, 1]])
-
-
-def _free_camera_extrinsic_from_scene(ctx) -> np.ndarray:
-    """렌더 직후 scene camera → cam2world (OpenCV convention, CU와 동일)."""
-    import mujoco
-    from robosuite.utils import transform_utils as T
-    headpos = np.zeros((3, 1))
-    forward = np.zeros((3, 1))
-    up = np.zeros((3, 1))
-    mujoco.mjv_cameraInModel(headpos, forward, up, ctx.scn)
-    hp = headpos.ravel()
-    fw = forward.ravel() / np.linalg.norm(forward)
-    uu = up.ravel() / np.linalg.norm(up)
-    z = -fw
-    x = np.cross(uu, z); x /= np.linalg.norm(x)
-    y = np.cross(z, x)
-    pose = T.make_pose(hp, np.column_stack([x, y, z]))
-    corr = np.array(
-        [[1.0, 0.0, 0.0, 0.0], [0.0, -1.0, 0.0, 0.0],
-         [0.0, 0.0, -1.0, 0.0], [0.0, 0.0, 0.0, 1.0]]
-    )
-    return pose @ corr
-
-
-def _robocasa_free_camera_render(env, h: int, w: int):
-    """RGB + metric depth + geom segmentation (동일 free camera, 2-pass render)."""
-    from robosuite.utils.mjcf_utils import IMAGE_CONVENTION_MAPPING
-    convention = IMAGE_CONVENTION_MAPPING[macros.IMAGE_CONVENTION]
-    rgb, depth_raw = env.sim.render(
-        camera_name=None, width=w, height=h, depth=True, segmentation=False)
-    rgb = np.asarray(rgb)[::convention]
-    depth_raw = np.asarray(depth_raw)[::convention]
-    depth_m = CU.get_real_depth_map(env.sim, depth_raw)
-    seg_raw = env.sim.render(
-        camera_name=None, width=w, height=h, depth=False, segmentation=True)
-    geom_seg = np.asarray(seg_raw)[::convention, :, 1]
-    return rgb, depth_m, geom_seg
 
 
 def robocasa_task_segmentation(env, spec, cam: str | None, h: int, w: int,
@@ -421,6 +308,168 @@ def fit_camera_to_points(env, cid, pts, margin=0.85, iters=12):
     return pos
 
 
+
+def _robocasa_task_bound_points(env) -> np.ndarray:
+    """RoboCasa task object 전체의 월드 바운드 점을 수집."""
+    m, d = env.sim.model, env.sim.data
+    pts = []
+    for name in _robocasa_task_object_names(env):
+        model = env.objects[name]
+        root = m.body_name2id(model.root_body)
+        for gid in range(m.ngeom):
+            bid = m.geom_bodyid[gid]
+            while bid not in (0, root):
+                bid = m.body_parentid[bid]
+            if bid == root:
+                c, r = d.geom_xpos[gid], m.geom_rbound[gid]
+                for k in range(3):
+                    e = np.zeros(3)
+                    e[k] = r
+                    pts += [c + e, c - e]
+    return np.asarray(pts) if pts else np.zeros((0, 3))
+
+
+def _robocasa_task_bound_center(env) -> np.ndarray:
+    """RoboCasa task object 전체를 바라보는 공통 lookat 중심."""
+    pts = _robocasa_task_bound_points(env)
+    if len(pts) == 0:
+        return np.array([0.0, 0.0, 0.8])
+    return pts.mean(axis=0)
+
+
+def _free_camera_extrinsic_from_scene(ctx) -> np.ndarray:
+    """현재 MuJoCo free camera의 cam2world extrinsic (OpenCV convention)."""
+    import mujoco
+    from robosuite.utils import transform_utils as T
+
+    headpos = np.zeros((3, 1))
+    forward = np.zeros((3, 1))
+    up = np.zeros((3, 1))
+    mujoco.mjv_cameraInModel(headpos, forward, up, ctx.scn)
+
+    hp = headpos.ravel()
+    fw = forward.ravel() / np.linalg.norm(forward)
+    uu = up.ravel() / np.linalg.norm(up)
+
+    z = -fw
+    x = np.cross(uu, z)
+    x /= np.linalg.norm(x)
+    y = np.cross(z, x)
+
+    pose = T.make_pose(hp, np.column_stack([x, y, z]))
+    corr = np.array(
+        [[1.0, 0.0, 0.0, 0.0],
+         [0.0, -1.0, 0.0, 0.0],
+         [0.0, 0.0, -1.0, 0.0],
+         [0.0, 0.0, 0.0, 1.0]]
+    )
+    return pose @ corr
+
+
+def _free_camera_intrinsic(h: int, w: int, fovy: float) -> np.ndarray:
+    """Free camera intrinsic matrix."""
+    f = 0.5 * h / np.tan(np.radians(fovy) / 2)
+    return np.array([[f, 0, w / 2], [0, f, h / 2], [0, 0, 1]])
+
+
+def _robocasa_scene_camera_distance(
+    env, center: np.ndarray, fovy: float, h: int, w: int,
+    azimuth: float, elevation: float, margin: float = AUTO_FIT_MARGIN
+) -> float:
+    """공통 방향은 유지하면서 모든 task object가 프레임에 들어오도록 distance만 계산."""
+    import mujoco
+    from robosuite.utils import transform_utils as T
+
+    ctx = env.sim._render_context_offscreen
+    cam = ctx.cam
+    cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+    cam.lookat[:] = center
+    cam.azimuth = float(azimuth)
+    cam.elevation = float(elevation)
+    env.sim.model.vis.global_.fovy = float(fovy)
+
+    pts = _robocasa_task_bound_points(env)
+    if len(pts) == 0:
+        return _ROBOCASA_SCENE_CAM_MIN_DIST
+
+    ty = np.tan(np.radians(fovy) / 2)
+    tx = ty * w / h
+    pts_h = np.hstack([pts, np.ones((len(pts), 1))])
+
+    def fits(dist: float) -> bool:
+        cam.distance = float(dist)
+        env.sim.forward()
+        mujoco.mjv_updateScene(
+            env.sim.model._model,
+            env.sim.data._data,
+            ctx.vopt,
+            ctx.pert,
+            cam,
+            mujoco.mjtCatBit.mjCAT_ALL,
+            ctx.scn,
+        )
+        w2c = T.pose_inv(_free_camera_extrinsic_from_scene(ctx))
+        P = (w2c @ pts_h.T).T[:, :3]
+        z = P[:, 2]
+        if np.any(z <= 1e-3):
+            return False
+
+        u = P[:, 0] / z
+        v = P[:, 1] / z
+        return (
+            np.abs(u).max() <= tx * margin
+            and np.abs(v).max() <= ty * margin
+        )
+
+    lo, hi = _ROBOCASA_SCENE_CAM_MIN_DIST, 6.0
+    if not fits(hi):
+        return hi
+
+    for _ in range(24):
+        mid = (lo + hi) / 2
+        if fits(mid):
+            hi = mid
+        else:
+            lo = mid
+
+    return max(hi, _ROBOCASA_SCENE_CAM_MIN_DIST)
+
+
+def _setup_robocasa_scene_camera(env, *, lookat, distance, fovy):
+    """모든 RoboCasa 태스크에 동일한 정면-상단 사선 방향을 적용."""
+    import mujoco
+
+    ctx = env.sim._render_context_offscreen
+    cam = ctx.cam
+    cam.type = mujoco.mjtCamera.mjCAMERA_FREE
+    cam.lookat[:] = lookat
+    cam.distance = float(distance)
+    cam.azimuth = _ROBOCASA_SCENE_CAM_AZIMUTH
+    cam.elevation = _ROBOCASA_SCENE_CAM_ELEVATION
+    env.sim.model.vis.global_.fovy = float(fovy)
+
+
+def _robocasa_scene_camera_render(env, h: int, w: int):
+    """공통 RoboCasa scene camera에서 RGB / depth / geom segmentation 획득."""
+    from robosuite.utils.mjcf_utils import IMAGE_CONVENTION_MAPPING
+
+    convention = IMAGE_CONVENTION_MAPPING[macros.IMAGE_CONVENTION]
+
+    rgb, depth_raw = env.sim.render(
+        camera_name=None, width=w, height=h, depth=True, segmentation=False
+    )
+    rgb = np.asarray(rgb)[::convention]
+    depth_raw = np.asarray(depth_raw)[::convention]
+    depth_m = CU.get_real_depth_map(env.sim, depth_raw)
+
+    seg_raw = env.sim.render(
+        camera_name=None, width=w, height=h, depth=False, segmentation=True
+    )
+    geom_seg = np.asarray(seg_raw)[::convention, :, 1]
+    return rgb, depth_m, geom_seg
+
+
+
 def _raw_geom_segmentation(env, cam: str | None, h: int, w: int) -> np.ndarray:
     """MuJoCo geom-ID segmentation render (group channel). cam=None → free camera."""
     from robosuite.utils.mjcf_utils import IMAGE_CONVENTION_MAPPING
@@ -480,29 +529,43 @@ def main():
     if spec["robocasa"]:
         print(f"[env] robocasa task objects: {list(_robocasa_task_object_names(env))}")
         env.sim.forward()
+
         fovy = FOVY_OVERRIDE or float(env.sim.model.vis.global_.fovy)
         center = _robocasa_task_bound_center(env)
-        dist = _robocasa_free_camera_distance(
-            env, center, fovy, H, W,
-            azimuth=_ROBOCASA_FREE_CAM["azimuth"],
-            elevation=_ROBOCASA_FREE_CAM["elevation"],
+        dist = _robocasa_scene_camera_distance(
+            env,
+            center,
+            fovy,
+            H,
+            W,
+            azimuth=_ROBOCASA_SCENE_CAM_AZIMUTH,
+            elevation=_ROBOCASA_SCENE_CAM_ELEVATION,
             margin=AUTO_FIT_MARGIN,
         )
-        _setup_robocasa_free_camera(
-            env, lookat=center, distance=dist,
-            azimuth=_ROBOCASA_FREE_CAM["azimuth"],
-            elevation=_ROBOCASA_FREE_CAM["elevation"],
+        _setup_robocasa_scene_camera(
+            env,
+            lookat=center,
+            distance=dist,
             fovy=fovy,
         )
-        print(f"[cam] RoboCasa free camera: lookat={np.round(center, 3)} "
-              f"dist={dist:.2f} az={_ROBOCASA_FREE_CAM['azimuth']:.0f}° "
-              f"el={_ROBOCASA_FREE_CAM['elevation']:.0f}° fovy={fovy:.1f}°")
-        rgb, depth_m, geom_seg = _robocasa_free_camera_render(env, H, W)
+
+        print(
+            f"[cam] RoboCasa common scene camera: "
+            f"lookat={np.round(center, 3)} dist={dist:.2f} "
+            f"az={_ROBOCASA_SCENE_CAM_AZIMUTH:.0f}° "
+            f"el={_ROBOCASA_SCENE_CAM_ELEVATION:.0f}° "
+            f"fovy={fovy:.1f}°"
+        )
+
+        rgb, depth_m, geom_seg = _robocasa_scene_camera_render(env, H, W)
+
         ctx = env.sim._render_context_offscreen
         K = _free_camera_intrinsic(H, W, fovy)
         T = _free_camera_extrinsic_from_scene(ctx)
+
         seg, name_of_id = robocasa_task_segmentation(
-            env, spec, None, H, W, geom_seg=geom_seg)
+            env, spec, None, H, W, geom_seg=geom_seg
+        )
         print(f"[env] tracked: {[v[0] for v in name_of_id.values()]}")
     else:
         cid0 = env.sim.model.camera_name2id(cam)
@@ -538,22 +601,30 @@ def main():
 
     if spec["robocasa"]:
         fovy = FOVY_OVERRIDE or float(env.sim.model.vis.global_.fovy)
-        fovx = float(np.degrees(2 * np.arctan(np.tan(np.radians(fovy) / 2) * W / H)))
+        fovx = float(np.degrees(
+            2 * np.arctan(np.tan(np.radians(fovy) / 2) * W / H)
+        ))
         import mujoco
         headpos = np.zeros((3, 1))
         forward = np.zeros((3, 1))
         up = np.zeros((3, 1))
         mujoco.mjv_cameraInModel(headpos, forward, up, ctx.scn)
         cam_pos = headpos.ravel()
-        print(f"[cam] free: fovy={fovy:.1f}° fovx={fovx:.1f}° (H{H}×W{W}) "
-              f"pos={np.round(cam_pos, 3)} f={K[0,0]:.1f}px")
+        print(
+            f"[cam] common scene: fovy={fovy:.1f}° fovx={fovx:.1f}° "
+            f"(H{H}×W{W}) pos={np.round(cam_pos, 3)} f={K[0,0]:.1f}px"
+        )
     else:
         cid = env.sim.model.camera_name2id(cam)
         fovy = float(env.sim.model.cam_fovy[cid])
-        fovx = float(np.degrees(2 * np.arctan(np.tan(np.radians(fovy) / 2) * W / H)))
+        fovx = float(np.degrees(
+            2 * np.arctan(np.tan(np.radians(fovy) / 2) * W / H)
+        ))
         cam_pos = env.sim.data.cam_xpos[cid]
-        print(f"[cam] {cam}: fovy={fovy:.1f}° fovx={fovx:.1f}° (H{H}×W{W}) "
-              f"pos={np.round(cam_pos, 3)} f={K[0,0]:.1f}px")
+        print(
+            f"[cam] {cam}: fovy={fovy:.1f}° fovx={fovx:.1f}° "
+            f"(H{H}×W{W}) pos={np.round(cam_pos, 3)} f={K[0,0]:.1f}px"
+        )
 
     objects = points_from_frame(depth_m, seg, K, T, name_of_id, base_offset_mm=base_off)
     print(f"[M1] detected {len(objects)}/{len(name_of_id)} tracked instances")
@@ -575,7 +646,8 @@ def main():
     for sid in name_of_id:
         ov[seg == sid] = (0.5 * ov[seg == sid] + [127, 0, 0]).astype(np.uint8)
     Image.fromarray(ov).save(OUT / "frame_masks.png")
-    node_ids = {n["id"].split("_", 2)[-1]: n["id"] for n in m1["nodes"]}
+    # 크롭 파일명 = 노드 id. inst 이름을 그대로 키로 (multi-underscore 이름도 안전)
+    node_ids = {o["name"]: f"obj_{o['cls']}_{o['name']}" for o in objects}
     save_crops(rgb, seg, name_of_id, node_ids, OUT / "crops")
     print(f"[M1] nodes={len(m1['nodes'])} edges={len(m1['edges'])} "
           f"crops={len(list((OUT / 'crops').glob('*.png')))}")
@@ -587,7 +659,7 @@ def main():
         import time
         import mujoco
         import mujoco.viewer
-        label = "free camera" if spec["robocasa"] else cam
+        label = "RoboCasa common scene camera" if spec["robocasa"] else cam
         print(f"[view] {label} 시점 뷰어 (창 닫으면 종료)")
         with mujoco.viewer.launch_passive(env.sim.model._model, env.sim.data._data) as v:
             if spec["robocasa"]:
@@ -598,7 +670,7 @@ def main():
                 v.cam.elevation = ctx.cam.elevation
             else:
                 v.cam.type = mujoco.mjtCamera.mjCAMERA_FIXED
-                v.cam.fixedcamid = cid0
+                v.cam.fixedcamid = env.sim.model.camera_name2id(cam)
             while v.is_running():
                 v.sync()
                 time.sleep(0.02)
