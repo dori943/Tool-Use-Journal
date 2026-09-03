@@ -211,6 +211,9 @@ def _m2_plan_complete(out):
         m2 = json.loads((out / "m2.json").read_text(encoding="utf-8"))
     except (OSError, json.JSONDecodeError):
         return False
+    # 0903: 피드백 재분해 직후는 새 질의가 아직 미측정 — 한 왕복 더 필요
+    if m2.get("m2_stats", {}).get("pending_grounding"):
+        return False
     for s in m2.get("m2_subgoals", []):
         if s.get("tool_candidate_ids") and not s.get("selected_tool_id"):
             return False
