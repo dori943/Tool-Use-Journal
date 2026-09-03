@@ -198,6 +198,44 @@ def decompose(subgoal: dict) -> list[dict]:
     raise ValueError(f"모르는 kind: {kind}")
 
 
+# 0903: 컨테이너에 "담는" 서브골과 같은 컨테이너 "위에 놓는"(덮는) 서브골 사이의 순서.
+# c4_2에서 M2가 "긴 물건 담기"(relocate → 상자)와 "뚜껑 덮기"(stack, container_id=상자)를
+# 별개 서브골로 내자 서브골 간 제약이 없어 M4가 뚜껑을 먼저 덮었다.
+# 물리 규칙: 컨테이너를 덮고 나면 안에 넣을 수 없다 → 담기 ≺ 덮기.
+# 구현은 sweep의 d2b, stack의 층 순서와 같은 수법: 덮는 서브골의 첫 상세(acquire) pre에
+# 담는 서브골이 establish하는 in(x, C)를 그대로 넣어 partial_order가 causal link로 잡게 한다.
+# 분할 뒤에는 자식들이 in(원소, C)를 각각 establish하므로 다시 호출한다(auto 태그로 교체).
+INSIDE_KINDS = {"relocate", "sweep_collect", "scoop_transfer"}
+
+
+def add_container_seal_pres(subgoals: list[dict]) -> list[str]:
+    logs = []
+    for b in subgoals:
+        if b.get("kind") != "stack" or not b.get("details"):
+            continue
+        # 받침: container_id가 있으면 그것, 없으면 첫 target (decompose의 stack 규칙과 동일)
+        C = b.get("container_id") or (b.get("target_ids") or [None])[0]
+        if not C:
+            continue
+        first = b["details"][0]
+        first["pre"] = [q for q in first["pre"] if not q.get("auto")]
+        added = []
+        for a in subgoals:
+            if a is b or a.get("kind") not in INSIDE_KINDS or a.get("container_id") != C:
+                continue
+            for d in a.get("details", []):
+                for e in d.get("establish", []):
+                    if e.get("head") == "in":
+                        first["pre"].append({"id": f"{first['detail_id']}_p{len(first['pre'])}",
+                                             "expr": e["expr"], "head": "in", "eval_by": "m2",
+                                             "auto": "container_seal"})
+                        added.append(a["subgoal_id"])
+        if added:
+            logs.append(f"  [순서] {b['subgoal_id']}({C} 덮기)는 "
+                        f"{sorted(set(added))}(담기) 뒤에 — 사전조건 {len(added)}건 부착")
+    return logs
+
+
 def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
     """causal link / threat → DAG 엣지 + mutex.
 
@@ -219,8 +257,10 @@ def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
             producers = [a for a in details if a is not b and
                          any(e["expr"] == p["expr"] for e in a["establish"])]
             # 같은 그룹의 생산자만 하드 순서로 못 박는다.
+            # 예외(0903): 컨테이너 담기 ≺ 덮기 사전조건(auto=container_seal)은 서브골(그룹)을
+            # 가로지르는 물리 제약이라 그룹이 달라도 하드 엣지로 둔다.
             for a in producers:
-                if a["group_id"] == b["group_id"]:
+                if a["group_id"] == b["group_id"] or p.get("auto") == "container_seal":
                     edges.append({"from": a["detail_id"], "to": b["detail_id"],
                                   "why": f"causal_link: {p['expr']}"})
             # 그룹 밖 생산자만 있으면(예: hand_empty) 배타 자원 — mutex

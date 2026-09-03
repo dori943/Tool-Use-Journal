@@ -97,6 +97,35 @@ def _robocasa_task_object_names(env):
     return tuple(sorted(objects.keys()))
 
 
+# env.objects 에 없는 고정 바디(worldbody 직속)도 M1이 추적해야 하는 경우.
+# c4_2 의 packing_box 는 fixture 처럼 worldbody 에 직접 붙어 env.objects 에 없어서
+# M1 이 뚜껑만 보고 상자를 몰랐다 (0903 1차 실행: LLM 이 뚜껑을 용기로 삼음).
+# 이름 -> 클래스. 바디 subtree 의 group=1 geom 을 그 물체의 visual 로 쓴다.
+_EXTRA_ROBOCASA_BODIES = {
+    "c4_2": {"packing_box": "box"},
+}
+
+
+def _robocasa_tracked_models(env, spec):
+    """(이름, 모델) 목록 — env.objects 와 spec['extra_bodies'] 고정 바디를 합친다.
+
+    고정 바디는 root_body 와 빈 visual_geoms 만 가진 대역 객체로 넘겨,
+    _object_visual_geom_ids 가 subtree group=1 geom 으로 떨어지게 한다.
+    """
+    from types import SimpleNamespace
+    objects = getattr(env, "objects", None) or {}
+    items = [(name, objects[name]) for name in _robocasa_task_object_names(env)]
+    m = env.sim.model
+    for body, _cls in (spec.get("extra_bodies") or {}).items():
+        try:
+            m.body_name2id(body)
+        except Exception:
+            print(f"[env] 경고: 고정 바디 {body!r} 가 모델에 없어 추적하지 않습니다.")
+            continue
+        items.append((body, SimpleNamespace(root_body=body, visual_geoms=[])))
+    return items
+
+
 def _subtree_geom_ids_by_group(m, body_id: int, group: int) -> list[int]:
     """body subtree에서 geom_group==group 인 geom ID 수집."""
     geoms = []
@@ -143,10 +172,10 @@ def robocasa_task_segmentation(env, spec, cam: str | None, h: int, w: int,
         geom_seg = _raw_geom_segmentation(env, cam, h, w)
     seg = np.zeros((h, w), dtype=np.int32)
     name_of_id = {}
-    for sid, name in enumerate(_robocasa_task_object_names(env), start=1):
-        model = env.objects[name]
+    extra_cls = spec.get("extra_bodies") or {}
+    for sid, (name, model) in enumerate(_robocasa_tracked_models(env, spec), start=1):
         geom_ids = _object_visual_geom_ids(env, model)
-        cls = spec["class_of"](name)
+        cls = extra_cls.get(name) or spec["class_of"](name)
         if not cls:
             continue
         name_of_id[sid] = (name, cls)
@@ -195,6 +224,7 @@ def task_spec(name):
                 class_of=class_of,
                 bound_objects=bound,
                 extra_geom_names=_EXTRA_GEOMS.get(name, []),
+                extra_bodies=_EXTRA_ROBOCASA_BODIES.get(name, {}),
                 robocasa=TASKS[name].robocasa)
 
 
@@ -309,12 +339,11 @@ def fit_camera_to_points(env, cid, pts, margin=0.85, iters=12):
 
 
 
-def _robocasa_task_bound_points(env) -> np.ndarray:
+def _robocasa_task_bound_points(env, spec) -> np.ndarray:
     """RoboCasa task object 전체의 월드 바운드 점을 수집."""
     m, d = env.sim.model, env.sim.data
     pts = []
-    for name in _robocasa_task_object_names(env):
-        model = env.objects[name]
+    for name, model in _robocasa_tracked_models(env, spec):
         root = m.body_name2id(model.root_body)
         for gid in range(m.ngeom):
             bid = m.geom_bodyid[gid]
@@ -329,9 +358,9 @@ def _robocasa_task_bound_points(env) -> np.ndarray:
     return np.asarray(pts) if pts else np.zeros((0, 3))
 
 
-def _robocasa_task_bound_center(env) -> np.ndarray:
+def _robocasa_task_bound_center(env, spec) -> np.ndarray:
     """RoboCasa task object 전체를 바라보는 공통 lookat 중심."""
-    pts = _robocasa_task_bound_points(env)
+    pts = _robocasa_task_bound_points(env, spec)
     if len(pts) == 0:
         return np.array([0.0, 0.0, 0.8])
     return pts.mean(axis=0)
@@ -373,7 +402,7 @@ def _free_camera_intrinsic(h: int, w: int, fovy: float) -> np.ndarray:
 
 
 def _robocasa_scene_camera_distance(
-    env, center: np.ndarray, fovy: float, h: int, w: int,
+    env, spec, center: np.ndarray, fovy: float, h: int, w: int,
     azimuth: float, elevation: float, margin: float = AUTO_FIT_MARGIN
 ) -> float:
     """공통 방향은 유지하면서 모든 task object가 프레임에 들어오도록 distance만 계산."""
@@ -388,7 +417,7 @@ def _robocasa_scene_camera_distance(
     cam.elevation = float(elevation)
     env.sim.model.vis.global_.fovy = float(fovy)
 
-    pts = _robocasa_task_bound_points(env)
+    pts = _robocasa_task_bound_points(env, spec)
     if len(pts) == 0:
         return _ROBOCASA_SCENE_CAM_MIN_DIST
 
@@ -531,9 +560,10 @@ def main():
         env.sim.forward()
 
         fovy = FOVY_OVERRIDE or float(env.sim.model.vis.global_.fovy)
-        center = _robocasa_task_bound_center(env)
+        center = _robocasa_task_bound_center(env, spec)
         dist = _robocasa_scene_camera_distance(
             env,
+            spec,
             center,
             fovy,
             H,

@@ -6,7 +6,7 @@
   python scripts/run_m2.py c1_2              # 지시문은 task_registry 가 단일 출처
   python scripts/run_m2.py c1_1 --m1-json path.json   # M1 JSON 경로 직접 지정
 
-서브골 생성은 항상 LLM(gpt-4o)이다 → OPENAI_API_KEY 필수.
+서브골 생성은 항상 LLM이다. 기본 Gemini(GEMINI_API_KEY), TUJ_LLM_PROVIDER=openai 면 OpenAI(OPENAI_API_KEY).
 
 출력: output/<task>/m2.json (팀 구조 — main의 M1·M3 산출물 폴더 명명과 동일: output/c1_1/)
       내용: 서브골·부분순서·mutex·M3 질의 사양·invariant
@@ -176,22 +176,33 @@ def main():
         qids = {q["queried_by"] for q in out["m2_queries"]}
         rids = {r.get("queried_by") for r in responses if r.get("queried_by")}
         if rids and not (qids & rids):
-            sys.exit("[중단] m3.json 응답이 이번 분해의 질의와 하나도 매칭되지 않습니다.\n"
-                     "  run_m3 -> run_m2 -> run_m3 왕복 순서를 확인하십시오. (m2.json 미변경)")
-        for line in apply_m3(out, responses):
-            print(line)
-        # 측정 반영 후 자기보고 신뢰도 갱신 (LLM 3차 호출)
-        if rough._client is None:               # 분해 생략 경로에서도 클라이언트 보장
-            from openai import OpenAI
-            rough._client = OpenAI()
-        for line in update_confidence(out, rough._client, rough.model,
-                                      usage_acc=rough.usage):
-            print(line)
+            if rough.feedback:
+                # 0903: 피드백 재분해로 구조가 바뀌면 직전 응답과 안 맞는 게 정상이다.
+                # 새 질의는 다음 접지 라운드(run.py 왕복)가 측정한다. 판정·신뢰도 갱신·
+                # 분할은 그때 응답으로 하고, 여기서는 재분해 결과만 저장한다.
+                print("[M2] 재분해로 질의가 바뀌어 직전 m3.json 응답과 매칭되지 않음 — "
+                      "판정/신뢰도 갱신/분할은 다음 접지 라운드 후에 수행")
+                responses = None
+                out["m2_stats"]["pending_grounding"] = True   # run.py 왕복 계속 신호
+            else:
+                sys.exit("[중단] m3.json 응답이 이번 분해의 질의와 하나도 매칭되지 않습니다.\n"
+                         "  run_m3 -> run_m2 -> run_m3 왕복 순서를 확인하십시오. (m2.json 미변경)")
+        if responses is not None:
+            out["m2_stats"].pop("pending_grounding", None)
+            for line in apply_m3(out, responses):
+                print(line)
+            # 측정 반영 후 자기보고 신뢰도 갱신 (LLM 3차 호출)
+            if rough._client is None:               # 분해 생략 경로에서도 클라이언트 보장
+                from tuj.m2_subgoal.rough import make_llm_client
+                rough._client = make_llm_client()
+            for line in update_confidence(out, rough._client, rough.model,
+                                          usage_acc=rough.usage):
+                print(line)
+            # 0828: batch 응답의 partition대로 서브골 분할 (확보/반환은 한 번만 생성)
+            from tuj.m2_subgoal.regroup import split_after_m3
+            for line in split_after_m3(out):
+                print(line)
         out["m2_stats"]["llm_usage"] = rough.usage
-        # 0828: batch 응답의 partition대로 서브골 분할 (확보/반환은 한 번만 생성)
-        from tuj.m2_subgoal.regroup import split_after_m3
-        for line in split_after_m3(out):
-            print(line)
 
     with open(os.path.join(tdir, "m2.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)

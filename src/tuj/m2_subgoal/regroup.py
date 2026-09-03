@@ -19,7 +19,7 @@ batch 질의 응답의 partition(그룹 구성)대로, 서브골 하나를 그�
 """
 from __future__ import annotations
 
-from .core import _detail, build_queries, decompose, invariants_for, partial_order
+from .core import _detail, add_container_seal_pres, build_queries, decompose, invariants_for, partial_order
 
 
 def _cycle_check(details: list[dict], edges: list[dict]) -> list[str]:
@@ -130,6 +130,7 @@ def split_after_m3(m2_out: dict) -> list[str]:
         return logs
 
     m2_out["m2_subgoals"] = new_subs
+    logs += add_container_seal_pres(new_subs)   # 0903: 분할 자식 기준으로 담기 ≺ 덮기 재부착
     all_details = [d for s2 in new_subs for d in s2["details"]]
     edges, mutex = partial_order(all_details)
     stuck = _cycle_check(all_details, edges)
