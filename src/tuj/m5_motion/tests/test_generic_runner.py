@@ -4,6 +4,7 @@ import json
 from types import SimpleNamespace
 
 import numpy as np
+import pytest
 
 import tuj.m5_motion.generic_runner as generic_runner
 from tuj.m4_taskplanner.serialization import (
@@ -440,6 +441,7 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
             str(output_dir),
             "--video",
             str(video_path),
+            "--no-scripted-grasps",
         ]
     )
 
@@ -454,6 +456,38 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
     assert summary["simulation_status"] == "SUCCESS"
     assert summary["simulation_mode"] == "controller"
     assert summary["video"] == str(video_path.resolve())
+
+
+@pytest.mark.parametrize("mode_args", [
+    ["--simulate", "controller"],
+    ["--video", "test.mp4"],
+    ["--simulate", "controller", "--scripted-grasps"],
+])
+def test_controller_defaults_to_scripted_before_constructing_planner(
+    tmp_path, monkeypatch, mode_args
+):
+    from tuj.m5_motion.scripted_grasps import cli
+
+    task_path = tmp_path / "task.json"
+    task_path.write_text(json.dumps({"status": "SUCCESS",
+        "selected_plan": _selected().model_dump(mode="json")}), encoding="utf-8")
+    world_path = tmp_path / "world.json"
+    world_path.write_text(_world().model_dump_json(), encoding="utf-8")
+    monkeypatch.delenv("OPENAI_API_KEY", raising=False)
+    observed = []
+
+    def forbidden(*args, **kwargs):
+        pytest.fail("batch LLM planner must not run before scripted acquisition")
+
+    def execute(args, *rest):
+        observed.append(args.scripted_grasps)
+        return 0
+
+    monkeypatch.setattr(generic_runner, "ToolUseJournalPlannerPool", forbidden)
+    monkeypatch.setattr(cli, "execute_selected_plan_live", execute)
+    assert main(["--task-planner", str(task_path), "--initial-world", str(world_path),
+        "--output-dir", str(tmp_path / "out"), *mode_args]) == 0
+    assert observed == [True]
 
 
 def test_generic_video_recorder_follows_runtime_environment_swap(

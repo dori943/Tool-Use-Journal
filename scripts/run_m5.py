@@ -10,6 +10,8 @@ run_m1.py 와 같은 방식이다. 태스크 id(c1_1, c2_1, ...)만 주면
 두 가지 실행 엔진을 하나로 묶었다.
   (기본) 범용 계획 — generic_runner. 태스크 무관 in-process 파이프라인.
          --simulate {kinematic,controller} 로 MuJoCo 재생까지 가능.
+         controller/video는 등록된 파지 함수를 우선 실행한 뒤 실제 상태로
+         후속 경로를 계획한다. --no-scripted-grasps로 기존 일괄 계획을 선택한다.
   (--physical) 물리 실행 — 태스크 전용 예제 러너를 subprocess 로 띄운다.
          검증된 물리 grasp/contact 프로파일로 실제 grasp+sweep 를 수행한다.
          전용 예제 러너가 있는 태스크만 지원한다(아래 PHYSICAL 참고).
