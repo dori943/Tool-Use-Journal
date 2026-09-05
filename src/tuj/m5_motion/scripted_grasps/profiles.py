@@ -10,7 +10,7 @@ def configure_environment(env, environment, ee):
     from tuj.m5_motion.tool_use_journal_runtime import tool_use_journal_joint_position_controller_config
 
     kitchen = environment != "C1_1_LegoSweep"
-    if not kitchen and ee != "3F":
+    if not kitchen and ee not in {"3F", "vac"}:
         # C1_1 already accepts the M5 joint controller during construction.
         # Reloading its robot model changes the calibrated hand/controller
         # initialization, so the native plate profile needs no rebuild.
@@ -36,7 +36,7 @@ def configure_environment(env, environment, ee):
     def reset_with_controller(*args, **kwargs):
         observation = reset(*args, **kwargs)
         robot = env.robots[0]
-        config = tool_use_journal_joint_position_controller_config(kp=150. if kitchen else 50.)
+        config = tool_use_journal_joint_position_controller_config(kp=150. if kitchen or ee == "vac" else 50.)
         robot.composite_controller_config = config
         robot.part_controller_config = deepcopy(config["body_parts"])
         robot._load_controller()

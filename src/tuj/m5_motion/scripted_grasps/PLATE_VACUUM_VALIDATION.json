@@ -1,0 +1,106 @@
+{
+  "generated_utc": "2026-09-05T09:49:08.253557+00:00",
+  "base_commit": "c00da72e849c9f4b1263095456172098eae60399",
+  "function": "grasp_plate_vacuum",
+  "object_id": "plate",
+  "environment": "C1_1_LegoSweep",
+  "ee": "vac",
+  "status": "VALIDATED_FOR_RECORDED_GRASP_AND_CONTINUATION_PROBES",
+  "policy": "CONTACT_GATED_KINEMATIC_ATTACH; not validated physical suction-force retention",
+  "scope": "Borrowed M5 runtime, 5s grasp hold, existing M5 motion planner/controller with supplied test keyframes, 2cm movement/2s hold/direct release. Tilt case adds 30 degrees. Not a full C1_1 sweep.",
+  "full_c1_1_task": "NOT_TESTED",
+  "recipe_source": {
+    "path": "src/tuj/m5_motion/scripted_grasps/objects/plate_vacuum.py",
+    "sha256": "76543ee6104da6773c91cdb7a9a77c988d12b9ebcc437360b21a8ab8a0f2fc62"
+  },
+  "successful_probes": [
+    {
+      "config": {
+        "label": "vac-fast-06",
+        "ee": "vac",
+        "overrides": {
+          "offset_m": [
+            0,
+            0,
+            -0.0045
+          ],
+          "prelift_stabilization_s": 0,
+          "close_duration_s": 0.5
+        }
+      },
+      "metrics": {
+        "minimum_hold_lift_m": 0.18288043785092423,
+        "minimum_bottom_clearance_m": 0.18088038760777092,
+        "all_finger_contact_fraction": 1.0,
+        "max_slip_m": 7.787472434140088e-06,
+        "max_slip_deg": 0.02300793121365651,
+        "hold_s": 5.000000000006111,
+        "requested_hold_s": 5.0,
+        "attachment_active_fraction": 1.0,
+        "validation_basis": "CONTACT_GATED_KINEMATIC_ATTACHMENT",
+        "pose_error_reference": "ATTACH_TIME"
+      },
+      "followup_result": {
+        "move_status": "SUCCESS",
+        "release_drop_m": 0.2011169062276863,
+        "attachment_after_release": null,
+        "held_tool_after_release": null
+      },
+      "evidence": {
+        "path": "artifacts/plate-comparison-20260905/vac-fast-06/summary.json",
+        "sha256": "0af16ec24c4455602ff4694ec2add3e5dfeb2294a81f093909840161c5fbe339"
+      }
+    },
+    {
+      "config": {
+        "label": "vac-tilt-08",
+        "ee": "vac",
+        "xy": [
+          -0.3,
+          -0.1
+        ],
+        "tilt_deg": 30
+      },
+      "metrics": {
+        "minimum_hold_lift_m": 0.18379529612036538,
+        "minimum_bottom_clearance_m": 0.182198601006492,
+        "all_finger_contact_fraction": 1.0,
+        "max_slip_m": 2.978575580904537e-06,
+        "max_slip_deg": 0.001246904848583187,
+        "hold_s": 5.000000000006111,
+        "requested_hold_s": 5.0,
+        "attachment_active_fraction": 1.0,
+        "validation_basis": "CONTACT_GATED_KINEMATIC_ATTACHMENT",
+        "pose_error_reference": "ATTACH_TIME"
+      },
+      "followup_result": {
+        "tilt_deg": 30,
+        "move_status": "SUCCESS",
+        "release_drop_m": 0.1952120391778931,
+        "attachment_after_release": null,
+        "held_tool_after_release": null
+      },
+      "evidence": {
+        "path": "artifacts/plate-comparison-20260905/vac-tilt-08/summary.json",
+        "sha256": "28dff17c4f5058f05b8ba9607aee6feb7fade49d8f2313610c07047fc9635367"
+      }
+    }
+  ],
+  "two_finger_status": "SIX_COMPARISONS_FAILED; EXISTING_EXPERIMENTAL_DISPATCH_PRESERVED",
+  "original_lab_files_checked": 31,
+  "original_lab_changed": [],
+  "tests": {
+    "name": "pytest",
+    "errors": "0",
+    "failures": "0",
+    "skipped": "2",
+    "tests": "281",
+    "time": "12.904",
+    "timestamp": "2026-09-05T18:47:22.513584+09:00",
+    "hostname": "DESKTOP-18M216I"
+  },
+  "report": {
+    "path": "artifacts/plate-comparison-20260905/report.json",
+    "sha256": "ddd5d799dc1033bac2ccd7e5c1bf3afaf378bfcbbafbf3bd205fc31cdf249c6d"
+  }
+}

@@ -1,5 +1,5 @@
 """Expose each scripted recipe's EE requirement to upstream task planning."""
-from .registry import ALIASES, ENTRIES
+from .registry import ALIASES, ENTRIES, ALTERNATIVE_ENTRIES
 
 
 def scene_id_aliases(scene):
@@ -27,6 +27,13 @@ def constrain_task_request(request, environment):
         if entry is None:
             continue
         before=list(subgoal.feasible_ee)
+        # Preserve a grounded, explicitly selected alternative (e.g. plate vac).
+        # When the default EE remains feasible, existing task selection is kept.
+        if before and entry.ee not in before:
+            alternatives=[e for e in ALTERNATIVE_ENTRIES
+                if e.environment==environment and e.object_id==entry.object_id and e.ee in before]
+            if alternatives:
+                entry=alternatives[0]
         if before and entry.ee not in before:
             raise ValueError(f'SCRIPTED_GRASP_EE_INFEASIBLE: {subgoal.subgoal_id}: {entry.object_id} requires {entry.ee}, grounded feasible EEs={before}')
         subgoal.feasible_ee=[entry.ee]

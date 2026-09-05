@@ -10,9 +10,13 @@
 | 실험 연결: 함수는 호출하지만 성공 미검증 | plate(2F): 현재 runtime에서 lift 전 접촉 안정성 실패 |
 | 이식·등록 제외 | tongs, ladle |
 
+접시에는 별도 **vacuum 대안**도 추가했다. C1_1에서 `ee=vac`을 명시하면 `grasp_plate_vacuum(context)`를 호출한다. 기본 배치에서 파지·5초 유지·2cm 후속 이동·놓기를, 다른 위치에서 30° 기울이기·유지·놓기까지 통과했다. 접촉 확인 후 KINEMATIC attach를 사용하는 검증이며 실제 흡착력이나 전체 쓸기 성공을 의미하지 않는다. 기본 `plate+2F`는 기존 실험 상태를 유지한다. 상세 비교는 `artifacts/plate-comparison-20260905/report.md`, 근거 해시는 [PLATE_VACUUM_VALIDATION.json](PLATE_VACUUM_VALIDATION.json)에 있다.
+
 자동 분기는 plate를 포함한 14개 객체에 연결되어 있다. 검증 완료는 13개이고 plate는 `EXPERIMENTAL`로 manifest에 기록된다. 2026-09-04의 8개 후속 통과 기록에 09-05 보정으로 bottle, spatula, bread, mug, lid가 추가됐다. 후속 검사는 일반 M5 계획기를 통한 2cm 이동·2초 유지 및 실제 release이며, 전체 task PLACE나 모든 배치의 성공률을 뜻하지 않는다. plate 파지가 실패하면 해당 단계에서 중단하며 일반 LLM 파지로 바꾸지 않는다.
 
 파지·5초 유지·2cm 후속 이동·2초 유지·release 기준으로 13개 객체를 검증했다. 사과는 실제 전체 task에서 파지·유지·운반, 뒤집개는 파지·5초 유지를 통과했다. 전체 task 4개는 이후 계획 단계에서 중단되었고 완료 판정은 아직 없다. plate 연결 변경을 포함한 회귀검사는 273 passed, 2 skipped이다. `SOURCE.json`의 원본 lab 소스·보정값 31개 SHA-256은 작업 전과 일치한다.
+
+위 13개는 기존 기본 EE 레시피의 기록이다. 접시 vacuum 대안 추가 후 최종 회귀검사는 **279 passed, 2 skipped**이다. 접시의 2F 비교 6개 조합은 모두 실패했고, 성공한 vacuum 레시피를 2F 성공으로 집계하지 않는다. M4 준비 함수는 접시에 grounded feasible EE가 `vac`만 지정되면 이를 유지하며, `2F`도 가능하면 기존 기본 선택을 유지한다.
 
 ## GitHub 기준
 

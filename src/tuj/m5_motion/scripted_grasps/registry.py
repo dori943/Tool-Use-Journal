@@ -11,16 +11,19 @@ class GraspEntry:
     environment: str
     ee: str
     driver: str
+    module_name: str | None = None
 
     def recipe(self):
-        module = import_module(f"{__package__}.objects.{self.object_id}")
+        name = self.module_name or self.object_id
+        module = import_module(f"{__package__}.objects.{name}")
         if self.driver == "catalog":
-            return getattr(module, self.object_id + "_recipe")()
+            return getattr(module, name + "_recipe")()
         return getattr(module, self.object_id.title() + "Recipe")()
 
     def function(self):
-        module = import_module(f"{__package__}.objects.{self.object_id}")
-        return getattr(module, "grasp_" + self.object_id)
+        name = self.module_name or self.object_id
+        module = import_module(f"{__package__}.objects.{name}")
+        return getattr(module, "grasp_" + name)
 
 
 ENTRIES = tuple(GraspEntry(*row) for row in (
@@ -40,6 +43,11 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     ("lid", "C4_2_DiagonalFitPacking", "vac", "catalog"),
 ))
 
+# Explicitly selected EE alternatives; never retry a failed 2F grasp with vac.
+ALTERNATIVE_ENTRIES = (
+    GraspEntry("plate", "C1_1_LegoSweep", "vac", "catalog", "plate_vacuum"),
+)
+
 # Exact M1 identifiers only; no substring or fuzzy matching of object names.
 ALIASES = {f"obj_{e.object_id}_{e.object_id}": e.object_id for e in ENTRIES}
 
@@ -56,6 +64,8 @@ ENABLED_ENTRIES = tuple(entry for entry in ENTRIES if entry.object_id not in PEN
 def integration_status(entry):
     if entry.object_id in PENDING_INTEGRATION:
         return "BLOCKED"
+    if entry in ALTERNATIVE_ENTRIES:
+        return "VALIDATED"
     if entry.object_id in EXPERIMENTAL_INTEGRATION:
         return "EXPERIMENTAL"
     return "VALIDATED"
@@ -81,11 +91,14 @@ def resolve(request):
         target = task.tool
     target = ALIASES.get(target, target)
     environment = request.world.metadata.get("environment_name")
-    for entry in ENTRIES:
-        if (entry.object_id, entry.environment) == (target, environment):
-            if task.ee != entry.ee:
-                raise ValueError(f"SCRIPTED_GRASP_EE_MISMATCH: {target} requires {entry.ee}, got {task.ee}")
+    matches = [e for e in ENTRIES + ALTERNATIVE_ENTRIES
+               if (e.object_id, e.environment) == (target, environment)]
+    for entry in matches:
+        if task.ee == entry.ee:
             if target in PENDING_INTEGRATION:
                 raise ScriptedGraspUnavailable(f"SCRIPTED_GRASP_NOT_VALIDATED: {target}: {PENDING_INTEGRATION[target]}")
             return entry
+    if matches:
+        supported = '/'.join(e.ee for e in matches)
+        raise ValueError(f"SCRIPTED_GRASP_EE_MISMATCH: {target} requires {supported}, got {task.ee}")
     return None
