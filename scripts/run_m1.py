@@ -52,6 +52,31 @@ _ROBOCASA_CAM_PREFERENCES = ("robot0_robotview", "robot0_eye_in_hand")
 _ROBOCASA_SCENE_CAM_AZIMUTH = 180.0
 _ROBOCASA_SCENE_CAM_ELEVATION = -55.0
 _ROBOCASA_SCENE_CAM_MIN_DIST = 0.9
+# 태스크별 시점 오버라이드 (없는 태스크는 위 공통값 사용).
+# elevation 은 음수가 클수록 더 위에서 내려다봄(-90 = 탑다운).
+# c4_2: 상자 앞벽에 바게트가 가려져 점군이 작게 잡히므로 더 위에서 본다.
+# margin   : 물체가 프레임을 채우는 비율(기본 AUTO_FIT_MARGIN). 크게 → 카메라가 가까워짐.
+# min_dist : 거리 바닥값(기본 _ROBOCASA_SCENE_CAM_MIN_DIST). margin 올릴 때 같이 낮춰야 효과.
+# ── 태스크별 카메라 오버라이드 (6개 태스크 공통: robocasa 씬은 자유카메라, 네이티브
+#    c1_1/c2_1 은 고정 agentview 카메라를 이 값으로 옮긴다) ──
+# pos      : 카메라 위치 [x, y, z] (m, 월드). 이걸 주면 auto-fit 을 끄고 그 자리에 둔다.
+# lookat   : 바라볼 점 [x, y, z]. 생략하면 태스크 물체 중심을 자동으로 바라본다.
+# fovy     : 수직 화각(deg). 작게 → 확대(줌인), 크게 → 넓게. (기본 FOVY_OVERRIDE=60)
+# crop_pos / crop_lookat / crop_fovy : 2차 뷰(3/4 사선). 있으면 한 번 더 렌더해
+#            옆면 점군을 1차와 합치고(높이 복구), M3 재질 크롭은 이 뷰에서 자른다.
+_SCENE_CAM_OVERRIDES = {
+    # 시작값: 기존 output/로그의 auto 카메라(az=180°, el=-55°, dist≈0.9~1.0)를 옮긴 것.
+    # 좌표 = 월드(m). x↑=화면 아래, y=좌우, z↓=가까이. 직각은 pos x,y 를 lookat 에 0.02 남기고 붙이기.
+    # ── 네이티브(agentview) ──
+    "c1_1": {"lookat": [-0.075, 0.058, 0.878], "pos": [0.105, 0.058, 1.458]},
+    "c2_1": {"lookat": [-0.285, 0.16, 0.878], "pos": [-0.265, 0.16, 1.55],     # 1차: 탑다운
+             "crop_pos": [0.265, 0.148, 1.498]},                                  # 2차: 3/4 사선(기존 뷰)
+    # ── RoboCasa ──
+    "c1_2": {"lookat": [2.455, -3.188, 0.941], "pos": [2.482, -3.188, 1.398]},
+    "c2_2": {"lookat": [2.445, -3.020, 0.932], "pos": [2.537, -3.020, 1.658]},
+    "c4_1": {"lookat": [2.591, -3.221, 1.025], "pos": [2.655, -3.221, 1.634]},
+    "c4_2": {"lookat": [2.435, -3.137, 0.871], "pos": [2.496, -3.138, 1.607]},
+}
 H, W = 512, 512
 FOVY_OVERRIDE = 60.0        # None이면 씬 기본값(45°)
 AUTO_FIT = True             # True: 추적 객체 전부 프레임에 들어가게 카메라 위치 자동 조정
@@ -315,6 +340,32 @@ def object_bound_points(env, spec):
     return np.asarray(pts)
 
 
+def set_fixed_camera_pose(env, cid, pos, lookat):
+    """고정 카메라(cid)를 월드 pos 에 두고 lookat 을 바라보게 한다.
+
+    MuJoCo 카메라는 -z 가 시선, +y 가 화면 위. parent 가 world(회전 없음)인 카메라
+    (robosuite agentview 등) 기준. 네이티브 태스크의 pos/lookat 수동 모드에 쓴다.
+    """
+    from robosuite.utils import transform_utils as T
+    m, d = env.sim.model, env.sim.data
+    pos = np.asarray(pos, dtype=float)
+    fwd = np.asarray(lookat, dtype=float) - pos
+    n = float(np.linalg.norm(fwd))
+    if n < 1e-6:
+        sys.exit("[err] 카메라 pos 와 lookat 이 같습니다.")
+    fwd /= n
+    right = np.cross(fwd, np.array([0.0, 0.0, 1.0]))
+    if np.linalg.norm(right) < 1e-6:            # 정확히 위/아래를 볼 때
+        right = np.array([1.0, 0.0, 0.0])
+    right /= np.linalg.norm(right)
+    up = np.cross(right, fwd); up /= np.linalg.norm(up)
+    xyzw = T.mat2quat(np.column_stack([right, up, -fwd]))
+    env.sim.forward()
+    m.cam_pos[cid] += pos - d.cam_xpos[cid]     # 월드 위치로 이동
+    m.cam_quat[cid] = [xyzw[3], xyzw[0], xyzw[1], xyzw[2]]
+    env.sim.forward()
+
+
 def fit_camera_to_points(env, cid, pts, margin=0.85, iters=12):
     """시점 방향 고정, 위치만 이동: 좌우·상하 중앙정렬 + 프레임 초과 시 후진/여유 시 전진."""
     m, d = env.sim.model, env.sim.data
@@ -403,7 +454,8 @@ def _free_camera_intrinsic(h: int, w: int, fovy: float) -> np.ndarray:
 
 def _robocasa_scene_camera_distance(
     env, spec, center: np.ndarray, fovy: float, h: int, w: int,
-    azimuth: float, elevation: float, margin: float = AUTO_FIT_MARGIN
+    azimuth: float, elevation: float, margin: float = AUTO_FIT_MARGIN,
+    min_dist: float = _ROBOCASA_SCENE_CAM_MIN_DIST,
 ) -> float:
     """공통 방향은 유지하면서 모든 task object가 프레임에 들어오도록 distance만 계산."""
     import mujoco
@@ -419,7 +471,7 @@ def _robocasa_scene_camera_distance(
 
     pts = _robocasa_task_bound_points(env, spec)
     if len(pts) == 0:
-        return _ROBOCASA_SCENE_CAM_MIN_DIST
+        return min_dist
 
     ty = np.tan(np.radians(fovy) / 2)
     tx = ty * w / h
@@ -450,7 +502,7 @@ def _robocasa_scene_camera_distance(
             and np.abs(v).max() <= ty * margin
         )
 
-    lo, hi = _ROBOCASA_SCENE_CAM_MIN_DIST, 6.0
+    lo, hi = float(min_dist), 6.0
     if not fits(hi):
         return hi
 
@@ -461,11 +513,12 @@ def _robocasa_scene_camera_distance(
         else:
             lo = mid
 
-    return max(hi, _ROBOCASA_SCENE_CAM_MIN_DIST)
+    return max(hi, float(min_dist))
 
 
-def _setup_robocasa_scene_camera(env, *, lookat, distance, fovy):
-    """모든 RoboCasa 태스크에 동일한 정면-상단 사선 방향을 적용."""
+def _setup_robocasa_scene_camera(env, *, lookat, distance, fovy,
+                                 azimuth=None, elevation=None):
+    """RoboCasa 공통 정면-상단 사선 시점. azimuth/elevation 미지정 시 공통 상수."""
     import mujoco
 
     ctx = env.sim._render_context_offscreen
@@ -473,8 +526,8 @@ def _setup_robocasa_scene_camera(env, *, lookat, distance, fovy):
     cam.type = mujoco.mjtCamera.mjCAMERA_FREE
     cam.lookat[:] = lookat
     cam.distance = float(distance)
-    cam.azimuth = _ROBOCASA_SCENE_CAM_AZIMUTH
-    cam.elevation = _ROBOCASA_SCENE_CAM_ELEVATION
+    cam.azimuth = float(_ROBOCASA_SCENE_CAM_AZIMUTH if azimuth is None else azimuth)
+    cam.elevation = float(_ROBOCASA_SCENE_CAM_ELEVATION if elevation is None else elevation)
     env.sim.model.vis.global_.fovy = float(fovy)
 
 
@@ -530,6 +583,62 @@ def instance_segmentation(env, obs: dict, cam: str, h: int, w: int) -> np.ndarra
     ).reshape(h, w) + 1)
 
 
+def _orbit_from_pos(pos, lookat):
+    """카메라 pos/lookat → MuJoCo 자유카메라 (dist, azimuth, elevation). pos = lookat - dist*forward."""
+    pos = np.asarray(pos, dtype=float); look = np.asarray(lookat, dtype=float)
+    v = look - pos
+    dist = float(np.linalg.norm(v))
+    if dist < 1e-6:
+        sys.exit("[err] 카메라 pos 와 lookat 이 같습니다.")
+    f = v / dist
+    el = float(np.degrees(np.arcsin(np.clip(f[2], -1.0, 1.0))))
+    az = float(np.degrees(np.arctan2(f[1], f[0])))
+    return dist, az, el
+
+
+def _merge_object_points(a, b):
+    """두 뷰의 물체별 점군을 이름 기준으로 합친다 (둘 다 베이스 프레임 mm)."""
+    by = {o["name"]: dict(o) for o in a}
+    for o in b:
+        if o["name"] in by:
+            by[o["name"]]["points"] = np.vstack([by[o["name"]]["points"], o["points"]])
+        else:
+            by[o["name"]] = dict(o)
+    return list(by.values())
+
+
+def _render_second_view(env, spec, cam, name_of_id, cam_ov, lookat_default):
+    """2차 뷰(3/4 사선, crop_pos): 옆면 점군(높이) + 재질 크롭용. → (rgb, depth_m, seg, K, T)."""
+    pos = np.asarray(cam_ov["crop_pos"], dtype=float)
+    lookat = np.asarray(cam_ov.get("crop_lookat", lookat_default), dtype=float)
+    if spec["robocasa"]:
+        fovy = float(cam_ov.get("crop_fovy", env.sim.model.vis.global_.fovy))
+        dist, az, el = _orbit_from_pos(pos, lookat)
+        _setup_robocasa_scene_camera(env, lookat=lookat, distance=dist, fovy=fovy,
+                                     azimuth=az, elevation=el)
+        rgb, depth_m, geom_seg = _robocasa_scene_camera_render(env, H, W)
+        ctx = env.sim._render_context_offscreen
+        K = _free_camera_intrinsic(H, W, fovy)
+        T = _free_camera_extrinsic_from_scene(ctx)
+        seg, _ = robocasa_task_segmentation(env, spec, None, H, W, geom_seg=geom_seg)
+        print(f"[cam] 2차 뷰(사선/크롭): pos={np.round(pos, 3)} lookat={np.round(lookat, 3)} "
+              f"dist={dist:.2f} az={az:.0f}° el={el:.0f}° fovy={fovy:.1f}°")
+    else:
+        cid = env.sim.model.camera_name2id(cam)
+        if "crop_fovy" in cam_ov:
+            env.sim.model.cam_fovy[cid] = float(cam_ov["crop_fovy"])
+        set_fixed_camera_pose(env, cid, pos, lookat)
+        obs = env._get_observations(force_update=True)
+        K = CU.get_camera_intrinsic_matrix(env.sim, cam, H, W)
+        T = CU.get_camera_extrinsic_matrix(env.sim, cam)
+        depth_m = np.asarray(CU.get_real_depth_map(env.sim, obs[f"{cam}_depth"])).squeeze()
+        rgb = np.asarray(obs[f"{cam}_image"])
+        seg = instance_segmentation(env, obs, cam, H, W)
+        print(f"[cam] 2차 뷰(사선/크롭) {cam}: pos={np.round(pos, 3)} lookat={np.round(lookat, 3)} "
+              f"fovy={float(env.sim.model.cam_fovy[cid]):.1f}°")
+    return rgb, depth_m, seg, K, T
+
+
 def main():
     name = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else "c1_1"
     view = "--view" in sys.argv
@@ -559,32 +668,54 @@ def main():
         print(f"[env] robocasa task objects: {list(_robocasa_task_object_names(env))}")
         env.sim.forward()
 
-        fovy = FOVY_OVERRIDE or float(env.sim.model.vis.global_.fovy)
+        cam_ov = _SCENE_CAM_OVERRIDES.get(name, {})
+        # fovy: 태스크 오버라이드 > 전역 FOVY_OVERRIDE > 씬 기본. 작게 → 확대(줌인).
+        fovy = float(cam_ov.get("fovy", FOVY_OVERRIDE or env.sim.model.vis.global_.fovy))
         center = _robocasa_task_bound_center(env, spec)
-        dist = _robocasa_scene_camera_distance(
-            env,
-            spec,
-            center,
-            fovy,
-            H,
-            W,
-            azimuth=_ROBOCASA_SCENE_CAM_AZIMUTH,
-            elevation=_ROBOCASA_SCENE_CAM_ELEVATION,
-            margin=AUTO_FIT_MARGIN,
-        )
+        if "pos" in cam_ov:
+            # ── 수동 모드: 카메라 위치(x,y,z)를 직접 지정. auto-fit 을 쓰지 않는다.
+            #    lookat 미지정이면 태스크 물체 중심을 바라본다. MuJoCo 자유카메라 규약
+            #    (pos = lookat - dist*forward) 을 역산해 az/el/dist 로 변환한다.
+            pos = np.asarray(cam_ov["pos"], dtype=float)
+            center = np.asarray(cam_ov.get("lookat", center), dtype=float)
+            v = center - pos
+            dist = float(np.linalg.norm(v))
+            if dist < 1e-6:
+                sys.exit("[err] 카메라 pos 와 lookat 이 같습니다.")
+            f = v / dist
+            cam_el = float(np.degrees(np.arcsin(np.clip(f[2], -1.0, 1.0))))
+            cam_az = float(np.degrees(np.arctan2(f[1], f[0])))
+            cam_mode = f"수동 pos={np.round(pos, 3)}"
+        else:
+            # ── 자동 모드: 방향(az/el)은 고정, 물체가 프레임에 차도록 거리만 계산.
+            cam_az = cam_ov.get("azimuth", _ROBOCASA_SCENE_CAM_AZIMUTH)
+            cam_el = cam_ov.get("elevation", _ROBOCASA_SCENE_CAM_ELEVATION)
+            dist = _robocasa_scene_camera_distance(
+                env,
+                spec,
+                center,
+                fovy,
+                H,
+                W,
+                azimuth=cam_az,
+                elevation=cam_el,
+                margin=cam_ov.get("margin", AUTO_FIT_MARGIN),
+                min_dist=cam_ov.get("min_dist", _ROBOCASA_SCENE_CAM_MIN_DIST),
+            )
+            cam_mode = "auto-fit" + (" (태스크 오버라이드)" if cam_ov else "")
         _setup_robocasa_scene_camera(
             env,
             lookat=center,
             distance=dist,
             fovy=fovy,
+            azimuth=cam_az,
+            elevation=cam_el,
         )
 
         print(
-            f"[cam] RoboCasa common scene camera: "
+            f"[cam] RoboCasa scene camera [{cam_mode}]: "
             f"lookat={np.round(center, 3)} dist={dist:.2f} "
-            f"az={_ROBOCASA_SCENE_CAM_AZIMUTH:.0f}° "
-            f"el={_ROBOCASA_SCENE_CAM_ELEVATION:.0f}° "
-            f"fovy={fovy:.1f}°"
+            f"az={cam_az:.0f}° el={cam_el:.0f}° fovy={fovy:.1f}°"
         )
 
         rgb, depth_m, geom_seg = _robocasa_scene_camera_render(env, H, W)
@@ -599,22 +730,33 @@ def main():
         print(f"[env] tracked: {[v[0] for v in name_of_id.values()]}")
     else:
         cid0 = env.sim.model.camera_name2id(cam)
-        if FOVY_OVERRIDE:
-            print(f"[cam] fovy {env.sim.model.cam_fovy[cid0]:.1f}° -> {FOVY_OVERRIDE:.1f}°")
-            env.sim.model.cam_fovy[cid0] = FOVY_OVERRIDE
-        if AUTO_FIT:
+        cam_ov = _SCENE_CAM_OVERRIDES.get(name, {})
+        fovy_ov = cam_ov.get("fovy", FOVY_OVERRIDE)
+        if fovy_ov:
+            print(f"[cam] fovy {env.sim.model.cam_fovy[cid0]:.1f}° -> {float(fovy_ov):.1f}°")
+            env.sim.model.cam_fovy[cid0] = float(fovy_ov)
+        if "pos" in cam_ov:
+            # 수동 모드: 고정 카메라를 지정 위치로 옮기고 lookat(미지정 시 물체 중심)을 향하게.
+            env.sim.forward()
+            lookat = cam_ov.get("lookat")
+            if lookat is None:
+                pts = object_bound_points(env, spec)
+                lookat = pts.mean(axis=0) if len(pts) else env.sim.data.cam_xpos[cid0] + [0, 0, -1]
+            set_fixed_camera_pose(env, cid0, cam_ov["pos"], lookat)
+            print(f"[cam] {cam} 수동 pos={np.round(cam_ov['pos'], 3)} lookat={np.round(lookat, 3)}")
+        elif AUTO_FIT:
             env.sim.forward()
             pos = fit_camera_to_points(env, cid0, object_bound_points(env, spec),
                                         margin=AUTO_FIT_MARGIN)
             print(f"[cam] auto-fit -> pos={np.round(pos, 3)} (margin={AUTO_FIT_MARGIN})")
-        if FOVY_OVERRIDE or AUTO_FIT:
+        if fovy_ov or AUTO_FIT or "pos" in cam_ov:
             env.sim.forward()
             obs = env._get_observations(force_update=True)
 
         K = CU.get_camera_intrinsic_matrix(env.sim, cam, H, W)
         T = CU.get_camera_extrinsic_matrix(env.sim, cam)
         depth_m = np.asarray(CU.get_real_depth_map(env.sim, obs[f"{cam}_depth"])).squeeze()
-        rgb = None
+        rgb = np.asarray(obs[f"{cam}_image"])     # 2차 뷰가 obs 를 덮어쓰므로 지금 확보
         seg = instance_segmentation(env, obs, cam, H, W)
         inst_keys = list(env.model.instances_to_ids.keys())
         name_of_id = {}                               # seg 픽셀값 = 키 순서 인덱스 + 1
@@ -630,7 +772,7 @@ def main():
     print(f"[env] robot base offset (mm): {base_off[:2]}")
 
     if spec["robocasa"]:
-        fovy = FOVY_OVERRIDE or float(env.sim.model.vis.global_.fovy)
+        fovy = float(env.sim.model.vis.global_.fovy)   # 카메라 설정 시 넣은 값(태스크 fovy 반영)
         fovx = float(np.degrees(
             2 * np.arctan(np.tan(np.radians(fovy) / 2) * W / H)
         ))
@@ -657,6 +799,26 @@ def main():
         )
 
     objects = points_from_frame(depth_m, seg, K, T, name_of_id, base_offset_mm=base_off)
+    # ── 2차 뷰(3/4 사선): crop_pos 가 있으면 옆면 점군을 합치고 크롭은 이 뷰에서 자른다 ──
+    cam_ov = _SCENE_CAM_OVERRIDES.get(name, {})
+    crop_rgb, crop_seg = rgb, seg
+    if "crop_pos" in cam_ov:
+        if "lookat" in cam_ov:
+            look0 = cam_ov["lookat"]
+        else:
+            pts0 = np.vstack([o["points"] for o in objects]) if objects else np.zeros((1, 3))
+            look0 = pts0.mean(axis=0) / 1000.0 + np.asarray(base_off) / 1000.0
+        rgb2, depth2, seg2, K2, T2 = _render_second_view(env, spec, cam, name_of_id, cam_ov, look0)
+        objects2 = points_from_frame(depth2, seg2, K2, T2, name_of_id, base_offset_mm=base_off)
+        n_before = {o["name"]: len(o["points"]) for o in objects}
+        objects = _merge_object_points(objects, objects2)
+        for o in objects:
+            n1 = n_before.get(o["name"], 0)
+            print(f"     {o['name']:24s} points: 1차 {n1} + 2차 {len(o['points']) - n1} = {len(o['points'])}")
+        crop_rgb, crop_seg = rgb2, seg2
+        from PIL import Image as _Im
+        OUT.mkdir(parents=True, exist_ok=True)
+        _Im.fromarray(rgb2).save(OUT / "frame_crop.png")
     print(f"[M1] detected {len(objects)}/{len(name_of_id)} tracked instances")
     for o in objects:
         print(f"     {o['name']:24s} points={len(o['points'])}")
@@ -678,7 +840,7 @@ def main():
     Image.fromarray(ov).save(OUT / "frame_masks.png")
     # 크롭 파일명 = 노드 id. inst 이름을 그대로 키로 (multi-underscore 이름도 안전)
     node_ids = {o["name"]: f"obj_{o['cls']}_{o['name']}" for o in objects}
-    save_crops(rgb, seg, name_of_id, node_ids, OUT / "crops")
+    save_crops(crop_rgb, crop_seg, name_of_id, node_ids, OUT / "crops")   # 2차 뷰 있으면 그 프레임
     print(f"[M1] nodes={len(m1['nodes'])} edges={len(m1['edges'])} "
           f"crops={len(list((OUT / 'crops').glob('*.png')))}")
     for e in m1["edges"]:

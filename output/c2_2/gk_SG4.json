@@ -5,120 +5,60 @@
       "queried_by": [
         "SG4_d1_p0",
         "SG4_d1_p1",
-        "SG4_d1_p2"
+        "SG4_d1_p2",
+        "SG4_d1_p1"
       ],
       "geometry": {
-        "length_mm": 57.4,
+        "length_mm": 57.5,
         "diameter_mm": null,
         "extents_mm": [
-          57.4,
-          56.3,
+          57.5,
+          56.2,
           1.5
         ],
-        "height_z_mm": 1.5,
+        "height_z_mm": 1.6,
         "cylinder_like": false,
-        "surface_rms_mm": 0.0
+        "surface_rms_mm": 0.0,
+        "seal_patch_rms_mm": 0.001,
+        "footprint_mm": [
+          54.1,
+          56.7
+        ],
+        "height_mm": 1.6
       },
-      "material": "plastic",
-      "density_kgm3": 1742.5,
-      "mass_kg": 0.005,
-      "youngs_gpa": 28.11,
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.002,
+      "youngs_gpa": null,
       "mu": {
-        "mu": 0.333,
+        "mu": 0.428,
         "stage": 0,
-        "material": "plastic",
+        "material": "unknown",
         "rms_mm": 0.0
       },
-      "confidence": 0.35,
-      "mass_range_kg": [
-        0.002,
-        0.008
-      ],
-      "materials_topk": [
-        {
-          "name": "plastic",
-          "prob": 0.35,
-          "density_kgm3": [
-            900.0,
-            1300.0
-          ],
-          "thickness_cm": [
-            0.2,
-            0.5
-          ]
-        },
-        {
-          "name": "rubber",
-          "prob": 0.3,
-          "density_kgm3": [
-            500.0,
-            1200.0
-          ],
-          "thickness_cm": [
-            0.2,
-            0.5
-          ]
-        },
-        {
-          "name": "metal",
-          "prob": 0.15,
-          "density_kgm3": [
-            2700.0,
-            8000.0
-          ],
-          "thickness_cm": [
-            0.1,
-            0.3
-          ]
-        },
-        {
-          "name": "ceramic",
-          "prob": 0.1,
-          "density_kgm3": [
-            1800.0,
-            3000.0
-          ],
-          "thickness_cm": [
-            0.5,
-            1.0
-          ]
-        },
-        {
-          "name": "wood",
-          "prob": 0.1,
-          "density_kgm3": [
-            300.0,
-            900.0
-          ],
-          "thickness_cm": [
-            0.5,
-            1.0
-          ]
-        }
-      ],
-      "caption": "Round red object",
+      "confidence": 0.5,
       "ee": {
         "2F": {
           "feasible": true,
-          "margin": 4.995,
+          "margin": 4.998,
           "margin_unit": "kg",
-          "reason": "질량 0.005 vs 페이로드 5.0kg",
+          "reason": "질량 0.002 vs 페이로드 5.0kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 56.3,
+              "value": 54.1,
               "limit": 85.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.005,
+              "value": 0.002,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.074,
+              "value": 0.023,
               "limit": 235.0,
               "pass": true
             }
@@ -126,25 +66,25 @@
         },
         "3F": {
           "feasible": true,
-          "margin": 2.495,
+          "margin": 2.498,
           "margin_unit": "kg",
-          "reason": "질량 0.005 vs 페이로드 2.5kg",
+          "reason": "질량 0.002 vs 페이로드 2.5kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 56.3,
+              "value": 54.1,
               "limit": 140.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.005,
+              "value": 0.002,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.074,
+              "value": 0.023,
               "limit": 60.0,
               "pass": true
             }
@@ -152,9 +92,9 @@
         },
         "vac": {
           "feasible": true,
-          "margin": 0.495,
+          "margin": 0.498,
           "margin_unit": "kg",
-          "reason": "질량 0.005 vs 페이로드 0.5kg",
+          "reason": "질량 0.002 vs 페이로드 0.5kg",
           "checks": [
             {
               "rule": "flatness",
@@ -164,14 +104,20 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.005,
+              "value": 0.002,
               "limit": 0.5,
               "pass": true
             },
             {
               "rule": "seal_contact",
               "value": 30.0,
-              "limit": 56.3,
+              "limit": 56.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.001,
+              "limit": 1.5,
               "pass": true
             }
           ]
@@ -182,6 +128,15 @@
         "reach_mm": 850,
         "reachable": true,
         "margin_mm": 157.8
+      },
+      "predicates": {
+        "top_exposed": {
+          "value": false,
+          "blockers": [
+            "obj_tomato_plate_tomato_plate"
+          ],
+          "queried_by": "SG4_d1_p1"
+        }
       }
     }
   },
@@ -191,8 +146,8 @@
       "from": "obj_tomato_slice_tomato_slice",
       "to": "obj_cheese_cheese_1",
       "type": "fits_inside",
-      "value_mm": -31.4,
-      "check": "opening_22.7 - footprint_54.1",
+      "value_mm": -35.4,
+      "check": "opening_18.7 - footprint_54.1",
       "pass": false
     },
     {
@@ -200,9 +155,9 @@
       "from": "obj_tomato_slice_tomato_slice",
       "to": "obj_cheese_cheese_1",
       "type": "clearance",
-      "value_mm": 0.9,
-      "check": "container_depth_2.4 - target_height_1.5",
-      "pass": true
+      "value_mm": -35.4,
+      "check": "floor_fit(open_18.7-base_54.1) & no_tip(h_1.6<=3.0x54.1)",
+      "pass": false
     }
   ],
   "flags": {

@@ -23,12 +23,24 @@ def fits_inside(target: dict, container: dict, wall_mm: float = 4.0) -> dict:
             "pass": bool(v > 0)}
 
 
-def depth_clearance(target: dict, container: dict) -> dict:
-    """컨테이너 깊이 − 대상 높이 (음수 = 세워 담으면 돌출)."""
-    v = container["bbox_mm"][2] - target["bbox_mm"][2]
-    return {"type": "clearance", "value_mm": round(v, 1),
-            "check": f"container_depth_{container['bbox_mm'][2]} - target_height_{target['bbox_mm'][2]}",
-            "pass": bool(v > 0)}
+def depth_clearance(target: dict, container: dict, wall_mm: float = 4.0,
+                    tip_ratio: float = 3.0) -> dict:
+    """컨테이너가 대상을 담아 둘 수 있는가 — '깊이>높이'가 아니라 바닥 면적 수용 +
+    전도 없음으로 판정(0902). 얕은 트레이여도 물체가 바닥에 앉고 넘어지지 않으면 담기 OK.
+      · 바닥 수용: 대상 footprint(최소변) ≤ 컨테이너 개구(외곽 − 벽두께)
+      · 전도 없음: 대상 높이 ≤ tip_ratio × 바닥 최소변 (가늘고 높은 물체만 탈락)
+    value_mm = 두 여유 중 빡빡한 쪽. (종전: 깊이 25mm 트레이에서 사과/빵/머그 전부 unsat)"""
+    open_w = container["bbox_mm"][0] - 2 * wall_mm
+    open_d = container["bbox_mm"][1] - 2 * wall_mm
+    base = min(target["bbox_mm"][0], target["bbox_mm"][1])
+    h = target["bbox_mm"][2]
+    floor_margin = min(open_w, open_d) - base
+    tip_margin = tip_ratio * base - h
+    v = min(floor_margin, tip_margin)
+    return {"type": "clearance", "value_mm": round(float(v), 1),
+            "check": (f"floor_fit(open_{round(min(open_w, open_d), 1)}-base_{round(base, 1)})"
+                      f" & no_tip(h_{round(h, 1)}<={tip_ratio}x{round(base, 1)})"),
+            "pass": bool(floor_margin > 0 and tip_margin > 0)}
 
 
 def gap(node_a: dict, node_b: dict, max_pts: int = 1500) -> dict:
@@ -69,6 +81,33 @@ def opening_pass(passer: dict, opening_height_mm: float, pass_height_mm: float) 
     return {"type": "opening_pass", "value_mm": round(v, 1),
             "check": f"opening_{opening_height_mm} - pass_height_{pass_height_mm}",
             "pass": bool(v > 0)}
+
+
+def gap_access(tool: dict, target: dict, gap_width_mm: float | None = None,
+               tip_ratio: float = None) -> dict:
+    """gap_accessible(?tool, ?target) 접지(0901 어휘 확장): 도구가 틈에 진입해
+    대상에 닿을 수 있는가. 3조건을 bbox 산술로 — 전부 도구/대상 치수 비교, VLM 0회.
+      · thickness_lt_gap : 도구 최소 두께 < 틈 폭
+      · contact_le_target: 도구 접촉폭(중간 치수) ≤ 대상 최대 폭 (물거나 긁을 수 있음)
+      · reach_ge_depth   : 도구 최대 길이 ≥ 진입 깊이(대상 높이 근사)
+    gap_width_mm 미지정 시 대상 최소변으로 근사(틈에 낀 대상 자신의 폭)."""
+    t = sorted(tool["bbox_mm"])
+    tool_thick, tool_contact, tool_len = t[0], t[1], t[2]
+    gap_w = gap_width_mm if gap_width_mm is not None else min(target["bbox_mm"])
+    target_w = max(target["bbox_mm"][0], target["bbox_mm"][1])
+    depth = target["bbox_mm"][2]
+    checks = [
+        {"rule": "thickness_lt_gap", "value_mm": round(tool_thick, 1),
+         "limit_mm": round(gap_w, 1), "pass": bool(tool_thick < gap_w)},
+        {"rule": "contact_le_target", "value_mm": round(tool_contact, 1),
+         "limit_mm": round(target_w, 1), "pass": bool(tool_contact <= target_w)},
+        {"rule": "reach_ge_depth", "value_mm": round(tool_len, 1),
+         "limit_mm": round(depth, 1), "pass": bool(tool_len >= depth)},
+    ]
+    margin = min(gap_w - tool_thick, target_w - tool_contact, tool_len - depth)
+    return {"type": "gap_accessible", "value_mm": round(float(margin), 1),
+            "check": "thickness<gap & contact<=target & reach>=depth",
+            "checks": checks, "pass": bool(all(c["pass"] for c in checks))}
 
 
 # ── 0828 신규 (프로토타입, 수빈 작성 — push 전 협의) ────────────────────────
