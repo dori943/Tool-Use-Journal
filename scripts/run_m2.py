@@ -87,7 +87,8 @@ def main():
     m1_json = None
     if "--m1-json" in sys.argv:
         m1_json = sys.argv[sys.argv.index("--m1-json") + 1]
-    tdir = os.path.join("output", name)      # output/c1_1/ (main의 M1·M3 폴더와 동일 명명)
+    tdir = (os.path.abspath(sys.argv[sys.argv.index("--output-dir") + 1])
+            if "--output-dir" in sys.argv else os.path.join("output", name))
     os.makedirs(tdir, exist_ok=True)
     if not m1_json and os.path.exists(os.path.join(tdir, "m1.json")):
         m1_json = os.path.join(tdir, "m1.json")             # M1 모듈 출력 자동 사용

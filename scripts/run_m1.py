@@ -536,7 +536,10 @@ def main():
     if name not in TASK_ENVS:
         sys.exit(f"[err] unknown task {name!r}. 등록된 태스크: {list(TASK_ENVS)}")
     spec = task_spec(name)
-    OUT = ROOT / "output" / name
+    OUT = (Path(sys.argv[sys.argv.index("--output-dir") + 1]).resolve()
+           if "--output-dir" in sys.argv else ROOT / "output" / name)
+    if "--seed" in sys.argv:
+        np.random.seed(int(sys.argv[sys.argv.index("--seed") + 1]))
     cam = _initial_camera_name(spec)
 
     make_kwargs = dict(
@@ -546,6 +549,8 @@ def main():
         camera_depths=True,
         render_camera=cam, ignore_done=True,
     )
+    if "--seed" in sys.argv:
+        make_kwargs["seed"] = int(sys.argv[sys.argv.index("--seed") + 1])
     if spec["robocasa"]:
         print("[env] RoboCasa Kitchen: camera_segmentations unsupported; "
               "using task-object visual geom segmentation")

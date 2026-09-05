@@ -154,7 +154,7 @@ def stage_m1(task, out, args):
     module = load_script("run_m1")
     if task not in TASK_ENV:
         sys.exit(f"[err] 등록되지 않은 태스크 {task!r}. 등록됨: {list(TASK_ENV)}")
-    argv = [task] + (["--view"] if args.view else [])
+    argv = [task, "--output-dir", str(out), "--seed", str(args.seed)] + (["--view"] if args.view else [])
     call_main(module, argv, "run_m1")
 
 
@@ -172,7 +172,7 @@ def stage_m2(task, out, args, pass_no):
         print(f"[M2] 이전 m3.json 을 {backup.name} 으로 옮기고 새로 분해합니다.")
 
     module = load_script("run_m2")
-    argv = [task]
+    argv = [task, "--output-dir", str(out)]
     if args.m1_json:
         argv += ["--m1-json", str(out / "m1.json")]
     call_main(module, argv, "run_m2")
@@ -190,7 +190,7 @@ def stage_m3(task, out, args, label="M3"):
     before = {p: p.stat().st_mtime for p in _gk_files(out)}
     module = load_script("run_m3")
     argv = [task, "--backend", args.backend, "--model", args.model,
-            "--memory", args.memory]
+            "--memory", args.memory, "--output-dir", str(out)]
     call_main(module, argv, "run_m3")
     fresh = [p for p in _gk_files(out)
              if p not in before or p.stat().st_mtime > before[p]]
@@ -382,7 +382,8 @@ def stage_m5(task, out, args):
         argv = ["--task-planner", str(m4),
                 "--environment", env_name,
                 "--output-dir", str(m5_dir),
-                "--seed", str(args.seed)]
+                "--seed", str(args.seed),
+                "--provider", os.environ["TUJ_LLM_PROVIDER"]]
         if args.m5_validate_only:
             argv.append("--validate-input-only")
         elif args.m5_simulate:
@@ -413,6 +414,8 @@ def build_parser():
                    help="M1 JSON 경로 직접 지정 (지정 시 씬 재로드 없음)")
     p.add_argument("--seed", type=int, default=0,
                    help="씬 배치 난수 시드 — M1 과 M5 환경 생성에 동일 적용")
+    p.add_argument("--output-dir", type=Path,
+                   help="별도 M1~M5 실행 폴더 (기본 output/<task>)")
     p.add_argument("--backend", default="siphy", choices=("siphy", "mock"),
                    help="M3 물성 백엔드")
     p.add_argument("--model", default=None,
@@ -477,7 +480,7 @@ def main():
     args = build_parser().parse_args()
     _resolve_llm(args)
     task = args.task
-    out = ROOT / "output" / task
+    out = args.output_dir.resolve() if args.output_dir else ROOT / "output" / task
     out.mkdir(parents=True, exist_ok=True)
     start = STAGES.index(args.start_from) if args.start_from else 0
     stop = STAGES.index(args.stop_after) if args.stop_after else len(STAGES) - 1

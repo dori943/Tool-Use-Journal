@@ -118,7 +118,8 @@ def main():
     model = args[args.index("--model") + 1] if "--model" in args else "gpt-4o-mini"
     memory_path = args[args.index("--memory") + 1] if "--memory" in args else str(ROOT / "output" / "memory.json")
 
-    OUT = ROOT / "output" / name
+    OUT = (Path(args[args.index("--output-dir") + 1]).resolve()
+           if "--output-dir" in args else ROOT / "output" / name)
     if not (OUT / "m1.json").exists():
         sys.exit(f"[err] {OUT}/m1.json 없음 — 먼저 python scripts/run_m1.py {name}")
 

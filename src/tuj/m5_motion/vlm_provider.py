@@ -206,6 +206,8 @@ def _prompt_payload(request: MotionPlanRequest, candidate_count: int) -> dict[st
             "candidate_count": candidate_count,
             "task": task,
             "world": world,
+            "held_object_grasp": request.world.metadata.get("contact_friction_held_objects", {}),
+            "held_transport_goal": request.task.metadata.get("held_transport_goal"),
             "allowed_frames_and_anchors": _frame_catalog(request),
             "constraints": {
                 "collision_margin_m": request.constraints.collision_margin_m,
@@ -235,6 +237,16 @@ Hard rules:
 - offset_along_approach_m is in metres and roll_rad is in radians.
 - Give every strategy and keyframe a short, stable, unique identifier.
 - Each strategy is an ordered, coherent route for the supplied single subgoal.
+- For a held TRANSPORT/MOVE, the object is already grasped. Do not approach or
+  regrasp its current center. Route the held object to target_region_id.
+- When held_transport_goal is supplied, its anchor is the measured grasp-offset
+  corrected EEF destination above that region. End every strategy at exactly
+  that frame_ref/anchor with zero offset. Preserve its approach axis, tool axis,
+  and roll on every keyframe (transform the axis if using a different frame).
+  Diversify the transit route and clearance, not the established grasp posture.
+- held_transport_goal already includes rim clearance. Include at least one
+  direct SAMPLING_BASED transfer to that anchor with zero extra offset; do not
+  make every candidate add a high standoff that can exceed the arm's reach.
 - PICK strategies must include a GRASP keyframe followed by LIFT or RETREAT.
 - PLACE strategies must include a PLACE keyframe followed by RETREAT.
 - PICK_TOOL strategies use GRASP then LIFT/RETREAT; RETURN_TOOL strategies use
@@ -250,6 +262,9 @@ performed later by deterministic robot code. Your output is only a proposal set.
 
 class OpenAIKeyframeProvider:
     """Generate and freeze multiple keyframe strategies with Structured Outputs."""
+
+    provider_name = "OpenAI"
+    prompt_version = _PROMPT_VERSION
 
     def __init__(
         self,
@@ -313,7 +328,7 @@ class OpenAIKeyframeProvider:
     ) -> KeyframePlanArtifact:
         if len(generated.candidates) != self.config.candidate_count:
             raise OpenAIKeyframeProviderError(
-                "OpenAI response candidate count does not match the request"
+                f"{self.provider_name} response candidate count does not match the request"
             )
         resolver = RelativePoseResolver(request.world)
         strategies: list[KeyframePlanCandidate] = []
@@ -436,7 +451,7 @@ class OpenAIKeyframeProvider:
                     rationale=proposed.rationale,
                     provenance=StrategyGenerationProvenance(
                         generator_kind=StrategyGeneratorKind.VLM,
-                        generator_id=_PROMPT_VERSION,
+                        generator_id=self.prompt_version,
                         input_hash=prompt_hash,
                         model_id=self.config.model,
                         prompt_hash=prompt_hash,
@@ -449,7 +464,7 @@ class OpenAIKeyframeProvider:
         if not strategies:
             details = "; ".join(rejected_candidates)
             raise OpenAIKeyframeProviderError(
-                "OpenAI response contained no valid keyframe candidates"
+                f"{self.provider_name} response contained no valid keyframe candidates"
                 + (f": {details}" if details else "")
             )
 
@@ -467,11 +482,12 @@ class OpenAIKeyframeProvider:
                 artifact_id=f"keyframe-plan-artifact:{artifact_hash[:24]}",
                 artifact_type="KeyframePlanArtifact",
                 produced_by=ModuleName.MOTION_PLANNER,
-                invocation_id=f"openai-keyframes:{request.request_id}",
+                invocation_id=f"{self.provider_name.lower()}-keyframes:{request.request_id}",
                 input_artifact_ids=[request.provenance.artifact_id],
                 metadata={
                     "model": self.config.model,
-                    "prompt_version": _PROMPT_VERSION,
+                    "prompt_version": self.prompt_version,
+                    "provider": self.provider_name.lower(),
                     "provider_request_id": response_id,
                     "rejected_candidate_count": len(rejected_candidates),
                     "rejected_candidates": rejected_candidates,
@@ -482,13 +498,27 @@ class OpenAIKeyframeProvider:
             candidates=strategies,
         )
 
+    def _request_response(self, instructions: str, payload: dict[str, Any]) -> Any:
+        return self._openai_client().responses.parse(
+            model=self.config.model,
+            instructions=instructions,
+            input=_canonical_json(payload),
+            text_format=GeneratedKeyframeBatch,
+            reasoning={"effort": self.config.reasoning_effort},
+            max_output_tokens=self.config.max_output_tokens,
+            store=False,
+            timeout=self.config.timeout_s,
+        )
+
     def generate(self, request: MotionPlanRequest) -> KeyframePlanArtifact:
         payload = _prompt_payload(request, self.config.candidate_count)
         instructions = _system_instructions(self.config.candidate_count)
         prompt_hash = _sha256(
             {
-                "version": _PROMPT_VERSION,
+                "version": self.prompt_version,
                 "model": self.config.model,
+                "reasoning_effort": self.config.reasoning_effort,
+                "max_output_tokens": self.config.max_output_tokens,
                 "instructions": instructions,
                 "payload": payload,
             }
@@ -513,22 +543,13 @@ class OpenAIKeyframeProvider:
             return cached
 
         try:
-            response = self._openai_client().responses.parse(
-                model=self.config.model,
-                instructions=instructions,
-                input=_canonical_json(payload),
-                text_format=GeneratedKeyframeBatch,
-                reasoning={"effort": self.config.reasoning_effort},
-                max_output_tokens=self.config.max_output_tokens,
-                store=False,
-                timeout=self.config.timeout_s,
-            )
-        except MissingOpenAIAPIKeyError:
+            response = self._request_response(instructions, payload)
+        except OpenAIKeyframeProviderError:
             raise
         except Exception as error:  # noqa: BLE001 - SDK error surface varies
             raise OpenAIKeyframeProviderError(
-                f"OpenAI Responses request failed ({type(error).__name__})"
-            ) from error
+                f"{self.provider_name} keyframe request failed ({type(error).__name__})"
+            ) from None
 
         parsed = getattr(response, "output_parsed", None)
         if parsed is None:
@@ -542,7 +563,7 @@ class OpenAIKeyframeProvider:
                 else ""
             )
             raise OpenAIKeyframeProviderError(
-                f"OpenAI response {response_id!r} had no parsed output "
+                f"{self.provider_name} response {response_id!r} had no parsed output "
                 f"(status={status}{reason_suffix})"
             )
         if not isinstance(parsed, GeneratedKeyframeBatch):
@@ -550,7 +571,7 @@ class OpenAIKeyframeProvider:
                 parsed = GeneratedKeyframeBatch.model_validate(parsed)
             except ValidationError as error:
                 raise OpenAIKeyframeProviderError(
-                    "OpenAI response did not match the keyframe batch schema"
+                    f"{self.provider_name} response did not match the keyframe batch schema"
                 ) from error
 
         artifact = self._convert(
