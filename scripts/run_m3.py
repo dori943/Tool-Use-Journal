@@ -44,6 +44,9 @@ HEAD_MAP = {
     "gap":            ("relational", "gap"),
     "distance":       ("relational", "distance"),
     "clearance":      ("relational", "clearance"),
+    # 0901 어휘 확장(도희): flat_face(도구 평평면), gap_accessible(도구가 틈 진입 가능)
+    "flat_face":      ("flat_face", None),
+    "gap_accessible": ("gap_accessible", None),
     # 집합형(batch/swept_space): m2_queries가 직접 실어야 함, 컴파일러는 스킵
     "batch_feasible":  ("__skip__", None),
     "act_space_clear": ("__skip__", None),
@@ -64,10 +67,36 @@ def crop_of(out, node_id):
     return p if p.exists() else None
 
 
+def _split_args(expr):
+    """expr의 최상위 인자만 분리 — 중괄호 집합 {a,b,c}는 하나의 토큰으로 유지.
+    (종전: 단순 콤마 분리가 집합을 쪼개 원소가 개별 인자로 새어 나갔다 —
+     c2_1 fits(집합,트레이) → (빵,머그) 같은 엉뚱한 쌍의 원인)."""
+    inner = expr.split("(", 1)[-1].rsplit(")", 1)[0]
+    args, depth, cur = [], 0, ""
+    for ch in inner:
+        if ch == "{":
+            depth += 1; cur += ch
+        elif ch == "}":
+            depth -= 1; cur += ch
+        elif ch == "," and depth == 0:
+            args.append(cur); cur = ""
+        else:
+            cur += ch
+    if cur.strip():
+        args.append(cur)
+    return [a for a in (x.strip() for x in args) if a]
+
+
 def compile_predicates(m2, ids, aliases):
-    """details의 eval_by:m3 술어 중 미질의/미해결 → 질의 목록으로 컴파일."""
+    """details의 eval_by:m3 술어 중 미질의/미해결 → 질의 목록으로 컴파일.
+    집합 {a,b,c} 인자는 원소별로 펼쳐 질의한다 (0828 C2_1 계약)."""
     def resolve(tok, sg):
         tok = tok.strip()
+        if tok.startswith("{") and tok.endswith("}"):     # 집합 → 원소별 해석 후 합침
+            acc = []
+            for m in tok[1:-1].split(","):
+                acc += resolve(m, sg)
+            return acc
         if tok.startswith("obj_"):
             return [tok] if tok in ids else []
         if tok.startswith("?"):
@@ -88,23 +117,31 @@ def compile_predicates(m2, ids, aliases):
                 kind, relation = HEAD_MAP[head]
                 if kind == "__skip__":
                     continue
-                args = [a for a in p["expr"].split("(", 1)[-1].rstrip(")").split(",")
-                        if not a.strip().startswith("{")]
-                targets = [resolve(a, sg) for a in args] or [[]]
+                targets = [resolve(a, sg) for a in _split_args(p["expr"])] or [[]]
                 base = {"subgoal_id": sg["subgoal_id"], "queried_by": p["id"], "kind": kind}
                 if kind == "relational":
-                    a_list, b_list = (targets + [[]])[:2]
-                    for a in a_list:
+                    a_list = targets[0]
+                    b_list = targets[1] if len(targets) > 1 else []
+                    for a in a_list:                        # 집합 target → (원소, 컨테이너)
                         for b in b_list:
                             out.append(base | {"a": a, "b": b, "relation": relation})
                     if not (a_list and b_list):
                         out.append(base | {"kind": "error",
                                            "error": f"unresolved args in {p['expr']!r} "
                                                     f"(별칭/노드 미해결 — m1 추적 대상 확인)"})
-                else:
+                elif kind == "gap_accessible":              # (?tool, ?target)
+                    tools = targets[0]
+                    tgts = targets[1] if len(targets) > 1 else []
+                    for ttool in tools:
+                        for tgt in tgts:
+                            out.append(base | {"tool_id": ttool, "target_id": tgt})
+                    if not (tools and tgts):
+                        out.append(base | {"kind": "error",
+                                           "error": f"unresolved args in {p['expr']!r}"})
+                else:                                       # ee/top_exposed/clear/flat_face
                     nodes = targets[-1] if head == "ee_usable" else targets[0]
-                    for n in nodes:
-                        out.append(base | {"node_id": n})
+                    for nd in nodes:
+                        out.append(base | {"node_id": nd})
                     if not nodes:
                         out.append(base | {"kind": "error",
                                            "error": f"unresolved args in {p['expr']!r}"})
@@ -158,12 +195,15 @@ def main():
         aliases = {"tool_rest": [i for i in ids
                                  if "rack" in i.lower() and "gripperrack" not in i.lower()]}
         compiled = compile_predicates(m2, ids, aliases)
-        key = lambda q: (q["queried_by"], q.get("node_id") or (q.get("a"), q.get("b")))
+        key = lambda q: (q["queried_by"], q["kind"],
+                         q.get("node_id") or (q.get("a"), q.get("b"))
+                         or (q.get("tool_id"), q.get("target_id")))
         already = {key(q) for q in queries}
         compiled = [q for q in compiled if key(q) not in already]
         for q in compiled:
-            print(f"  [compile] {q['queried_by']} -> {q['kind']}"
-                  f"({q.get('node_id') or (q.get('a'), q.get('b')) or q.get('error')})")
+            tgt = (q.get("node_id") or (q.get("a"), q.get("b"))
+                   or (q.get("tool_id"), q.get("target_id")) or q.get("error"))
+            print(f"  [compile] {q['queried_by']} -> {q['kind']}({tgt})")
         queries += compiled
         for sg in m2.get("m2_subgoals", []):
             sel = set(sg.get("object_ids", []))
@@ -207,6 +247,11 @@ def main():
                 r = mat.query_top_exposed(gk, q["node_id"], queried_by=qid)
             elif kind == "clear":
                 r = mat.query_clear(gk, q["node_id"], queried_by=qid)
+            elif kind == "flat_face":
+                r = mat.query_flat_face(gk, q["node_id"], queried_by=qid)
+            elif kind == "gap_accessible":
+                r = mat.query_gap_accessible(gk, q["tool_id"], q["target_id"],
+                                             queried_by=qid)
             elif kind in ("batch", "swept_space"):
                 call = {"kind": kind, "action_type": q.get("action_type"),
                         "actor": q.get("actor"), "member_ids": q.get("member_ids", []),
