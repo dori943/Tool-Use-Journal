@@ -813,6 +813,8 @@ class MotionPlanBuilder:
                             "DETACH_OBJECT target does not match attached object"
                         )
                     current_attached_object_id = None
+                    if event_target == current_held_tool_id:
+                        current_held_tool_id = None
                 elif event_type in {
                     KeyframeEventType.GRIPPER_CLOSE,
                     KeyframeEventType.SUCTION_ON,

@@ -208,7 +208,9 @@ def _run_physical(argv: list[str]) -> int:
 
 def main(argv: Sequence[str] | None = None) -> int:
     for source_root in reversed(SOURCE_ROOTS):
-        if source_root.is_dir() and str(source_root) not in sys.path:
+        if source_root.is_dir():
+            if str(source_root) in sys.path:
+                sys.path.remove(str(source_root))
             sys.path.insert(0, str(source_root))
 
     args = list(sys.argv[1:] if argv is None else argv)

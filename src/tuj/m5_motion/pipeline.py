@@ -153,6 +153,9 @@ class MotionPlanningPipeline:
     ) -> MotionPlanningResult:
         """Generate candidates, choose a connected branch, and finalize timing."""
 
+        update_reference = getattr(self._kinematics, "set_reference_qpos", None)
+        if callable(update_reference):
+            update_reference(request.world.robot_state.joint_positions_rad)
         artifact = self._provider.generate(request)
         self._validate_artifact(request, artifact)
         explicit_collision_arguments = (

@@ -428,6 +428,23 @@ class ToolUseJournalCollisionContextFactory:
     ) -> CollisionContext:
         transforms = _attachment_transforms(request.world)
         attached_id = request.world.robot_state.attached_object_id
+        held = request.world.robot_state.held_tool_id
+        physical = request.world.metadata.get("contact_friction_held_objects", {})
+        if attached_id is None and held in physical:
+            transform = AttachedObjectTransform.model_validate(physical[held])
+            if transform.object_id != held:
+                raise ToolUseJournalCollisionBindingError("contact grasp transform targets a different object")
+            return CollisionContext(
+                context_id=f"contact-held:{held}:initial",
+                scene_state_id=f"{request.world.scene.signature}:contact-held:{held}",
+                active_ee=active_ee,
+                attached_object_ids=[held],
+                attached_object_transforms=[transform],
+                free_object_poses=_free_object_poses(request.world, exclude=(held,)),
+                touch_links=[active_ee],
+                collision_model_version=self.compiler.model_version_for(active_ee),
+                metadata={"attachment_proxy": "CONTACT_FRICTION"},
+            )
         if attached_id is None:
             context_id = f"ee-attached:{active_ee}"
             return CollisionContext(
@@ -724,7 +741,11 @@ class ToolUseJournalCollisionContextFactory:
         target = request.task.goal.target_object_id
         if not target:
             raise ToolUseJournalCollisionBindingError("PLACE has no target object")
-        if request.world.robot_state.attached_object_id != target:
+        contact_held = (
+            base.metadata.get("attachment_proxy") == "CONTACT_FRICTION"
+            and request.world.robot_state.held_tool_id == target
+        )
+        if request.world.robot_state.attached_object_id != target and not contact_held:
             raise ToolUseJournalCollisionBindingError(
                 f"PLACE target {target!r} is not the currently attached object"
             )
@@ -1100,6 +1121,13 @@ class ToolUseJournalMotionRequestPlanner:
             else RoutedKeyframeStrategyProvider(selected_provider)
         )
         kinematics = adapter.make_kinematics()
+        if getattr(env, "scripted_grasp_profile", None) is not None:
+            # Continue from the physical grasp pose. Tight IK tolerances leave
+            # room for controller error inside M5's unchanged goal tolerance.
+            from .scripted_grasps.ik_continuity import ContinuousIK
+            kinematics = ContinuousIK(
+                kinematics, adapter.data.qpos[adapter.robot._ref_joint_pos_indexes]
+            )
         pipeline = MotionPlanningPipeline(routed_provider, kinematics)
         factory = ToolUseJournalCollisionContextFactory(
             compiler,

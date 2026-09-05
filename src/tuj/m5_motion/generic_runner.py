@@ -196,6 +196,7 @@ def capture_initial_world(
     *,
     initial_ee: str | None,
     seed: int,
+    scripted_grasps: bool = False,
 ) -> WorldSnapshot:
     from tuj.m5_motion.tool_use_journal import (
         ToolUseJournalEnvironmentAdapter,
@@ -207,6 +208,7 @@ def capture_initial_world(
         environment_name,
         active_ee=initial_ee,
         seed=seed,
+        **({"scripted_grasps": True} if scripted_grasps else {}),
     )
     try:
         env.reset()  # type: ignore[attr-defined]
@@ -231,6 +233,7 @@ class ToolUseJournalPlannerPool:
         repository: Path,
         *,
         seed: int,
+        provider: Any = None,
         ee_attach_registry_root: Path | None = None,
         ee_attach_trajectory_paths: Sequence[Path] = (),
         ee_return_trajectory_paths: Sequence[Path] = (),
@@ -239,6 +242,7 @@ class ToolUseJournalPlannerPool:
     ) -> None:
         self.repository = repository
         self.seed = seed
+        self.provider = provider
         self.ee_attach_registry_root = ee_attach_registry_root
         self.ee_attach_trajectory_paths = tuple(ee_attach_trajectory_paths)
         self.ee_return_trajectory_paths = tuple(ee_return_trajectory_paths)
@@ -276,6 +280,7 @@ class ToolUseJournalPlannerPool:
                 self.repository,
                 seed=self.seed,
                 ee_attach_registry_root=self.ee_attach_registry_root,
+                **({"provider": self.provider} if self.provider is not None else {}),
                 ee_attach_trajectory_paths=self.ee_attach_trajectory_paths,
                 ee_return_trajectory_paths=self.ee_return_trajectory_paths,
                 ee_attach_policy=self.ee_attach_policy,
@@ -609,6 +614,9 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
     parser.add_argument("--repository", type=Path, default=repository)
     parser.add_argument("--output-dir", type=Path)
     parser.add_argument("--seed", type=int, default=0)
+    parser.add_argument("--provider", choices=("openai", "gemini"),
+        default=os.environ.get("TUJ_LLM_PROVIDER", "openai"))
+    parser.add_argument("--model", help="M5 keyframe model; defaults to the provider's model")
     parser.add_argument(
         "--ee-attach-policy",
         choices=tuple(policy.value for policy in EEAttachPolicy),
@@ -650,6 +658,8 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
     )
     parser.add_argument("--validate-input-only", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
+    parser.add_argument("--scripted-grasps", action="store_true",
+        help="execute supported acquisitions with object functions, then plan each remaining motion from actual state (requires --simulate controller)")
     parser.add_argument(
         "--simulate",
         choices=("kinematic", "controller"),
@@ -723,6 +733,8 @@ def main(
     simulation_mode = args.simulate or (
         "controller" if args.video is not None else None
     )
+    if args.scripted_grasps and simulation_mode != "controller":
+        parser.error("--scripted-grasps requires --simulate controller")
     if simulation_mode is not None and args.validate_input_only:
         parser.error("--simulate cannot be combined with --validate-input-only")
     if simulation_mode is not None and args.dry_run:
@@ -756,6 +768,7 @@ def main(
                 args.environment,
                 initial_ee=_parse_initial_ee(args.initial_ee),
                 seed=args.seed,
+                **({"scripted_grasps": True} if args.scripted_grasps else {}),
             )
 
         constraints = _load_source(
@@ -795,9 +808,11 @@ def main(
     print(f"[M5] validation: {validation_path}")
     if args.validate_input_only or args.dry_run:
         return 0
-    if not os.environ.get("OPENAI_API_KEY"):
+    key_name = "GEMINI_API_KEY" if args.provider == "gemini" else "OPENAI_API_KEY"
+    has_key = os.environ.get(key_name) or (args.provider == "gemini" and os.environ.get("GOOGLE_API_KEY"))
+    if not args.scripted_grasps and not has_key:
         parser.error(
-            "OPENAI_API_KEY is required for generic keyframe generation; "
+            f"{key_name} is required for generic keyframe generation; "
             "use --validate-input-only to check inputs without it"
         )
 
@@ -813,6 +828,15 @@ def main(
         or f"task-planner:selected-plan:{selected_hash[:24]}"
     )
     planner_pool_options: dict[str, Any] = {"seed": args.seed}
+    if args.provider == "gemini":
+        from tuj.m5_motion.gemini_provider import GeminiKeyframeProvider, GeminiKeyframeProviderConfig
+        config = GeminiKeyframeProviderConfig.from_environment(
+            **({"model": args.model} if args.model else {}))
+        planner_pool_options["provider"] = GeminiKeyframeProvider(config)
+    elif args.model:
+        from tuj.m5_motion.vlm_provider import OpenAIKeyframeProvider, OpenAIKeyframeProviderConfig
+        planner_pool_options["provider"] = OpenAIKeyframeProvider(
+            OpenAIKeyframeProviderConfig.from_environment(model=args.model))
     if args.ee_attach_registry is not None:
         planner_pool_options["ee_attach_registry_root"] = (
             args.ee_attach_registry.expanduser().resolve()
@@ -831,6 +855,11 @@ def main(
         planner_pool_options["ee_attach_start_tolerance_rad"] = (
             args.ee_attach_start_tolerance_rad
         )
+    if args.scripted_grasps:
+        from tuj.m5_motion.scripted_grasps.cli import execute_selected_plan_live
+
+        return execute_selected_plan_live(args, selected, world, constraints, options,
+            repository_path, output_dir, artifact_id, planner_pool_options)
     planners = ToolUseJournalPlannerPool(repository_path, **planner_pool_options)
     try:
         result = SelectedPlanMotionOrchestrator(
