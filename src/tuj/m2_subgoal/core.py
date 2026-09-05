@@ -344,15 +344,23 @@ def build_queries(subgoal: dict, details: list[dict]) -> list[dict]:
                 for t in targets:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
                               "m3_call": {"kind": "ee", "node_id": t}})
-            elif head in ("fits", "clear"):
+            elif head == "fits":
                 oid, rid = b.get("?o"), b.get("?r")
                 if oid in (None, "?tool") or rid in (None, "tool_rest"):
                     continue                       # 도구 거치 위치는 측정 대상 아님
-                rel = "fits_inside" if head == "fits" else "clearance"
                 for t in _set_members(oid):          # 집합이면 원소별 관계 질의
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
                               "m3_call": {"kind": "relational", "a": t, "b": rid,
-                                          "relation": rel}})
+                                          "relation": "fits_inside"}})
+            elif head == "clear":
+                # clear(?r) = 목적지 영역이 비어 있는가 (점유 객체 유무, M3 query_clear).
+                # 0905: 이전엔 clearance(컨테이너 깊이 - 물체 높이)로 잘못 매핑돼
+                # 트레이 벽보다 높은 물체가 있으면 clear=unsat으로 오판됐음 (c2_1).
+                rid = b.get("?r")
+                if rid in (None, "tool_rest"):
+                    continue
+                q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
+                          "m3_call": {"kind": "clear", "node_id": rid}})
             elif head in ("batch_feasible", "act_space_clear"):
                 # 0828 신규 질의. 물체 1개짜리는 묶기 판정이 필요 없어 질의를 내지 않는다
                 # (not_queried — tool_rest와 같은 취급). 액션 주체(actor):
