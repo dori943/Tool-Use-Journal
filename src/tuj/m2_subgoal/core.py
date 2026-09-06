@@ -335,9 +335,12 @@ def build_queries(subgoal: dict, details: list[dict]) -> list[dict]:
                 oid = b.get("?o")
                 # 집합 표기 "{a,b}"는 원소별로 펼쳐 질의 (0828 — C2_1에서 발견)
                 targets = tool_ids if oid == "?tool" else _set_members(oid)
+                # 0905: top_exposed는 M3 query_top_exposed(상면 점유 여부)로 직접 질의.
+                # 이전엔 intrinsic으로 나가서 응답에 판정 근거가 없어 항상 unknown이었음.
+                kind = "top_exposed" if head == "top_exposed" else "intrinsic"
                 for t in targets:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                              "m3_call": {"kind": "intrinsic", "node_id": t}})
+                              "m3_call": {"kind": kind, "node_id": t}})
             elif head == "ee_usable":
                 oid = b.get("?o")
                 targets = tool_ids if oid == "?tool" else _set_members(oid)
