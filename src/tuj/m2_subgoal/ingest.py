@@ -54,8 +54,12 @@ def _judge(head: str, nodes: list[str], view: dict, rels: list[dict],
             v = r.get("reachable")
             ev.append({"node": n, "reachable": v, "margin_mm": r.get("margin_mm")})
         elif head == "top_exposed":
-            v = info.get("top_exposed")          # 현재 M3 응답에 없음 → None
-            ev.append({"node": n, "top_exposed": v})
+            # 0905: M3 query_top_exposed 응답 {type: top_exposed, node_id, value, blockers}
+            r = next((x for x in rels
+                      if x.get("type") == "top_exposed" and x.get("node_id") == n), None)
+            v = r.get("value") if r else info.get("top_exposed")
+            ev.append({"node": n, "top_exposed": v,
+                       "blockers": (r or {}).get("blockers", [])})
         elif head == "ee_usable":
             ee = info.get("ee")
             v = any(x.get("feasible") for x in ee.values()) if ee else None
@@ -365,16 +369,19 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
             # 필요한 액션 횟수(그룹 수)가 적을수록 우선. batch 응답이 없으면 최하위
             # (batch 질의가 아예 없던 기존 실행에서는 전원이 같아 순위 변화 없음)
             batch_rank = -len(part) if part else float("-inf")
-            scored.append((len(feasible), batch_rank,
-                           float(reach.get("margin_mm") or 0.0), c, feasible, part))
+            # 0905: 확정 기준을 액션 횟수 최소 → 리치 여유 최대로 변경. 사용 가능 EE 수는
+            # 위에서 "하나라도 있는가"로만 거른다 (도구의 태스크 적합성과 무관한 값이라
+            # 점수에 넣으면 c1_1에서 ladle(EE 3종, 12회)이 plate(vac 1종, 2회)를 이겼음)
+            scored.append((batch_rank, float(reach.get("margin_mm") or 0.0),
+                           len(feasible), c, feasible, part))
         if not scored:
             s.pop("selected_tool_id", None)      # 이전 라운드의 무근거 확정 잔재 제거
             s.pop("selection_evidence", None)
             logs.append(f"  [도구 확정] {s['subgoal_id']}: 측정된 후보 없음 — 확정 보류"
                         " (다음 접지 응답 후 확정)")
             continue
-        scored.sort(reverse=True)   # EE 수 최대 → 액션 횟수 최소 → 리치 여유 최대 (0828 개정)
-        n_ee, batch_rank, margin, chosen, _, part = scored[0]
+        scored.sort(reverse=True)   # 액션 횟수 최소 → 리치 여유 최대 → EE 수 (0905 개정)
+        batch_rank, margin, n_ee, chosen, _, part = scored[0]
         s["selected_tool_id"] = chosen
         # 0903: kind의 핵심 술어가 미측정이면 확정은 하되 근거에 남기고 경고한다.
         # (c4_1 gap_accessible, c1_2 flat_face가 M3에 아직 없어 리치 여유 몇 mm로 갈렸음.
@@ -392,7 +399,7 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
         s["selection_evidence"] = [
             {"node": c2, "feasible_ees": f2, "reach_margin_mm": m3,
              "batch_groups": (len(p2) if p2 else None)}
-            for (n2, br2, m3, c2, f2, p2) in scored]
+            for (br2, m3, n2, c2, f2, p2) in scored]
         logs.append(f"  [도구 확정] {s['subgoal_id']}: {chosen} 선택 "
                     f"(사용 가능 EE {n_ee}종, 리치 여유 {margin}mm"
                     + (f", 필요 액션 {len(part)}회" if part else "") + ")")
