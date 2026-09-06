@@ -138,6 +138,41 @@ class Materializer:
         self.log(module="m3", event="predicate", pred="clear", node=region_id)
         return res
 
+    # ── 0901 어휘 확장 접지 2종 (flat_face / gap_accessible — 도희) ─────────
+    def query_flat_face(self, gk: dict, node_id: str, queried_by: str,
+                        rms_tol_mm: float = 2.0, min_face_mm: float = 40.0,
+                        patch_tol_mm: float = 1.5) -> dict:
+        """flat_face(?tool)(0901): 도구에 넓고 평평한 작업면이 있는가 — flatten용.
+        상면 평면성(rms) + 접촉 패치 평면성(seal_patch) + 작업면 폭(footprint)으로 판정."""
+        intr = self.query_intrinsic(gk, node_id, queried_by)
+        g = intr["geometry"]
+        rms = g.get("surface_rms_mm", float("nan"))
+        patch = g.get("seal_patch_rms_mm", 99.9)
+        face = min(g.get("footprint_mm", [0.0, 0.0]))
+        planar = (rms == rms) and rms <= rms_tol_mm and patch <= patch_tol_mm
+        ok = bool(planar and face >= min_face_mm)
+        res = {"queried_by": queried_by, "node_id": node_id, "type": "flat_face",
+               "value": ok, "pass": ok,
+               "check": (f"rms_{rms}<={rms_tol_mm} & patch_{patch}"
+                         f"<={patch_tol_mm} & face_{round(face, 1)}>={min_face_mm}")}
+        entry = gk["nodes"].setdefault(node_id, {"queried_by": []})
+        entry.setdefault("predicates", {})["flat_face"] = {
+            "value": ok, "face_mm": round(face, 1), "queried_by": queried_by}
+        self.log(module="m3", event="predicate", pred="flat_face", node=node_id)
+        return res
+
+    def query_gap_accessible(self, gk: dict, tool_id: str, target_id: str,
+                             queried_by: str, gap_width_mm: float | None = None) -> dict:
+        """gap_accessible(?tool, ?target)(0901): 도구가 틈에 진입해 대상에 닿는가 — extract용.
+        relational.gap_access(도구 두께/접촉폭/리치 vs 틈·대상 치수). 결과는 edge로 적재."""
+        r = {"queried_by": queried_by, "from": tool_id, "to": target_id} \
+            | relational.gap_access(self.nodes[tool_id], self.nodes[target_id],
+                                    gap_width_mm=gap_width_mm)
+        gk["edges"].append(r)
+        self.log(module="m3", event="predicate", pred="gap_accessible",
+                 tool=tool_id, target=target_id)
+        return r
+
     # ── 0828 신규 질의 2종 — 프로토타입 (수빈 작성, push 전 협의) ──────────
     # batch:       한 번의 액션으로 member 집합을 동시 처리할 수 있는가.
     #              안 되면 근접도/폭 기준 파티션(그룹 구성)까지 계산해 돌려준다.
@@ -169,8 +204,20 @@ class Materializer:
         actor = call.get("actor") or {}
         res = {"queried_by": queried_by, "subgoal_id": gk["subgoal_id"],
                "kind": "batch", "actor": actor}
+        if actor.get("type") == "ee_pool" and members:
+            # relocate 직접 파지: 그리퍼는 한 번에 물체 1개만 든다(도구 스윕처럼 폭 안에
+            # 여러 개를 담는 동시 처리가 물리적으로 불가) → 물체별 1그룹 파티션.
+            # M2는 이 partition을 '물체별 1개' 폴백 대신 측정 근거로 우선 사용한다.
+            part = [[m["id"]] for m in members]
+            self.log(module="m3", event="batch", actor="ee_pool", n_groups=len(part))
+            return res | {"feasible": len(members) <= 1,
+                          "checks": [{"rule": "ee_pool_one_per_grasp", "capacity": 1,
+                                      "demand": len(members), "unit": "count",
+                                      "margin": 1 - len(members),
+                                      "pass": bool(len(members) <= 1)}],
+                          "binding_check": "ee_pool_one_per_grasp", "partition": part}
         if actor.get("type") != "object" or len(members) < 2:
-            # EE 풀 주체(relocate)의 동시 파지 계산은 스펙 협의 후 — 지금은 미측정 응답
+            # 주체 미상/단일 물체 — 묶기 판정 대상 아님
             return res | {"feasible": None, "checks": [],
                           "binding_check": None, "partition": None}
         tool = self.nodes[actor["id"]]

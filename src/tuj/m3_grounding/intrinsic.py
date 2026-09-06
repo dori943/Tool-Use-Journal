@@ -38,6 +38,36 @@ def surface_rms(points, top_frac=0.12) -> float:
     return float(np.sqrt(np.mean((Xc @ normal) ** 2)))
 
 
+NO_SEAL_PATCH_MM = 99.9   # seal 크기 평면 패치가 없을 때의 sentinel (흡착 불가)
+
+
+def seal_patch_rms_mm(points, seal_r_mm=15.0, top_frac=0.25, n_cand=40) -> float:
+    """흡착컵이 밀폐할 수 있는 평면 패치가 상면에 있는가 — 있으면 가장 평평한
+    패치(반경 seal_r_mm)의 평면잔차 RMS(mm), 없으면 NO_SEAL_PATCH_MM.
+    상면 후보 중심들에서 반경 내 점을 모아 평면을 피팅, seal 지름을 실제로 덮는
+    패치만 인정한다. 오목한 그릇(숟가락)·둥근 물체(사과)는 seal 크기 평면이 없어
+    sentinel → vac 자동 탈락. (오목도 링 지표는 접시 림에 오검출돼 폐기.)"""
+    pts = np.asarray(points, dtype=np.float64)
+    z = pts[:, 2]
+    top = pts[z > z.max() - top_frac * max(np.ptp(z), 1e-6)]
+    if len(top) < 20:
+        return NO_SEAL_PATCH_MM
+    rng = np.random.default_rng(0)
+    cand = top[rng.choice(len(top), min(n_cand, len(top)), replace=False)][:, :2]
+    best = NO_SEAL_PATCH_MM
+    for c in cand:
+        patch = top[np.linalg.norm(top[:, :2] - c, axis=1) <= seal_r_mm]
+        if len(patch) < 10:
+            continue
+        if min(np.ptp(patch[:, 0]), np.ptp(patch[:, 1])) < seal_r_mm:
+            continue                      # seal 지름을 못 덮는 좁은 패치는 무효
+        Xc = patch - patch.mean(axis=0)
+        nrm = np.linalg.svd(Xc, full_matrices=False)[2][-1]
+        rms = float(np.sqrt(np.mean((Xc @ nrm) ** 2)))
+        best = min(best, rms)
+    return round(best, 3)
+
+
 # ── SiPhy 백엔드 (material / density / mass / E) ──────
 
 class PropertyBackend:
@@ -137,6 +167,8 @@ def ground_intrinsic(node: dict, crop_rgb=None, backend: PropertyBackend | None 
     pts = node["_points"]
     dims = pca_dims(pts)
     rms = surface_rms(pts)
+    seal_rms = seal_patch_rms_mm(pts)
+    bbox = node["bbox_mm"]
     props = backend.estimate(crop_rgb, node["class"], points_mm=pts)
 
     mass = props.get("mass_kg")
@@ -146,7 +178,11 @@ def ground_intrinsic(node: dict, crop_rgb=None, backend: PropertyBackend | None 
                      * props["density_kgm3"], 3)
 
     mu = friction.estimate(props["material"], rms, **friction_hooks)
-    out = {"geometry": dims | {"surface_rms_mm": round(rms, 2)},
+    out = {"geometry": dims | {"surface_rms_mm": round(rms, 2),
+                              "seal_patch_rms_mm": seal_rms,
+                              "footprint_mm": [round(float(bbox[0]), 1),
+                                               round(float(bbox[1]), 1)],
+                              "height_mm": round(float(bbox[2]), 1)},
            "material": props["material"], "density_kgm3": props["density_kgm3"],
            "mass_kg": mass, "youngs_gpa": props.get("youngs_gpa"),
            "mu": mu, "confidence": props.get("confidence")}

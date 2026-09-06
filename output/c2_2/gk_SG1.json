@@ -5,120 +5,60 @@
       "queried_by": [
         "SG1_d1_p0",
         "SG1_d1_p1",
-        "SG1_d1_p2"
+        "SG1_d1_p2",
+        "SG1_d1_p1"
       ],
       "geometry": {
-        "length_mm": 97.6,
+        "length_mm": 97.5,
         "diameter_mm": null,
         "extents_mm": [
-          97.6,
-          9.9,
-          6.6
+          97.5,
+          9.5,
+          6.3
         ],
-        "height_z_mm": 9.9,
+        "height_z_mm": 9.6,
         "cylinder_like": false,
-        "surface_rms_mm": NaN
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          6.3,
+          97.5
+        ],
+        "height_mm": 9.6
       },
-      "material": "wood",
-      "density_kgm3": 2771.9,
-      "mass_kg": 0.004,
-      "youngs_gpa": 78.89,
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.003,
+      "youngs_gpa": null,
       "mu": {
-        "mu": 0.5,
+        "mu": 0.45,
         "stage": 0,
-        "material": "wood",
+        "material": "unknown",
         "rms_mm": NaN
       },
-      "confidence": 0.375,
-      "mass_range_kg": [
-        0.001,
-        0.006
-      ],
-      "materials_topk": [
-        {
-          "name": "wood",
-          "prob": 0.375,
-          "density_kgm3": [
-            350.0,
-            800.0
-          ],
-          "thickness_cm": [
-            1.0,
-            3.0
-          ]
-        },
-        {
-          "name": "metal",
-          "prob": 0.25,
-          "density_kgm3": [
-            7800.0,
-            8900.0
-          ],
-          "thickness_cm": [
-            0.1,
-            0.5
-          ]
-        },
-        {
-          "name": "plastic",
-          "prob": 0.167,
-          "density_kgm3": [
-            800.0,
-            1300.0
-          ],
-          "thickness_cm": [
-            0.1,
-            0.3
-          ]
-        },
-        {
-          "name": "rubber",
-          "prob": 0.125,
-          "density_kgm3": [
-            500.0,
-            1200.0
-          ],
-          "thickness_cm": [
-            0.2,
-            0.5
-          ]
-        },
-        {
-          "name": "ceramic",
-          "prob": 0.083,
-          "density_kgm3": [
-            1500.0,
-            3000.0
-          ],
-          "thickness_cm": [
-            0.5,
-            1.0
-          ]
-        }
-      ],
-      "caption": "Wooden carving tool",
+      "confidence": 0.5,
       "ee": {
         "2F": {
           "feasible": true,
-          "margin": 4.996,
+          "margin": 4.997,
           "margin_unit": "kg",
-          "reason": "질량 0.004 vs 페이로드 5.0kg",
+          "reason": "질량 0.003 vs 페이로드 5.0kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 6.6,
+              "value": 6.3,
               "limit": 85.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.004,
+              "value": 0.003,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.039,
+              "value": 0.033,
               "limit": 235.0,
               "pass": true
             }
@@ -126,25 +66,25 @@
         },
         "3F": {
           "feasible": true,
-          "margin": 2.496,
+          "margin": 2.497,
           "margin_unit": "kg",
-          "reason": "질량 0.004 vs 페이로드 2.5kg",
+          "reason": "질량 0.003 vs 페이로드 2.5kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 6.6,
+              "value": 6.3,
               "limit": 140.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.004,
+              "value": 0.003,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.039,
+              "value": 0.033,
               "limit": 60.0,
               "pass": true
             }
@@ -154,7 +94,7 @@
           "feasible": false,
           "margin": NaN,
           "margin_unit": "mm",
-          "reason": "상면 RMS nan vs 허용 1.5; 접촉면 폭 10 vs seal 직경 30mm",
+          "reason": "상면 RMS nan vs 허용 1.5; 접촉면 폭 10 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
           "checks": [
             {
               "rule": "flatness",
@@ -164,24 +104,39 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.004,
+              "value": 0.003,
               "limit": 0.5,
               "pass": true
             },
             {
               "rule": "seal_contact",
               "value": 30.0,
-              "limit": 9.9,
+              "limit": 9.5,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
               "pass": false
             }
           ]
         }
       },
       "reachability": {
-        "distance_mm": 616.7,
+        "distance_mm": 616.6,
         "reach_mm": 850,
         "reachable": true,
-        "margin_mm": 233.3
+        "margin_mm": 233.4
+      },
+      "predicates": {
+        "top_exposed": {
+          "value": false,
+          "blockers": [
+            "obj_bread_b_bread_b"
+          ],
+          "queried_by": "SG1_d1_p1"
+        }
       }
     }
   },
@@ -191,8 +146,8 @@
       "from": "obj_bread_a_bread_a",
       "to": "obj_serving_plate_serving_plate",
       "type": "fits_inside",
-      "value_mm": 160.5,
-      "check": "opening_167.0 - footprint_6.5",
+      "value_mm": 160.7,
+      "check": "opening_167.0 - footprint_6.3",
       "pass": true
     },
     {
@@ -200,9 +155,9 @@
       "from": "obj_bread_a_bread_a",
       "to": "obj_serving_plate_serving_plate",
       "type": "clearance",
-      "value_mm": -0.1,
-      "check": "container_depth_9.8 - target_height_9.9",
-      "pass": false
+      "value_mm": 9.3,
+      "check": "floor_fit(open_167.0-base_6.3) & no_tip(h_9.6<=3.0x6.3)",
+      "pass": true
     }
   ],
   "flags": {

@@ -5,120 +5,60 @@
       "queried_by": [
         "SG5_d1_p0",
         "SG5_d1_p1",
-        "SG5_d1_p2"
+        "SG5_d1_p2",
+        "SG5_d1_p1"
       ],
       "geometry": {
-        "length_mm": 112.1,
+        "length_mm": 114.2,
         "diameter_mm": null,
         "extents_mm": [
-          112.1,
-          112.2,
+          114.2,
+          113.9,
           14.7
         ],
-        "height_z_mm": 14.6,
+        "height_z_mm": 14.8,
         "cylinder_like": false,
-        "surface_rms_mm": 0.12
+        "surface_rms_mm": 0.12,
+        "seal_patch_rms_mm": 0.001,
+        "footprint_mm": [
+          101.2,
+          103.2
+        ],
+        "height_mm": 14.8
       },
-      "material": "wheat flour",
-      "density_kgm3": 1055.0,
-      "mass_kg": 0.023,
-      "youngs_gpa": 1.96,
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.077,
+      "youngs_gpa": null,
       "mu": {
         "mu": 0.43,
         "stage": 0,
-        "material": "wheat flour",
+        "material": "unknown",
         "rms_mm": 0.12
       },
-      "confidence": 0.308,
-      "mass_range_kg": [
-        0.011,
-        0.035
-      ],
-      "materials_topk": [
-        {
-          "name": "wheat flour",
-          "prob": 0.308,
-          "density_kgm3": [
-            600.0,
-            800.0
-          ],
-          "thickness_cm": [
-            1.0,
-            2.0
-          ]
-        },
-        {
-          "name": "water",
-          "prob": 0.231,
-          "density_kgm3": [
-            960.0,
-            1000.0
-          ],
-          "thickness_cm": [
-            0.1,
-            0.5
-          ]
-        },
-        {
-          "name": "yeast",
-          "prob": 0.192,
-          "density_kgm3": [
-            300.0,
-            500.0
-          ],
-          "thickness_cm": [
-            0.01,
-            0.1
-          ]
-        },
-        {
-          "name": "salt",
-          "prob": 0.154,
-          "density_kgm3": [
-            2000.0,
-            2500.0
-          ],
-          "thickness_cm": [
-            0.01,
-            0.1
-          ]
-        },
-        {
-          "name": "sugar",
-          "prob": 0.115,
-          "density_kgm3": [
-            1600.0,
-            1700.0
-          ],
-          "thickness_cm": [
-            0.01,
-            0.1
-          ]
-        }
-      ],
-      "caption": "Slice of bread",
+      "confidence": 0.5,
       "ee": {
         "2F": {
-          "feasible": true,
-          "margin": 4.977,
-          "margin_unit": "kg",
-          "reason": "질량 0.023 vs 페이로드 5.0kg",
+          "feasible": false,
+          "margin": -16.2,
+          "margin_unit": "mm",
+          "reason": "치수 101 vs 개구 85mm",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 14.7,
+              "value": 101.2,
               "limit": 85.0,
-              "pass": true
+              "pass": false
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.023,
+              "value": 0.077,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.262,
+              "value": 0.878,
               "limit": 235.0,
               "pass": true
             }
@@ -126,25 +66,25 @@
         },
         "3F": {
           "feasible": true,
-          "margin": 2.477,
+          "margin": 2.423,
           "margin_unit": "kg",
-          "reason": "질량 0.023 vs 페이로드 2.5kg",
+          "reason": "질량 0.077 vs 페이로드 2.5kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 14.7,
+              "value": 101.2,
               "limit": 140.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.023,
+              "value": 0.077,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.262,
+              "value": 0.878,
               "limit": 60.0,
               "pass": true
             }
@@ -152,9 +92,9 @@
         },
         "vac": {
           "feasible": true,
-          "margin": 0.477,
+          "margin": 0.423,
           "margin_unit": "kg",
-          "reason": "질량 0.023 vs 페이로드 0.5kg",
+          "reason": "질량 0.077 vs 페이로드 0.5kg",
           "checks": [
             {
               "rule": "flatness",
@@ -164,14 +104,20 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.023,
+              "value": 0.077,
               "limit": 0.5,
               "pass": true
             },
             {
               "rule": "seal_contact",
               "value": 30.0,
-              "limit": 112.1,
+              "limit": 113.9,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.001,
+              "limit": 1.5,
               "pass": true
             }
           ]
@@ -182,6 +128,13 @@
         "reach_mm": 850,
         "reachable": true,
         "margin_mm": 273.2
+      },
+      "predicates": {
+        "top_exposed": {
+          "value": true,
+          "blockers": [],
+          "queried_by": "SG5_d1_p1"
+        }
       }
     }
   },
@@ -191,8 +144,8 @@
       "from": "obj_bread_b_bread_b",
       "to": "obj_tomato_slice_tomato_slice",
       "type": "fits_inside",
-      "value_mm": -55.0,
-      "check": "opening_46.1 - footprint_101.1",
+      "value_mm": -55.1,
+      "check": "opening_46.1 - footprint_101.2",
       "pass": false
     },
     {
@@ -200,8 +153,8 @@
       "from": "obj_bread_b_bread_b",
       "to": "obj_tomato_slice_tomato_slice",
       "type": "clearance",
-      "value_mm": -13.1,
-      "check": "container_depth_1.5 - target_height_14.6",
+      "value_mm": -55.1,
+      "check": "floor_fit(open_46.1-base_101.2) & no_tip(h_14.8<=3.0x101.2)",
       "pass": false
     }
   ],

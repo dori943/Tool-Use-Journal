@@ -5,120 +5,60 @@
       "queried_by": [
         "SG3_d1_p0",
         "SG3_d1_p1",
-        "SG3_d1_p2"
+        "SG3_d1_p2",
+        "SG3_d1_p1"
       ],
       "geometry": {
-        "length_mm": 57.9,
+        "length_mm": 53.6,
         "diameter_mm": null,
         "extents_mm": [
-          57.9,
-          33.7,
-          3.0
+          53.6,
+          28.9,
+          3.3
         ],
-        "height_z_mm": 2.4,
+        "height_z_mm": 2.3,
         "cylinder_like": false,
-        "surface_rms_mm": NaN
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          26.7,
+          53.9
+        ],
+        "height_mm": 2.3
       },
-      "material": "steel",
-      "density_kgm3": 5955.8,
-      "mass_kg": 0.009,
-      "youngs_gpa": 116.69,
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.002,
+      "youngs_gpa": null,
       "mu": {
         "mu": 0.45,
         "stage": 0,
-        "material": "steel",
+        "material": "unknown",
         "rms_mm": NaN
       },
-      "confidence": 0.308,
-      "mass_range_kg": [
-        0.004,
-        0.014
-      ],
-      "materials_topk": [
-        {
-          "name": "steel",
-          "prob": 0.308,
-          "density_kgm3": [
-            7850.0,
-            8050.0
-          ],
-          "thickness_cm": [
-            0.5,
-            1.5
-          ]
-        },
-        {
-          "name": "aluminum",
-          "prob": 0.231,
-          "density_kgm3": [
-            2700.0,
-            2800.0
-          ],
-          "thickness_cm": [
-            0.5,
-            1.5
-          ]
-        },
-        {
-          "name": "plastic",
-          "prob": 0.154,
-          "density_kgm3": [
-            900.0,
-            1200.0
-          ],
-          "thickness_cm": [
-            0.3,
-            1.0
-          ]
-        },
-        {
-          "name": "copper",
-          "prob": 0.192,
-          "density_kgm3": [
-            8900.0,
-            9000.0
-          ],
-          "thickness_cm": [
-            0.5,
-            1.5
-          ]
-        },
-        {
-          "name": "brass",
-          "prob": 0.115,
-          "density_kgm3": [
-            8500.0,
-            8700.0
-          ],
-          "thickness_cm": [
-            0.5,
-            1.5
-          ]
-        }
-      ],
-      "caption": "Curved metallic object",
+      "confidence": 0.5,
       "ee": {
         "2F": {
           "feasible": true,
-          "margin": 4.991,
+          "margin": 4.998,
           "margin_unit": "kg",
-          "reason": "질량 0.009 vs 페이로드 5.0kg",
+          "reason": "질량 0.002 vs 페이로드 5.0kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 33.7,
+              "value": 26.7,
               "limit": 85.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.009,
+              "value": 0.002,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.098,
+              "value": 0.022,
               "limit": 235.0,
               "pass": true
             }
@@ -126,25 +66,25 @@
         },
         "3F": {
           "feasible": true,
-          "margin": 2.491,
+          "margin": 2.498,
           "margin_unit": "kg",
-          "reason": "질량 0.009 vs 페이로드 2.5kg",
+          "reason": "질량 0.002 vs 페이로드 2.5kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 33.7,
+              "value": 26.7,
               "limit": 140.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.009,
+              "value": 0.002,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.098,
+              "value": 0.022,
               "limit": 60.0,
               "pass": true
             }
@@ -154,7 +94,7 @@
           "feasible": false,
           "margin": NaN,
           "margin_unit": "mm",
-          "reason": "상면 RMS nan vs 허용 1.5",
+          "reason": "상면 RMS nan vs 허용 1.5; 접촉면 폭 29 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
           "checks": [
             {
               "rule": "flatness",
@@ -164,144 +104,101 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.009,
+              "value": 0.002,
               "limit": 0.5,
               "pass": true
             },
             {
               "rule": "seal_contact",
               "value": 30.0,
-              "limit": 33.7,
-              "pass": true
+              "limit": 28.9,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
             }
           ]
         }
       },
       "reachability": {
-        "distance_mm": 701.6,
+        "distance_mm": 703.8,
         "reach_mm": 850,
         "reachable": true,
-        "margin_mm": 148.4
+        "margin_mm": 146.2
+      },
+      "predicates": {
+        "top_exposed": {
+          "value": false,
+          "blockers": [
+            "obj_cheese_cheese_2",
+            "obj_cheese_cheese_3",
+            "obj_cheese_plate_cheese_plate"
+          ],
+          "queried_by": "SG3_d1_p1"
+        }
       }
     },
     "obj_cheese_cheese_2": {
       "queried_by": [
         "SG3_d1_p0",
         "SG3_d1_p1",
-        "SG3_d1_p2"
+        "SG3_d1_p2",
+        "SG3_d1_p1"
       ],
       "geometry": {
-        "length_mm": 57.3,
+        "length_mm": 56.8,
         "diameter_mm": null,
         "extents_mm": [
-          57.3,
-          33.0,
-          6.1
+          56.8,
+          32.8,
+          5.7
         ],
-        "height_z_mm": 6.2,
+        "height_z_mm": 4.2,
         "cylinder_like": false,
-        "surface_rms_mm": NaN
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          30.7,
+          58.2
+        ],
+        "height_mm": 4.2
       },
-      "material": "gold",
-      "density_kgm3": 2007.5,
-      "mass_kg": 0.001,
-      "youngs_gpa": 107.33,
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.004,
+      "youngs_gpa": null,
       "mu": {
         "mu": 0.45,
         "stage": 0,
-        "material": "gold",
+        "material": "unknown",
         "rms_mm": NaN
       },
-      "confidence": 0.267,
-      "mass_range_kg": [
-        0.0,
-        0.002
-      ],
-      "materials_topk": [
-        {
-          "name": "gold",
-          "prob": 0.267,
-          "density_kgm3": [
-            1200.0,
-            1900.0
-          ],
-          "thickness_cm": [
-            0.1,
-            0.5
-          ]
-        },
-        {
-          "name": "silver",
-          "prob": 0.233,
-          "density_kgm3": [
-            900.0,
-            1050.0
-          ],
-          "thickness_cm": [
-            0.1,
-            0.5
-          ]
-        },
-        {
-          "name": "copper",
-          "prob": 0.2,
-          "density_kgm3": [
-            800.0,
-            900.0
-          ],
-          "thickness_cm": [
-            0.1,
-            0.5
-          ]
-        },
-        {
-          "name": "brass",
-          "prob": 0.167,
-          "density_kgm3": [
-            850.0,
-            870.0
-          ],
-          "thickness_cm": [
-            0.1,
-            0.5
-          ]
-        },
-        {
-          "name": "stainless steel",
-          "prob": 0.133,
-          "density_kgm3": [
-            7800.0,
-            8000.0
-          ],
-          "thickness_cm": [
-            0.1,
-            0.5
-          ]
-        }
-      ],
-      "caption": "Curved metallic object, possibly a pendant.",
+      "confidence": 0.5,
       "ee": {
         "2F": {
           "feasible": true,
-          "margin": 4.999,
+          "margin": 4.996,
           "margin_unit": "kg",
-          "reason": "질량 0.001 vs 페이로드 5.0kg",
+          "reason": "질량 0.004 vs 페이로드 5.0kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 6.1,
+              "value": 30.7,
               "limit": 85.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.001,
+              "value": 0.004,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.011,
+              "value": 0.044,
               "limit": 235.0,
               "pass": true
             }
@@ -309,25 +206,25 @@
         },
         "3F": {
           "feasible": true,
-          "margin": 2.499,
+          "margin": 2.496,
           "margin_unit": "kg",
-          "reason": "질량 0.001 vs 페이로드 2.5kg",
+          "reason": "질량 0.004 vs 페이로드 2.5kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 6.1,
+              "value": 30.7,
               "limit": 140.0,
               "pass": true
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.001,
+              "value": 0.004,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.011,
+              "value": 0.044,
               "limit": 60.0,
               "pass": true
             }
@@ -337,7 +234,7 @@
           "feasible": false,
           "margin": NaN,
           "margin_unit": "mm",
-          "reason": "상면 RMS nan vs 허용 1.5",
+          "reason": "상면 RMS nan vs 허용 1.5; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
           "checks": [
             {
               "rule": "flatness",
@@ -347,128 +244,84 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.001,
+              "value": 0.004,
               "limit": 0.5,
               "pass": true
             },
             {
               "rule": "seal_contact",
               "value": 30.0,
-              "limit": 33.0,
+              "limit": 32.8,
               "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
             }
           ]
         }
       },
       "reachability": {
-        "distance_mm": 701.6,
+        "distance_mm": 701.5,
         "reach_mm": 850,
         "reachable": true,
-        "margin_mm": 148.4
+        "margin_mm": 148.5
+      },
+      "predicates": {
+        "top_exposed": {
+          "value": false,
+          "blockers": [
+            "obj_cheese_cheese_3",
+            "obj_cheese_plate_cheese_plate"
+          ],
+          "queried_by": "SG3_d1_p1"
+        }
       }
     },
     "obj_cheese_cheese_3": {
       "queried_by": [
         "SG3_d1_p0",
         "SG3_d1_p1",
-        "SG3_d1_p2"
+        "SG3_d1_p2",
+        "SG3_d1_p1"
       ],
       "geometry": {
         "length_mm": 53.4,
         "diameter_mm": null,
         "extents_mm": [
           53.4,
-          51.2,
-          2.0
+          49.1,
+          1.9
         ],
         "height_z_mm": 1.9,
         "cylinder_like": false,
-        "surface_rms_mm": 0.05
+        "surface_rms_mm": 0.05,
+        "seal_patch_rms_mm": 0.013,
+        "footprint_mm": [
+          54.1,
+          51.2
+        ],
+        "height_mm": 1.9
       },
-      "material": "granite",
-      "density_kgm3": 2564.0,
-      "mass_kg": 0.007,
-      "youngs_gpa": 38.5,
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.003,
+      "youngs_gpa": null,
       "mu": {
         "mu": 0.429,
         "stage": 0,
-        "material": "granite",
+        "material": "unknown",
         "rms_mm": 0.05
       },
-      "confidence": 0.28,
-      "mass_range_kg": [
-        0.004,
-        0.011
-      ],
-      "materials_topk": [
-        {
-          "name": "granite",
-          "prob": 0.28,
-          "density_kgm3": [
-            2500.0,
-            2700.0
-          ],
-          "thickness_cm": [
-            5.0,
-            10.0
-          ]
-        },
-        {
-          "name": "limestone",
-          "prob": 0.24,
-          "density_kgm3": [
-            2200.0,
-            2600.0
-          ],
-          "thickness_cm": [
-            5.0,
-            15.0
-          ]
-        },
-        {
-          "name": "sandstone",
-          "prob": 0.2,
-          "density_kgm3": [
-            2200.0,
-            3000.0
-          ],
-          "thickness_cm": [
-            5.0,
-            12.0
-          ]
-        },
-        {
-          "name": "shale",
-          "prob": 0.16,
-          "density_kgm3": [
-            2200.0,
-            2700.0
-          ],
-          "thickness_cm": [
-            5.0,
-            10.0
-          ]
-        },
-        {
-          "name": "basalt",
-          "prob": 0.12,
-          "density_kgm3": [
-            2800.0,
-            3000.0
-          ],
-          "thickness_cm": [
-            5.0,
-            10.0
-          ]
-        }
-      ],
-      "caption": "Rounded stone or rock fragment",
+      "confidence": 0.5,
       "ee": {
         "2F": {
           "feasible": true,
-          "margin": 4.993,
+          "margin": 4.997,
           "margin_unit": "kg",
-          "reason": "질량 0.007 vs 페이로드 5.0kg",
+          "reason": "질량 0.003 vs 페이로드 5.0kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
@@ -478,13 +331,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.007,
+              "value": 0.003,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.08,
+              "value": 0.034,
               "limit": 235.0,
               "pass": true
             }
@@ -492,9 +345,9 @@
         },
         "3F": {
           "feasible": true,
-          "margin": 2.493,
+          "margin": 2.497,
           "margin_unit": "kg",
-          "reason": "질량 0.007 vs 페이로드 2.5kg",
+          "reason": "질량 0.003 vs 페이로드 2.5kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
@@ -504,13 +357,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.007,
+              "value": 0.003,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 0.08,
+              "value": 0.034,
               "limit": 60.0,
               "pass": true
             }
@@ -518,9 +371,9 @@
         },
         "vac": {
           "feasible": true,
-          "margin": 0.493,
+          "margin": 0.497,
           "margin_unit": "kg",
-          "reason": "질량 0.007 vs 페이로드 0.5kg",
+          "reason": "질량 0.003 vs 페이로드 0.5kg",
           "checks": [
             {
               "rule": "flatness",
@@ -530,24 +383,37 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.007,
+              "value": 0.003,
               "limit": 0.5,
               "pass": true
             },
             {
               "rule": "seal_contact",
               "value": 30.0,
-              "limit": 51.2,
+              "limit": 49.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.013,
+              "limit": 1.5,
               "pass": true
             }
           ]
         }
       },
       "reachability": {
-        "distance_mm": 687.8,
+        "distance_mm": 687.9,
         "reach_mm": 850,
         "reachable": true,
-        "margin_mm": 162.2
+        "margin_mm": 162.1
+      },
+      "predicates": {
+        "top_exposed": {
+          "value": true,
+          "blockers": [],
+          "queried_by": "SG3_d1_p1"
+        }
       }
     }
   },
@@ -557,8 +423,8 @@
       "from": "obj_cheese_cheese_1",
       "to": "obj_turkey_turkey_1",
       "type": "fits_inside",
-      "value_mm": -16.0,
-      "check": "opening_14.7 - footprint_30.7",
+      "value_mm": -9.4,
+      "check": "opening_17.3 - footprint_26.7",
       "pass": false
     },
     {
@@ -566,8 +432,8 @@
       "from": "obj_cheese_cheese_2",
       "to": "obj_turkey_turkey_1",
       "type": "fits_inside",
-      "value_mm": -15.9,
-      "check": "opening_14.7 - footprint_30.6",
+      "value_mm": -13.4,
+      "check": "opening_17.3 - footprint_30.7",
       "pass": false
     },
     {
@@ -575,8 +441,8 @@
       "from": "obj_cheese_cheese_3",
       "to": "obj_turkey_turkey_1",
       "type": "fits_inside",
-      "value_mm": -38.7,
-      "check": "opening_14.7 - footprint_53.4",
+      "value_mm": -33.9,
+      "check": "opening_17.3 - footprint_51.2",
       "pass": false
     },
     {
@@ -584,17 +450,17 @@
       "from": "obj_cheese_cheese_1",
       "to": "obj_turkey_turkey_1",
       "type": "clearance",
-      "value_mm": 1.1,
-      "check": "container_depth_3.5 - target_height_2.4",
-      "pass": true
+      "value_mm": -9.4,
+      "check": "floor_fit(open_17.3-base_26.7) & no_tip(h_2.3<=3.0x26.7)",
+      "pass": false
     },
     {
       "queried_by": "SG3_d3_p3",
       "from": "obj_cheese_cheese_2",
       "to": "obj_turkey_turkey_1",
       "type": "clearance",
-      "value_mm": -2.7,
-      "check": "container_depth_3.5 - target_height_6.2",
+      "value_mm": -13.4,
+      "check": "floor_fit(open_17.3-base_30.7) & no_tip(h_4.2<=3.0x30.7)",
       "pass": false
     },
     {
@@ -602,9 +468,9 @@
       "from": "obj_cheese_cheese_3",
       "to": "obj_turkey_turkey_1",
       "type": "clearance",
-      "value_mm": 1.6,
-      "check": "container_depth_3.5 - target_height_1.9",
-      "pass": true
+      "value_mm": -33.9,
+      "check": "floor_fit(open_17.3-base_51.2) & no_tip(h_1.9<=3.0x51.2)",
+      "pass": false
     }
   ],
   "flags": {
@@ -887,10 +753,29 @@
       "actor": {
         "type": "ee_pool"
       },
-      "feasible": null,
-      "checks": [],
-      "binding_check": null,
-      "partition": null
+      "feasible": false,
+      "checks": [
+        {
+          "rule": "ee_pool_one_per_grasp",
+          "capacity": 1,
+          "demand": 3,
+          "unit": "count",
+          "margin": -2,
+          "pass": false
+        }
+      ],
+      "binding_check": "ee_pool_one_per_grasp",
+      "partition": [
+        [
+          "obj_cheese_cheese_1"
+        ],
+        [
+          "obj_cheese_cheese_2"
+        ],
+        [
+          "obj_cheese_cheese_3"
+        ]
+      ]
     }
   ],
   "swept_space": [
