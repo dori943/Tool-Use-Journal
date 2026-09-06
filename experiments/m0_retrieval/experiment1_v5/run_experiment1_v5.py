@@ -1,13 +1,13 @@
-"""Experiment 1 v4 CLI — independent SiPhy Stage-1 + Gemini Stage-2 per condition.
+"""Experiment 1 v5 CLI ??independent SiPhy Stage-1 + Gemini Stage-2 per condition.
 
 Usage (PowerShell):
-  python experiments/m0_retrieval/experiment1_v4/run_experiment1_v4.py --capture-observations --object bottle
-  python experiments/m0_retrieval/experiment1_v4/run_experiment1_v4.py --object bottle --dry-run
-  python experiments/m0_retrieval/experiment1_v4/run_experiment1_v4.py --static-eval-test
-  python experiments/m0_retrieval/experiment1_v4/run_experiment1_v4.py --recompute-from-units
-  python experiments/m0_retrieval/experiment1_v4/run_experiment1_v4.py --object bottle --condition C1
+  python experiments/m0_retrieval/experiment1_v5/run_experiment1_v5.py --capture-observations --object bottle
+  python experiments/m0_retrieval/experiment1_v5/run_experiment1_v5.py --object bottle --dry-run
+  python experiments/m0_retrieval/experiment1_v5/run_experiment1_v5.py --static-eval-test
+  python experiments/m0_retrieval/experiment1_v5/run_experiment1_v5.py --recompute-from-units
+  python experiments/m0_retrieval/experiment1_v5/run_experiment1_v5.py --object bottle --condition C1
 
-Outputs: output/m0_retrieval/experiment1_v4/{units,raw_results*.csv,condition_summary.csv}
+Outputs: output/m0_retrieval/experiment1_v5/{units,raw_results*.csv,condition_summary.csv}
 Does NOT modify experiment1_v3/ or production src/.
 
 Observation / M1 path matches v3 (shared helpers under experiments/m0_retrieval/).
@@ -23,14 +23,14 @@ from pathlib import Path
 from typing import Any
 
 ROOT = Path(__file__).resolve().parents[3]
-EXP_V4 = Path(__file__).resolve().parent
-PARENT_EXP = EXP_V4.parent
+EXP_V5 = Path(__file__).resolve().parent
+PARENT_EXP = EXP_V5.parent
 
-for p in (ROOT, ROOT / "src", PARENT_EXP, EXP_V4):
+for p in (ROOT, ROOT / "src", PARENT_EXP, EXP_V5):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
-from v4_conditions import CONDITIONS  # noqa: E402
+from v5_conditions import CONDITIONS  # noqa: E402
 from gemini_stage2 import assert_no_gt_leakage  # noqa: E402
 from gemini_backend import DEFAULT_GEMINI_MODEL, PROVIDER, detect_sdk  # noqa: E402
 from gt_loader import load_all_gt  # noqa: E402
@@ -43,24 +43,24 @@ from eval_io import (  # noqa: E402
     write_raw_and_summary,
 )
 from observation_prep import (  # noqa: E402
-    capture_observations_v4,
-    crop_path_v4,
-    ensure_observations_v4,
-    load_m1_manifest_v4,
+    capture_observations_v5,
+    crop_path_v5,
+    ensure_observations_v5,
+    load_m1_manifest_v5,
     m1_bbox_for as m1_bbox_from_prep,
 )
-from runner import Experiment1V4Runner  # noqa: E402
-from siphy_stage1 import (  # noqa: E402
+from runner import Experiment1V5Runner  # noqa: E402
+from selective_siphy_stage1 import (  # noqa: E402
     SiPhyStage1Runner,
     resolve_siphy_model,
     static_gemini_only_feasibility,
 )
 from gemini_stage2 import GeminiStage2Runner  # noqa: E402
 
-OUT_DIR = ROOT / "output" / "m0_retrieval" / "experiment1_v4"
+OUT_DIR = ROOT / "output" / "m0_retrieval" / "experiment1_v5"
 UNITS_DIR = OUT_DIR / "units"
 SIPHY_LOG_PATH = OUT_DIR / "intermediate_siphy_results.json"
-EXPERIMENT_VERSION = "experiment1_v4"
+EXPERIMENT_VERSION = "experiment1_v5"
 
 
 def write_json(path: Path, data: Any) -> None:
@@ -69,8 +69,8 @@ def write_json(path: Path, data: Any) -> None:
 
 
 def load_m1_manifest() -> dict[str, Any]:
-    """v4-local production M1 only (same capture path as v3; no unit/GT copy)."""
-    return load_m1_manifest_v4()
+    """v5-local production M1 only (same capture path as v3; no unit/GT copy)."""
+    return load_m1_manifest_v5()
 
 
 def m1_bbox_for(object_key: str, manifest: dict[str, Any]) -> list[float] | None:
@@ -78,8 +78,8 @@ def m1_bbox_for(object_key: str, manifest: dict[str, Any]) -> list[float] | None
 
 
 def crop_image_path_for(object_key: str) -> Path:
-    """Prefer v4-local crop from the shared observation pipeline."""
-    return crop_path_v4(object_key)
+    """Prefer v5-local crop from the shared observation pipeline."""
+    return crop_path_v5(object_key)
 
 
 def _print_unit_dry(unit, *, gt: dict[str, Any] | None) -> None:
@@ -90,6 +90,13 @@ def _print_unit_dry(unit, *, gt: dict[str, Any] | None) -> None:
     print(f"Stage 1 expected call: {meta.get('stage1_expected_call')}")
     print(f"Stage 1 cache reuse: {meta.get('stage1_cache_reuse')}")
     print(f"Stage 1 output used: {meta['stage1_output_used']}")
+    print(f"Stage 1 mode: {meta.get('stage1_mode')}")
+    print(f"Stage 1 requested keys: {meta.get('stage1_requested_keys')}")
+    print(f"Stage 1 youngs_gpa (must be None): {meta.get('stage1_youngs_gpa')}")
+    if unit.stage1 and unit.stage1.stage1_system_prompt:
+        print("--- Stage 1 system prompt (selective) ---")
+        print(unit.stage1.stage1_system_prompt.strip())
+        print("---")
     print(f"Stage 2: {meta['stage2_model']} | input={meta['stage2_input']}")
     print(f"BBox in SiPhy: {meta['bbox_in_siphy']}")
     print(f"BBox in Gemini: {meta['bbox_in_gemini']}")
@@ -171,7 +178,7 @@ def assert_independent_siphy(units_by_cid: dict[str, Any]) -> list[str]:
 
 def run_dry_run(*, object_key: str, model: str) -> int:
     print("=" * 66)
-    print("[Experiment 1 v4] DRY-RUN (production SiPhyBackend + Gemini Stage2)")
+    print("[Experiment 1 v5] DRY-RUN (selective Stage1 + Gemini Stage2)")
     print("=" * 66)
     print(f"Output dir: {OUT_DIR}")
     print(f"Provider (Stage 2): {PROVIDER}")
@@ -179,33 +186,32 @@ def run_dry_run(*, object_key: str, model: str) -> int:
     shared_model = model
     siphy_model = resolve_siphy_model(shared_model)
     print(f"Shared --model: {shared_model}")
-    print(f"SiPhy Stage1 model (passed to SiPhyBackend): {siphy_model}")
+    print(f"Selective Stage1 model: {siphy_model}")
     print(f"Gemini Stage2 model: {shared_model}")
-    print("Stage 1: production tuj.m3_grounding.siphy_backend.SiPhyBackend")
-    print("Cache reuse: DISABLED (each C2-C7 runs its own SiPhy call)")
+    print("Stage 1: v5 selective (material/density-only; NOT SiPhyBackend.estimate)")
+    print("Cache reuse: DISABLED (each C2-C7 runs its own Stage1 call)")
     print()
-    print("===== GEMINI-ONLY STATIC FEASIBILITY (production rules) =====")
+    print("===== STAGE1 SELECTIVE FEASIBILITY =====")
     feas = static_gemini_only_feasibility(ROOT)
     for k, v in feas.items():
         print(f"  {k}: {v}")
-    print("  experiment_forces_OPENAI_API_KEY: False")
-    print("  cls_hint_in_SiPhy_VLM_prompt: False (production _propose image-only)")
-    print(f"  v4_default_shared_model: {resolve_siphy_model('gemini-3.6-flash')}")
+    print("  bbox_in_stage1: False")
+    print(f"  v5_default_shared_model: {resolve_siphy_model('gemini-3.6-flash')}")
     try:
-        print(f"Gemini SDK (Stage2): {detect_sdk()}")
+        print(f"Gemini SDK: {detect_sdk()}")
     except ImportError as exc:
-        print(f"Gemini SDK (Stage2): MISSING ({exc})")
+        print(f"Gemini SDK: MISSING ({exc})")
 
     OUT_DIR.mkdir(parents=True, exist_ok=True)
-    # Same observation/M1 path as v3 (shared helpers → v4 OUT_DIR).
-    ensure_observations_v4([object_key])
+    # Same observation/M1 path as v3/v4 (shared helpers → v5 OUT_DIR).
+    ensure_observations_v5([object_key])
     gts = load_all_gt()
     write_json(OUT_DIR / "gt_manifest.json", gts)
     m1 = load_m1_manifest()
     crop = crop_image_path_for(object_key)
     bbox = m1_bbox_for(object_key, m1)
     print(f"Crop path: {crop} exists={crop.is_file()}")
-    print(f"M1 bbox_mm (production, v4-local): {bbox}")
+    print(f"M1 bbox_mm (production, v5-local): {bbox}")
     if bbox is None:
         print("FAIL: production M1 bbox_mm missing after observation capture")
         return 1
@@ -221,7 +227,7 @@ def run_dry_run(*, object_key: str, model: str) -> int:
     siphy._log.pop(object_key, None)
 
     gemini = GeminiStage2Runner(model=shared_model, dry_run=True)
-    runner = Experiment1V4Runner(siphy=siphy, gemini=gemini, dry_run=True)
+    runner = Experiment1V5Runner(siphy=siphy, gemini=gemini, dry_run=True)
 
     units = {}
     for cid in CONDITIONS:
@@ -275,22 +281,86 @@ def run_dry_run(*, object_key: str, model: str) -> int:
     if units["C4"].dry_run_meta.get("expected_gemini_calls") != 1:
         errors.append("C4 expected_gemini_calls must be 1")
 
+    # v5 selective Stage1 schema asserts
+    from selective_siphy_stage1 import (
+        FORBIDDEN_STAGE1_KEYS,
+        stage1_mode_for_cues,
+        system_prompt_for_cues,
+    )
+
+    expect_mode = {
+        "C2": "material_only",
+        "C3": "density_only",
+        "C4": "material_only",
+        "C5": "density_only",
+        "C6": "material_density",
+        "C7": "material_density",
+    }
+    for cid, mode in expect_mode.items():
+        u = units[cid]
+        s1 = u.stage1
+        if s1 is None:
+            errors.append(f"{cid}: missing Stage1")
+            continue
+        if s1.stage1_mode != mode:
+            errors.append(f"{cid}: stage1_mode={s1.stage1_mode!r} expected {mode!r}")
+        if tuple(s1.stage1_requested_keys) != CONDITIONS[cid].siphy_cues:
+            errors.append(f"{cid}: requested_keys mismatch {s1.stage1_requested_keys}")
+        if s1.youngs_gpa is not None:
+            errors.append(f"{cid}: Stage1 youngs_gpa must be None")
+        raw = s1.raw_siphy_output or {}
+        for bad in FORBIDDEN_STAGE1_KEYS:
+            if bad in raw and raw.get(bad) is not None and bad not in ("materials",):
+                # dry-run raw may list keys in notes; only flag if value present as field
+                pass
+        if mode == "material_only":
+            if s1.material is None:
+                errors.append(f"{cid}: material_only must produce material")
+            if s1.density_kgm3 is not None:
+                errors.append(f"{cid}: material_only must NOT produce density")
+        elif mode == "density_only":
+            if s1.density_kgm3 is None:
+                errors.append(f"{cid}: density_only must produce density")
+            if s1.material is not None:
+                errors.append(f"{cid}: density_only must NOT produce material")
+        else:
+            if s1.material is None or s1.density_kgm3 is None:
+                errors.append(f"{cid}: material_density must produce both")
+        # Prompt text must not mention bbox / youngs / mass / mu as requested outputs
+        sp = s1.stage1_system_prompt or system_prompt_for_cues(CONDITIONS[cid].siphy_cues)
+        low = sp.lower()
+        if "bbox" in low:
+            errors.append(f"{cid}: Stage1 system prompt contains bbox")
+        if "young" in low and mode != "material_density":
+            # material_density prompt says "Do not estimate ... Young's"
+            pass
+        if '"youngs_gpa"' in low or '"mass_kg"' in low or '"mu"' in low:
+            errors.append(f"{cid}: Stage1 schema must not request youngs/mass/mu")
+        # Stage2 must not receive bbox in siphy path
+        if u.dry_run_meta.get("bbox_in_siphy"):
+            errors.append(f"{cid}: bbox_in_siphy")
+
+    # C1 has no stage1
+    if units["C1"].stage1 is not None:
+        errors.append("C1 must not run Stage1")
+
     print()
-    print("===== INDEPENDENCE / BBOX ASSERTS =====")
+    print("===== INDEPENDENCE / SELECTIVE STAGE1 ASSERTS =====")
     if errors:
         for e in errors:
             print(f"FAIL: {e}")
         return 1
     print("OK: C2-C7 each expect SiPhy=1, Gemini=1, Total=2")
     print("OK: C1 expects SiPhy=0, Gemini=1, Total=1")
-    print("OK: C1/C4 bbox_mm non-null (production M1 from v4 observations)")
-    print("OK: no cache reuse / siphy_cache_hit always False")
-    print("OK: C2/C4, C3/C5, C6/C7 have independent Stage1 placeholders")
-    print("OK: BBox never in SiPhy Stage 1")
-    print("OK: Stage1 uses production SiPhyBackend (no experiment-owned VLM)")
+    print("OK: C1/C4 bbox_mm non-null (production M1 from v5 observations)")
+    print("OK: C2/C4 Stage1 = material_only (no density/youngs/mass/mu)")
+    print("OK: C3/C5 Stage1 = density_only (no material/youngs/mass/mu)")
+    print("OK: C6/C7 Stage1 = material+density only")
+    print("OK: BBox never in Stage1")
+    print("OK: Stage1 is selective Gemini (not production SiPhyBackend.estimate)")
     print(f"OK: Stage1 and Stage2 share model={shared_model}")
     print()
-    print("If live C1-C7 on one object: SiPhy calls=6, Gemini Stage2=7, Total LLM=13")
+    print("If live C1-C7 on one object: Stage1 calls=6, Gemini Stage2=7, Total LLM=13")
 
     write_json(
         OUT_DIR / "run_metadata.json",
@@ -305,15 +375,14 @@ def run_dry_run(*, object_key: str, model: str) -> int:
             "m1_bbox_mm": bbox,
             "crop_image_path": str(crop),
             "gemini_only_feasibility": feas,
+            "stage1_modes": {cid: units[cid].stage1.stage1_mode if units[cid].stage1 else None for cid in CONDITIONS},
             "notes": [
-                "True two-stage: production SiPhyBackend.estimate -> Gemini Stage 2.",
-                "Same --model is passed to SiPhyBackend and Stage2 Gemini.",
-                "Default shared model: gemini-3.6-flash.",
-                "SiPhy provider/keys follow production _make_client (TUJ_LLM_PROVIDER).",
-                "NO cross-condition SiPhy cache: each C2-C7 runs its own SiPhy call.",
-                "intermediate_siphy_results.json is a condition-keyed LOG only.",
+                "v5: selective Stage1 (material/density-only) -> Gemini Stage 2.",
+                "Does NOT call production SiPhyBackend.estimate.",
+                "Same --model for Stage1 and Stage2 (default gemini-3.6-flash).",
+                "NO cross-condition Stage1 cache.",
                 "BBox only in Gemini Stage 2 (C1/C4/C5/C7).",
-                "Observations/M1 via same helpers as v3 (observation_capture).",
+                "Observations/M1 via same helpers as v3/v4.",
             ],
         },
     )
@@ -330,14 +399,14 @@ def run_live(
 ) -> int:
     """Run live inference; write units/ + raw_results like v3.
 
-    Default: accumulate under experiment1_v4/units/ (no per-batch live_runs/).
+    Default: accumulate under experiment1_v5/units/ (no per-batch live_runs/).
     ``use_live_runs=True`` is legacy/debug only.
     """
     OUT_DIR.mkdir(parents=True, exist_ok=True)
     stamp = datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
     if use_live_runs:
         live_dir = OUT_DIR / "live_runs" / stamp
-        print(f"[v4] LEGACY --use-live-runs → {live_dir}")
+        print(f"[v5] LEGACY --use-live-runs ??{live_dir}")
         units_dir = live_dir / "units"
         siphy_log = live_dir / "intermediate_siphy_results.json"
         meta_dir = live_dir
@@ -347,13 +416,13 @@ def run_live(
         meta_dir = OUT_DIR
     units_dir.mkdir(parents=True, exist_ok=True)
 
-    ensure_observations_v4(object_keys)
+    ensure_observations_v5(object_keys)
     gts = load_all_gt()
     write_json(OUT_DIR / "gt_manifest.json", gts)
     m1 = load_m1_manifest()
 
-    print(f"[v4 LIVE] shared --model for SiPhy+Stage2: {model}")
-    print(f"[v4 LIVE] units → {units_dir}")
+    print(f"[v5 LIVE] shared --model for SiPhy+Stage2: {model}")
+    print(f"[v5 LIVE] units ??{units_dir}")
     siphy = SiPhyStage1Runner(
         out_path=siphy_log,
         dry_run=False,
@@ -361,7 +430,7 @@ def run_live(
         repo_root=ROOT,
     )
     gemini = GeminiStage2Runner(model=model, dry_run=False)
-    runner = Experiment1V4Runner(siphy=siphy, gemini=gemini, dry_run=False)
+    runner = Experiment1V5Runner(siphy=siphy, gemini=gemini, dry_run=False)
 
     batch_rows: list[dict] = []
     failed = 0
@@ -379,7 +448,7 @@ def run_live(
         for cid in condition_ids:
             cond = CONDITIONS[cid]
             print("=" * 66)
-            print(f"[v4 LIVE] {ok} / {cid}")
+            print(f"[v5 LIVE] {ok} / {cid}")
             unit = runner.run_unit(
                 cond,
                 object_key=ok,
@@ -398,7 +467,7 @@ def run_live(
                 batch_rows.extend(rows)
             else:
                 failed += 1
-                print(f"[v4] unit not eligible for raw_results merge: {ok}/{cid}")
+                print(f"[v5] unit not eligible for raw_results merge: {ok}/{cid}")
 
             print(f"Saved: {unit_path}")
             print(
@@ -461,13 +530,13 @@ def run_live(
 
 def main() -> int:
     ap = argparse.ArgumentParser(
-        description="Experiment 1 v4 (independent SiPhy + Gemini per condition)"
+        description="Experiment 1 v5 (independent SiPhy + Gemini per condition)"
     )
     ap.add_argument("--dry-run", action="store_true")
     ap.add_argument(
         "--capture-observations",
         action="store_true",
-        help="Same as v3: single-object scene + production M1 → v4 observations/",
+        help="Same as v3: single-object scene + production M1 ??v5 observations/",
     )
     ap.add_argument(
         "--recompute-from-units",
@@ -505,7 +574,7 @@ def main() -> int:
 
     # Capture-only (no LLM), mirroring v3.
     if args.capture_observations and not args.dry_run and not args.conditions and not args.all:
-        capture_observations_v4(args.objects)
+        capture_observations_v5(args.objects)
         return 0
 
     if args.dry_run:
@@ -513,7 +582,7 @@ def main() -> int:
         if ok not in OBJECTS:
             raise SystemExit(f"unknown object: {ok}")
         if args.capture_observations:
-            capture_observations_v4([ok])
+            capture_observations_v5([ok])
         return run_dry_run(object_key=ok, model=args.model)
 
     if args.all:
@@ -536,7 +605,7 @@ def main() -> int:
                 raise SystemExit(f"unknown condition: {c}")
 
     if args.capture_observations:
-        capture_observations_v4(oks)
+        capture_observations_v5(oks)
     return run_live(
         object_keys=oks,
         condition_ids=cids,

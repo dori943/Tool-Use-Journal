@@ -1,13 +1,13 @@
-"""Orchestrate Experiment 1 v4: independent SiPhy Stage 1 + Gemini Stage 2 per condition."""
+"""Orchestrate Experiment 1 v5: selective Stage 1 + Gemini Stage 2 per condition."""
 from __future__ import annotations
 
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
-from v4_conditions import Condition
+from v5_conditions import Condition
 from gemini_stage2 import GeminiStage2Runner, Stage2Result
-from siphy_stage1 import SiPhyStage1Result, SiPhyStage1Runner
+from selective_siphy_stage1 import SiPhyStage1Result, SiPhyStage1Runner
 
 
 @dataclass
@@ -77,8 +77,9 @@ def describe_pipeline(condition: Condition) -> dict[str, Any]:
             "predicted Material" if c == "material" else "predicted Density"
         )
     return {
-        "stage1_model": "production_SiPhyBackend (Gemini OpenAI-compat when TUJ_LLM_PROVIDER=gemini / GEMINI key)",
+        "stage1_model": "v5_selective_siphy (material/density-only Gemini; not full SiPhyBackend)",
         "stage1_input": "Image ONLY",
+        "stage1_requested_properties": list(cues),
         "stage1_output_used": stage1_out,
         "stage1_cache_reuse": False,
         "stage2_model": "gemini",
@@ -102,7 +103,7 @@ def _sum_optional(a: int | None, b: int | None) -> int | None:
     return (a or 0) + (b or 0)
 
 
-class Experiment1V4Runner:
+class Experiment1V5Runner:
     def __init__(
         self,
         *,
@@ -132,14 +133,19 @@ class Experiment1V4Runner:
         siphy_density = None
 
         if condition.uses_siphy:
-            # Always a fresh SiPhy call for this condition (no cache reuse).
-            stage1 = self.siphy.run(object_key, condition.id, crop_image_path)
+            # Fresh selective Stage1 call (only condition.siphy_cues requested).
+            stage1 = self.siphy.run(
+                object_key,
+                condition.id,
+                crop_image_path,
+                siphy_cues=condition.siphy_cues,
+            )
             siphy_executed = bool(stage1.siphy_call_executed)
             siphy_calls = int(stage1.siphy_model_call_count) if siphy_executed else 0
             fixed_cues = stage1.cues(condition.siphy_cues)
             siphy_material = stage1.material
             siphy_density = stage1.density_kgm3
-
+            # Expose selective schema on dry-run meta below.
         stage2 = self.gemini.run(
             condition,
             crop_image_path=crop_image_path if crop_image_path.exists() else None,
@@ -165,6 +171,10 @@ class Experiment1V4Runner:
         meta = describe_pipeline(condition)
         meta["stage1_cache_reuse"] = False
         meta["siphy_cache_hit"] = False
+        if stage1 is not None:
+            meta["stage1_mode"] = stage1.stage1_mode
+            meta["stage1_requested_keys"] = list(stage1.stage1_requested_keys)
+            meta["stage1_youngs_gpa"] = stage1.youngs_gpa  # must be None in v5
         if self.dry_run:
             live_siphy = 1 if condition.uses_siphy else 0
             meta["expected_siphy_calls"] = live_siphy
