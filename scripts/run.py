@@ -53,13 +53,9 @@ sys.path.insert(0, str(ROOT / "src"))
 
 STAGES = ("m1", "m2", "m3", "m4", "m5")
 
-# M5 는 자체적으로 환경을 다시 만들기 때문에 환경 이름이 필요하다.
-# scripts/run_m1.py 의 TASKS 와 같은 내용이며, M1 을 건너뛰어도(=--m1-json)
-# robosuite import 없이 환경 이름을 알 수 있도록 여기에도 둔다.
-TASK_ENV = {
-    "c1_1": "C1_1_LegoSweep",
-    "c2_1": "C2_1_ObjectSorting",
-}
+# 태스크 id <-> 환경 이름은 단일 출처(task_registry)에서 가져온다.
+# (M5 가 환경을 다시 만들 때 등 robosuite import 없이 이름만 필요할 때 쓴다.)
+from task_registry import TASK_ENVS as TASK_ENV  # noqa: E402
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -156,8 +152,8 @@ def stage_m1(task, out, args):
 
     seed_everything(args.seed)
     module = load_script("run_m1")
-    if task not in module.TASKS:
-        sys.exit(f"[err] run_m1.TASKS 에 {task!r} 없음: {list(module.TASKS)}")
+    if task not in TASK_ENV:
+        sys.exit(f"[err] 등록되지 않은 태스크 {task!r}. 등록됨: {list(TASK_ENV)}")
     argv = [task] + (["--view"] if args.view else [])
     call_main(module, argv, "run_m1")
 
@@ -202,6 +198,26 @@ def stage_m3(task, out, args, label="M3"):
     if stale:
         print(f"[{label}] 이번 실행에서 갱신되지 않은 gk 파일: {stale}")
     return fresh
+
+
+def _m2_plan_complete(out):
+    """m2.json이 M4로 넘길 수 있는 상태인지 — 도구가 필요한 서브골은 전부 확정됐는가.
+
+    0831: 왕복을 고정 2회가 아니라 완성될 때까지 반복하기 위한 판정.
+    전략 전환(예: relocate -> 도구 사용)이 일어나면 새 질의의 측정과 확정에
+    한 왕복이 더 필요하다 — 미확정 상태로 M4에 가면 invalid input으로 멈춘다.
+    """
+    try:
+        m2 = json.loads((out / "m2.json").read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError):
+        return False
+    # 0903: 피드백 재분해 직후는 새 질의가 아직 미측정 — 한 왕복 더 필요
+    if m2.get("m2_stats", {}).get("pending_grounding"):
+        return False
+    for s in m2.get("m2_subgoals", []):
+        if s.get("tool_candidate_ids") and not s.get("selected_tool_id"):
+            return False
+    return True
 
 
 def build_gk_bundle(out, gk_paths=None):
@@ -399,7 +415,10 @@ def build_parser():
                    help="씬 배치 난수 시드 — M1 과 M5 환경 생성에 동일 적용")
     p.add_argument("--backend", default="siphy", choices=("siphy", "mock"),
                    help="M3 물성 백엔드")
-    p.add_argument("--model", default="gpt-4o-mini", help="M3 백엔드 VLM 모델")
+    p.add_argument("--model", default=None,
+                   help="M2·M3 공통 LLM 모델 (미지정 시 provider 기본값). 예: gemini-2.5-flash, gpt-4o")
+    p.add_argument("--provider", choices=("gemini", "openai"), default=None,
+                   help="LLM 제공자 (미지정 시 --model 접두어로 추론, 그래도 없으면 gemini)")
     p.add_argument("--memory", default=str(ROOT / "output" / "memory.json"),
                    help="M3 물성 메모리 경로 ('none' 이면 사용 안 함)")
     p.add_argument("--robot-spec", default=str(ROOT / "configs" / "robot_spec.json"),
@@ -428,8 +447,35 @@ def build_parser():
     return p
 
 
+def _infer_provider(model):
+    m = (model or "").lower()
+    if m.startswith("gemini"):
+        return "gemini"
+    if m.startswith(("gpt", "o1", "o3", "o4", "chatgpt", "text-")):
+        return "openai"
+    return None
+
+
+def _resolve_llm(args):
+    """--model/--provider 를 M2·M3 양쪽에 일관 적용한다.
+
+    M2(run_m2/LLMRough)는 TUJ_LLM_PROVIDER·TUJ_M2_MODEL 환경변수를, M3(SiPhyBackend)는
+    --model 인자와 TUJ_LLM_PROVIDER 를 읽는다. 여기서 둘의 제공자·모델을 맞춘다.
+    같은 프로세스에서 모듈 main() 을 호출하므로 os.environ 설정이 그대로 전달된다.
+    """
+    provider = (args.provider or _infer_provider(args.model)
+                or os.environ.get("TUJ_LLM_PROVIDER") or "gemini")
+    os.environ["TUJ_LLM_PROVIDER"] = provider
+    if args.model:                              # 명시 모델 → M2·M3 동일 모델
+        os.environ["TUJ_M2_MODEL"] = args.model
+    else:                                       # 미지정 → 제공자 기본값(M3용), M2 는 자체 기본
+        args.model = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini"}[provider]
+    print(f"[run] LLM provider={provider} model={args.model}")
+
+
 def main():
     args = build_parser().parse_args()
+    _resolve_llm(args)
     task = args.task
     out = ROOT / "output" / task
     out.mkdir(parents=True, exist_ok=True)
@@ -467,12 +513,21 @@ def main():
         stage_m2(task, out, args, pass_no=1)
         if stop < 2:
             return
-        banner("M3  Metric & Physical Grounding (1차 — M2 반영용)")
-        stage_m3(task, out, args, label="M3.1")
-        banner("M2  재분해 + 측정 반영 + 서브골 분할 (2차)")
-        stage_m2(task, out, args, pass_no=2)
-        banner("M3  Metric & Physical Grounding (2차 — 최종)")
-        gk_paths = stage_m3(task, out, args, label="M3.2")
+        # 0831: 왕복을 계획 완성까지 반복. 전략 전환(직접 이동 기각 -> 도구 사용)이
+        # 일어나면 새 도구 질의의 측정·확정에 한 왕복이 더 필요하다. 상한은 안전장치.
+        max_rounds = 4
+        for rnd in range(1, max_rounds + 1):
+            banner(f"M3  Metric & Physical Grounding ({rnd}차)")
+            stage_m3(task, out, args, label=f"M3.{rnd}")
+            banner(f"M2  재분해 + 측정 반영 ({rnd + 1}차)")
+            stage_m2(task, out, args, pass_no=2)
+            if _m2_plan_complete(out):
+                break
+            print(f"[run] 계획 미완성(도구 미확정) — 왕복 {rnd + 1}회차 진행")
+        else:
+            print(f"[run] 왕복 상한({max_rounds}회) 도달 — 현재 계획으로 진행")
+        banner("M3  Metric & Physical Grounding (최종 — 서브그래프 조립)")
+        gk_paths = stage_m3(task, out, args, label="M3.final")
     if stop < 3:
         return
 

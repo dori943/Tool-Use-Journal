@@ -13,7 +13,7 @@
 """
 from __future__ import annotations
 
-from .core import build_queries, decompose, invariants_for, partial_order
+from .core import add_container_seal_pres, build_queries, decompose, invariants_for, partial_order
 from .rough import TemplateRough
 
 
@@ -23,10 +23,11 @@ def run_m2(task: str, m1_serialized: dict, rough=None) -> dict:
 
     all_details, all_edges, all_mutex, all_queries = [], [], [], []
     for s in subgoals:
-        details = decompose(s)
-        s["details"] = details
-        all_details += details
-        all_queries += build_queries(s, details)
+        s["details"] = decompose(s)
+    add_container_seal_pres(subgoals)          # 0903: 담기 ≺ 덮기 (서브골 간)
+    for s in subgoals:
+        all_details += s["details"]
+        all_queries += build_queries(s, s["details"])
     edges, mutex = partial_order(all_details)
 
     # 서브골별 객체 선택(object_ids)은 LLMRough 2차 호출이 담당한다 (0821 결정).

@@ -432,7 +432,12 @@ def make_tool_use_journal_env(
         if active_ee is not None
         else None
     )
-    return suite.make(env_name=env_name, **options)
+    env = suite.make(env_name=env_name, **options)
+    # 요청한 EE를 선언 상태로 각인 (tool_use_journal_runtime의 env 생성과 동일 처리).
+    # 없으면 초기 EE 장착 이후 생성되는 planner env가 declared None으로 남아
+    # require_physical_ee의 declared/physical 불일치로 중단된다 (0831).
+    setattr(env, "current_ee_id", active_ee)
+    return env
 
 
 class ToolUseJournalEnvironmentAdapter:

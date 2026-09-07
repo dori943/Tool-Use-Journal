@@ -20,7 +20,8 @@ top-1 확정 게이트 (우리 추가): gap = probs[top1] − probs[top2] > TOP1
   재료 분포를 top-1에 원-핫 확정 → density·mass·μ 상류가 top-1 재료 값으로 일관.
   gap 작으면 SiPhy 원 철학(재료 확정 안 함, 분포 가중평균) 유지.
 
-API 키: OPENAI_API_KEY 환경변수 또는 레포 루트 my_api_key.py (SiPhy 관례 동일).
+API 키: OPENAI_API_KEY(우선) 또는 GEMINI_API_KEY/GOOGLE_API_KEY 환경변수, 혹은 레포 루트
+  my_api_key.py (SiPhy 관례). Gemini 는 OpenAI 호환 엔드포인트로 자동 폴백.
 """
 from __future__ import annotations
 
@@ -142,6 +143,12 @@ def _effective_probs(probs: np.ndarray, gap_threshold: float = TOP1_GAP):
     return probs, top, gap, False
 
 
+# Gemini 는 OpenAI 호환 엔드포인트를 제공 → OPENAI_API_KEY 없고 GEMINI_API_KEY 만
+# 있어도 동일 client 로 돌아가게 한다.
+_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+_DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+
+
 class SiPhyBackend(PropertyBackend):
     """crop RGB 1장 → material/density/mass/E (+ 재료 후보 분포).
 
@@ -151,22 +158,66 @@ class SiPhyBackend(PropertyBackend):
     def __init__(self, api_key: str | None = None, model: str = "gpt-4o-mini",
                  client=None, repo_root=None, seed: int = 100, verbose: bool = False):
         self.model, self.seed, self.verbose = model, seed, verbose
-        self.client = client or self._make_client(api_key, repo_root)
+        if client is not None:
+            self.client = client
+        else:                                           # 키 출처에 따라 model 도 조정될 수 있음
+            self.client, self.model = self._make_client(api_key, repo_root, model)
+        # Gemini OpenAI 호환 엔드포인트는 seed 파라미터를 지원하지 않는다(400).
+        burl = str(getattr(self.client, "base_url", "") or "")
+        self._is_gemini = ("generativelanguage" in burl
+                           or str(self.model).startswith("gemini"))
+        self._supports_seed = not self._is_gemini
+        # Gemini 2.5 계열은 thinking 토큰이 max_tokens 를 잠식 → 500 이면 JSON 이 잘린다.
+        self._max_tokens = 4096 if self._is_gemini else 500
 
     @staticmethod
-    def _make_client(api_key, repo_root):
-        key = api_key or os.environ.get("OPENAI_API_KEY")
-        if not key and repo_root:                       # SiPhy 관례: 루트 my_api_key.py
+    def _make_client(api_key, repo_root, model="gpt-4o-mini"):
+        """OpenAI 우선, 없으면 Gemini(OpenAI 호환 엔드포인트)로 폴백.
+
+        키 탐색: 인자 → 환경변수 → 레포 루트 my_api_key.py.
+        OPENAI_API_KEY 있으면 OpenAI, 없고 GEMINI_API_KEY(또는 GOOGLE_API_KEY) 있으면
+        Gemini 를 쓴다. model 이 gpt* 기본값이면 Gemini 기본 모델로 바꾼다.
+        반환: (client, 실제 사용할 model 이름).
+        """
+        def _from_repo(var):                            # SiPhy 관례: 루트 my_api_key.py
+            if not repo_root:
+                return None
             f = os.path.join(str(repo_root), "my_api_key.py")
-            if os.path.exists(f):
-                ns: dict = {}
-                exec(open(f, encoding="utf-8").read(), ns)
-                key = ns.get("OPENAI_API_KEY")
-        if not key:
-            raise RuntimeError("OPENAI_API_KEY 없음 — 환경변수 또는 my_api_key.py 필요 "
-                               "(오프라인이면 MockBackend 사용)")
+            if not os.path.exists(f):
+                return None
+            ns: dict = {}
+            exec(open(f, encoding="utf-8").read(), ns)
+            return ns.get(var)
+
         from openai import OpenAI
-        return OpenAI(api_key=key)
+        okey = api_key or os.environ.get("OPENAI_API_KEY") or _from_repo("OPENAI_API_KEY")
+        gkey = (os.environ.get("GEMINI_API_KEY") or os.environ.get("GOOGLE_API_KEY")
+                or _from_repo("GEMINI_API_KEY") or _from_repo("GOOGLE_API_KEY"))
+        ms = str(model or "")
+        # provider: run.py/M2 와 동일 규약(TUJ_LLM_PROVIDER) → 모델 접두어 → 키 자동감지
+        provider = (os.environ.get("TUJ_LLM_PROVIDER")
+                    or ("gemini" if ms.startswith("gemini")
+                        else "openai" if ms.startswith(("gpt", "o1", "o3", "o4", "chatgpt"))
+                        else None))
+        if provider == "gemini":
+            if not gkey:
+                raise RuntimeError("GEMINI_API_KEY 없음 (TUJ_LLM_PROVIDER=gemini) — "
+                                   "환경변수 또는 my_api_key.py 필요")
+            gmodel = model if ms.startswith("gemini") else _DEFAULT_GEMINI_MODEL
+            return OpenAI(api_key=gkey, base_url=_GEMINI_BASE_URL), gmodel
+        if provider == "openai":
+            if not okey:
+                raise RuntimeError("OPENAI_API_KEY 없음 (TUJ_LLM_PROVIDER=openai) — "
+                                   "환경변수 또는 my_api_key.py 필요")
+            return OpenAI(api_key=okey), model
+        # provider 미지정: OpenAI 우선, 없으면 Gemini
+        if okey:
+            return OpenAI(api_key=okey), model
+        if gkey:
+            gmodel = model if ms.startswith("gemini") else _DEFAULT_GEMINI_MODEL
+            return OpenAI(api_key=gkey, base_url=_GEMINI_BASE_URL), gmodel
+        raise RuntimeError("OPENAI_API_KEY / GEMINI_API_KEY 없음 — 환경변수 또는 "
+                           "my_api_key.py 필요 (오프라인이면 MockBackend 사용)")
 
     # ── VLM 1콜 ──────────────────────────────────────
     def _propose(self, crop_rgb) -> dict:
@@ -174,17 +225,29 @@ class SiPhyBackend(PropertyBackend):
         last_err = None
         for t in range(MAX_TRIES):                      # gpt_wrapper 방식: seed+t 재시도
             try:
-                r = self.client.chat.completions.create(
-                    model=self.model, max_tokens=500, seed=self.seed + t,
+                kwargs = dict(
+                    model=self.model, max_tokens=self._max_tokens,
                     messages=[
                         {"role": "system", "content": SYS_MSG},
                         {"role": "user", "content": [{
                             "type": "image_url",
                             "image_url": {"url": f"data:image/png;base64,{b64}"}}]},
                     ])
+                if self._supports_seed:              # Gemini 는 seed 미지원 → 생략
+                    kwargs["seed"] = self.seed + t
+                r = self.client.chat.completions.create(**kwargs)
                 if self.verbose and getattr(r, "usage", None):
                     print(f"  [siphy] tokens: {r.usage.total_tokens}")
-                return _parse_response(r.choices[0].message.content)
+                choice = r.choices[0]
+                text = choice.message.content or ""
+                if getattr(choice, "finish_reason", None) == "length":
+                    raise RuntimeError(
+                        f"응답이 max_tokens={self._max_tokens} 에서 잘림(finish_reason=length). "
+                        f"앞부분: {text[:120]!r}")
+                try:
+                    return _parse_response(text)
+                except (json.JSONDecodeError, KeyError, ValueError) as pe:
+                    raise RuntimeError(f"JSON 파싱 실패: {pe}. 응답 앞부분: {text[:200]!r}") from pe
             except Exception as e:                      # noqa: BLE001
                 last_err = e
         raise RuntimeError(f"SiPhy VLM 호출/파싱 {MAX_TRIES}회 실패: {last_err}")

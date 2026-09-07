@@ -12,6 +12,10 @@
   relocate       d1 acquire(target) → d2 transport(target, container) → d3 place
   sweep_collect  d1 acquire(?tool) → d2 tool_act:sweep(targets→container)
                  → d2b transport(?tool, rest) → d3 place(?tool, rest)
+  flatten        sweep_collect과 같은 도구 골격, d2가 tool_act:flatten (C1_2)
+  stack          층마다 acquire → transport → place_on, 아래층 완성 후 다음 층 (C2_2, C4_1)
+  scoop_transfer sweep_collect과 같은 도구 골격, d2가 tool_act:scoop (C3_2, 양 개념 협의중)
+  extract        도구 골격, d2가 tool_act:extract — 틈에서 빼내기까지만 (C4_2, 협의중)
 
 술어 eval_by (누가 판정하나 — M6 역추적의 근거):
   m2     계획 상태만으로 판정 (hand_empty, holding, above, in)
@@ -35,12 +39,30 @@ TEMPLATES = {
     "tool_act:sweep": (["holding(?t)", "batch_feasible(?t, ?targets)",
                         "act_space_clear(?t, ?targets, ?r)", "path_clear(?t, ?r)"],
                        ["in(?targets, ?r)"], []),
+    # --- 0901 확장: 태스크 8종 커버 (C1_2, C2_2, C3_2, C4_1, C4_2) ---
+    "tool_act:flatten": (["holding(?t)", "flat_face(?t)",
+                          "act_space_clear(?t, ?targets, ?work)", "path_clear(?t, ?work)"],
+                         ["flattened(?targets)"], []),
+    "place_on": (["holding(?o)", "above(?o, ?base)", "top_exposed(?base)", "fits(?o, ?base)"],
+                 ["on(?o, ?base)", "hand_empty"], ["holding(?o)", "above(?o, ?base)"]),
+    "tool_act:scoop": (["holding(?t)", "batch_feasible(?t, ?targets)",
+                        "act_space_clear(?t, ?targets, ?r)", "path_clear(?t, ?r)"],
+                       ["in(?targets, ?r)"], []),
+    "tool_act:extract": (["holding(?t)", "gap_accessible(?t, ?o)", "path_clear(?t, ?o)"],
+                         ["extracted(?o)"], []),
 }
 
 EVAL_BY = {"hand_empty": "m2", "holding": "m2", "above": "m2", "in": "m2",
            "reachable": "m3", "top_exposed": "m3", "fits": "m3", "clear": "m3",
            "ee_usable": "m3", "batch_feasible": "m3", "act_space_clear": "m3",
-           "path_clear": "motion"}
+           "path_clear": "motion",
+           # 0901 확장분. flat_face(도구에 평평한 작업면이 있는가)와
+           # gap_accessible(도구가 틈에 진입 가능한가)은 M3 신규 질의 — 도희 협의 필요.
+           "on": "m2", "flattened": "m2", "extracted": "m2",
+           "flat_face": "m3", "gap_accessible": "m3"}
+
+# 도구를 전제로 하는 kind — 분해가 ?tool 자유변수를 쓰고, 검문이 도구 후보를 요구한다
+TOOL_KINDS = {"sweep_collect", "flatten", "scoop_transfer", "extract"}
 
 
 def _cond(sid, i, kind, template, binding):
@@ -101,7 +123,117 @@ def decompose(subgoal: dict) -> list[dict]:
             d2b,
             _detail(f"{sid}_d3", "place", {"?o": "?tool", "?r": "tool_rest"}, g, "도구 반환"),
         ]
+    if kind == "flatten":
+        # C1_2 (반죽 펴기). sweep_collect와 같은 도구 골격: 확보 → 도구 행위 → 거치 → 반납.
+        targets = "{" + ",".join(subgoal["target_ids"]) + "}"
+        work = subgoal.get("container_id") or targets   # 별도 작업 영역이 없으면 대상 자리에서 수행
+        g = f"G_{sid}_tool"
+        d2b = _detail(f"{sid}_d2b", "transport", {"?o": "?tool", "?r": "tool_rest"}, g, "도구를 거치 위치로 운반")
+        d2b["pre"].append({"id": f"{sid}_d2b_p{len(d2b['pre'])}",
+                           "expr": f"flattened({targets})", "head": "flattened", "eval_by": "m2"})
+        return [
+            _detail(f"{sid}_d1", "acquire", {"?o": "?tool"}, g, "flatten 도구 확보 (?tool: 후보 중 M4 선택)"),
+            _detail(f"{sid}_d2", "tool_act:flatten", {"?t": "?tool", "?targets": targets, "?work": work},
+                    g, f"{targets}를 평평하게 편다"),
+            d2b,
+            _detail(f"{sid}_d3", "place", {"?o": "?tool", "?r": "tool_rest"}, g, "도구 반환"),
+        ]
+    if kind == "stack":
+        # C2_2 (샌드위치) / C4_1 (뚜껑 덮기). target_ids 순서 = 쌓는 순서 (아래 → 위).
+        # container_id가 있으면 첫 받침(접시 등), 없으면 첫 대상이 바닥이 된다.
+        ts = list(subgoal["target_ids"])
+        base = subgoal.get("container_id")
+        if base is None:
+            base, ts = ts[0], ts[1:]
+        g = f"G_{sid}"
+        out, prev = [], None                        # prev = (직전에 올린 물체, 그 받침)
+        for i, o in enumerate(ts, 1):
+            d1 = _detail(f"{sid}_s{i}a", "acquire", {"?o": o}, g, f"{o} 확보")
+            if prev:
+                # 아래층이 완성된 뒤에만 다음 층 확보 — sweep의 d2b와 같은 수법.
+                # 이 조건이 직전 place_on의 establish(on)와 causal link를 만들어
+                # 층 순서(아래→위)를 하드 엣지로 못 박는다.
+                d1["pre"].append({"id": f"{sid}_s{i}a_p{len(d1['pre'])}",
+                                  "expr": f"on({prev[0]}, {prev[1]})", "head": "on", "eval_by": "m2"})
+            out += [
+                d1,
+                _detail(f"{sid}_s{i}b", "transport", {"?o": o, "?r": base}, g, f"{o}를 {base} 위로 운반"),
+                _detail(f"{sid}_s{i}c", "place_on", {"?o": o, "?base": base}, g, f"{o}를 {base} 위에 놓기"),
+            ]
+            prev, base = (o, base), o               # 다음 층의 받침은 방금 올린 물체
+        return out
+    if kind == "scoop_transfer":
+        # C3_2 (파스타 2인분). sweep_collect와 같은 도구 골격, d2만 tool_act:scoop.
+        # [협의] '2인분' 같은 양 개념의 측정·판정 방식은 미정 — 현재는 대상 집합
+        # 전체 이동으로 근사한다 (양 판정이 정해지면 establish 술어를 교체).
+        r = subgoal["container_id"]
+        targets = "{" + ",".join(subgoal["target_ids"]) + "}"
+        g = f"G_{sid}_tool"
+        d2b = _detail(f"{sid}_d2b", "transport", {"?o": "?tool", "?r": "tool_rest"}, g, "도구를 거치 위치로 운반")
+        d2b["pre"].append({"id": f"{sid}_d2b_p{len(d2b['pre'])}",
+                           "expr": f"in({targets}, {r})", "head": "in", "eval_by": "m2"})
+        return [
+            _detail(f"{sid}_d1", "acquire", {"?o": "?tool"}, g, "scoop 도구 확보 (?tool: 후보 중 M4 선택)"),
+            _detail(f"{sid}_d2", "tool_act:scoop", {"?t": "?tool", "?targets": targets, "?r": r},
+                    g, f"{targets}를 {r}로 떠서 옮긴다"),
+            d2b,
+            _detail(f"{sid}_d3", "place", {"?o": "?tool", "?r": "tool_rest"}, g, "도구 반환"),
+        ]
+    if kind == "extract":
+        # C4_2 (틈새 카드). [협의] gap_accessible(도구가 틈에 진입 가능한가) 판정은
+        # 틈새 기하 질의가 필요 — M3(도희) 협의 후 확정. 빼낸 뒤의 목적지 배치는
+        # 별도 relocate 서브골이 담당한다 (extract는 '꺼내기'까지만).
+        ts = subgoal["target_ids"]
+        o = ts[0] if len(ts) == 1 else "{" + ",".join(ts) + "}"
+        g = f"G_{sid}_tool"
+        d2b = _detail(f"{sid}_d2b", "transport", {"?o": "?tool", "?r": "tool_rest"}, g, "도구를 거치 위치로 운반")
+        d2b["pre"].append({"id": f"{sid}_d2b_p{len(d2b['pre'])}",
+                           "expr": f"extracted({o})", "head": "extracted", "eval_by": "m2"})
+        return [
+            _detail(f"{sid}_d1", "acquire", {"?o": "?tool"}, g, "extract 도구 확보 (?tool: 후보 중 M4 선택)"),
+            _detail(f"{sid}_d2", "tool_act:extract", {"?t": "?tool", "?o": o}, g, f"{o}를 틈에서 빼낸다"),
+            d2b,
+            _detail(f"{sid}_d3", "place", {"?o": "?tool", "?r": "tool_rest"}, g, "도구 반환"),
+        ]
     raise ValueError(f"모르는 kind: {kind}")
+
+
+# 0903: 컨테이너에 "담는" 서브골과 같은 컨테이너 "위에 놓는"(덮는) 서브골 사이의 순서.
+# c4_2에서 M2가 "긴 물건 담기"(relocate → 상자)와 "뚜껑 덮기"(stack, container_id=상자)를
+# 별개 서브골로 내자 서브골 간 제약이 없어 M4가 뚜껑을 먼저 덮었다.
+# 물리 규칙: 컨테이너를 덮고 나면 안에 넣을 수 없다 → 담기 ≺ 덮기.
+# 구현은 sweep의 d2b, stack의 층 순서와 같은 수법: 덮는 서브골의 첫 상세(acquire) pre에
+# 담는 서브골이 establish하는 in(x, C)를 그대로 넣어 partial_order가 causal link로 잡게 한다.
+# 분할 뒤에는 자식들이 in(원소, C)를 각각 establish하므로 다시 호출한다(auto 태그로 교체).
+INSIDE_KINDS = {"relocate", "sweep_collect", "scoop_transfer"}
+
+
+def add_container_seal_pres(subgoals: list[dict]) -> list[str]:
+    logs = []
+    for b in subgoals:
+        if b.get("kind") != "stack" or not b.get("details"):
+            continue
+        # 받침: container_id가 있으면 그것, 없으면 첫 target (decompose의 stack 규칙과 동일)
+        C = b.get("container_id") or (b.get("target_ids") or [None])[0]
+        if not C:
+            continue
+        first = b["details"][0]
+        first["pre"] = [q for q in first["pre"] if not q.get("auto")]
+        added = []
+        for a in subgoals:
+            if a is b or a.get("kind") not in INSIDE_KINDS or a.get("container_id") != C:
+                continue
+            for d in a.get("details", []):
+                for e in d.get("establish", []):
+                    if e.get("head") == "in":
+                        first["pre"].append({"id": f"{first['detail_id']}_p{len(first['pre'])}",
+                                             "expr": e["expr"], "head": "in", "eval_by": "m2",
+                                             "auto": "container_seal"})
+                        added.append(a["subgoal_id"])
+        if added:
+            logs.append(f"  [순서] {b['subgoal_id']}({C} 덮기)는 "
+                        f"{sorted(set(added))}(담기) 뒤에 — 사전조건 {len(added)}건 부착")
+    return logs
 
 
 def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
@@ -125,8 +257,10 @@ def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
             producers = [a for a in details if a is not b and
                          any(e["expr"] == p["expr"] for e in a["establish"])]
             # 같은 그룹의 생산자만 하드 순서로 못 박는다.
+            # 예외(0903): 컨테이너 담기 ≺ 덮기 사전조건(auto=container_seal)은 서브골(그룹)을
+            # 가로지르는 물리 제약이라 그룹이 달라도 하드 엣지로 둔다.
             for a in producers:
-                if a["group_id"] == b["group_id"]:
+                if a["group_id"] == b["group_id"] or p.get("auto") == "container_seal":
                     edges.append({"from": a["detail_id"], "to": b["detail_id"],
                                   "why": f"causal_link: {p['expr']}"})
             # 그룹 밖 생산자만 있으면(예: hand_empty) 배타 자원 — mutex
@@ -144,8 +278,15 @@ def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
                 if c is b or not any(d["expr"] == p["expr"] for d in c["destroy"]):
                     continue
                 if c["group_id"] == b["group_id"]:
-                    threat_edges.append({"from": b["detail_id"], "to": c["detail_id"],
-                                         "why": f"threat: {c['detail_id']}가 {p['expr']}를 파괴"})
+                    # 0901: b와 c가 같은 자원을 둘 다 소비·파괴하면(예: stack 한 그룹의
+                    # acquire 여럿이 hand_empty를 다툼) 방향 정보가 없다 — 양방향 엣지는
+                    # 사이클이 되므로 하드 엣지를 만들지 않는다. 순서는 causal link가
+                    # 정한다 (stack은 다음 층 acquire의 on(...) 사전조건이 그 역할).
+                    symmetric = (any(d["expr"] == p["expr"] for d in b["destroy"]) and
+                                 any(q["expr"] == p["expr"] for q in c["pre"]))
+                    if not symmetric:
+                        threat_edges.append({"from": b["detail_id"], "to": c["detail_id"],
+                                             "why": f"threat: {c['detail_id']}가 {p['expr']}를 파괴"})
                     continue
                 key = tuple(sorted((b["group_id"], c["group_id"])))
                 if not any(m["groups"] == list(key) and m["resource"] == p["expr"] for m in mutex):
@@ -194,24 +335,35 @@ def build_queries(subgoal: dict, details: list[dict]) -> list[dict]:
                 oid = b.get("?o")
                 # 집합 표기 "{a,b}"는 원소별로 펼쳐 질의 (0828 — C2_1에서 발견)
                 targets = tool_ids if oid == "?tool" else _set_members(oid)
+                # 0905: top_exposed는 M3 query_top_exposed(상면 점유 여부)로 직접 질의.
+                # 이전엔 intrinsic으로 나가서 응답에 판정 근거가 없어 항상 unknown이었음.
+                kind = "top_exposed" if head == "top_exposed" else "intrinsic"
                 for t in targets:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                              "m3_call": {"kind": "intrinsic", "node_id": t}})
+                              "m3_call": {"kind": kind, "node_id": t}})
             elif head == "ee_usable":
                 oid = b.get("?o")
                 targets = tool_ids if oid == "?tool" else _set_members(oid)
                 for t in targets:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
                               "m3_call": {"kind": "ee", "node_id": t}})
-            elif head in ("fits", "clear"):
+            elif head == "fits":
                 oid, rid = b.get("?o"), b.get("?r")
                 if oid in (None, "?tool") or rid in (None, "tool_rest"):
                     continue                       # 도구 거치 위치는 측정 대상 아님
-                rel = "fits_inside" if head == "fits" else "clearance"
                 for t in _set_members(oid):          # 집합이면 원소별 관계 질의
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
                               "m3_call": {"kind": "relational", "a": t, "b": rid,
-                                          "relation": rel}})
+                                          "relation": "fits_inside"}})
+            elif head == "clear":
+                # clear(?r) = 목적지 영역이 비어 있는가 (점유 객체 유무, M3 query_clear).
+                # 0905: 이전엔 clearance(컨테이너 깊이 - 물체 높이)로 잘못 매핑돼
+                # 트레이 벽보다 높은 물체가 있으면 clear=unsat으로 오판됐음 (c2_1).
+                rid = b.get("?r")
+                if rid in (None, "tool_rest"):
+                    continue
+                q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
+                          "m3_call": {"kind": "clear", "node_id": rid}})
             elif head in ("batch_feasible", "act_space_clear"):
                 # 0828 신규 질의. 물체 1개짜리는 묶기 판정이 필요 없어 질의를 내지 않는다
                 # (not_queried — tool_rest와 같은 취급). 액션 주체(actor):
@@ -256,8 +408,25 @@ def invariants_for(subgoals: list[dict]) -> list[dict]:
                     else f"all_in({{{','.join(ts)}}}, {s['container_id']})")
             inv.append({"id": f"INV_{s['subgoal_id']}", "expr": expr,
                         "check_at": "final"})
-        elif s["kind"] == "sweep_collect":
+        elif s["kind"] in ("sweep_collect", "scoop_transfer"):
             inv.append({"id": f"INV_{s['subgoal_id']}",
                         "expr": f"all_in({{{','.join(s['target_ids'])}}}, {s['container_id']})",
                         "check_at": "final"})
+        elif s["kind"] == "flatten":
+            inv.append({"id": f"INV_{s['subgoal_id']}",
+                        "expr": f"flattened({{{','.join(s['target_ids'])}}})",
+                        "check_at": "final"})
+        elif s["kind"] == "stack":
+            ts, base = list(s["target_ids"]), s.get("container_id")
+            if base is None:
+                base, ts = ts[0], ts[1:]
+            for j, o in enumerate(ts, 1):           # 층마다 제 받침 위에 있는가
+                inv.append({"id": f"INV_{s['subgoal_id']}_{j}",
+                            "expr": f"on({o}, {base})", "check_at": "final"})
+                base = o
+        elif s["kind"] == "extract":
+            ts = s["target_ids"]
+            o = ts[0] if len(ts) == 1 else "{" + ",".join(ts) + "}"
+            inv.append({"id": f"INV_{s['subgoal_id']}",
+                        "expr": f"extracted({o})", "check_at": "final"})
     return inv

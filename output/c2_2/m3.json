@@ -1,0 +1,1852 @@
+{
+  "responses": [
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p0",
+      "node_id": "obj_bread_a_bread_a",
+      "geometry": {
+        "length_mm": 97.5,
+        "diameter_mm": null,
+        "extents_mm": [
+          97.5,
+          9.5,
+          6.3
+        ],
+        "height_z_mm": 9.6,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          6.3,
+          97.5
+        ],
+        "height_mm": 9.6
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.003,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": NaN
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "node_id": "obj_bread_a_bread_a",
+      "geometry": {
+        "length_mm": 97.5,
+        "diameter_mm": null,
+        "extents_mm": [
+          97.5,
+          9.5,
+          6.3
+        ],
+        "height_z_mm": 9.6,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          6.3,
+          97.5
+        ],
+        "height_mm": 9.6
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.003,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": NaN
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p2",
+      "node_id": "obj_bread_a_bread_a",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.997,
+          "margin_unit": "kg",
+          "reason": "질량 0.003 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 6.3,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.033,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.497,
+          "margin_unit": "kg",
+          "reason": "질량 0.003 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 6.3,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.033,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": NaN,
+          "margin_unit": "mm",
+          "reason": "상면 RMS nan vs 허용 1.5; 접촉면 폭 10 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": NaN,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 9.5,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 616.6,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 233.4
+      }
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p2",
+      "from": "obj_bread_a_bread_a",
+      "to": "obj_serving_plate_serving_plate",
+      "type": "fits_inside",
+      "value_mm": 160.7,
+      "check": "opening_167.0 - footprint_6.3",
+      "pass": true
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d3_p3",
+      "from": "obj_bread_a_bread_a",
+      "to": "obj_serving_plate_serving_plate",
+      "type": "clearance",
+      "value_mm": 9.3,
+      "check": "floor_fit(open_167.0-base_6.3) & no_tip(h_9.6<=3.0x6.3)",
+      "pass": true
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p0",
+      "node_id": "obj_turkey_turkey_1",
+      "geometry": {
+        "length_mm": 44.9,
+        "diameter_mm": null,
+        "extents_mm": [
+          44.9,
+          15.3,
+          4.0
+        ],
+        "height_z_mm": 3.5,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          25.3,
+          41.0
+        ],
+        "height_mm": 3.5
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.002,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": NaN
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p0",
+      "node_id": "obj_turkey_turkey_2",
+      "geometry": {
+        "length_mm": 46.8,
+        "diameter_mm": null,
+        "extents_mm": [
+          46.8,
+          18.8,
+          6.5
+        ],
+        "height_z_mm": 5.6,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          27.4,
+          43.4
+        ],
+        "height_mm": 5.6
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.003,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": NaN
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p0",
+      "node_id": "obj_turkey_turkey_3",
+      "geometry": {
+        "length_mm": 72.4,
+        "diameter_mm": null,
+        "extents_mm": [
+          72.4,
+          44.5,
+          0.7
+        ],
+        "height_z_mm": 0.8,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.02,
+        "seal_patch_rms_mm": 0.026,
+        "footprint_mm": [
+          72.3,
+          44.5
+        ],
+        "height_mm": 0.8
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.001,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.428,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": 0.02
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p1",
+      "node_id": "obj_turkey_turkey_1",
+      "geometry": {
+        "length_mm": 44.9,
+        "diameter_mm": null,
+        "extents_mm": [
+          44.9,
+          15.3,
+          4.0
+        ],
+        "height_z_mm": 3.5,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          25.3,
+          41.0
+        ],
+        "height_mm": 3.5
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.002,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": NaN
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p1",
+      "node_id": "obj_turkey_turkey_2",
+      "geometry": {
+        "length_mm": 46.8,
+        "diameter_mm": null,
+        "extents_mm": [
+          46.8,
+          18.8,
+          6.5
+        ],
+        "height_z_mm": 5.6,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          27.4,
+          43.4
+        ],
+        "height_mm": 5.6
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.003,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": NaN
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p1",
+      "node_id": "obj_turkey_turkey_3",
+      "geometry": {
+        "length_mm": 72.4,
+        "diameter_mm": null,
+        "extents_mm": [
+          72.4,
+          44.5,
+          0.7
+        ],
+        "height_z_mm": 0.8,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.02,
+        "seal_patch_rms_mm": 0.026,
+        "footprint_mm": [
+          72.3,
+          44.5
+        ],
+        "height_mm": 0.8
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.001,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.428,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": 0.02
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p2",
+      "node_id": "obj_turkey_turkey_1",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.998,
+          "margin_unit": "kg",
+          "reason": "질량 0.002 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 25.3,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.002,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.022,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.498,
+          "margin_unit": "kg",
+          "reason": "질량 0.002 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 25.3,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.002,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.022,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": NaN,
+          "margin_unit": "mm",
+          "reason": "상면 RMS nan vs 허용 1.5; 접촉면 폭 15 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": NaN,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.002,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 15.3,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 773.1,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 76.9
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p2",
+      "node_id": "obj_turkey_turkey_2",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.997,
+          "margin_unit": "kg",
+          "reason": "질량 0.003 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 27.4,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.033,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.497,
+          "margin_unit": "kg",
+          "reason": "질량 0.003 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 27.4,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.033,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": NaN,
+          "margin_unit": "mm",
+          "reason": "상면 RMS nan vs 허용 1.5; 접촉면 폭 19 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": NaN,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 18.8,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 772.6,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 77.4
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p2",
+      "node_id": "obj_turkey_turkey_3",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.999,
+          "margin_unit": "kg",
+          "reason": "질량 0.001 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 44.5,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.001,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.011,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.499,
+          "margin_unit": "kg",
+          "reason": "질량 0.001 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 44.5,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.001,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.011,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": true,
+          "margin": 0.499,
+          "margin_unit": "kg",
+          "reason": "질량 0.001 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.02,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.001,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 44.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.026,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 751.6,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 98.4
+      }
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p3",
+      "kind": "batch",
+      "actor": {
+        "type": "ee_pool"
+      },
+      "feasible": false,
+      "checks": [
+        {
+          "rule": "ee_pool_one_per_grasp",
+          "capacity": 1,
+          "demand": 3,
+          "unit": "count",
+          "margin": -2,
+          "pass": false
+        }
+      ],
+      "binding_check": "ee_pool_one_per_grasp",
+      "partition": [
+        [
+          "obj_turkey_turkey_1"
+        ],
+        [
+          "obj_turkey_turkey_2"
+        ],
+        [
+          "obj_turkey_turkey_3"
+        ]
+      ]
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d2_p1",
+      "kind": "swept_space",
+      "actor": {
+        "type": "ee_pool"
+      },
+      "clear": null,
+      "margin_mm": null,
+      "blockers": []
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p2",
+      "from": "obj_turkey_turkey_1",
+      "to": "obj_bread_a_bread_a",
+      "type": "fits_inside",
+      "value_mm": -27.0,
+      "check": "opening_-1.7 - footprint_25.3",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p2",
+      "from": "obj_turkey_turkey_2",
+      "to": "obj_bread_a_bread_a",
+      "type": "fits_inside",
+      "value_mm": -29.1,
+      "check": "opening_-1.7 - footprint_27.4",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p2",
+      "from": "obj_turkey_turkey_3",
+      "to": "obj_bread_a_bread_a",
+      "type": "fits_inside",
+      "value_mm": -46.2,
+      "check": "opening_-1.7 - footprint_44.5",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p3",
+      "from": "obj_turkey_turkey_1",
+      "to": "obj_bread_a_bread_a",
+      "type": "clearance",
+      "value_mm": -27.0,
+      "check": "floor_fit(open_-1.7-base_25.3) & no_tip(h_3.5<=3.0x25.3)",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p3",
+      "from": "obj_turkey_turkey_2",
+      "to": "obj_bread_a_bread_a",
+      "type": "clearance",
+      "value_mm": -29.1,
+      "check": "floor_fit(open_-1.7-base_27.4) & no_tip(h_5.6<=3.0x27.4)",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d3_p3",
+      "from": "obj_turkey_turkey_3",
+      "to": "obj_bread_a_bread_a",
+      "type": "clearance",
+      "value_mm": -46.2,
+      "check": "floor_fit(open_-1.7-base_44.5) & no_tip(h_0.8<=3.0x44.5)",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p0",
+      "node_id": "obj_cheese_cheese_1",
+      "geometry": {
+        "length_mm": 53.6,
+        "diameter_mm": null,
+        "extents_mm": [
+          53.6,
+          28.9,
+          3.3
+        ],
+        "height_z_mm": 2.3,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          26.7,
+          53.9
+        ],
+        "height_mm": 2.3
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.002,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": NaN
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p0",
+      "node_id": "obj_cheese_cheese_2",
+      "geometry": {
+        "length_mm": 56.8,
+        "diameter_mm": null,
+        "extents_mm": [
+          56.8,
+          32.8,
+          5.7
+        ],
+        "height_z_mm": 4.2,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          30.7,
+          58.2
+        ],
+        "height_mm": 4.2
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.004,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": NaN
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p0",
+      "node_id": "obj_cheese_cheese_3",
+      "geometry": {
+        "length_mm": 53.4,
+        "diameter_mm": null,
+        "extents_mm": [
+          53.4,
+          49.1,
+          1.9
+        ],
+        "height_z_mm": 1.9,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.05,
+        "seal_patch_rms_mm": 0.013,
+        "footprint_mm": [
+          54.1,
+          51.2
+        ],
+        "height_mm": 1.9
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.003,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.429,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": 0.05
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p1",
+      "node_id": "obj_cheese_cheese_1",
+      "geometry": {
+        "length_mm": 53.6,
+        "diameter_mm": null,
+        "extents_mm": [
+          53.6,
+          28.9,
+          3.3
+        ],
+        "height_z_mm": 2.3,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          26.7,
+          53.9
+        ],
+        "height_mm": 2.3
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.002,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": NaN
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p1",
+      "node_id": "obj_cheese_cheese_2",
+      "geometry": {
+        "length_mm": 56.8,
+        "diameter_mm": null,
+        "extents_mm": [
+          56.8,
+          32.8,
+          5.7
+        ],
+        "height_z_mm": 4.2,
+        "cylinder_like": false,
+        "surface_rms_mm": NaN,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          30.7,
+          58.2
+        ],
+        "height_mm": 4.2
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.004,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.45,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": NaN
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p1",
+      "node_id": "obj_cheese_cheese_3",
+      "geometry": {
+        "length_mm": 53.4,
+        "diameter_mm": null,
+        "extents_mm": [
+          53.4,
+          49.1,
+          1.9
+        ],
+        "height_z_mm": 1.9,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.05,
+        "seal_patch_rms_mm": 0.013,
+        "footprint_mm": [
+          54.1,
+          51.2
+        ],
+        "height_mm": 1.9
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.003,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.429,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": 0.05
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p2",
+      "node_id": "obj_cheese_cheese_1",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.998,
+          "margin_unit": "kg",
+          "reason": "질량 0.002 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 26.7,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.002,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.022,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.498,
+          "margin_unit": "kg",
+          "reason": "질량 0.002 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 26.7,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.002,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.022,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": NaN,
+          "margin_unit": "mm",
+          "reason": "상면 RMS nan vs 허용 1.5; 접촉면 폭 29 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": NaN,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.002,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 28.9,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 703.8,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 146.2
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p2",
+      "node_id": "obj_cheese_cheese_2",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.996,
+          "margin_unit": "kg",
+          "reason": "질량 0.004 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 30.7,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.004,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.044,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.496,
+          "margin_unit": "kg",
+          "reason": "질량 0.004 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 30.7,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.004,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.044,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": NaN,
+          "margin_unit": "mm",
+          "reason": "상면 RMS nan vs 허용 1.5; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": NaN,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.004,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 32.8,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 701.5,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 148.5
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p2",
+      "node_id": "obj_cheese_cheese_3",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.997,
+          "margin_unit": "kg",
+          "reason": "질량 0.003 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 51.2,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.034,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.497,
+          "margin_unit": "kg",
+          "reason": "질량 0.003 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 51.2,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.034,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": true,
+          "margin": 0.497,
+          "margin_unit": "kg",
+          "reason": "질량 0.003 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.05,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.003,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 49.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.013,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 687.9,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 162.1
+      }
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p3",
+      "kind": "batch",
+      "actor": {
+        "type": "ee_pool"
+      },
+      "feasible": false,
+      "checks": [
+        {
+          "rule": "ee_pool_one_per_grasp",
+          "capacity": 1,
+          "demand": 3,
+          "unit": "count",
+          "margin": -2,
+          "pass": false
+        }
+      ],
+      "binding_check": "ee_pool_one_per_grasp",
+      "partition": [
+        [
+          "obj_cheese_cheese_1"
+        ],
+        [
+          "obj_cheese_cheese_2"
+        ],
+        [
+          "obj_cheese_cheese_3"
+        ]
+      ]
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d2_p1",
+      "kind": "swept_space",
+      "actor": {
+        "type": "ee_pool"
+      },
+      "clear": null,
+      "margin_mm": null,
+      "blockers": []
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p2",
+      "from": "obj_cheese_cheese_1",
+      "to": "obj_turkey_turkey_1",
+      "type": "fits_inside",
+      "value_mm": -9.4,
+      "check": "opening_17.3 - footprint_26.7",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p2",
+      "from": "obj_cheese_cheese_2",
+      "to": "obj_turkey_turkey_1",
+      "type": "fits_inside",
+      "value_mm": -13.4,
+      "check": "opening_17.3 - footprint_30.7",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p2",
+      "from": "obj_cheese_cheese_3",
+      "to": "obj_turkey_turkey_1",
+      "type": "fits_inside",
+      "value_mm": -33.9,
+      "check": "opening_17.3 - footprint_51.2",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p3",
+      "from": "obj_cheese_cheese_1",
+      "to": "obj_turkey_turkey_1",
+      "type": "clearance",
+      "value_mm": -9.4,
+      "check": "floor_fit(open_17.3-base_26.7) & no_tip(h_2.3<=3.0x26.7)",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p3",
+      "from": "obj_cheese_cheese_2",
+      "to": "obj_turkey_turkey_1",
+      "type": "clearance",
+      "value_mm": -13.4,
+      "check": "floor_fit(open_17.3-base_30.7) & no_tip(h_4.2<=3.0x30.7)",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d3_p3",
+      "from": "obj_cheese_cheese_3",
+      "to": "obj_turkey_turkey_1",
+      "type": "clearance",
+      "value_mm": -33.9,
+      "check": "floor_fit(open_17.3-base_51.2) & no_tip(h_1.9<=3.0x51.2)",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG4",
+      "queried_by": "SG4_d1_p0",
+      "node_id": "obj_tomato_slice_tomato_slice",
+      "geometry": {
+        "length_mm": 57.5,
+        "diameter_mm": null,
+        "extents_mm": [
+          57.5,
+          56.2,
+          1.5
+        ],
+        "height_z_mm": 1.6,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.0,
+        "seal_patch_rms_mm": 0.001,
+        "footprint_mm": [
+          54.1,
+          56.7
+        ],
+        "height_mm": 1.6
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.002,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.428,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": 0.0
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG4",
+      "queried_by": "SG4_d1_p1",
+      "node_id": "obj_tomato_slice_tomato_slice",
+      "geometry": {
+        "length_mm": 57.5,
+        "diameter_mm": null,
+        "extents_mm": [
+          57.5,
+          56.2,
+          1.5
+        ],
+        "height_z_mm": 1.6,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.0,
+        "seal_patch_rms_mm": 0.001,
+        "footprint_mm": [
+          54.1,
+          56.7
+        ],
+        "height_mm": 1.6
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.002,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.428,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": 0.0
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG4",
+      "queried_by": "SG4_d1_p2",
+      "node_id": "obj_tomato_slice_tomato_slice",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.998,
+          "margin_unit": "kg",
+          "reason": "질량 0.002 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 54.1,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.002,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.023,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.498,
+          "margin_unit": "kg",
+          "reason": "질량 0.002 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 54.1,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.002,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.023,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": true,
+          "margin": 0.498,
+          "margin_unit": "kg",
+          "reason": "질량 0.002 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.0,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.002,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 56.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.001,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 692.2,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 157.8
+      }
+    },
+    {
+      "subgoal_id": "SG4",
+      "queried_by": "SG4_d3_p2",
+      "from": "obj_tomato_slice_tomato_slice",
+      "to": "obj_cheese_cheese_1",
+      "type": "fits_inside",
+      "value_mm": -35.4,
+      "check": "opening_18.7 - footprint_54.1",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG4",
+      "queried_by": "SG4_d3_p3",
+      "from": "obj_tomato_slice_tomato_slice",
+      "to": "obj_cheese_cheese_1",
+      "type": "clearance",
+      "value_mm": -35.4,
+      "check": "floor_fit(open_18.7-base_54.1) & no_tip(h_1.6<=3.0x54.1)",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG5",
+      "queried_by": "SG5_d1_p0",
+      "node_id": "obj_bread_b_bread_b",
+      "geometry": {
+        "length_mm": 114.2,
+        "diameter_mm": null,
+        "extents_mm": [
+          114.2,
+          113.9,
+          14.7
+        ],
+        "height_z_mm": 14.8,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.12,
+        "seal_patch_rms_mm": 0.001,
+        "footprint_mm": [
+          101.2,
+          103.2
+        ],
+        "height_mm": 14.8
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.077,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.43,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": 0.12
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG5",
+      "queried_by": "SG5_d1_p1",
+      "node_id": "obj_bread_b_bread_b",
+      "geometry": {
+        "length_mm": 114.2,
+        "diameter_mm": null,
+        "extents_mm": [
+          114.2,
+          113.9,
+          14.7
+        ],
+        "height_z_mm": 14.8,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.12,
+        "seal_patch_rms_mm": 0.001,
+        "footprint_mm": [
+          101.2,
+          103.2
+        ],
+        "height_mm": 14.8
+      },
+      "material": "unknown",
+      "density_kgm3": 500,
+      "mass_kg": 0.077,
+      "youngs_gpa": null,
+      "mu": {
+        "mu": 0.43,
+        "stage": 0,
+        "material": "unknown",
+        "rms_mm": 0.12
+      },
+      "confidence": 0.5
+    },
+    {
+      "subgoal_id": "SG5",
+      "queried_by": "SG5_d1_p2",
+      "node_id": "obj_bread_b_bread_b",
+      "ee": {
+        "2F": {
+          "feasible": false,
+          "margin": -16.2,
+          "margin_unit": "mm",
+          "reason": "치수 101 vs 개구 85mm",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 101.2,
+              "limit": 85.0,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.077,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.878,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.423,
+          "margin_unit": "kg",
+          "reason": "질량 0.077 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 101.2,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.077,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.878,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": true,
+          "margin": 0.423,
+          "margin_unit": "kg",
+          "reason": "질량 0.077 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.12,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.077,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 113.9,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.001,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 576.8,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 273.2
+      }
+    },
+    {
+      "subgoal_id": "SG5",
+      "queried_by": "SG5_d3_p2",
+      "from": "obj_bread_b_bread_b",
+      "to": "obj_tomato_slice_tomato_slice",
+      "type": "fits_inside",
+      "value_mm": -55.1,
+      "check": "opening_46.1 - footprint_101.2",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG5",
+      "queried_by": "SG5_d3_p3",
+      "from": "obj_bread_b_bread_b",
+      "to": "obj_tomato_slice_tomato_slice",
+      "type": "clearance",
+      "value_mm": -55.1,
+      "check": "floor_fit(open_46.1-base_101.2) & no_tip(h_14.8<=3.0x101.2)",
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG1",
+      "queried_by": "SG1_d1_p1",
+      "node_id": "obj_bread_a_bread_a",
+      "type": "top_exposed",
+      "value": false,
+      "blockers": [
+        "obj_bread_b_bread_b"
+      ],
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p1",
+      "node_id": "obj_turkey_turkey_1",
+      "type": "top_exposed",
+      "value": false,
+      "blockers": [
+        "obj_turkey_turkey_2",
+        "obj_turkey_turkey_3",
+        "obj_turkey_plate_turkey_plate"
+      ],
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p1",
+      "node_id": "obj_turkey_turkey_2",
+      "type": "top_exposed",
+      "value": false,
+      "blockers": [
+        "obj_turkey_turkey_1",
+        "obj_turkey_turkey_3"
+      ],
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG2",
+      "queried_by": "SG2_d1_p1",
+      "node_id": "obj_turkey_turkey_3",
+      "type": "top_exposed",
+      "value": true,
+      "blockers": [],
+      "pass": true
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p1",
+      "node_id": "obj_cheese_cheese_1",
+      "type": "top_exposed",
+      "value": false,
+      "blockers": [
+        "obj_cheese_cheese_2",
+        "obj_cheese_cheese_3",
+        "obj_cheese_plate_cheese_plate"
+      ],
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p1",
+      "node_id": "obj_cheese_cheese_2",
+      "type": "top_exposed",
+      "value": false,
+      "blockers": [
+        "obj_cheese_cheese_3",
+        "obj_cheese_plate_cheese_plate"
+      ],
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG3",
+      "queried_by": "SG3_d1_p1",
+      "node_id": "obj_cheese_cheese_3",
+      "type": "top_exposed",
+      "value": true,
+      "blockers": [],
+      "pass": true
+    },
+    {
+      "subgoal_id": "SG4",
+      "queried_by": "SG4_d1_p1",
+      "node_id": "obj_tomato_slice_tomato_slice",
+      "type": "top_exposed",
+      "value": false,
+      "blockers": [
+        "obj_tomato_plate_tomato_plate"
+      ],
+      "pass": false
+    },
+    {
+      "subgoal_id": "SG5",
+      "queried_by": "SG5_d1_p1",
+      "node_id": "obj_bread_b_bread_b",
+      "type": "top_exposed",
+      "value": true,
+      "blockers": [],
+      "pass": true
+    }
+  ]
+}

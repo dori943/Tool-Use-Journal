@@ -21,6 +21,10 @@ G = 9.81
 #  "seal_rms_tol_mm"(vac; run_m3가 flatness_tol_rms_mm → seal_rms_tol_mm 정규화),
 #  "seal_diameter_mm"(vac), "pass_height_mm"}
 
+# vac 흡착 패치 평면 허용 RMS(mm) — 흡착컵 크기 평면 패치가 이보다 거칠거나
+# 아예 없으면(sentinel) 밀폐 불가. ee_spec의 seal_rms_tol_mm를 우선 사용.
+SEAL_PATCH_RMS_TOL_MM = 1.5
+
 
 def _check(rule, value, limit, less_than=True):
     ok = value < limit if less_than else value > limit
@@ -30,11 +34,17 @@ def _check(rule, value, limit, less_than=True):
 
 
 def grasp_dim_mm(geometry: dict) -> float:
-    """파지 치수: 원통이면 지름, 아니면 최소 유의미 extent."""
-    if geometry.get("diameter_mm") is not None:
+    """접근 방향 파지 폭. 테이블에 놓인 물체는 그리퍼가 수평 단면을 다물어 파지하므로
+    파지 폭 = min(수평 footprint)다. 수직 두께는 물체가 테이블에 밀착돼 측면 접근이
+    막히므로 파지 치수가 될 수 없다(최소 extent를 쓰던 종전 버그: 접시 두께 11로 통과).
+    예: 접시 182x182x11 → 두께 11이 아니라 footprint 182 → 2F/3F 개구 초과로 탈락."""
+    fp = geometry.get("footprint_mm")
+    if fp:
+        return min(float(fp[0]), float(fp[1]))
+    if geometry.get("diameter_mm") is not None:       # footprint 없는 구버전 경로
         return geometry["diameter_mm"]
     ext = sorted(geometry["extents_mm"])
-    return ext[0] if ext[0] > 5 else ext[1]           # 최소 유의미 치수
+    return ext[0] if ext[0] > 5 else ext[1]
 
 
 def seal_contact_dim_mm(geometry: dict) -> float:
@@ -96,6 +106,14 @@ def evaluate_ee(ee_spec: dict, intrinsic: dict) -> dict:
             units["seal_contact"] = "mm"
             reasons["seal_contact"] = (f"접촉면 폭 {contact:.0f} vs "
                                        f"seal 직경 {ee_spec['seal_diameter_mm']:.0f}mm")
+
+        # ★ seal_patch: 흡착컵 크기의 평면 패치가 상면에 있어야 밀폐 가능.
+        #   오목한 그릇(숟가락)·둥근 물체(사과)는 seal 크기 평면이 없어(sentinel) 탈락.
+        patch_rms = g.get("seal_patch_rms_mm", SEAL_PATCH_RMS_TOL_MM)
+        p_tol = ee_spec.get("seal_rms_tol_mm", SEAL_PATCH_RMS_TOL_MM)
+        checks.append(_check("seal_patch", patch_rms, p_tol))
+        units["seal_patch"] = "mm"
+        reasons["seal_patch"] = f"흡착 패치 RMS {patch_rms} vs 허용 {p_tol}mm"
     else:
         return {"feasible": False, "margin": 0.0, "margin_unit": "",
                 "reason": f"규칙 없음: {t}", "checks": []}

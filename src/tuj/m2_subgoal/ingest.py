@@ -54,8 +54,12 @@ def _judge(head: str, nodes: list[str], view: dict, rels: list[dict],
             v = r.get("reachable")
             ev.append({"node": n, "reachable": v, "margin_mm": r.get("margin_mm")})
         elif head == "top_exposed":
-            v = info.get("top_exposed")          # 현재 M3 응답에 없음 → None
-            ev.append({"node": n, "top_exposed": v})
+            # 0905: M3 query_top_exposed 응답 {type: top_exposed, node_id, value, blockers}
+            r = next((x for x in rels
+                      if x.get("type") == "top_exposed" and x.get("node_id") == n), None)
+            v = r.get("value") if r else info.get("top_exposed")
+            ev.append({"node": n, "top_exposed": v,
+                       "blockers": (r or {}).get("blockers", [])})
         elif head == "ee_usable":
             ee = info.get("ee")
             v = any(x.get("feasible") for x in ee.values()) if ee else None
@@ -205,6 +209,58 @@ def update_confidence(m2_out: dict, client, model: str = "gpt-4o",
     return logs
 
 
+def measurement_feedback(m2_out: dict) -> str | None:
+    """직전 왕복에서 unsat 난 술어를 사실 요약 텍스트로 만든다 (재분해 프롬프트 주입용).
+
+    0831 설계: 해법("도구를 써라")은 절대 넣지 않는다 — 측정 사실만 전달하고,
+    대안 도출은 분해 LLM의 몫으로 남긴다. 그래야 도구 사용이 창발로 성립한다.
+    """
+    lines = []
+    for s in m2_out.get("m2_subgoals", []):
+        for d in s.get("details", []):
+            for p in d.get("pre", []):
+                if p.get("status") != "unsat":
+                    continue
+                # batch/act_space는 unsat이어도 분할(partition)과 제외 목록으로
+                # 해소되는 신호라 재분해 사유가 아니다 (0831 — kind 진동 방지)
+                if p.get("head") in ("batch_feasible", "act_space_clear"):
+                    continue
+                # 0903: 목적지 clear 불충족은 수행 방식(kind)을 바꿔도 해소되지 않는다
+                # (트레이가 막힌 건 쓸어 담아도 마찬가지). 이걸 넣으면 "다른 kind를
+                # 내라"는 요구가 되어 엉뚱한 재분해(c2_1: 트레이 담기를 도구 사용으로)가
+                # 나온다. 목적지 정리는 별도 서브골 추가 문제이고, 현재 c2_1의 clear
+                # unsat은 접지 규칙(컨테이너 깊이) 쪽 이슈라 M3 수정 대상. 재분해 사유에서 제외.
+                if p.get("head") == "clear":
+                    continue
+                ev = p.get("evidence") or []
+                detail = ""
+                falsy = [e for e in ev if e.get("reachable") is False]
+                if falsy:
+                    margins = [e.get("margin_mm") for e in falsy
+                               if e.get("margin_mm") is not None]
+                    detail = f" (대상 {len(ev)}개 중 {len(falsy)}개는 로봇 팔이 닿지 않음"
+                    if margins:
+                        detail += f", 최대 {abs(min(margins)):.1f}mm 부족"
+                    detail += ")"
+                elif ev and all("pass" in e for e in ev):
+                    n_f = sum(1 for e in ev if not e.get("pass"))
+                    detail = f" (검사 {len(ev)}건 중 {n_f}건 불충족)"
+                lines.append(f"- {p['expr']} -> 불충족{detail}")
+    if not lines:
+        return None
+    return ("직전 계획 평가: 아래 조건이 실측에서 충족되지 않아 직전 분해는 실행 불가로"
+            " 판정되었다.\n"
+            + "\n".join(lines)
+            + "\n위 제약은 로봇과 장면의 물리적 사실이므로, 같은 kind의 분해를 반복하면"
+              " 동일하게 실행 불가로 판정된다. 위 제약이 적용되지 않는 다른 수행 방식"
+              "(kind)의 분해를 출력하라.")
+
+
+# kind별 도구 적합성의 핵심 m3 술어 (측정 없이는 후보를 가를 근거가 없는 것)
+_CORE_PRED = {"sweep_collect": "batch_feasible", "scoop_transfer": "batch_feasible",
+              "flatten": "flat_face", "extract": "gap_accessible"}
+
+
 def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
     """M3 응답을 M2 출력의 m3 술어에 반영하고 로그 라인을 돌려준다. (m2_out은 제자리 수정)"""
     by_q: dict[str, list[dict]] = {}
@@ -214,6 +270,10 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
 
     # 질의 사양에서 술어 id → 대상 노드 목록 (질의가 실제로 향했던 노드들)
     q_nodes: dict[str, list[str]] = {}
+    # 0903: 관계 질의는 (a, b) 쌍까지 기억한다. from만 보면 접지 컴파일 보충이 만든
+    # 엉뚱한 쌍(c2_1: fits(빵, 머그) — 빵을 머그에 넣는지 검사)이 from=빵으로 통과해
+    # unsat을 만들고, 그게 재분해 피드백으로 들어가 kind가 stack으로 튀었다.
+    q_pairs: dict[str, set] = {}
     for q in m2_out.get("m2_queries", []):
         c = q["m3_call"]
         if c.get("kind") in ("batch", "swept_space"):   # 0828 신규 — 노드 대신 그룹 대상
@@ -224,6 +284,8 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
             q_nodes.setdefault(q["queried_by"], [])
             if n not in q_nodes[q["queried_by"]]:
                 q_nodes[q["queried_by"]].append(n)
+        if c.get("kind") == "relational" and c.get("a") and c.get("b"):
+            q_pairs.setdefault(q["queried_by"], set()).add((c["a"], c["b"]))
 
     logs, n_sat = [], {"sat": 0, "unsat": 0, "unknown": 0, "unanswered": 0, "not_queried": 0}
     for s in m2_out["m2_subgoals"]:
@@ -232,8 +294,25 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
                 if p["eval_by"] != "m3":
                     continue
                 rs = by_q.get(p["id"], [])
-                rels = [r for r in rs if "pass" in r or "check" in r]
-                answered_nodes = [r["node_id"] for r in rs if "node_id" in r]
+                expected = set(q_nodes.get(p["id"], []))
+                # 관계 응답은 from/to 키를 쓴다. 접지 쪽 컴파일 보충이 만든 예상 밖 쌍
+                # (예: fits({집합}, 영역)을 (원소, 원소)로 오파싱)이 판정을 오염시키지
+                # 않도록, 우리가 질의를 발행한 노드(from)의 응답만 판정에 쓴다 (0831).
+                rels = [r for r in rs if ("pass" in r or "check" in r)
+                        and (not expected or r.get("from") in expected
+                             or r.get("node_id") in expected)]
+                pairs = q_pairs.get(p["id"])
+                if pairs:                        # 관계 술어: 발행한 (from, to) 쌍만 인정
+                    dropped = [r for r in rels if r.get("from") and r.get("to")
+                               and (r["from"], r["to"]) not in pairs]
+                    if dropped:
+                        logs.append(f"  [무시] {p['id']}: 발행하지 않은 쌍 "
+                                    + ", ".join(f"({r['from']}, {r['to']})" for r in dropped)
+                                    + " (접지 컴파일 보충)")
+                    rels = [r for r in rels if r not in dropped]
+                answered_nodes = [r.get("node_id") or r.get("from")
+                                  for r in rs
+                                  if (r.get("node_id") or r.get("from"))]
                 nodes = q_nodes.get(p["id"], []) or answered_nodes
                 if p["id"] not in q_nodes:      # 질의 자체를 안 낸 술어 (예: tool_rest는 측정 대상 아님)
                     status, ev = "not_queried", []
@@ -283,26 +362,79 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
                 continue                      # 팔이 안 닿는 후보 탈락
             b = batch_by.get(s["subgoal_id"], {}).get(c)
             part = b.get("partition") if b else None
+            # 측정값이 하나도 없는 후보는 채점 대상이 아니다 (0831 — 무데이터 동점이
+            # id 정렬로 갈리는 오확정 방지. 전략 전환 직후 라운드가 이 경우다)
+            if not ee and not reach and b is None:
+                continue
             # 필요한 액션 횟수(그룹 수)가 적을수록 우선. batch 응답이 없으면 최하위
             # (batch 질의가 아예 없던 기존 실행에서는 전원이 같아 순위 변화 없음)
             batch_rank = -len(part) if part else float("-inf")
-            scored.append((len(feasible), batch_rank,
-                           float(reach.get("margin_mm") or 0.0), c, feasible, part))
+            # 0905: 확정 기준을 액션 횟수 최소 → 리치 여유 최대로 변경. 사용 가능 EE 수는
+            # 위에서 "하나라도 있는가"로만 거른다 (도구의 태스크 적합성과 무관한 값이라
+            # 점수에 넣으면 c1_1에서 ladle(EE 3종, 12회)이 plate(vac 1종, 2회)를 이겼음)
+            scored.append((batch_rank, float(reach.get("margin_mm") or 0.0),
+                           len(feasible), c, feasible, part))
         if not scored:
-            logs.append(f"  [도구 확정] {s['subgoal_id']}: 통과한 후보 없음")
+            s.pop("selected_tool_id", None)      # 이전 라운드의 무근거 확정 잔재 제거
+            s.pop("selection_evidence", None)
+            logs.append(f"  [도구 확정] {s['subgoal_id']}: 측정된 후보 없음 — 확정 보류"
+                        " (다음 접지 응답 후 확정)")
             continue
-        scored.sort(reverse=True)   # EE 수 최대 → 액션 횟수 최소 → 리치 여유 최대 (0828 개정)
-        n_ee, batch_rank, margin, chosen, _, part = scored[0]
+        scored.sort(reverse=True)   # 액션 횟수 최소 → 리치 여유 최대 → EE 수 (0905 개정)
+        batch_rank, margin, n_ee, chosen, _, part = scored[0]
         s["selected_tool_id"] = chosen
+        # 0903: kind의 핵심 술어가 미측정이면 확정은 하되 근거에 남기고 경고한다.
+        # (c4_1 gap_accessible, c1_2 flat_face가 M3에 아직 없어 리치 여유 몇 mm로 갈렸음.
+        #  보류로 바꾸면 M4까지 못 가므로 일단 확정 + 표시. M3 구현 시 자동 해소)
+        core = _CORE_PRED.get(s.get("kind"))
+        if core:
+            st = {p.get("status") for d in s.get("details", []) for p in d.get("pre", [])
+                  if p.get("head") == core}
+            if not (st & {"sat", "unsat"}):
+                s["selection_note"] = f"{core} 미측정 상태에서 확정 (EE 수/리치 여유 기준)"
+                logs.append(f"  [경고] {s['subgoal_id']}: 핵심 술어 {core}가 미측정 — "
+                            f"도구 확정이 측정 근거 없이 EE 수/리치 여유로 결정됨")
         if part and len(part) > 1:
             s["partition_plan"] = part        # regroup이 이 구성대로 서브골을 나눈다
         s["selection_evidence"] = [
             {"node": c2, "feasible_ees": f2, "reach_margin_mm": m3,
              "batch_groups": (len(p2) if p2 else None)}
-            for (n2, br2, m3, c2, f2, p2) in scored]
+            for (br2, m3, n2, c2, f2, p2) in scored]
         logs.append(f"  [도구 확정] {s['subgoal_id']}: {chosen} 선택 "
                     f"(사용 가능 EE {n_ee}종, 리치 여유 {margin}mm"
                     + (f", 필요 액션 {len(part)}회" if part else "") + ")")
+
+    # 0903: 도구 없는 서브골(relocate 다중 target)의 그룹 분할.
+    # 위 블록은 도구 후보가 있는 서브골만 partition_plan을 채우므로, 물체 5개짜리
+    # relocate는 batch 응답과 무관하게 한 덩어리(binding 통짜)로 M4에 갔다(0903 1차
+    # 실행 c2_1/c4_2). 접지의 batch 응답(actor=ee_pool)이 partition을 주면 그대로
+    # 쓰고, 미측정(feasible None — M3 쪽 ee_pool 동시 파지 계산이 아직 없음)이면
+    # 물체별 1개씩 나눈다. 맨손 이동은 한 번에 하나씩 옮기는 것이 안전한 기본값이다.
+    pool_batch: dict[str, dict] = {}
+    for r in responses:
+        a = r.get("actor")
+        if r.get("kind") == "batch" and isinstance(a, dict) and a.get("type") == "ee_pool":
+            pool_batch[r.get("subgoal_id")] = r
+    for s in m2_out["m2_subgoals"]:
+        if s.get("tool_candidate_ids") or s.get("partition_plan"):
+            continue                          # 도구 서브골은 위에서 처리, 이미 분할 계획 있음
+        targets = s.get("target_ids") or []
+        if len(targets) < 2:
+            continue
+        b = pool_batch.get(s["subgoal_id"])
+        if b is None:
+            continue                          # batch 질의 자체가 없던 서브골
+        part = b.get("partition")
+        if part and len(part) > 1:
+            s["partition_plan"] = [list(g) for g in part]
+            why = "접지 partition"
+        elif b.get("feasible") is True:
+            continue                          # 동시 처리 가능 판정 — 분할 불필요
+        else:
+            s["partition_plan"] = [[t] for t in targets]
+            why = ("batch 미측정(ee_pool) 폴백: 물체별 1개" if b.get("feasible") is None
+                   else "batch unsat인데 partition 없음: 물체별 1개")
+        logs.append(f"  [분할 계획] {s['subgoal_id']}: 그룹 {len(s['partition_plan'])}개 ({why})")
 
     m2_out["m2_stats"]["m3_predicates"] = n_sat
     total = sum(n_sat.values())
