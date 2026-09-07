@@ -422,8 +422,12 @@ def make_tool_use_journal_env(
         "has_renderer": False,
         "has_offscreen_renderer": False,
         "use_camera_obs": False,
-        # C1's branch default names a camera that is not in the compiled model.
-        "render_camera": "frontview",
+        # render_camera는 has_renderer=False여도 robosuite reset()의
+        # initialize_renderer()가 이름을 resolve하므로 컴파일된 모델에 실제로
+        # 존재해야 한다. "frontview"는 테이블 아레나(c1_1)에만 있고 RoboCasa 주방
+        # 모델에는 없어 ValueError로 중단됐다. 로봇에 붙은 robot0_robotview는
+        # 씬과 무관하게 모든 환경에 존재하므로 이것을 쓴다 (렌더링에는 안 쓰임).
+        "render_camera": "robot0_robotview",
         "initialization_noise": None,
         "hard_reset": False,
     }
