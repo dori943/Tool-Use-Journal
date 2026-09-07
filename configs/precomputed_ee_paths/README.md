@@ -4,11 +4,18 @@ The production default is `precomputed-required`.  Store only trajectories
 that have completed controller replay and the applicable lock/release model
 transition validation.
 
+Shared rack trajectories live outside task folders. The registry first checks
+an optional environment-specific override, then checks `ee_rack/`. It never
+scans another task's directory. Shared files must declare
+`portable_across_environments` and a matching `rack-relative-v1` signature.
+Their `environment_name` remains the commissioning provenance, not the lookup
+or usage scope.
+
 Expected layout:
 
 ```text
 configs/precomputed_ee_paths/
-  C1_1_LegoSweep/
+  ee_rack/
     bare_to_2F.json
     bare_to_3F.json
     bare_to_vac.json
@@ -27,6 +34,13 @@ Pairwise exchanges do not need six additional artifacts.  Motion Planner
 composes `<source>_to_bare.json` with `bare_to_<target>.json`, offsets the second
 timeline, verifies the joint-space seam and all four release/lock events, and
 returns one request-bound `MotionPlan`.
+
+Cross-environment playback keeps the joint trajectory but rebases every stored
+EEF pose through the rack reference frame. It verifies the canonical start
+joint state and robot-to-rack pose, then densely collision-checks the complete
+trajectory against the current environment's collision models and dynamic
+objects. A path without explicit portable metadata is never loaded from the
+shared `ee_rack/` directory.
 
 The commissioning command performs dynamic generation once, controller
 execution, fresh-runtime precomputed replay (three times by default), and only

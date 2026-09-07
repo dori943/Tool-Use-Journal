@@ -52,7 +52,7 @@ def _make_runtime(
 def _ensure_attach_start_eef_metadata(
     repository: Path,
     environment: str,
-    environment_root: Path,
+    shared_rack_root: Path,
     seed: int,
 ) -> None:
     """Migrate legacy 1.0 files with the canonical bare-home EEF pose."""
@@ -60,7 +60,7 @@ def _ensure_attach_start_eef_metadata(
     from tuj.m5_motion.precomputed_ee_attach import EEAttachTrajectoryTemplate
     from tuj.m5_motion.tool_use_journal import ToolUseJournalEnvironmentAdapter
 
-    paths = [environment_root / f"bare_to_{target}.json" for target in TARGETS]
+    paths = [shared_rack_root / f"bare_to_{target}.json" for target in TARGETS]
     templates = [
         EEAttachTrajectoryTemplate.model_validate_json(
             path.read_text(encoding="utf-8")
@@ -433,12 +433,12 @@ def main() -> int:
     args = _parse_args()
     repository = args.repository.expanduser().resolve()
     registry_root = repository / "configs" / "precomputed_ee_paths"
-    environment_root = registry_root / args.environment
-    attach_path = environment_root / f"bare_to_{args.source_ee}.json"
+    shared_rack_root = registry_root / "ee_rack"
+    attach_path = shared_rack_root / f"bare_to_{args.source_ee}.json"
     output = (
         args.output.expanduser().resolve()
         if args.output is not None
-        else environment_root / f"{args.source_ee}_to_bare.json"
+        else shared_rack_root / f"{args.source_ee}_to_bare.json"
     )
     if not attach_path.is_file():
         raise SystemExit(f"validated attach trajectory does not exist: {attach_path}")
@@ -457,7 +457,7 @@ def main() -> int:
     _ensure_attach_start_eef_metadata(
         repository,
         args.environment,
-        environment_root,
+        shared_rack_root,
         args.seed,
     )
 

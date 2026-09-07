@@ -210,6 +210,10 @@ TABLE_OFFSET = np.array(
 # ============================================================
 
 ROBOT_BASE_X = -0.68
+# Compiled UR5e root sits 112 mm above the table surface in the C1-1
+# workcell. Other tasks keep this offset so the commissioned rack joint paths
+# remain valid after translating the workcell.
+ROBOT_BASE_SURFACE_OFFSET_Z = 0.112
 
 
 # ============================================================

@@ -28,10 +28,10 @@ from robosuite.utils.mjcf_utils import new_body, new_geom
 from environments.c1_1_lego_sweep import (
     EE_RACK_LAYOUT,
     ROBOT_BASE_X,
+    ROBOT_BASE_SURFACE_OFFSET_Z,
 )
 from environments.c1_2_dough_flatten import (
     PEDESTAL_HALF_XY,
-    PEDESTAL_TOP_Z,
 )
 from environments.ee_rack import add_ee_rack
 from environments.kitchen_base import KitchenBase
@@ -322,6 +322,7 @@ class C4_2_DiagonalFitPacking(KitchenBase):
         self._work_origin_xy = None
         self._robot_base_xy = None
         self._robot_base_yaw = 0.0
+        self._robot_base_root_z = None
 
         self._island_surface_z = None
         self._island_bounds = None
@@ -1332,6 +1333,10 @@ class C4_2_DiagonalFitPacking(KitchenBase):
     ):
         """Install pedestal, robot base, and EE rack."""
 
+        # Preserve the commissioned C1-1 robot/rack Z transform while moving
+        # the complete EE-rack workcell to this island.
+        robot_base_root_z = float(surface_z + ROBOT_BASE_SURFACE_OFFSET_Z)
+
         remove_robot_pedestal(
             self.model
         )
@@ -1340,7 +1345,7 @@ class C4_2_DiagonalFitPacking(KitchenBase):
             add_robot_pedestal(
                 self.model,
                 center_xy=robot_xy,
-                top_z=PEDESTAL_TOP_Z,
+                top_z=surface_z,
                 half_size_xy=PEDESTAL_HALF_XY,
             )
         )
@@ -1357,7 +1362,7 @@ class C4_2_DiagonalFitPacking(KitchenBase):
                 float(
                     robot_xy[1]
                 ),
-                PEDESTAL_TOP_Z,
+                robot_base_root_z,
             ]
         )
 
@@ -1380,6 +1385,7 @@ class C4_2_DiagonalFitPacking(KitchenBase):
         self._robot_base_yaw = (
             robot_yaw
         )
+        self._robot_base_root_z = robot_base_root_z
 
         self._remove_existing_ee_rack()
 
@@ -1500,6 +1506,7 @@ class C4_2_DiagonalFitPacking(KitchenBase):
         if (
             self._robot_base_xy
             is not None
+            and self._robot_base_root_z is not None
         ):
             self.init_robot_base_pos = (
                 np.array(
@@ -1510,7 +1517,7 @@ class C4_2_DiagonalFitPacking(KitchenBase):
                         self._robot_base_xy[
                             1
                         ],
-                        PEDESTAL_TOP_Z,
+                        self._robot_base_root_z,
                     ],
                     dtype=float,
                 )
