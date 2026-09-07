@@ -57,6 +57,17 @@ TOOL_USE_JOURNAL_EE_GRIPPER_TYPES: dict[str, str] = {
 TOOL_USE_JOURNAL_TESTED_REVISION = (
     "113f84686d94203dbd90f1836187e351aa0b246d"
 )
+# Every commissioned rack path starts and ends at this bare-flange home. The
+# rack and robot are installed as one translated workcell in each task, so the
+# same joint state is the environment-independent trajectory seam.
+TOOL_USE_JOURNAL_BARE_HOME_QPOS = (
+    -0.47,
+    -1.735,
+    2.48,
+    -2.275,
+    -1.59,
+    -1.991,
+)
 _EXPECTED_EES = frozenset(TOOL_USE_JOURNAL_EE_GRIPPER_TYPES)
 _REFERENCE_ACTIVE_EE = object()
 _PHYSICAL_EE_BY_CLASS = {
@@ -422,8 +433,12 @@ def make_tool_use_journal_env(
         "has_renderer": False,
         "has_offscreen_renderer": False,
         "use_camera_obs": False,
-        # C1's branch default names a camera that is not in the compiled model.
-        "render_camera": "frontview",
+        # render_camera는 has_renderer=False여도 robosuite reset()의
+        # initialize_renderer()가 이름을 resolve하므로 컴파일된 모델에 실제로
+        # 존재해야 한다. "frontview"는 테이블 아레나(c1_1)에만 있고 RoboCasa 주방
+        # 모델에는 없어 ValueError로 중단됐다. 로봇에 붙은 robot0_robotview는
+        # 씬과 무관하게 모든 환경에 존재하므로 이것을 쓴다 (렌더링에는 안 쓰임).
+        "render_camera": "robot0_robotview",
         "initialization_noise": None,
         "hard_reset": False,
     }
@@ -441,6 +456,13 @@ def make_tool_use_journal_env(
             if options.get("render_camera") in {"frontview", "agentview"}:
                 options["render_camera"] = "robot0_robotview"
     env = suite.make(env_name=env_name, **options)
+    if active_ee is None and getattr(env, "robot_configs", None):
+        # Set this before the caller's first reset. RoboCasa constructs the
+        # robot lazily, and a task-specific default here would make a reusable
+        # rack trajectory fail its exact start-state contract.
+        env.robot_configs[0]["initial_qpos"] = list(
+            TOOL_USE_JOURNAL_BARE_HOME_QPOS
+        )
     if scripted_grasps:
         from tuj.m5_motion.scripted_grasps.profiles import configure_environment
 

@@ -27,6 +27,7 @@ from tuj.m5_motion.precomputed_ee_attach import (
     EEAttachTrajectoryEventTemplate,
     EEAttachTrajectorySegmentTemplate,
     EEAttachTrajectoryTemplate,
+    PORTABLE_EE_PATH_DIRECTORY,
     PrecomputedEEAttachPlanner,
     PrecomputedEEAttachRegistry,
     PrecomputedEEPathError,
@@ -35,7 +36,11 @@ from tuj.m5_motion.precomputed_ee_attach import (
     _robot_model,
     compute_rack_signature,
     compute_workcell_signature,
+    is_cross_environment_ee_path,
+    is_portable_ee_path,
     normalize_ee_id,
+    rebase_portable_pose,
+    validate_portable_start_pose,
 )
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
@@ -155,7 +160,7 @@ class EEReturnTrajectoryTemplate(_TemplateModel):
 
 
 class PrecomputedEEReturnRegistry:
-    """Load environment-scoped EE -> bare templates."""
+    """Load environment-local paths first, then the shared EE-rack path."""
 
     def __init__(
         self,
@@ -165,6 +170,7 @@ class PrecomputedEEReturnRegistry:
     ) -> None:
         self.root = Path(root)
         self._overrides: dict[tuple[str, str], Path] = {}
+        self._portable_overrides: dict[str, Path] = {}
         for raw_path in trajectory_paths:
             path = Path(raw_path)
             template = self._load_file(path)
@@ -172,6 +178,13 @@ class PrecomputedEEReturnRegistry:
             if key in self._overrides:
                 raise ValueError(f"duplicate EE return trajectory override for {key}")
             self._overrides[key] = path
+            if is_portable_ee_path(template):
+                source = template.source_active_ee
+                if source in self._portable_overrides:
+                    raise ValueError(
+                        f"duplicate portable EE return trajectory override for {source}"
+                    )
+                self._portable_overrides[source] = path
 
     @staticmethod
     def _load_file(path: Path) -> EEReturnTrajectoryTemplate:
@@ -200,13 +213,25 @@ class PrecomputedEEReturnRegistry:
                 EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_NOT_FOUND,
                 str(error),
             ) from error
-        path = self._overrides.get((environment_name, source))
-        if path is None:
-            path = self.root / environment_name / f"{source}_to_bare.json"
+        exact_path = self._overrides.get((environment_name, source))
+        if exact_path is None:
+            exact_path = self.root / environment_name / f"{source}_to_bare.json"
+        use_shared_path = not exact_path.is_file()
+        if use_shared_path:
+            path = self._portable_overrides.get(source)
+            if path is None:
+                path = (
+                    self.root
+                    / PORTABLE_EE_PATH_DIRECTORY
+                    / f"{source}_to_bare.json"
+                )
+        else:
+            path = exact_path
         template = self._load_file(path)
-        if (
-            template.environment_name != environment_name
-            or template.source_active_ee != source
+        if template.source_active_ee != source or (
+            use_shared_path and not is_portable_ee_path(template)
+        ) or (
+            not use_shared_path and template.environment_name != environment_name
         ):
             raise PrecomputedEEPathError(
                 EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_STALE,
@@ -367,6 +392,11 @@ def derive_return_template_from_attach(
             "derived_from_attach_trajectory_id": attach.trajectory_id,
             "source_plan_fingerprint": fingerprint,
             "requires_controller_validation": True,
+            **{
+                key: value
+                for key, value in attach.metadata.items()
+                if key.startswith("portable_")
+            },
         },
     )
 
@@ -540,6 +570,22 @@ class PrecomputedEEExchangePlanner:
                 "robot model differs from the stored return trajectory",
                 template,
             )
+        if is_cross_environment_ee_path(template, request.world):
+            try:
+                validate_portable_start_pose(request.world, template)
+            except ValueError as error:
+                raise self._failure(
+                    EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH,
+                    str(error),
+                    template,
+                ) from error
+            if set(selected) != set(template.collision_model_versions):
+                raise self._failure(
+                    EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_STALE,
+                    "return collision context ids differ from the stored trajectory",
+                    template,
+                )
+            return selected
         if template.rack_signature != compute_rack_signature(request.world):
             raise self._failure(
                 EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH,
@@ -620,7 +666,9 @@ class PrecomputedEEExchangePlanner:
         seam_world.robot_state.joint_velocities_rad_s = [
             0.0
         ] * len(attach_template.joint_names)
-        seam_world.robot_state.eef_pose = canonical_start_eef.model_copy(deep=True)
+        seam_world.robot_state.eef_pose = rebase_portable_pose(
+            attach_template, request.world, canonical_start_eef
+        )
         seam_world.metadata["physical_active_ee"] = None
         seam_world.metadata["declared_active_ee"] = None
         return request.model_copy(
@@ -658,7 +706,17 @@ class PrecomputedEEExchangePlanner:
                 start_time_s=segment.waypoints[0].time_from_start_s,
                 end_time_s=segment.waypoints[-1].time_from_start_s,
                 interpolation=segment.interpolation,
-                waypoints=[item.model_copy(deep=True) for item in segment.waypoints],
+                waypoints=[
+                    item.model_copy(
+                        deep=True,
+                        update={
+                            "eef_pose": rebase_portable_pose(
+                                template, request.world, item.eef_pose
+                            )
+                        },
+                    )
+                    for item in segment.waypoints
+                ],
                 collision_checked=True,
                 min_clearance_m=clearances[segment.segment_id],
                 collision_context_before=contexts[segment.collision_context_before],
@@ -674,6 +732,9 @@ class PrecomputedEEExchangePlanner:
                     "source": "precomputed",
                     "trajectory_id": template.trajectory_id,
                     "source_segment_id": segment.segment_id,
+                    "cross_environment_reuse": is_cross_environment_ee_path(
+                        template, request.world
+                    ),
                 },
             )
             for index, segment in enumerate(template.segments)

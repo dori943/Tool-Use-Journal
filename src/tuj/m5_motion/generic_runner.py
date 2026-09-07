@@ -630,8 +630,8 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
         "--ee-attach-registry",
         type=Path,
         help=(
-            "Root containing <environment>/bare_to_<EE>.json and "
-            "<EE>_to_bare.json trajectories"
+            "Root containing optional <environment>/ overrides and shared "
+            "ee_rack/bare_to_<EE>.json plus <EE>_to_bare.json trajectories"
         ),
     )
     parser.add_argument(
