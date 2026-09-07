@@ -1,4 +1,5 @@
 from types import SimpleNamespace
+import pytest
 import numpy as np
 from scipy.spatial.transform import Rotation
 from tuj.m5_motion.scripted_grasps.frames import transform
@@ -7,8 +8,10 @@ from tuj.m5_motion.geometry import tool_rotation_from_axis
 from tuj.m5_motion.tests.test_scripted_grasps import request_for,ENTRIES
 
 
-def test_region_transport_preserves_measured_grasp_offset_and_orientation():
+@pytest.mark.parametrize('margin,clearance',[(.005,.02),(.03,.06)])
+def test_region_transport_preserves_measured_grasp_offset_and_orientation(margin,clearance):
     request=request_for(ENTRIES[4],action='transport')
+    request.constraints.collision_margin_m=margin
     request.task.metadata['scripted_m4_implicit_object_pose']=True
     request.task.goal.target_region_id='tray'
     region=Rotation.from_euler('z',37,degrees=True).as_matrix()
@@ -28,7 +31,7 @@ def test_region_transport_preserves_measured_grasp_offset_and_orientation():
     object_center=(body@np.r_[center_in_body,1.])[:3]
     carried_center=object_center+(destination-grip[:3,3])
     np.testing.assert_allclose(carried_center[:2],(region@np.array([.02,0,0])+[-.5,.3,.7])[:2])
-    assert carried_center[2]>=.7+.05+.045+.05-1e-12
+    assert carried_center[2]>=.7+.05+.045+clearance-1e-12
     np.testing.assert_allclose(tool_rotation_from_axis(-region@hint['approach_axis_xyz'],hint['roll_rad']),grip[:3,:3],atol=1e-10)
     assert request.task.goal.target_pose is None
     assert hint['frame_ref']=='object:tray'

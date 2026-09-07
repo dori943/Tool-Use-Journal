@@ -239,6 +239,8 @@ Hard rules:
 - Each strategy is an ordered, coherent route for the supplied single subgoal.
 - For a held TRANSPORT/MOVE, the object is already grasped. Do not approach or
   regrasp its current center. Route the held object to target_region_id.
+  This subgoal ONLY transports: use TRANSFER keyframes, keep holding, and stop
+  at the destination. PLACE, PRE_PLACE and RETREAT belong to later subgoals.
 - When held_transport_goal is supplied, its anchor is the measured grasp-offset
   corrected EEF destination above that region. End every strategy at exactly
   that frame_ref/anchor with zero offset. Preserve its approach axis, tool axis,
@@ -247,6 +249,8 @@ Hard rules:
 - held_transport_goal already includes rim clearance. Include at least one
   direct SAMPLING_BASED transfer to that anchor with zero extra offset; do not
   make every candidate add a high standoff that can exceed the arm's reach.
+  The direct strategy's two TRANSFER keyframes are start_anchor then anchor,
+  both in the supplied frame_ref with zero offset and the supplied orientation.
 - PICK strategies must include a GRASP keyframe followed by LIFT or RETREAT.
 - PLACE strategies must include a PLACE keyframe followed by RETREAT.
 - PICK_TOOL strategies use GRASP then LIFT/RETREAT; RETURN_TOOL strategies use
@@ -423,6 +427,11 @@ class OpenAIKeyframeProvider:
                 rejected_candidates.append(f"{strategy_id}: {candidate_error}")
                 continue
             kinds = [keyframe.keyframe_type for keyframe in keyframes]
+            if request.task.metadata.get('held_transport_goal') and any(
+                kind is not KeyframeType.TRANSFER for kind in kinds
+            ):
+                rejected_candidates.append(f'{strategy_id}: held transport requires TRANSFER-only keyframes')
+                continue
             picks_resource = is_acquire_task(request.task)
             releases_resource = is_release_task(request.task)
             if picks_resource:

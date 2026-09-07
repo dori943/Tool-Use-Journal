@@ -50,6 +50,18 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
             camera = args.camera
             if camera not in runtime.env.sim.model.camera_names:
                 camera = runtime.env.render_camera
+            if _runtime_environment_name(initial_world) == 'C4_2_DiagonalFitPacking' and camera == 'robot0_robotview':
+                # The kitchen's stock robot view points below the work area.
+                # Use the existing scene-observation framing for the recording.
+                import importlib.util
+                spec = importlib.util.spec_from_file_location('scripted_video_camera', repository / 'scripts/run_m1.py')
+                capture = importlib.util.module_from_spec(spec)
+                spec.loader.exec_module(capture)
+                cid = runtime.env.sim.model.camera_name2id(camera)
+                runtime.env.sim.model.cam_fovy[cid] = 60.
+                capture.fit_camera_to_points(runtime.env, cid,
+                    capture.object_bound_points(runtime.env, capture.task_spec('c4_2')))
+                runtime.env.sim.forward()
             recorder = GenericSimulationVideoRecorder(runtime, args.video.resolve(), camera=camera,
                 width=args.width, height=args.height, fps=args.video_fps)
         session = ScriptedGraspSession(runtime, repository, output / "live", **planner_options)

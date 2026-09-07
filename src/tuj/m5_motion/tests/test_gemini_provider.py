@@ -48,6 +48,15 @@ def test_gemini_unknown_frames_rejected_before_planning():
         p.generate(_request())
 
 
+def test_held_transport_rejects_pick_or_place_keyframes():
+    request = _request()
+    request.task.action_type = 'TRANSPORT'
+    request.task.metadata['held_transport_goal'] = {'anchor': 'top_center'}
+    p, _ = provider(_batch())
+    with pytest.raises(OpenAIKeyframeProviderError, match='TRANSFER-only'):
+        p.generate(request)
+
+
 def test_missing_gemini_key_does_not_use_openai_key(monkeypatch):
     monkeypatch.delenv("GEMINI_API_KEY", raising=False)
     monkeypatch.delenv("GOOGLE_API_KEY", raising=False)

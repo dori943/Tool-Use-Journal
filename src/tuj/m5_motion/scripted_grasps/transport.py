@@ -33,16 +33,21 @@ def ground_held_transport(request, retention):
     center=(T_WB@np.r_[c.center_in_body,1.])[:3]
     half_height=float(np.abs(T_WB[2,:3])@np.asarray(c.local_size)/2.)
     desired_center=region_world.copy()
-    desired_center[2]=max(center[2],region_world[2]+region_half_height+half_height+.05)
+    # Keep the measured object bbox clear of the rim without an arbitrary 5 cm
+    # standoff that can place a reachable kitchen destination outside UR5e reach.
+    clearance=max(.02, request.constraints.collision_margin_m * 2.)
+    desired_center[2]=max(center[2],region_world[2]+region_half_height+half_height+clearance)
     destination=T_WG.copy()
     destination[:3,3]+=desired_center-center
     anchor='held_transport_goal'
     record.setdefault('anchors',{})[anchor]=(inverse(T_WR)@destination)[:3,3].tolist()
+    record['anchors']['held_transport_start']=(inverse(T_WR)@T_WG)[:3,3].tolist()
     z,x=destination[:3,2],destination[:3,0]
     base=tool_rotation_from_axis(z,0.)
     task.goal.target_pose=None
     task.metadata['held_transport_goal']={
         'frame_ref':'object:'+task.goal.target_region_id,'anchor':anchor,
+        'start_anchor':'held_transport_start',
         'approach_axis_xyz':(T_WR[:3,:3].T@(-z)).tolist(),
         'tool_axis_to_align':'-z','roll_rad':math.atan2(float(x@base[:,1]),float(x@base[:,0])),
         'offset_along_approach_m':0.,'preserve_grasp_orientation':True,
