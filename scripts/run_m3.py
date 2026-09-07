@@ -30,7 +30,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from tuj.m3_grounding import Materializer, MockBackend, PropertyMemory, SiPhyBackend, new_gk
+from tuj.m0_memory import DensityOnlyBackend, DensityOnlyResult
+from tuj.m3_grounding import (Materializer, MockBackend, PropertyMemory,
+                              SiPhyBackend, new_gk)
 
 
 # ── 술어 → m3_call 컴파일 (m2_queries가 안 실은 eval_by:m3 술어 보충) ──
@@ -154,6 +156,12 @@ def main():
     backend_name = args[args.index("--backend") + 1] if "--backend" in args else "siphy"
     model = args[args.index("--model") + 1] if "--model" in args else "gpt-4o-mini"
     memory_path = args[args.index("--memory") + 1] if "--memory" in args else str(ROOT / "output" / "memory.json")
+    bbox_threshold = float(args[args.index("--m0-bbox-threshold") + 1]) \
+        if "--m0-bbox-threshold" in args else 0.25
+    density_threshold = float(args[args.index("--m0-density-threshold") + 1]) \
+        if "--m0-density-threshold" in args else 0.20
+    debug_label = (args[args.index("--retrieval-debug-label") + 1]
+                   if "--retrieval-debug-label" in args else "M3")
 
     OUT = (Path(args[args.index("--output-dir") + 1]).resolve()
            if "--output-dir" in args else ROOT / "output" / name)
@@ -177,8 +185,18 @@ def main():
             e["seal_rms_tol_mm"] = e["flatness_tol_rms_mm"]
         ee_pool.append(e)
 
-    memory = None if memory_path == "none" else PropertyMemory(memory_path)
-    mat = Materializer(m1, backend=backend, memory=memory,
+    memory = None if memory_path == "none" else PropertyMemory(
+        memory_path, task_id=name, bbox_relative_threshold=bbox_threshold,
+        density_relative_threshold=density_threshold)
+    if backend_name == "siphy":
+        density_backend = DensityOnlyBackend(model=backend.model, client=backend.client,
+                                             repo_root=ROOT)
+        density_infer = density_backend.infer
+    else:
+        density_infer = lambda _crop: DensityOnlyResult(
+            None, False, error="density-only inference unavailable with mock backend")
+    mat = Materializer(m1, backend=backend, memory=None, task_id=name,
+                       object_knowledge=memory, density_infer=density_infer,
                        logger=lambda **kw: print("  [m3]", kw))
     preloaded = len(mat._cache)
     if preloaded:
@@ -347,6 +365,12 @@ def main():
         encoding="utf-8")
     (OUT / "m3_intrinsic.json").write_text(
         json.dumps(strip(dict(mat._cache)), ensure_ascii=False, indent=2), encoding="utf-8")
+    retrieval_debug = strip({"round": debug_label, "objects": mat.retrieval_debug})
+    debug_text = json.dumps(retrieval_debug, ensure_ascii=False, indent=2)
+    (OUT / "m0_retrieval.json").write_text(debug_text, encoding="utf-8")
+    debug_slug = "".join(ch.lower() if ch.isalnum() else "_" for ch in debug_label).strip("_")
+    (OUT / f"m0_retrieval.{debug_slug or 'm3'}.json").write_text(
+        debug_text, encoding="utf-8")
 
     n_t2 = len(mat._cache)
     if memory is not None:
