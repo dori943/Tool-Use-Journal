@@ -57,6 +57,17 @@ TOOL_USE_JOURNAL_EE_GRIPPER_TYPES: dict[str, str] = {
 TOOL_USE_JOURNAL_TESTED_REVISION = (
     "113f84686d94203dbd90f1836187e351aa0b246d"
 )
+# Every commissioned rack path starts and ends at this bare-flange home. The
+# rack and robot are installed as one translated workcell in each task, so the
+# same joint state is the environment-independent trajectory seam.
+TOOL_USE_JOURNAL_BARE_HOME_QPOS = (
+    -0.47,
+    -1.735,
+    2.48,
+    -2.275,
+    -1.59,
+    -1.991,
+)
 _EXPECTED_EES = frozenset(TOOL_USE_JOURNAL_EE_GRIPPER_TYPES)
 _REFERENCE_ACTIVE_EE = object()
 _PHYSICAL_EE_BY_CLASS = {
@@ -445,6 +456,13 @@ def make_tool_use_journal_env(
             if options.get("render_camera") in {"frontview", "agentview"}:
                 options["render_camera"] = "robot0_robotview"
     env = suite.make(env_name=env_name, **options)
+    if active_ee is None and getattr(env, "robot_configs", None):
+        # Set this before the caller's first reset. RoboCasa constructs the
+        # robot lazily, and a task-specific default here would make a reusable
+        # rack trajectory fail its exact start-state contract.
+        env.robot_configs[0]["initial_qpos"] = list(
+            TOOL_USE_JOURNAL_BARE_HOME_QPOS
+        )
     if scripted_grasps:
         from tuj.m5_motion.scripted_grasps.profiles import configure_environment
 

@@ -447,10 +447,12 @@ bare flange, 새 EE 장착 형상이 같은 segment 상태로 섞이지 않는�
 
 초기 `current_ee`가 `null`이면 Task Planner는 `DETACH_EE` 없이 첫 `ATTACH_EE`만
 생성한다. 운영 Motion Planner는 이 요청을 일반 keyframe/IK/RRT pipeline 전에
-가로채고 `configs/precomputed_ee_paths/<environment>/bare_to_<EE>.json`의 검증 완료
-관절 궤적을 사용한다. 저장 궤적은 시작 관절, UR5e base, rack/dock, collision model
-version, lock/verify event, 동역학 limit, 현재 scene의 보간 전 구간 collision을 모두
-통과해야 새 요청의 `MotionPlan`으로 바인딩된다.
+가로챈다. 현재 환경 전용 파일이 있으면 먼저 사용하고, 없으면
+`configs/precomputed_ee_paths/ee_rack/`의 공용 관절 궤적을 사용한다. 다른 task 폴더를
+검색하지 않는다. 공용 파일은 `portable_across_environments` 승인, robot-rack 상대 배치,
+rack-local 형상을 검증하고 저장 EEF pose를 현재 rack 좌표로 변환한다. 이후 시작 관절,
+lock/verify event, 동역학 limit, 현재 환경 collision model과 현재 scene의 보간 전 구간
+collision을 모두 통과해야 새 요청의 `MotionPlan`으로 바인딩된다.
 
 ```text
 EE_ATTACH → registry lookup → static/start validation
