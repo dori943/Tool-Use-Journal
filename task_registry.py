@@ -21,29 +21,78 @@ from dataclasses import dataclass
 
 @dataclass(frozen=True)
 class TaskEnv:
-    module: str            # environments 하위 모듈 파일명(stem)
-    cls: str               # robosuite 환경 클래스명 (robosuite 는 클래스명으로 등록)
+    module: str             # environments 하위 모듈 파일명(stem)
+    cls: str                # robosuite 환경 클래스명 (robosuite 는 클래스명으로 등록)
     robocasa: bool = False  # RoboCasa(KitchenBase) 의존 -> soft-import 대상
-    instruction: str = ""  # M2 서브골 분해에 넣는 자연어 지시문 (한국어 한 문장)
+    instruction: str = ""   # M2 서브골 분해에 넣는 자연어 지시문 (한국어 한 문장)
 
 
 TASKS = {
-    "c1_1": TaskEnv("c1_1_lego_sweep",              "C1_1_LegoSweep",
-                    instruction="도구를 골라 흩어진 레고 블록을 수집 구역으로 쓸어 담아라"),
-    "c2_1": TaskEnv("c2_1_object_sorting",          "C2_1_ObjectSorting",
-                    instruction="테이블 위 물체를 왼쪽부터 순서대로 파란 트레이로 옮겨라"),
-    "c1_2": TaskEnv("c1_2_dough_flatten",           "C1_2_DoughFlatten",           robocasa=True,
-                    instruction="도마 위의 반죽을 평평하게 펴라"),
-    "c2_2": TaskEnv("c2_2_sandwich_assembly",       "C2_2_SandwichAssembly",       robocasa=True,
-                    instruction="재료를 순서대로 쌓아 샌드위치를 만들어라"),
-    "c4_1": TaskEnv("c4_1_interval_fit_extraction", "C4_1_IntervalFitExtraction",  robocasa=True,
-                    instruction="가전 사이 틈에 떨어진 카드를 꺼내라"),
-    "c4_2": TaskEnv("c4_2_diagonal_fit_packing",    "C4_2_DiagonalFitPacking",     robocasa=True,
-                    instruction="긴 물건들을 상자에 담고 뚜껑을 덮어라"),
+    "c1_1": TaskEnv(
+        "c1_1_lego_sweep",
+        "C1_1_LegoSweep",
+        instruction="도구를 골라 흩어진 레고 블록을 수집 구역으로 쓸어 담아라",
+    ),
+
+    "c2_1": TaskEnv(
+        "c2_1_object_sorting",
+        "C2_1_ObjectSorting",
+        instruction="테이블 위 물체를 왼쪽부터 순서대로 파란 트레이로 옮겨라",
+    ),
+
+    # C2-1과 동일한 robosuite 기반 환경 구조
+    # RoboCasa / KitchenBase 비의존
+    "c3_1": TaskEnv(
+        "c3_1_object_sorting",
+        "C3_1_ObjectSorting",
+        instruction="테이블 위 물체를 모두 파란 트레이로 옮겨라",
+    ),
+
+    "c1_2": TaskEnv(
+        "c1_2_dough_flatten",
+        "C1_2_DoughFlatten",
+        robocasa=True,
+        instruction="도마 위의 반죽을 평평하게 펴라",
+    ),
+
+    "c2_2": TaskEnv(
+        "c2_2_sandwich_assembly",
+        "C2_2_SandwichAssembly",
+        robocasa=True,
+        instruction="재료를 순서대로 쌓아 샌드위치를 만들어라",
+    ),
+
+    "c3_2": TaskEnv(
+        "c3_2_breakfast_tray",
+        "C3_2_BreakfastTrayPreparation",
+        robocasa=True,
+        instruction=(
+            "두 사람을 위한 아침 식사 트레이를 준비하라. "
+            "각 트레이에는 접시, 머그컵, 포크, 숟가락, 빵, 과일이 하나씩 포함되어야 한다."
+        ),
+    ),
+
+    "c4_1": TaskEnv(
+        "c4_1_interval_fit_extraction",
+        "C4_1_IntervalFitExtraction",
+        robocasa=True,
+        instruction="가전 사이 틈에 떨어진 카드를 꺼내라",
+    ),
+
+    "c4_2": TaskEnv(
+        "c4_2_diagonal_fit_packing",
+        "C4_2_DiagonalFitPacking",
+        robocasa=True,
+        instruction="긴 물건들을 상자에 담고 뚜껑을 덮어라",
+    ),
 }
 
+
 # 편의 뷰: task id -> 환경 클래스명 (러너들이 참조).
-TASK_ENVS = {tid: t.cls for tid, t in TASKS.items()}
+TASK_ENVS = {
+    tid: task.cls
+    for tid, task in TASKS.items()
+}
 
 
 def env_name(task_id: str) -> str:
@@ -59,8 +108,15 @@ def instruction(task_id: str) -> str:
     비어 있으면 즉시 KeyError 로 알린다.
     """
     if task_id not in TASKS:
-        raise KeyError(f"'{task_id}' 는 task_registry 에 등록되지 않은 태스크다")
+        raise KeyError(
+            f"'{task_id}' 는 task_registry 에 등록되지 않은 태스크다"
+        )
+
     text = TASKS[task_id].instruction
+
     if not text:
-        raise KeyError(f"'{task_id}' 의 instruction 이 비어 있다")
+        raise KeyError(
+            f"'{task_id}' 의 instruction 이 비어 있다"
+        )
+
     return text
