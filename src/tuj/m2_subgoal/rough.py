@@ -92,6 +92,9 @@ PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 �
   바닥(첫 target 또는 container)으로 삼지 않는다.
 - 뚜껑을 덮거나 물체를 다른 물체 위에 얹는 것은 stack이다
   (target_ids=[얹을 물체], container_id=받침). relocate의 target_ids에 섞지 않는다.
+- 단 stack은 위로 층을 쌓는 것이라 target_ids 순서가 아래에서 위다. 여러 물체를
+  같은 받침 위에 나란히 올리는 것(예: 접시 하나에 빵과 과일)은 서로 얹는 것이
+  아니므로 stack이 아니라 relocate이고, container_id를 그 받침으로 둔다.
 - 태스크에 명시된 목표만 서브골로 만든다. 태스크에 없는 목표(예: 장애물 치우기,
   정리하기)를 발명하지 않는다.
 - target_ids / container_id / tool_candidate_ids 에는 위 노드 id만 쓴다.
@@ -169,6 +172,9 @@ PROMPT_COMBINED = """로봇 매니퓰레이션 태스크를 planning-level 서�
   바닥(첫 target 또는 container)으로 삼지 않는다.
 - 뚜껑을 덮거나 물체를 다른 물체 위에 얹는 것은 stack이다
   (target_ids=[얹을 물체], container_id=받침). relocate의 target_ids에 섞지 않는다.
+- 단 stack은 위로 층을 쌓는 것이라 target_ids 순서가 아래에서 위다. 여러 물체를
+  같은 받침 위에 나란히 올리는 것(예: 접시 하나에 빵과 과일)은 서로 얹는 것이
+  아니므로 stack이 아니라 relocate이고, container_id를 그 받침으로 둔다.
 - 태스크에 명시된 목표만 서브골로 만든다. 태스크에 없는 목표(예: 장애물 치우기,
   정리하기)를 발명하지 않는다.
 - target_ids / container_id / tool_candidate_ids / object_ids 에는 위 노드 id만 쓴다.

@@ -14,8 +14,8 @@ M1 접지값과 관계 함수(ground.py)로 직접 수행하고, G_k 조립도 M
 """
 from __future__ import annotations
 
-from .core import (add_container_seal_pres, decompose, invariants_for,
-                   partial_order, plan_evaluations)
+from .core import (add_container_seal_pres, add_uncover_effects, decompose,
+                   invariants_for, partial_order, plan_evaluations)
 from .rough import TemplateRough
 
 
@@ -42,6 +42,7 @@ def run_m2(task: str, m1_serialized: dict, rough=None) -> dict:
     for s in subgoals:
         s["details"] = decompose(s)
     add_container_seal_pres(subgoals)          # 0903: 담기 ≺ 덮기 (서브골 간)
+    add_uncover_effects(subgoals, m1_serialized)   # 0908: 치우면 드러남을 효과로
     for s in subgoals:
         all_details += s["details"]
     edges, mutex = partial_order(all_details)

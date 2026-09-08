@@ -19,9 +19,9 @@
 
 술어 eval_by (누가 판정하나 — M6 역추적의 근거):
   m2     계획 상태만으로 판정 (hand_empty, holding, above, in)
-  m3     측정 필요 → m2_queries로 나감 (reachable, fits, clear, ee_usable,
-         batch_feasible, act_space_clear — 뒤 2종은 0828 신규: 그룹 동시 처리·실행 공간)
-  motion 실행해봐야 앎 — 계획 시점 미결정으로 유보 (path_clear)
+  m3     접지값 필요 (reachable, top_exposed, fits, clear, ee_usable, flat_face,
+         gap_accessible, batch_feasible) — M1 접지값과 관계 함수로 판정
+  motion 실행해봐야 앎 — 계획 시점 미결정으로 유보 (path_clear, act_space_clear)
 """
 from __future__ import annotations
 
@@ -55,10 +55,15 @@ TEMPLATES = {
                          ["extracted(?o)"], []),
 }
 
+# 0908: act_space_clear(액션이 지나갈 공간이 비었나)를 motion으로 옮겼다.
+# 통합 후 relations.swept_space가 실제로 계산되기 시작하자 c2_2(쌓기: 통로에 아래층
+# 재료가 당연히 있음)와 c3_2(트레이 A로 가는 길에 트레이 B 물건이 있음)에서 대량
+# unsat이 나와 M4가 계획을 못 세웠다. 통로가 비었는지는 궤적이 정해져야 아는 것이라
+# path_clear와 성격이 같다 — 계획 시점에는 유보하고 모션 단계가 판정한다.
 EVAL_BY = {"hand_empty": "m2", "holding": "m2", "above": "m2", "in": "m2",
            "reachable": "m3", "top_exposed": "m3", "fits": "m3", "clear": "m3",
-           "ee_usable": "m3", "batch_feasible": "m3", "act_space_clear": "m3",
-           "path_clear": "motion",
+           "ee_usable": "m3", "batch_feasible": "m3",
+           "path_clear": "motion", "act_space_clear": "motion",
            # 0901 확장분. flat_face(도구에 평평한 작업면이 있는가)와
            # gap_accessible(도구가 틈에 진입 가능한가)은 M3 신규 질의 — 도희 협의 필요.
            "on": "m2", "flattened": "m2", "extracted": "m2",
@@ -211,31 +216,122 @@ def decompose(subgoal: dict) -> list[dict]:
 INSIDE_KINDS = {"relocate", "sweep_collect", "scoop_transfer"}
 
 
+def add_uncover_effects(subgoals: list[dict], m1: dict | None) -> list[str]:
+    """치우면 드러나는 것을 효과로 명시한다 (0908).
+
+    초기 상태에서 A 위에 B가 있으면 top_exposed(A)는 거짓이다. 그런데 B가 이 태스크의
+    대상이면 B를 집는 순간 A가 드러난다. 이 인과를 액션 효과로 적지 않으면 계획 모듈은
+    top_exposed(A)를 영영 충족되지 않는 사전조건으로 보고 A를 다루는 서브골을 확장하지
+    못한다 (c2_2: 빵 두 장이 겹쳐 있는데 위 빵이 1층, 아래 빵이 5층이라 5층을 못 올림).
+
+    그래서 B를 집는 acquire의 establish에 top_exposed(A)를 추가한다. 그러면
+    partial_order가 "B 집기 ≺ A 집기" 인과 링크를 자동으로 만들고, 계획 모듈의 심볼릭
+    상태 추적도 그 시점에 조건을 충족으로 본다. 블로커가 전부 이 태스크의 대상일 때만
+    적용한다 — 계획이 치우지 않는 물체는 실제로 끝까지 남기 때문이다.
+    """
+    if not m1:
+        return []
+    blockers: dict[str, set[str]] = {}
+    for e in m1.get("edges", []):
+        if e.get("type") in ("on", "inside") and e.get("from") and e.get("to"):
+            blockers.setdefault(e["to"], set()).add(e["from"])
+    planned = {t for s in subgoals for t in (s.get("target_ids") or [])}
+    logs = []
+    for covered, blks in blockers.items():
+        if covered not in planned or not blks <= planned:
+            continue
+        for blk in sorted(blks):
+            for s in subgoals:
+                for d in s.get("details", []):
+                    if d["action_type"] != "acquire":
+                        continue
+                    if d["binding"].get("?o") != blk:
+                        continue
+                    expr = f"top_exposed({covered})"
+                    if any(x["expr"] == expr for x in d["establish"]):
+                        continue
+                    d["establish"].append(
+                        {"id": f"{d['detail_id']}_e{len(d['establish'])}",
+                         "expr": expr, "head": "top_exposed", "eval_by": "m2",
+                         "auto": "uncover"})
+                    logs.append(f"  [노출] {blk}를 집으면 {covered}가 드러남 — "
+                                f"{d['detail_id']}의 효과로 추가")
+    return logs
+
+
+def _in_establishes(subgoal: dict, member: str | None = None) -> list[dict]:
+    """서브골이 성립시키는 in(...) 조건. member를 주면 그 물체를 옮기는 것만 고른다.
+
+    relocate의 establish는 분할 전에는 in({a,b,c}, r) 집합 표기라, 받침 하나가
+    집합 안에 들어 있는 경우까지 잡으려면 원소를 풀어 봐야 한다.
+    """
+    out = []
+    for d in subgoal.get("details", []):
+        for e in d.get("establish", []):
+            if e.get("head") != "in":
+                continue
+            if member is None or member in _set_members(_pred_arg(e["expr"], 0)):
+                out.append(e)
+    return out
+
+
+AUTO_DEST = ("container_seal", "base_arrival")   # 이 함수가 붙였다 지우는 사전조건
+
+
 def add_container_seal_pres(subgoals: list[dict]) -> list[str]:
+    """서브골의 목적지가 준비된 뒤에 처리하도록 사전조건을 단다.
+
+    목적지 C는 stack이면 받침, relocate/sweep/scoop이면 컨테이너다. 준비된다는 것은
+    두 가지다.
+      (1) 담기 ≺ 덮기 (0903) — C가 용기이고 다른 서브골이 C 안에 물건을 담는다면,
+          그 담기가 끝난 뒤에 덮어야 한다.
+      (2) 목적지 도착 ≺ 처리 (0908) — C 자체가 다른 서브골의 대상이라면(예: 접시를
+          트레이에 담고 그 접시 위에 빵을 올린다), 그 서브골이 먼저다. 안 걸면 아직
+          테이블에 있는 접시에 빵을 담고 빵째로 접시를 옮기는 계획이 허용된다.
+    """
     logs = []
     for b in subgoals:
-        if b.get("kind") != "stack" or not b.get("details"):
+        if not b.get("details"):
             continue
-        # 받침: container_id가 있으면 그것, 없으면 첫 target (decompose의 stack 규칙과 동일)
-        C = b.get("container_id") or (b.get("target_ids") or [None])[0]
+        if b.get("kind") == "stack":
+            # 받침: container_id가 있으면 그것, 없으면 첫 target (decompose의 stack 규칙과 동일)
+            C = b.get("container_id") or (b.get("target_ids") or [None])[0]
+        elif b.get("kind") in INSIDE_KINDS:
+            C = b.get("container_id")
+        else:
+            continue
         if not C:
             continue
         first = b["details"][0]
-        first["pre"] = [q for q in first["pre"] if not q.get("auto")]
-        added = []
+        # 이 함수가 붙인 것만 지운다. regroup이 먼저 붙이는 instruction_order 체인은
+        # 살려 둬야 한다 (분할 뒤 호출되므로 통째로 지우면 지시문 순서가 사라진다).
+        first["pre"] = [q for q in first["pre"] if q.get("auto") not in AUTO_DEST]
+        seal, arrival = [], []
         for a in subgoals:
-            if a is b or a.get("kind") not in INSIDE_KINDS or a.get("container_id") != C:
+            if a is b:
                 continue
-            for d in a.get("details", []):
-                for e in d.get("establish", []):
-                    if e.get("head") == "in":
-                        first["pre"].append({"id": f"{first['detail_id']}_p{len(first['pre'])}",
-                                             "expr": e["expr"], "head": "in", "eval_by": "m2",
-                                             "auto": "container_seal"})
-                        added.append(a["subgoal_id"])
-        if added:
+            # (1) 담기 ≺ 덮기. 덮는 쪽(stack)에만 건다 — 담는 서브골끼리 걸면 같은
+            #     컨테이너로 분할된 형제들이 서로를 사전조건으로 물어 사이클이 난다.
+            if b.get("kind") == "stack" and a.get("kind") in INSIDE_KINDS \
+                    and a.get("container_id") == C:
+                hits, why = _in_establishes(a), "container_seal"
+            # (2) 목적지 도착 ≺ 처리
+            elif C in (a.get("target_ids") or []):
+                hits, why = _in_establishes(a, C), "base_arrival"
+            else:
+                continue
+            for e in hits:
+                first["pre"].append({"id": f"{first['detail_id']}_p{len(first['pre'])}",
+                                     "expr": e["expr"], "head": "in", "eval_by": "m2",
+                                     "auto": why})
+                (seal if why == "container_seal" else arrival).append(a["subgoal_id"])
+        if seal:
             logs.append(f"  [순서] {b['subgoal_id']}({C} 덮기)는 "
-                        f"{sorted(set(added))}(담기) 뒤에 — 사전조건 {len(added)}건 부착")
+                        f"{sorted(set(seal))}(담기) 뒤에 — 사전조건 {len(seal)}건 부착")
+        if arrival:
+            verb = "위에 쌓기" if b.get("kind") == "stack" else "에 담기"
+            logs.append(f"  [순서] {b['subgoal_id']}({C} {verb})는 "
+                        f"{sorted(set(arrival))}({C} 옮기기) 뒤에 — 사전조건 {len(arrival)}건 부착")
     return logs
 
 
@@ -320,12 +416,11 @@ def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
             # 예외(0903): 컨테이너 담기 ≺ 덮기 사전조건(auto=container_seal)은 서브골(그룹)을
             # 가로지르는 물리 제약이라 그룹이 달라도 하드 엣지로 둔다.
             # 예외(0908): 지시문 순서(auto=instruction_order, VLM이 정한 relocate 처리 순서)도 동일.
+            # 예외(0908): 받침 도착(auto=base_arrival, 접시가 트레이에 담긴 뒤에야 그 위에 쌓기)도 동일.
             for a in producers:
                 if a["group_id"] == b["group_id"] or p.get("auto") in (
-                    "container_seal",
-                    "container_packing_sequence",
-                    "instruction_order",
-                ):
+                        "container_seal", "container_packing_sequence",
+                        "instruction_order", "base_arrival"):
                     edges.append({"from": a["detail_id"], "to": b["detail_id"],
                                   "why": f"causal_link: {p['expr']}"})
             # 그룹 밖 생산자만 있으면(예: hand_empty) 배타 자원 — mutex
@@ -370,6 +465,25 @@ def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
             seen.add(k)
             uniq.append(e)
     return uniq, mutex
+
+
+def _pred_arg(expr: str, i: int = 0) -> str:
+    """술어 문자열의 i번째 최상위 인자. 중괄호 집합 {a,b,c}는 한 토큰으로 유지한다."""
+    inner = expr.split("(", 1)[-1].rsplit(")", 1)[0]
+    args, depth, cur = [], 0, ""
+    for ch in inner:
+        if ch == "{":
+            depth += 1; cur += ch
+        elif ch == "}":
+            depth -= 1; cur += ch
+        elif ch == "," and depth == 0:
+            args.append(cur); cur = ""
+        else:
+            cur += ch
+    if cur.strip():
+        args.append(cur)
+    args = [a.strip() for a in args if a.strip()]
+    return args[i] if i < len(args) else ""
 
 
 def _set_members(v) -> list[str]:
@@ -437,7 +551,11 @@ def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None)
             b = d["binding"]
             head = p["head"]
             if head in ("reachable", "top_exposed"):
-                oid = b.get("?o")
+                # 0908: 인자를 바인딩(?o)이 아니라 술어 문자열에서 뽑는다. place_on의
+                # 사전조건은 top_exposed(?base)인데 ?o만 보던 탓에, expr에는 받침이
+                # 찍히면서 판정은 올릴 물체를 보는 어긋남이 있었다 (c2_2에서 같은 노드가
+                # s4a_p1은 sat, s5c_p2는 unsat으로 갈렸음).
+                oid = _pred_arg(p["expr"], 0)
                 # 집합 표기 "{a,b}"는 원소별로 펼쳐 질의 (0828 — C2_1에서 발견)
                 targets = tool_ids if oid == "?tool" else _set_members(oid)
                 # 0905: top_exposed는 M3 query_top_exposed(상면 점유 여부)로 직접 질의.
@@ -499,17 +617,22 @@ def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None)
                 members = _set_members(b.get("?targets") or b.get("?o"))
                 if "?tool" in members:
                     continue
-                # 물체 1개면 묶기 판정 불필요 → 질의 생략 (not_queried).
-                # 단 분할된 자식 서브골은 1개여도 발행한다 — 측정 모듈이 서브골별
-                # 서브그래프를 질의 기준으로 조립하므로, 재검증 겸 자기 몫을 남긴다.
-                if len(members) < 2 and "split_from" not in subgoal:
+                # 물체 1개면 "묶어서 한 번에" 판정은 의미가 없어 생략한다 (not_queried).
+                # 단 분할된 자식 서브골은 1개여도 발행한다 — 자기 몫을 남겨 재검증한다.
+                # 0908: act_space_clear(이동 통로가 비었나)는 물체 1개여도 의미가 있으므로
+                # 이 생략에서 뺀다. 종전에는 batch_feasible과 같은 분기라 c1_2 flatten
+                # (반죽 1개)의 통로 판정이 아예 돌지 않았다.
+                if (head == "batch_feasible" and len(members) < 2
+                        and "split_from" not in subgoal):
                     continue
                 actors = ([{"type": "object", "id": t} for t in tool_ids]
                           if tool_ids else [{"type": "ee_pool"}])
                 call = {"kind": "batch" if head == "batch_feasible" else "swept_space",
                         "action_type": subgoal["kind"], "member_ids": members}
                 if head == "act_space_clear":
-                    rid = b.get("?r")
+                    # 0908: flatten은 목적지 변수가 ?work다 (?r이 아니라). ?r만 보던 탓에
+                    # c1_2의 통로 판정이 발행되지 않았다.
+                    rid = b.get("?r") or b.get("?work")
                     if rid in (None, "tool_rest"):
                         continue
                     call["to"] = rid

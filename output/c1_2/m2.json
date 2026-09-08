@@ -3,42 +3,46 @@
   "m2_subgoals": [
     {
       "subgoal_id": "SG1",
-      "goal": "도마 위의 반죽을 평평하게 펴기",
+      "goal": "도마 위에 있는 반죽을 도구를 사용하여 평평하게 편다.",
       "kind": "flatten",
       "target_ids": [
         "obj_dough_dough"
       ],
       "container_id": "obj_cutting_board_cutting_board",
-      "ordered": false,
       "tool_candidate_ids": [
         "obj_bottle_bottle",
-        "obj_spatula_spatula"
+        "obj_spatula_spatula",
+        "obj_spoon_spoon"
       ],
+      "ordered": false,
       "object_ids": [
         "obj_dough_dough",
         "obj_cutting_board_cutting_board",
         "obj_bottle_bottle",
-        "obj_spatula_spatula"
+        "obj_spatula_spatula",
+        "obj_spoon_spoon"
       ],
-      "selection_reason": "반죽을 평평하게 펴기 위해 대상인 반죽과 그 받침대인 도마, 그리고 도구로 사용될 수 있는 병과 주걱을 선택했습니다.",
+      "selection_reason": "반죽을 평평하게 펴기 위해 대상인 반죽과 받침대인 도마, 그리고 도구로 활용 가능한 병, 뒤집개, 숟가락을 선택했습니다.",
       "confidence": {
         "before": {
-          "decomposition": 0.9,
+          "decomposition": 0.8,
           "object_selection": 0.7,
           "uncertain_about": [
-            "선택된 도구 후보(병, 주걱) 중 어떤 것이 반죽을 펴는 데 가장 적합한지 알 수 없음",
-            "도구 후보들의 실제 크기나 무게가 반죽을 펴는 작업에 적합한지 알 수 없음"
+            "도구 후보들의 실제 크기, 무게 및 재질",
+            "반죽의 점성과 단단한 정도"
           ]
         },
         "after": {
-          "decomposition": 0.9,
-          "object_selection": 0.9,
-          "uncertain_about": [],
-          "reason": "M3 측정 결과 도구 후보들의 실제 크기와 두께가 명확히 확인되어, 반죽을 펴는 작업에 대한 적합성 불확실성이 해소되었습니다."
+          "decomposition": 0.8,
+          "object_selection": 0.8,
+          "uncertain_about": [
+            "반죽의 점성과 단단한 정도"
+          ],
+          "reason": "도구 후보들의 물리적 제원과 파지 가능 여부는 실측을 통해 확인되었으나, 반죽의 점성과 단단한 정도는 여전히 측정되지 않아 불확실성으로 남아 있습니다."
         },
         "delta": {
           "decomposition": 0.0,
-          "object_selection": 0.2
+          "object_selection": 0.1
         }
       },
       "details": [
@@ -67,6 +71,11 @@
                   "node": "obj_spatula_spatula",
                   "reachable": true,
                   "margin_mm": 167.8
+                },
+                {
+                  "node": "obj_spoon_spoon",
+                  "reachable": true,
+                  "margin_mm": 139.2
                 }
               ]
             },
@@ -84,6 +93,11 @@
                 },
                 {
                   "node": "obj_spatula_spatula",
+                  "top_exposed": true,
+                  "blockers": []
+                },
+                {
+                  "node": "obj_spoon_spoon",
                   "top_exposed": true,
                   "blockers": []
                 }
@@ -109,6 +123,13 @@
                     "2F",
                     "3F",
                     "vac"
+                  ]
+                },
+                {
+                  "node": "obj_spoon_spoon",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
                   ]
                 }
               ]
@@ -178,6 +199,11 @@
                   "node": "obj_spatula_spatula",
                   "flat_face": true,
                   "check": "rms_0.03<=2.0 & patch_0.0<=1.5 & face_44.1>=40.0"
+                },
+                {
+                  "node": "obj_spoon_spoon",
+                  "flat_face": false,
+                  "check": "rms_0.37<=2.0 & patch_99.9<=1.5 & face_51.4>=40.0"
                 }
               ]
             },
@@ -346,23 +372,23 @@
             "height_mm": 93.9
           },
           "material": "steel",
-          "density_kgm3": 4520.0,
-          "mass_kg": 0.121,
-          "youngs_gpa": 92.96,
+          "density_kgm3": 4946.7,
+          "mass_kg": 0.113,
+          "youngs_gpa": 107.0,
           "mu": {
             "mu": 0.471,
             "stage": 0,
             "material": "steel",
             "rms_mm": 1.93
           },
-          "confidence": 0.257,
-          "caption": "Section of cylindrical pipe, possibly with a joint.",
+          "confidence": 0.267,
+          "caption": "Cylindrical metallic object",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.879,
+              "margin": 4.887,
               "margin_unit": "kg",
-              "reason": "질량 0.121 vs 페이로드 5.0kg",
+              "reason": "질량 0.113 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -372,13 +398,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.121,
+                  "value": 0.113,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 1.26,
+                  "value": 1.177,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -386,9 +412,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.379,
+              "margin": 2.387,
               "margin_unit": "kg",
-              "reason": "질량 0.121 vs 페이로드 2.5kg",
+              "reason": "질량 0.113 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -398,13 +424,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.121,
+                  "value": 0.113,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 1.26,
+                  "value": 1.177,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -424,7 +450,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.121,
+                  "value": 0.113,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -473,23 +499,23 @@
             "height_mm": 1.8
           },
           "material": "wood",
-          "density_kgm3": 1522.2,
-          "mass_kg": 0.004,
-          "youngs_gpa": 33.41,
+          "density_kgm3": 838.1,
+          "mass_kg": 0.006,
+          "youngs_gpa": 18.33,
           "mu": {
             "mu": 0.476,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.03
           },
-          "confidence": 0.225,
-          "caption": "Leopard print high-back chair or throne with a blocky design.",
+          "confidence": 0.429,
+          "caption": "Wooden cooking utensil with a patterned design",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.996,
+              "margin": 4.994,
               "margin_unit": "kg",
-              "reason": "질량 0.004 vs 페이로드 5.0kg",
+              "reason": "질량 0.006 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -499,13 +525,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.004,
+                  "value": 0.006,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.041,
+                  "value": 0.062,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -513,9 +539,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.496,
+              "margin": 2.494,
               "margin_unit": "kg",
-              "reason": "질량 0.004 vs 페이로드 2.5kg",
+              "reason": "질량 0.006 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -525,13 +551,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.004,
+                  "value": 0.006,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.041,
+                  "value": 0.062,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -539,9 +565,9 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.496,
+              "margin": 0.494,
               "margin_unit": "kg",
-              "reason": "질량 0.004 vs 페이로드 0.5kg",
+              "reason": "질량 0.006 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
@@ -551,7 +577,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.004,
+                  "value": 0.006,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -579,6 +605,133 @@
         },
         {
           "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p0",
+          "node_id": "obj_spoon_spoon",
+          "geometry": {
+            "length_mm": 109.3,
+            "diameter_mm": null,
+            "extents_mm": [
+              109.3,
+              51.5,
+              27.6
+            ],
+            "height_z_mm": 27.4,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.37,
+            "seal_patch_rms_mm": 99.9,
+            "footprint_mm": [
+              110.6,
+              51.4
+            ],
+            "height_mm": 27.4
+          },
+          "material": "wood",
+          "density_kgm3": 600.0,
+          "mass_kg": 0.014,
+          "youngs_gpa": 12.5,
+          "mu": {
+            "mu": 0.484,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.37
+          },
+          "confidence": 0.421,
+          "caption": "Wooden ladle with a round bowl",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.986,
+              "margin_unit": "kg",
+              "reason": "질량 0.014 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 51.4,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.014,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.142,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.486,
+              "margin_unit": "kg",
+              "reason": "질량 0.014 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 51.4,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.014,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.142,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": false,
+              "margin": -98.4,
+              "margin_unit": "mm",
+              "reason": "흡착 패치 RMS 99.9 vs 허용 1.5mm",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.37,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.014,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 51.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 99.9,
+                  "limit": 1.5,
+                  "pass": false
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 710.8,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 139.2
+          }
+        },
+        {
+          "subgoal_id": "SG1",
           "queried_by": "SG1_d1_p1",
           "node_id": "obj_bottle_bottle",
           "type": "top_exposed",
@@ -590,6 +743,15 @@
           "subgoal_id": "SG1",
           "queried_by": "SG1_d1_p1",
           "node_id": "obj_spatula_spatula",
+          "type": "top_exposed",
+          "value": true,
+          "pass": true,
+          "blockers": []
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p1",
+          "node_id": "obj_spoon_spoon",
           "type": "top_exposed",
           "value": true,
           "pass": true,
@@ -618,23 +780,23 @@
             "height_mm": 93.9
           },
           "material": "steel",
-          "density_kgm3": 4520.0,
-          "mass_kg": 0.121,
-          "youngs_gpa": 92.96,
+          "density_kgm3": 4946.7,
+          "mass_kg": 0.113,
+          "youngs_gpa": 107.0,
           "mu": {
             "mu": 0.471,
             "stage": 0,
             "material": "steel",
             "rms_mm": 1.93
           },
-          "confidence": 0.257,
-          "caption": "Section of cylindrical pipe, possibly with a joint.",
+          "confidence": 0.267,
+          "caption": "Cylindrical metallic object",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.879,
+              "margin": 4.887,
               "margin_unit": "kg",
-              "reason": "질량 0.121 vs 페이로드 5.0kg",
+              "reason": "질량 0.113 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -644,13 +806,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.121,
+                  "value": 0.113,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 1.26,
+                  "value": 1.177,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -658,9 +820,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.379,
+              "margin": 2.387,
               "margin_unit": "kg",
-              "reason": "질량 0.121 vs 페이로드 2.5kg",
+              "reason": "질량 0.113 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -670,13 +832,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.121,
+                  "value": 0.113,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 1.26,
+                  "value": 1.177,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -696,7 +858,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.121,
+                  "value": 0.113,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -745,23 +907,23 @@
             "height_mm": 1.8
           },
           "material": "wood",
-          "density_kgm3": 1522.2,
-          "mass_kg": 0.004,
-          "youngs_gpa": 33.41,
+          "density_kgm3": 838.1,
+          "mass_kg": 0.006,
+          "youngs_gpa": 18.33,
           "mu": {
             "mu": 0.476,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.03
           },
-          "confidence": 0.225,
-          "caption": "Leopard print high-back chair or throne with a blocky design.",
+          "confidence": 0.429,
+          "caption": "Wooden cooking utensil with a patterned design",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.996,
+              "margin": 4.994,
               "margin_unit": "kg",
-              "reason": "질량 0.004 vs 페이로드 5.0kg",
+              "reason": "질량 0.006 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -771,13 +933,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.004,
+                  "value": 0.006,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.041,
+                  "value": 0.062,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -785,9 +947,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.496,
+              "margin": 2.494,
               "margin_unit": "kg",
-              "reason": "질량 0.004 vs 페이로드 2.5kg",
+              "reason": "질량 0.006 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -797,13 +959,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.004,
+                  "value": 0.006,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.041,
+                  "value": 0.062,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -811,9 +973,9 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.496,
+              "margin": 0.494,
               "margin_unit": "kg",
-              "reason": "질량 0.004 vs 페이로드 0.5kg",
+              "reason": "질량 0.006 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
@@ -823,7 +985,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.004,
+                  "value": 0.006,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -851,6 +1013,133 @@
         },
         {
           "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p2",
+          "node_id": "obj_spoon_spoon",
+          "geometry": {
+            "length_mm": 109.3,
+            "diameter_mm": null,
+            "extents_mm": [
+              109.3,
+              51.5,
+              27.6
+            ],
+            "height_z_mm": 27.4,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.37,
+            "seal_patch_rms_mm": 99.9,
+            "footprint_mm": [
+              110.6,
+              51.4
+            ],
+            "height_mm": 27.4
+          },
+          "material": "wood",
+          "density_kgm3": 600.0,
+          "mass_kg": 0.014,
+          "youngs_gpa": 12.5,
+          "mu": {
+            "mu": 0.484,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.37
+          },
+          "confidence": 0.421,
+          "caption": "Wooden ladle with a round bowl",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.986,
+              "margin_unit": "kg",
+              "reason": "질량 0.014 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 51.4,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.014,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.142,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.486,
+              "margin_unit": "kg",
+              "reason": "질량 0.014 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 51.4,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.014,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.142,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": false,
+              "margin": -98.4,
+              "margin_unit": "mm",
+              "reason": "흡착 패치 RMS 99.9 vs 허용 1.5mm",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.37,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.014,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 51.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 99.9,
+                  "limit": 1.5,
+                  "pass": false
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 710.8,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 139.2
+          }
+        },
+        {
+          "subgoal_id": "SG1",
           "queried_by": "SG1_d2_p1",
           "node_id": "obj_bottle_bottle",
           "type": "flat_face",
@@ -866,6 +1155,15 @@
           "value": true,
           "pass": true,
           "check": "rms_0.03<=2.0 & patch_0.0<=1.5 & face_44.1>=40.0"
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d2_p1",
+          "node_id": "obj_spoon_spoon",
+          "type": "flat_face",
+          "value": false,
+          "pass": false,
+          "check": "rms_0.37<=2.0 & patch_99.9<=1.5 & face_51.4>=40.0"
         }
       ],
       "selected_tool_id": "obj_bottle_bottle",
@@ -888,6 +1186,15 @@
           ],
           "reach_margin_mm": 148.8,
           "batch_groups": null
+        },
+        {
+          "node": "obj_spoon_spoon",
+          "feasible_ees": [
+            "2F",
+            "3F"
+          ],
+          "reach_margin_mm": 139.2,
+          "batch_groups": null
         }
       ],
       "selection_by": "llm",
@@ -901,7 +1208,7 @@
           ],
           "length_mm": 246.6,
           "cylinder_like": false,
-          "mass_kg": 0.004,
+          "mass_kg": 0.006,
           "material": "wood",
           "feasible_ees": [
             "2F",
@@ -923,7 +1230,7 @@
           ],
           "length_mm": 102.1,
           "cylinder_like": false,
-          "mass_kg": 0.121,
+          "mass_kg": 0.113,
           "material": "steel",
           "feasible_ees": [
             "2F",
@@ -934,9 +1241,30 @@
           "partition": null,
           "core_pred": "flat_face",
           "core_value": true
+        },
+        {
+          "node": "obj_spoon_spoon",
+          "extents_mm": [
+            109.3,
+            51.5,
+            27.6
+          ],
+          "length_mm": 109.3,
+          "cylinder_like": false,
+          "mass_kg": 0.014,
+          "material": "wood",
+          "feasible_ees": [
+            "2F",
+            "3F"
+          ],
+          "reach_margin_mm": 139.2,
+          "batch_groups": null,
+          "partition": null,
+          "core_pred": "flat_face",
+          "core_value": false
         }
       ],
-      "selection_reason_tool": "병은 두께가 36.2mm로 두꺼워 반죽을 펴는 데 적합한 반면, 주걱은 두께가 1.5mm로 얇아 힘을 주면 휘어 부적합합니다.",
+      "selection_reason_tool": "반죽을 평평하게 펴는 작업에는 힘을 주어도 휘지 않는 두껍고 단단한 원통형 몸체를 가진 병이 가장 적합합니다.",
       "selected_tool_id_rule": "obj_spatula_spatula"
     }
   ],
@@ -989,26 +1317,26 @@
       "서브골 분해": {
         "calls": 1,
         "prompt_tokens": 891,
-        "completion_tokens": 101,
-        "tokens": 2318,
-        "seconds": 6.98
+        "completion_tokens": 148,
+        "tokens": 2861,
+        "seconds": 24.45
       },
       "객체 선택": {
         "calls": 1,
-        "prompt_tokens": 699,
-        "completion_tokens": 245,
-        "tokens": 2817,
-        "seconds": 12.24
+        "prompt_tokens": 702,
+        "completion_tokens": 231,
+        "tokens": 2549,
+        "seconds": 20.78
       },
       "confidence_update": {
         "calls": 1,
-        "prompt_tokens": 1396,
-        "completion_tokens": 162,
-        "tokens": 3693,
-        "seconds": 12.39
+        "prompt_tokens": 1461,
+        "completion_tokens": 160,
+        "tokens": 3132,
+        "seconds": 20.27
       }
     },
-    "n_evaluations": 8,
+    "n_evaluations": 12,
     "m3_predicates": {
       "sat": 4,
       "unsat": 0,

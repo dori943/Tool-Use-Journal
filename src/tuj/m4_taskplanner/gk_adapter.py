@@ -20,6 +20,7 @@ from tuj.m4_taskplanner.models import (
     ObjectSpec,
     OrderConstraints,
     TaskGraph,
+    MutexConstraint,
     TaskConstraints,
     TaskPlannerRequest,
     PlanningPolicy,
@@ -83,6 +84,42 @@ def build_request_from_gk(
         candidate_proposals=candidate_proposals,
         planning_policy=policy,
     )
+
+
+
+def _mutex_constraints(m2_payload: Mapping[str, Any],
+                       subgoals: list[Subgoal]) -> list[MutexConstraint]:
+    """M2 의 그룹 단위 자원 배타를 플래너가 읽는 detail 쌍으로 옮긴다.
+
+    M2 는 {"resource": "hand_empty", "groups": ["G_SG1", "G_SG2"]} 형태로 낸다.
+    한 팔이라 손은 한 번에 하나만 들 수 있으므로, 두 그룹의 작업을 끼워 넣으려면
+    사이에서 hand_empty 가 재확립되어야 한다는 뜻이다. MutexConstraint 의 a/b 는
+    detail id 이므로, 각 그룹에서 그 자원을 실제로 소비하는 detail(destroy 에
+    자원이 있는 것)만 골라 짝짓는다. 그룹의 모든 detail 을 곱하면 레코드가 불필요하게
+    늘어나 탐색만 무거워진다.
+    """
+    consumers: dict[tuple[str, str], list[str]] = {}
+    for sg in subgoals:
+        for cond in sg.destroy:
+            consumers.setdefault((sg.group_id, cond.type), []).append(sg.subgoal_id)
+    out: list[MutexConstraint] = []
+    seen: set[tuple[str, str]] = set()
+    for item in m2_payload.get("m2_mutex") or []:
+        groups = item.get("groups") or []
+        resource = item.get("resource")
+        if len(groups) != 2 or not resource:
+            continue
+        for a in consumers.get((groups[0], resource), []):
+            for b in consumers.get((groups[1], resource), []):
+                if a == b:
+                    continue
+                key = (a, b) if a <= b else (b, a)
+                if key in seen:
+                    continue
+                seen.add(key)
+                out.append(MutexConstraint(a=key[0], b=key[1], predicate=resource,
+                                           args=[], note=item.get("rule")))
+    return out
 
 
 def adapt_gk_m2_output(
@@ -266,7 +303,8 @@ def adapt_gk_m2_output(
         initial_state=normalized_initial_state,
         subgoals=subgoals,
         order_constraints=OrderConstraints(edges=edges),
-        constraints=TaskConstraints(),
+        constraints=TaskConstraints(
+            mutex=_mutex_constraints(m2_payload, subgoals)),
         log={
             "adapter": contract,
             "task_id": gk_payload.get("task_id"),
@@ -418,6 +456,17 @@ def _collect_gk_nodes(
 ) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
     result: dict[str, dict[str, Any]] = {}
     raw_to_canonical: dict[str, str] = {}
+    # 1차 패스: M1 이 노드에 실은 source_name(env 인스턴스명) 을 파싱 전에 등록.
+    # id 를 첫 언더스코어로 파싱하면 class·name 이 언더스코어를 포함한 객체
+    # (rolling_pin, packing_box 등)에서 잘못 잘리는데 (obj_rolling_pin_rolling_pin
+    # → pin_rolling_pin), source_name 을 우선 넣으면 파싱이 아예 안 돌아 정확히 매칭됨.
+    for record in records:
+        for raw_id, raw_node in _mapping(record.get("nodes")).items():
+            if not isinstance(raw_id, str):
+                continue
+            source_name = _mapping(raw_node).get("source_name")
+            if isinstance(source_name, str) and raw_id not in raw_to_canonical:
+                raw_to_canonical[raw_id] = source_name
     for record in records:
         for raw_id, raw_node in _mapping(record.get("nodes")).items():
             if not isinstance(raw_id, str):
@@ -581,6 +630,15 @@ def _derive_catalog(
             robot_spec=deepcopy(dict(raw)),
         )
 
+    # M1 이 노드에 실은 source_name(env 인스턴스명)을 raw_to_canonical 에 먼저 등록해
+    # id 파싱 실패(class·name 이 언더스코어 포함 — rolling_pin, packing_box 등)를 우회한다.
+    # M5 는 world.objects 키를 env 인스턴스명으로 갖고 있어 반드시 이 이름과 매칭해야 한다.
+    for raw_node in m1.get("nodes") or []:
+        record = _mapping(raw_node)
+        raw_id = record.get("id")
+        source_name = record.get("source_name")
+        if isinstance(raw_id, str) and isinstance(source_name, str) and raw_id not in raw_to_canonical:
+            raw_to_canonical[raw_id] = source_name
     objects: dict[str, ObjectSpec] = {}
     for raw_node in m1.get("nodes") or []:
         record = _mapping(raw_node)

@@ -59,11 +59,36 @@ PORTABLE_START_ORIENTATION_TOLERANCE_RAD = 0.03
 
 
 def portable_ee_path_directory_for(environment_name: str) -> str:
-    """Return the shared portable cache directory for an environment family."""
+    """Return the shared portable cache directory for an environment family.
+
+    Legacy environment-name mapping.  Kept as a read-only fallback so already
+    commissioned caches under ``ee_rack/`` and ``ee_rack_kitchen/`` remain
+    discoverable while new commissions land under a signature-keyed
+    subdirectory (see :func:`portable_ee_path_directory_from_world`).
+    """
 
     if environment_name in KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS:
         return PORTABLE_EE_PATH_DIRECTORY_KITCHEN
     return PORTABLE_EE_PATH_DIRECTORY
+
+
+PORTABLE_EE_PATH_SIGNATURE_PREFIX_LENGTH = 12
+
+
+def portable_ee_path_directory_from_world(world: "WorldSnapshot") -> str:
+    """Return the sig-keyed cache subdirectory for the current workcell.
+
+    The subdirectory is derived from the rack-relative geometry of ``world``
+    so that any two environments whose ``compute_portable_rack_signature``
+    matches share the same cache and any two that disagree land in
+    different subdirectories automatically — no hardcoded environment list.
+    """
+
+    signature = compute_portable_rack_signature(world)
+    return (
+        f"{PORTABLE_EE_PATH_DIRECTORY}/"
+        f"sig_{signature[:PORTABLE_EE_PATH_SIGNATURE_PREFIX_LENGTH]}"
+    )
 
 
 def normalize_ee_id(value: object) -> str:
@@ -698,7 +723,13 @@ class PrecomputedEEAttachRegistry:
                 f"invalid trajectory template {path}: {error}",
             ) from error
 
-    def load(self, environment_name: str, target_ee: object) -> EEAttachTrajectoryTemplate:
+    def load(
+        self,
+        environment_name: str,
+        target_ee: object,
+        *,
+        world: "WorldSnapshot | None" = None,
+    ) -> EEAttachTrajectoryTemplate:
         try:
             target = normalize_ee_id(target_ee)
         except ValueError as error:
@@ -711,10 +742,13 @@ class PrecomputedEEAttachRegistry:
             exact_path = self.root / environment_name / f"bare_to_{target}.json"
         use_shared_path = not exact_path.is_file()
         if use_shared_path:
-            portable_directory = portable_ee_path_directory_for(environment_name)
-            path = self._portable_overrides.get(target)
-            if path is None:
-                path = self.root / portable_directory / f"bare_to_{target}.json"
+            override_path = self._portable_overrides.get(target)
+            path, portable_directory = self._resolve_portable_path(
+                target,
+                environment_name=environment_name,
+                world=world,
+                override=override_path,
+            )
             self._last_resolution = {
                 "mode": "portable",
                 "directory": portable_directory,
@@ -722,7 +756,9 @@ class PrecomputedEEAttachRegistry:
             }
         else:
             path = exact_path
-            portable_directory = portable_ee_path_directory_for(environment_name)
+            portable_directory = self._preferred_portable_directory(
+                environment_name=environment_name, world=world
+            )
             self._last_resolution = {
                 "mode": "exact",
                 "directory": environment_name,
@@ -741,6 +777,66 @@ class PrecomputedEEAttachRegistry:
                 trajectory_id=template.trajectory_id,
             )
         return template
+
+    def _preferred_portable_directory(
+        self,
+        *,
+        environment_name: str,
+        world: "WorldSnapshot | None",
+    ) -> str:
+        """Signature-keyed subdirectory when ``world`` is available; else legacy."""
+
+        if world is not None:
+            try:
+                return portable_ee_path_directory_from_world(world)
+            except Exception:  # noqa: BLE001 - fall back to legacy mapping
+                pass
+        return portable_ee_path_directory_for(environment_name)
+
+    def _resolve_portable_path(
+        self,
+        target: str,
+        *,
+        environment_name: str,
+        world: "WorldSnapshot | None",
+        override: Path | None,
+    ) -> tuple[Path, str]:
+        """Pick the portable path preferring the sig-keyed subdirectory."""
+
+        if override is not None:
+            return override, self._preferred_portable_directory(
+                environment_name=environment_name, world=world
+            )
+        candidates: list[str] = []
+        if world is not None:
+            try:
+                candidates.append(portable_ee_path_directory_from_world(world))
+            except Exception:  # noqa: BLE001
+                pass
+        legacy_directory = portable_ee_path_directory_for(environment_name)
+        if legacy_directory not in candidates:
+            candidates.append(legacy_directory)
+        # ``ee_rack`` and ``ee_rack_kitchen`` remain readable regardless of which
+        # legacy family the environment belongs to, so a hand-curated cache
+        # stays discoverable during migration.
+        for fallback in (
+            PORTABLE_EE_PATH_DIRECTORY,
+            PORTABLE_EE_PATH_DIRECTORY_KITCHEN,
+        ):
+            if fallback not in candidates:
+                candidates.append(fallback)
+        chosen_path: Path | None = None
+        chosen_directory = candidates[0]
+        for directory in candidates:
+            candidate_path = self.root / directory / f"bare_to_{target}.json"
+            if candidate_path.is_file():
+                chosen_path = candidate_path
+                chosen_directory = directory
+                break
+        if chosen_path is None:
+            chosen_path = self.root / candidates[0] / f"bare_to_{target}.json"
+            chosen_directory = candidates[0]
+        return chosen_path, chosen_directory
 
     @property
     def last_resolution(self) -> Mapping[str, str] | None:
@@ -1106,7 +1202,9 @@ class PrecomputedEEAttachPlanner:
                 "request has no environment_name",
             )
         raw_target = request.task.metadata.get("to_ee") or request.task.ee
-        template = self.registry.load(environment_name, raw_target)
+        template = self.registry.load(
+            environment_name, raw_target, world=request.world
+        )
         self._log_cache_resolution()
         return template
 
@@ -1314,6 +1412,7 @@ __all__ = [
     "PORTABLE_EE_PATH_DIRECTORY",
     "PORTABLE_EE_PATH_DIRECTORY_KITCHEN",
     "PORTABLE_EE_PATH_SCOPE",
+    "PORTABLE_EE_PATH_SIGNATURE_PREFIX_LENGTH",
     "PrecomputedEEAttachPlanner",
     "PrecomputedEEAttachRegistry",
     "PrecomputedEEPathError",
@@ -1326,6 +1425,7 @@ __all__ = [
     "is_portable_ee_path",
     "normalize_ee_id",
     "portable_ee_path_directory_for",
+    "portable_ee_path_directory_from_world",
     "portable_ee_path_metadata",
     "rebase_portable_pose",
     "save_ee_attach_template",

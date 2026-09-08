@@ -1,5 +1,5 @@
 {
-  "status": "INFEASIBLE_NO_PLAN",
+  "status": "SUCCESS",
   "task": {
     "instruction": "\uae34 \ubb3c\uac74\ub4e4\uc744 \uc0c1\uc790\uc5d0 \ub2f4\uace0 \ub69c\uaed1\uc744 \ub36e\uc5b4\ub77c"
   },
@@ -8,44 +8,3706 @@
     "candidate_set": "after threshold, top-k, and hard pruning",
     "search": "lexicographically optimal among retained feasible candidates"
   },
-  "selected_plan": null,
+  "selected_plan": {
+    "cost_vector": {
+      "ee_switches": 1,
+      "tool_switches": 0,
+      "motion_cost": 18,
+      "execution_cost": 0
+    },
+    "subgoal_order": [
+      "SG1_s3_d1",
+      "SG1_s3_d2",
+      "SG1_s3_d3",
+      "SG1_s2_d1",
+      "SG1_s2_d2",
+      "SG1_s2_d3",
+      "SG1_s1_d1",
+      "SG1_s1_d2",
+      "SG1_s1_d3",
+      "SG2_s1a",
+      "SG2_s1b",
+      "SG2_s1c"
+    ],
+    "group_ee_assignments": {
+      "G_SG1_s1": "vac",
+      "G_SG1_s2": "vac",
+      "G_SG1_s3": "2F",
+      "G_SG2": "vac"
+    },
+    "candidate_assignments": [
+      {
+        "subgoal_id": "SG1_s3_d1",
+        "candidate_id": "SG1_s3_d1-auto-2F-notool",
+        "group_id": "G_SG1_s3",
+        "ee": "2F",
+        "tool": null,
+        "action_type": "acquire",
+        "mode": null,
+        "target_ids": [
+          "whisk"
+        ],
+        "goal_region_id": null,
+        "description": "obj_whisk_whisk \ud655\ubcf4",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.9924573243350535,
+            "known_min_score": 0.9924573243350535,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.9924573243350535,
+                "required": 0.038,
+                "capacity": 5.0,
+                "margin": 4.962,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "whisk"
+        },
+        "suitability_score": 0.9924573243350535,
+        "suitability": {
+          "overall_suitability": 0.9924573243350535,
+          "known_min_score": 0.9924573243350535,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.9924573243350535,
+              "required": 0.038,
+              "capacity": 5.0,
+              "margin": 4.962,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      },
+      {
+        "subgoal_id": "SG1_s3_d2",
+        "candidate_id": "SG1_s3_d2-auto-2F-notool",
+        "group_id": "G_SG1_s3",
+        "ee": "2F",
+        "tool": null,
+        "action_type": "transport",
+        "mode": null,
+        "target_ids": [
+          "whisk"
+        ],
+        "goal_region_id": "packing_box",
+        "description": "obj_whisk_whisk\ub97c obj_box_packing_box\ub85c \uc6b4\ubc18",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.9924573243350535,
+            "known_min_score": 0.9924573243350535,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.9924573243350535,
+                "required": 0.038,
+                "capacity": 5.0,
+                "margin": 4.962,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "whisk",
+          "?r": "packing_box"
+        },
+        "suitability_score": 0.9924573243350535,
+        "suitability": {
+          "overall_suitability": 0.9924573243350535,
+          "known_min_score": 0.9924573243350535,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.9924573243350535,
+              "required": 0.038,
+              "capacity": 5.0,
+              "margin": 4.962,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      },
+      {
+        "subgoal_id": "SG1_s3_d3",
+        "candidate_id": "SG1_s3_d3-auto-2F-notool",
+        "group_id": "G_SG1_s3",
+        "ee": "2F",
+        "tool": null,
+        "action_type": "place",
+        "mode": null,
+        "target_ids": [
+          "whisk"
+        ],
+        "goal_region_id": "packing_box",
+        "description": "obj_whisk_whisk\ub97c obj_box_packing_box\uc5d0 \ubc30\uce58",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.9924573243350535,
+            "known_min_score": 0.9924573243350535,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.9924573243350535,
+                "required": 0.038,
+                "capacity": 5.0,
+                "margin": 4.962,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "whisk",
+          "?r": "packing_box"
+        },
+        "suitability_score": 0.9924573243350535,
+        "suitability": {
+          "overall_suitability": 0.9924573243350535,
+          "known_min_score": 0.9924573243350535,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.9924573243350535,
+              "required": 0.038,
+              "capacity": 5.0,
+              "margin": 4.962,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      },
+      {
+        "subgoal_id": "SG1_s2_d1",
+        "candidate_id": "SG1_s2_d1-auto-vac-notool",
+        "group_id": "G_SG1_s2",
+        "ee": "vac",
+        "tool": null,
+        "action_type": "acquire",
+        "mode": null,
+        "target_ids": [
+          "rolling_pin"
+        ],
+        "goal_region_id": null,
+        "description": "obj_rolling_pin_rolling_pin \ud655\ubcf4",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.5393743257820928,
+            "known_min_score": 0.5393743257820928,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.5393743257820928,
+                "required": 0.427,
+                "capacity": 0.5,
+                "margin": 0.07300000000000001,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "rolling_pin"
+        },
+        "suitability_score": 0.5393743257820928,
+        "suitability": {
+          "overall_suitability": 0.5393743257820928,
+          "known_min_score": 0.5393743257820928,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.5393743257820928,
+              "required": 0.427,
+              "capacity": 0.5,
+              "margin": 0.07300000000000001,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      },
+      {
+        "subgoal_id": "SG1_s2_d2",
+        "candidate_id": "SG1_s2_d2-auto-vac-notool",
+        "group_id": "G_SG1_s2",
+        "ee": "vac",
+        "tool": null,
+        "action_type": "transport",
+        "mode": null,
+        "target_ids": [
+          "rolling_pin"
+        ],
+        "goal_region_id": "packing_box",
+        "description": "obj_rolling_pin_rolling_pin\ub97c obj_box_packing_box\ub85c \uc6b4\ubc18",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.5393743257820928,
+            "known_min_score": 0.5393743257820928,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.5393743257820928,
+                "required": 0.427,
+                "capacity": 0.5,
+                "margin": 0.07300000000000001,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "rolling_pin",
+          "?r": "packing_box"
+        },
+        "suitability_score": 0.5393743257820928,
+        "suitability": {
+          "overall_suitability": 0.5393743257820928,
+          "known_min_score": 0.5393743257820928,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.5393743257820928,
+              "required": 0.427,
+              "capacity": 0.5,
+              "margin": 0.07300000000000001,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      },
+      {
+        "subgoal_id": "SG1_s2_d3",
+        "candidate_id": "SG1_s2_d3-auto-vac-notool",
+        "group_id": "G_SG1_s2",
+        "ee": "vac",
+        "tool": null,
+        "action_type": "place",
+        "mode": null,
+        "target_ids": [
+          "rolling_pin"
+        ],
+        "goal_region_id": "packing_box",
+        "description": "obj_rolling_pin_rolling_pin\ub97c obj_box_packing_box\uc5d0 \ubc30\uce58",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.5393743257820928,
+            "known_min_score": 0.5393743257820928,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.5393743257820928,
+                "required": 0.427,
+                "capacity": 0.5,
+                "margin": 0.07300000000000001,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "rolling_pin",
+          "?r": "packing_box"
+        },
+        "suitability_score": 0.5393743257820928,
+        "suitability": {
+          "overall_suitability": 0.5393743257820928,
+          "known_min_score": 0.5393743257820928,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.5393743257820928,
+              "required": 0.427,
+              "capacity": 0.5,
+              "margin": 0.07300000000000001,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      },
+      {
+        "subgoal_id": "SG1_s1_d1",
+        "candidate_id": "SG1_s1_d1-auto-vac-notool",
+        "group_id": "G_SG1_s1",
+        "ee": "vac",
+        "tool": null,
+        "action_type": "acquire",
+        "mode": null,
+        "target_ids": [
+          "baguette"
+        ],
+        "goal_region_id": null,
+        "description": "obj_baguette_baguette \ud655\ubcf4",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.8576329331046313,
+            "known_min_score": 0.8576329331046313,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.8576329331046313,
+                "required": 0.083,
+                "capacity": 0.5,
+                "margin": 0.417,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "baguette"
+        },
+        "suitability_score": 0.8576329331046313,
+        "suitability": {
+          "overall_suitability": 0.8576329331046313,
+          "known_min_score": 0.8576329331046313,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.8576329331046313,
+              "required": 0.083,
+              "capacity": 0.5,
+              "margin": 0.417,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      },
+      {
+        "subgoal_id": "SG1_s1_d2",
+        "candidate_id": "SG1_s1_d2-auto-vac-notool",
+        "group_id": "G_SG1_s1",
+        "ee": "vac",
+        "tool": null,
+        "action_type": "transport",
+        "mode": null,
+        "target_ids": [
+          "baguette"
+        ],
+        "goal_region_id": "packing_box",
+        "description": "obj_baguette_baguette\ub97c obj_box_packing_box\ub85c \uc6b4\ubc18",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.8576329331046313,
+            "known_min_score": 0.8576329331046313,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.8576329331046313,
+                "required": 0.083,
+                "capacity": 0.5,
+                "margin": 0.417,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "baguette",
+          "?r": "packing_box"
+        },
+        "suitability_score": 0.8576329331046313,
+        "suitability": {
+          "overall_suitability": 0.8576329331046313,
+          "known_min_score": 0.8576329331046313,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.8576329331046313,
+              "required": 0.083,
+              "capacity": 0.5,
+              "margin": 0.417,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      },
+      {
+        "subgoal_id": "SG1_s1_d3",
+        "candidate_id": "SG1_s1_d3-auto-vac-notool",
+        "group_id": "G_SG1_s1",
+        "ee": "vac",
+        "tool": null,
+        "action_type": "place",
+        "mode": null,
+        "target_ids": [
+          "baguette"
+        ],
+        "goal_region_id": "packing_box",
+        "description": "obj_baguette_baguette\ub97c obj_box_packing_box\uc5d0 \ubc30\uce58",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.8576329331046313,
+            "known_min_score": 0.8576329331046313,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.8576329331046313,
+                "required": 0.083,
+                "capacity": 0.5,
+                "margin": 0.417,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "baguette",
+          "?r": "packing_box"
+        },
+        "suitability_score": 0.8576329331046313,
+        "suitability": {
+          "overall_suitability": 0.8576329331046313,
+          "known_min_score": 0.8576329331046313,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.8576329331046313,
+              "required": 0.083,
+              "capacity": 0.5,
+              "margin": 0.417,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      },
+      {
+        "subgoal_id": "SG2_s1a",
+        "candidate_id": "SG2_s1a-auto-vac-notool",
+        "group_id": "G_SG2",
+        "ee": "vac",
+        "tool": null,
+        "action_type": "acquire",
+        "mode": null,
+        "target_ids": [
+          "lid"
+        ],
+        "goal_region_id": null,
+        "description": "obj_lid_lid \ud655\ubcf4",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.9191176470588235,
+            "known_min_score": 0.9191176470588235,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.9191176470588235,
+                "required": 0.044,
+                "capacity": 0.5,
+                "margin": 0.456,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "lid"
+        },
+        "suitability_score": 0.9191176470588235,
+        "suitability": {
+          "overall_suitability": 0.9191176470588235,
+          "known_min_score": 0.9191176470588235,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.9191176470588235,
+              "required": 0.044,
+              "capacity": 0.5,
+              "margin": 0.456,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      },
+      {
+        "subgoal_id": "SG2_s1b",
+        "candidate_id": "SG2_s1b-auto-vac-notool",
+        "group_id": "G_SG2",
+        "ee": "vac",
+        "tool": null,
+        "action_type": "transport",
+        "mode": null,
+        "target_ids": [
+          "lid"
+        ],
+        "goal_region_id": "packing_box",
+        "description": "obj_lid_lid\ub97c obj_box_packing_box \uc704\ub85c \uc6b4\ubc18",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.9191176470588235,
+            "known_min_score": 0.9191176470588235,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.9191176470588235,
+                "required": 0.044,
+                "capacity": 0.5,
+                "margin": 0.456,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "lid",
+          "?r": "packing_box"
+        },
+        "suitability_score": 0.9191176470588235,
+        "suitability": {
+          "overall_suitability": 0.9191176470588235,
+          "known_min_score": 0.9191176470588235,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.9191176470588235,
+              "required": 0.044,
+              "capacity": 0.5,
+              "margin": 0.456,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      },
+      {
+        "subgoal_id": "SG2_s1c",
+        "candidate_id": "SG2_s1c-auto-vac-notool",
+        "group_id": "G_SG2",
+        "ee": "vac",
+        "tool": null,
+        "action_type": "place_on",
+        "mode": null,
+        "target_ids": [
+          "lid"
+        ],
+        "goal_region_id": null,
+        "description": "obj_lid_lid\ub97c obj_box_packing_box \uc704\uc5d0 \ub193\uae30",
+        "grasp_id": null,
+        "grasp": null,
+        "action_parameters": {
+          "suitability": {
+            "overall_suitability": 0.9191176470588235,
+            "known_min_score": 0.9191176470588235,
+            "applicable_component_count": 1,
+            "known_component_count": 1,
+            "unknown_component_count": 0,
+            "unknown_components": [],
+            "aggregation": "minimum_applicable_margin",
+            "components": {
+              "payload": {
+                "status": "PASS",
+                "score": 0.9191176470588235,
+                "required": 0.044,
+                "capacity": 0.5,
+                "margin": 0.456,
+                "unit": "kg"
+              },
+              "wrench": {
+                "status": "NOT_APPLICABLE",
+                "details": {
+                  "reason": "subgoal has no wrench requirement"
+                }
+              }
+            }
+          }
+        },
+        "source_binding": {
+          "?o": "lid",
+          "?base": "packing_box"
+        },
+        "suitability_score": 0.9191176470588235,
+        "suitability": {
+          "overall_suitability": 0.9191176470588235,
+          "known_min_score": 0.9191176470588235,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.9191176470588235,
+              "required": 0.044,
+              "capacity": 0.5,
+              "margin": 0.456,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        },
+        "ee_selection_source": "task_planner",
+        "ee_feasible_set_source": "gk",
+        "tool_selection_source": "not_required"
+      }
+    ],
+    "steps": [
+      {
+        "step_index": 0,
+        "kind": "transition",
+        "action": "MOVE_TO_EE_RACK",
+        "parameters": {},
+        "subgoal_id": "SG1_s3_d1",
+        "candidate_id": "SG1_s3_d1-auto-2F-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 3
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 1,
+        "kind": "transition",
+        "action": "ATTACH_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s3_d1",
+        "candidate_id": "SG1_s3_d1-auto-2F-notool",
+        "preconditions": [
+          "docked(2F)"
+        ],
+        "postconditions": [
+          "mounted(2F)"
+        ],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 2,
+        "kind": "transition",
+        "action": "VERIFY_ATTACHMENT",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s3_d1",
+        "candidate_id": "SG1_s3_d1-auto-2F-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 3,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s3_d1"
+        },
+        "subgoal_id": "SG1_s3_d1",
+        "candidate_id": "SG1_s3_d1-auto-2F-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 4,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.9924573243350535,
+              "known_min_score": 0.9924573243350535,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.9924573243350535,
+                  "required": 0.038,
+                  "capacity": 5.0,
+                  "margin": 4.962,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s3_d1-auto-2F-notool",
+          "ee": "2F",
+          "subgoal": "SG1_s3_d1",
+          "tool": null
+        },
+        "subgoal_id": "SG1_s3_d1",
+        "candidate_id": "SG1_s3_d1-auto-2F-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s3_d1_p0",
+            "type": "reachable",
+            "args": [
+              "whisk"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "reachable(obj_whisk_whisk)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_whisk_whisk",
+                "reachable": true,
+                "margin_mm": 463.1
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s3_d1_p1",
+            "type": "top_exposed",
+            "args": [
+              "whisk"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "top_exposed(obj_whisk_whisk)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_whisk_whisk",
+                "top_exposed": true,
+                "blockers": []
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s3_d1_p2",
+            "type": "ee_usable",
+            "args": [
+              "?EE",
+              "whisk"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "ee_usable(?EE, obj_whisk_whisk)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_whisk_whisk",
+                "feasible_ees": [
+                  "2F",
+                  "3F"
+                ]
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s3_d1_p3",
+            "type": "batch_feasible",
+            "args": [
+              "?EE",
+              "whisk"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "batch_feasible(?EE, obj_whisk_whisk)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "actor": {
+                  "type": "ee_pool"
+                },
+                "feasible": true,
+                "binding_check": "ee_pool_one_per_grasp",
+                "partition": [
+                  [
+                    "obj_whisk_whisk"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s3_d1_p4",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s3_d1_e0",
+            "type": "holding",
+            "args": [
+              "whisk"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_whisk_whisk)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 5,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s3_d2",
+        "candidate_id": "SG1_s3_d2-auto-2F-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 6,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s3_d2"
+        },
+        "subgoal_id": "SG1_s3_d2",
+        "candidate_id": "SG1_s3_d2-auto-2F-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 7,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.9924573243350535,
+              "known_min_score": 0.9924573243350535,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.9924573243350535,
+                  "required": 0.038,
+                  "capacity": 5.0,
+                  "margin": 4.962,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s3_d2-auto-2F-notool",
+          "ee": "2F",
+          "subgoal": "SG1_s3_d2",
+          "tool": null
+        },
+        "subgoal_id": "SG1_s3_d2",
+        "candidate_id": "SG1_s3_d2-auto-2F-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s3_d2_p0",
+            "type": "holding",
+            "args": [
+              "whisk"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_whisk_whisk)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s3_d2_p1",
+            "type": "act_space_clear",
+            "args": [
+              "?EE",
+              "whisk",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "act_space_clear(?EE, obj_whisk_whisk, obj_box_packing_box)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "actor": {
+                  "type": "ee_pool"
+                },
+                "clear": true,
+                "margin_mm": 12.2,
+                "blockers": []
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s3_d2_p2",
+            "type": "path_clear",
+            "args": [
+              "whisk",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(obj_whisk_whisk, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s3_d2_e0",
+            "type": "above",
+            "args": [
+              "whisk",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(obj_whisk_whisk, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 8,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s3_d3",
+        "candidate_id": "SG1_s3_d3-auto-2F-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 9,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s3_d3"
+        },
+        "subgoal_id": "SG1_s3_d3",
+        "candidate_id": "SG1_s3_d3-auto-2F-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 10,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.9924573243350535,
+              "known_min_score": 0.9924573243350535,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.9924573243350535,
+                  "required": 0.038,
+                  "capacity": 5.0,
+                  "margin": 4.962,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s3_d3-auto-2F-notool",
+          "ee": "2F",
+          "subgoal": "SG1_s3_d3",
+          "tool": null
+        },
+        "subgoal_id": "SG1_s3_d3",
+        "candidate_id": "SG1_s3_d3-auto-2F-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s3_d3_p0",
+            "type": "holding",
+            "args": [
+              "whisk"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_whisk_whisk)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s3_d3_p1",
+            "type": "above",
+            "args": [
+              "whisk",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(obj_whisk_whisk, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s3_d3_p2",
+            "type": "fits",
+            "args": [
+              "whisk",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "fits(obj_whisk_whisk, obj_box_packing_box)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_whisk_whisk",
+                "check": "opening_180.0[inner_bbox] - footprint_24.5",
+                "value_mm": 155.5,
+                "pass": true
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s3_d3_p3",
+            "type": "clear",
+            "args": [
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "clear(obj_box_packing_box)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_box_packing_box",
+                "check": null,
+                "value_mm": null,
+                "pass": true
+              }
+            ]
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s3_d3_e0",
+            "type": "in",
+            "args": [
+              "whisk",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in(obj_whisk_whisk, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s3_d3_e1",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 11,
+        "kind": "transition",
+        "action": "MOVE_TO_EE_RACK",
+        "parameters": {},
+        "subgoal_id": "SG1_s2_d1",
+        "candidate_id": "SG1_s2_d1-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 3
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 12,
+        "kind": "transition",
+        "action": "DETACH_EE",
+        "parameters": {
+          "ee": "2F"
+        },
+        "subgoal_id": "SG1_s2_d1",
+        "candidate_id": "SG1_s2_d1-auto-vac-notool",
+        "preconditions": [
+          "hand_empty",
+          "mounted(2F)"
+        ],
+        "postconditions": [
+          "docked(2F)"
+        ],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 13,
+        "kind": "transition",
+        "action": "ATTACH_EE",
+        "parameters": {
+          "ee": "vac"
+        },
+        "subgoal_id": "SG1_s2_d1",
+        "candidate_id": "SG1_s2_d1-auto-vac-notool",
+        "preconditions": [
+          "docked(vac)"
+        ],
+        "postconditions": [
+          "mounted(vac)"
+        ],
+        "cost_delta": {
+          "ee_switches": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 14,
+        "kind": "transition",
+        "action": "VERIFY_ATTACHMENT",
+        "parameters": {
+          "ee": "vac"
+        },
+        "subgoal_id": "SG1_s2_d1",
+        "candidate_id": "SG1_s2_d1-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 15,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s2_d1"
+        },
+        "subgoal_id": "SG1_s2_d1",
+        "candidate_id": "SG1_s2_d1-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 16,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.5393743257820928,
+              "known_min_score": 0.5393743257820928,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.5393743257820928,
+                  "required": 0.427,
+                  "capacity": 0.5,
+                  "margin": 0.07300000000000001,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s2_d1-auto-vac-notool",
+          "ee": "vac",
+          "subgoal": "SG1_s2_d1",
+          "tool": null
+        },
+        "subgoal_id": "SG1_s2_d1",
+        "candidate_id": "SG1_s2_d1-auto-vac-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s2_d1_p0",
+            "type": "reachable",
+            "args": [
+              "rolling_pin"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "reachable(obj_rolling_pin_rolling_pin)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_rolling_pin_rolling_pin",
+                "reachable": true,
+                "margin_mm": 278.9
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s2_d1_p1",
+            "type": "top_exposed",
+            "args": [
+              "rolling_pin"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "top_exposed(obj_rolling_pin_rolling_pin)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_rolling_pin_rolling_pin",
+                "top_exposed": true,
+                "blockers": []
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s2_d1_p2",
+            "type": "ee_usable",
+            "args": [
+              "?EE",
+              "rolling_pin"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "ee_usable(?EE, obj_rolling_pin_rolling_pin)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_rolling_pin_rolling_pin",
+                "feasible_ees": [
+                  "2F",
+                  "3F",
+                  "vac"
+                ]
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s2_d1_p3",
+            "type": "batch_feasible",
+            "args": [
+              "?EE",
+              "rolling_pin"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "batch_feasible(?EE, obj_rolling_pin_rolling_pin)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "actor": {
+                  "type": "ee_pool"
+                },
+                "feasible": true,
+                "binding_check": "ee_pool_one_per_grasp",
+                "partition": [
+                  [
+                    "obj_rolling_pin_rolling_pin"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s2_d1_p4",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s2_d1_e0",
+            "type": "holding",
+            "args": [
+              "rolling_pin"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_rolling_pin_rolling_pin)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 17,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "vac"
+        },
+        "subgoal_id": "SG1_s2_d2",
+        "candidate_id": "SG1_s2_d2-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 18,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s2_d2"
+        },
+        "subgoal_id": "SG1_s2_d2",
+        "candidate_id": "SG1_s2_d2-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 19,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.5393743257820928,
+              "known_min_score": 0.5393743257820928,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.5393743257820928,
+                  "required": 0.427,
+                  "capacity": 0.5,
+                  "margin": 0.07300000000000001,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s2_d2-auto-vac-notool",
+          "ee": "vac",
+          "subgoal": "SG1_s2_d2",
+          "tool": null
+        },
+        "subgoal_id": "SG1_s2_d2",
+        "candidate_id": "SG1_s2_d2-auto-vac-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s2_d2_p0",
+            "type": "holding",
+            "args": [
+              "rolling_pin"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_rolling_pin_rolling_pin)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s2_d2_p1",
+            "type": "act_space_clear",
+            "args": [
+              "?EE",
+              "rolling_pin",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "act_space_clear(?EE, obj_rolling_pin_rolling_pin, obj_box_packing_box)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "actor": {
+                  "type": "ee_pool"
+                },
+                "clear": true,
+                "margin_mm": 18.6,
+                "blockers": []
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s2_d2_p2",
+            "type": "path_clear",
+            "args": [
+              "rolling_pin",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(obj_rolling_pin_rolling_pin, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s2_d2_e0",
+            "type": "above",
+            "args": [
+              "rolling_pin",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(obj_rolling_pin_rolling_pin, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 20,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "vac"
+        },
+        "subgoal_id": "SG1_s2_d3",
+        "candidate_id": "SG1_s2_d3-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 21,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s2_d3"
+        },
+        "subgoal_id": "SG1_s2_d3",
+        "candidate_id": "SG1_s2_d3-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 22,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.5393743257820928,
+              "known_min_score": 0.5393743257820928,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.5393743257820928,
+                  "required": 0.427,
+                  "capacity": 0.5,
+                  "margin": 0.07300000000000001,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s2_d3-auto-vac-notool",
+          "ee": "vac",
+          "subgoal": "SG1_s2_d3",
+          "tool": null
+        },
+        "subgoal_id": "SG1_s2_d3",
+        "candidate_id": "SG1_s2_d3-auto-vac-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s2_d3_p0",
+            "type": "holding",
+            "args": [
+              "rolling_pin"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_rolling_pin_rolling_pin)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s2_d3_p1",
+            "type": "above",
+            "args": [
+              "rolling_pin",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(obj_rolling_pin_rolling_pin, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s2_d3_p2",
+            "type": "fits",
+            "args": [
+              "rolling_pin",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "fits(obj_rolling_pin_rolling_pin, obj_box_packing_box)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_rolling_pin_rolling_pin",
+                "check": "opening_180.0[inner_bbox] - footprint_37.3",
+                "value_mm": 142.7,
+                "pass": true
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s2_d3_p3",
+            "type": "clear",
+            "args": [
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "clear(obj_box_packing_box)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_box_packing_box",
+                "check": null,
+                "value_mm": null,
+                "pass": true
+              }
+            ]
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s2_d3_e0",
+            "type": "in",
+            "args": [
+              "rolling_pin",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in(obj_rolling_pin_rolling_pin, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s2_d3_e1",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 23,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "vac"
+        },
+        "subgoal_id": "SG1_s1_d1",
+        "candidate_id": "SG1_s1_d1-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 24,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s1_d1"
+        },
+        "subgoal_id": "SG1_s1_d1",
+        "candidate_id": "SG1_s1_d1-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 25,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.8576329331046313,
+              "known_min_score": 0.8576329331046313,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.8576329331046313,
+                  "required": 0.083,
+                  "capacity": 0.5,
+                  "margin": 0.417,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s1_d1-auto-vac-notool",
+          "ee": "vac",
+          "subgoal": "SG1_s1_d1",
+          "tool": null
+        },
+        "subgoal_id": "SG1_s1_d1",
+        "candidate_id": "SG1_s1_d1-auto-vac-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s1_d1_p0",
+            "type": "reachable",
+            "args": [
+              "baguette"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "reachable(obj_baguette_baguette)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_baguette_baguette",
+                "reachable": true,
+                "margin_mm": 362.5
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s1_d1_p1",
+            "type": "top_exposed",
+            "args": [
+              "baguette"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "top_exposed(obj_baguette_baguette)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_baguette_baguette",
+                "top_exposed": true,
+                "blockers": []
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s1_d1_p2",
+            "type": "ee_usable",
+            "args": [
+              "?EE",
+              "baguette"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "ee_usable(?EE, obj_baguette_baguette)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_baguette_baguette",
+                "feasible_ees": [
+                  "2F",
+                  "3F",
+                  "vac"
+                ]
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s1_d1_p3",
+            "type": "batch_feasible",
+            "args": [
+              "?EE",
+              "baguette"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "batch_feasible(?EE, obj_baguette_baguette)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "actor": {
+                  "type": "ee_pool"
+                },
+                "feasible": true,
+                "binding_check": "ee_pool_one_per_grasp",
+                "partition": [
+                  [
+                    "obj_baguette_baguette"
+                  ]
+                ]
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s1_d1_p4",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s1_d1_e0",
+            "type": "holding",
+            "args": [
+              "baguette"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_baguette_baguette)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 26,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "vac"
+        },
+        "subgoal_id": "SG1_s1_d2",
+        "candidate_id": "SG1_s1_d2-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 27,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s1_d2"
+        },
+        "subgoal_id": "SG1_s1_d2",
+        "candidate_id": "SG1_s1_d2-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 28,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.8576329331046313,
+              "known_min_score": 0.8576329331046313,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.8576329331046313,
+                  "required": 0.083,
+                  "capacity": 0.5,
+                  "margin": 0.417,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s1_d2-auto-vac-notool",
+          "ee": "vac",
+          "subgoal": "SG1_s1_d2",
+          "tool": null
+        },
+        "subgoal_id": "SG1_s1_d2",
+        "candidate_id": "SG1_s1_d2-auto-vac-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s1_d2_p0",
+            "type": "holding",
+            "args": [
+              "baguette"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_baguette_baguette)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s1_d2_p1",
+            "type": "act_space_clear",
+            "args": [
+              "?EE",
+              "baguette",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "act_space_clear(?EE, obj_baguette_baguette, obj_box_packing_box)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "actor": {
+                  "type": "ee_pool"
+                },
+                "clear": true,
+                "margin_mm": 26.0,
+                "blockers": []
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s1_d2_p2",
+            "type": "path_clear",
+            "args": [
+              "baguette",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(obj_baguette_baguette, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s1_d2_e0",
+            "type": "above",
+            "args": [
+              "baguette",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(obj_baguette_baguette, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 29,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "vac"
+        },
+        "subgoal_id": "SG1_s1_d3",
+        "candidate_id": "SG1_s1_d3-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 30,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG1_s1_d3"
+        },
+        "subgoal_id": "SG1_s1_d3",
+        "candidate_id": "SG1_s1_d3-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 31,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.8576329331046313,
+              "known_min_score": 0.8576329331046313,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.8576329331046313,
+                  "required": 0.083,
+                  "capacity": 0.5,
+                  "margin": 0.417,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG1_s1_d3-auto-vac-notool",
+          "ee": "vac",
+          "subgoal": "SG1_s1_d3",
+          "tool": null
+        },
+        "subgoal_id": "SG1_s1_d3",
+        "candidate_id": "SG1_s1_d3-auto-vac-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG1_s1_d3_p0",
+            "type": "holding",
+            "args": [
+              "baguette"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_baguette_baguette)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s1_d3_p1",
+            "type": "above",
+            "args": [
+              "baguette",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(obj_baguette_baguette, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s1_d3_p2",
+            "type": "fits",
+            "args": [
+              "baguette",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "fits(obj_baguette_baguette, obj_box_packing_box)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_baguette_baguette",
+                "check": "opening_180.0[inner_bbox] - footprint_52.0",
+                "value_mm": 128.0,
+                "pass": true
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_s1_d3_p3",
+            "type": "clear",
+            "args": [
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "clear(obj_box_packing_box)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_box_packing_box",
+                "check": null,
+                "value_mm": null,
+                "pass": true
+              }
+            ]
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_s1_d3_e0",
+            "type": "in",
+            "args": [
+              "baguette",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in(obj_baguette_baguette, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_s1_d3_e1",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 32,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "vac"
+        },
+        "subgoal_id": "SG2_s1a",
+        "candidate_id": "SG2_s1a-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 33,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG2_s1a"
+        },
+        "subgoal_id": "SG2_s1a",
+        "candidate_id": "SG2_s1a-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 34,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.9191176470588235,
+              "known_min_score": 0.9191176470588235,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.9191176470588235,
+                  "required": 0.044,
+                  "capacity": 0.5,
+                  "margin": 0.456,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG2_s1a-auto-vac-notool",
+          "ee": "vac",
+          "subgoal": "SG2_s1a",
+          "tool": null
+        },
+        "subgoal_id": "SG2_s1a",
+        "candidate_id": "SG2_s1a-auto-vac-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG2_s1a_p0",
+            "type": "reachable",
+            "args": [
+              "lid"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "reachable(obj_lid_lid)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_lid_lid",
+                "reachable": true,
+                "margin_mm": 133.6
+              }
+            ]
+          },
+          {
+            "cond_id": "SG2_s1a_p1",
+            "type": "top_exposed",
+            "args": [
+              "lid"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "top_exposed(obj_lid_lid)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_lid_lid",
+                "top_exposed": true,
+                "blockers": []
+              }
+            ]
+          },
+          {
+            "cond_id": "SG2_s1a_p2",
+            "type": "ee_usable",
+            "args": [
+              "?EE",
+              "lid"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "ee_usable(?EE, obj_lid_lid)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_lid_lid",
+                "feasible_ees": [
+                  "vac"
+                ]
+              }
+            ]
+          },
+          {
+            "cond_id": "SG2_s1a_p3",
+            "type": "batch_feasible",
+            "args": [
+              "?EE",
+              "lid"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?EE, obj_lid_lid)",
+            "negated": false,
+            "status": "not_queried",
+            "evidence": []
+          },
+          {
+            "cond_id": "SG2_s1a_p4",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG2_s1a_p5",
+            "type": "in",
+            "args": [
+              "baguette",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in(obj_baguette_baguette, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG2_s1a_p6",
+            "type": "in",
+            "args": [
+              "rolling_pin",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in(obj_rolling_pin_rolling_pin, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG2_s1a_p7",
+            "type": "in",
+            "args": [
+              "whisk",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in(obj_whisk_whisk, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG2_s1a_e0",
+            "type": "holding",
+            "args": [
+              "lid"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_lid_lid)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 35,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "vac"
+        },
+        "subgoal_id": "SG2_s1b",
+        "candidate_id": "SG2_s1b-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 36,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG2_s1b"
+        },
+        "subgoal_id": "SG2_s1b",
+        "candidate_id": "SG2_s1b-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 37,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.9191176470588235,
+              "known_min_score": 0.9191176470588235,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.9191176470588235,
+                  "required": 0.044,
+                  "capacity": 0.5,
+                  "margin": 0.456,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG2_s1b-auto-vac-notool",
+          "ee": "vac",
+          "subgoal": "SG2_s1b",
+          "tool": null
+        },
+        "subgoal_id": "SG2_s1b",
+        "candidate_id": "SG2_s1b-auto-vac-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG2_s1b_p0",
+            "type": "holding",
+            "args": [
+              "lid"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_lid_lid)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG2_s1b_p1",
+            "type": "act_space_clear",
+            "args": [
+              "?EE",
+              "lid",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "act_space_clear(?EE, obj_lid_lid, obj_box_packing_box)",
+            "negated": false,
+            "status": "not_queried",
+            "evidence": []
+          },
+          {
+            "cond_id": "SG2_s1b_p2",
+            "type": "path_clear",
+            "args": [
+              "lid",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(obj_lid_lid, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG2_s1b_e0",
+            "type": "above",
+            "args": [
+              "lid",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(obj_lid_lid, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": true
+      },
+      {
+        "step_index": 38,
+        "kind": "transition",
+        "action": "KEEP_EE",
+        "parameters": {
+          "ee": "vac"
+        },
+        "subgoal_id": "SG2_s1c",
+        "candidate_id": "SG2_s1c-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {},
+        "verification_required": false
+      },
+      {
+        "step_index": 39,
+        "kind": "transition",
+        "action": "MOVE_TO_WORKSPACE",
+        "parameters": {
+          "subgoal": "SG2_s1c"
+        },
+        "subgoal_id": "SG2_s1c",
+        "candidate_id": "SG2_s1c-auto-vac-notool",
+        "preconditions": [],
+        "postconditions": [],
+        "cost_delta": {
+          "motion_cost": 1
+        },
+        "verification_required": false
+      },
+      {
+        "step_index": 40,
+        "kind": "subgoal",
+        "action": "EXECUTE_SUBGOAL",
+        "parameters": {
+          "action_parameters": {
+            "suitability": {
+              "overall_suitability": 0.9191176470588235,
+              "known_min_score": 0.9191176470588235,
+              "applicable_component_count": 1,
+              "known_component_count": 1,
+              "unknown_component_count": 0,
+              "unknown_components": [],
+              "aggregation": "minimum_applicable_margin",
+              "components": {
+                "payload": {
+                  "status": "PASS",
+                  "score": 0.9191176470588235,
+                  "required": 0.044,
+                  "capacity": 0.5,
+                  "margin": 0.456,
+                  "unit": "kg"
+                },
+                "wrench": {
+                  "status": "NOT_APPLICABLE",
+                  "details": {
+                    "reason": "subgoal has no wrench requirement"
+                  }
+                }
+              }
+            }
+          },
+          "candidate": "SG2_s1c-auto-vac-notool",
+          "ee": "vac",
+          "subgoal": "SG2_s1c",
+          "tool": null
+        },
+        "subgoal_id": "SG2_s1c",
+        "candidate_id": "SG2_s1c-auto-vac-notool",
+        "preconditions": [
+          {
+            "cond_id": "SG2_s1c_p0",
+            "type": "holding",
+            "args": [
+              "lid"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(obj_lid_lid)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG2_s1c_p1",
+            "type": "above",
+            "args": [
+              "lid",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(obj_lid_lid, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG2_s1c_p2",
+            "type": "top_exposed",
+            "args": [
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "top_exposed(obj_box_packing_box)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_lid_lid",
+                "top_exposed": true,
+                "blockers": []
+              }
+            ]
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG2_s1c_e0",
+            "type": "on",
+            "args": [
+              "lid",
+              "packing_box"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "on(obj_lid_lid, obj_box_packing_box)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG2_s1c_e1",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "cost_delta": {},
+        "verification_required": false
+      }
+    ],
+    "ee_blocks": [
+      {
+        "ee": "2F",
+        "step_start": 0,
+        "step_end": 12,
+        "subgoals": [
+          "SG1_s3_d1",
+          "SG1_s3_d2",
+          "SG1_s3_d3"
+        ],
+        "tool_blocks": [
+          {
+            "tool": null,
+            "step_start": 0,
+            "step_end": 12,
+            "subgoals": [
+              "SG1_s3_d1",
+              "SG1_s3_d2",
+              "SG1_s3_d3"
+            ]
+          }
+        ]
+      },
+      {
+        "ee": "vac",
+        "step_start": 13,
+        "step_end": 40,
+        "subgoals": [
+          "SG1_s2_d1",
+          "SG1_s2_d2",
+          "SG1_s2_d3",
+          "SG1_s1_d1",
+          "SG1_s1_d2",
+          "SG1_s1_d3",
+          "SG2_s1a",
+          "SG2_s1b",
+          "SG2_s1c"
+        ],
+        "tool_blocks": [
+          {
+            "tool": null,
+            "step_start": 13,
+            "step_end": 40,
+            "subgoals": [
+              "SG1_s2_d1",
+              "SG1_s2_d2",
+              "SG1_s2_d3",
+              "SG1_s1_d1",
+              "SG1_s1_d2",
+              "SG1_s1_d3",
+              "SG2_s1a",
+              "SG2_s1b",
+              "SG2_s1c"
+            ]
+          }
+        ]
+      }
+    ],
+    "tool_blocks": [
+      {
+        "tool": null,
+        "step_start": 0,
+        "step_end": 12,
+        "subgoals": [
+          "SG1_s3_d1",
+          "SG1_s3_d2",
+          "SG1_s3_d3"
+        ],
+        "ee": "2F"
+      },
+      {
+        "tool": null,
+        "step_start": 13,
+        "step_end": 40,
+        "subgoals": [
+          "SG1_s2_d1",
+          "SG1_s2_d2",
+          "SG1_s2_d3",
+          "SG1_s1_d1",
+          "SG1_s1_d2",
+          "SG1_s1_d3",
+          "SG2_s1a",
+          "SG2_s1b",
+          "SG2_s1c"
+        ],
+        "ee": "vac"
+      }
+    ],
+    "action_counts": {
+      "n_tool_picks": 0,
+      "n_tool_returns": 0,
+      "n_ee_detaches": 1,
+      "n_ee_attaches": 2
+    },
+    "terminal_state": {
+      "current_ee": "vac",
+      "held_tool": null,
+      "completed_subgoals": [
+        "SG1_s1_d1",
+        "SG1_s1_d2",
+        "SG1_s1_d3",
+        "SG1_s2_d1",
+        "SG1_s2_d2",
+        "SG1_s2_d3",
+        "SG1_s3_d1",
+        "SG1_s3_d2",
+        "SG1_s3_d3",
+        "SG2_s1a",
+        "SG2_s1b",
+        "SG2_s1c"
+      ],
+      "facts": [
+        "act_space_clear(?EE, baguette, packing_box)",
+        "act_space_clear(?EE, rolling_pin, packing_box)",
+        "act_space_clear(?EE, whisk, packing_box)",
+        "batch_feasible(?EE, baguette)",
+        "batch_feasible(?EE, rolling_pin)",
+        "batch_feasible(?EE, whisk)",
+        "clear(packing_box)",
+        "ee_usable(?EE, baguette)",
+        "ee_usable(?EE, lid)",
+        "ee_usable(?EE, rolling_pin)",
+        "ee_usable(?EE, whisk)",
+        "fits(baguette, packing_box)",
+        "fits(rolling_pin, packing_box)",
+        "fits(whisk, packing_box)",
+        "hand_empty()",
+        "in(baguette, packing_box)",
+        "in(rolling_pin, packing_box)",
+        "in(whisk, packing_box)",
+        "on(lid, packing_box)",
+        "reachable(baguette)",
+        "reachable(lid)",
+        "reachable(rolling_pin)",
+        "reachable(whisk)",
+        "top_exposed(baguette)",
+        "top_exposed(lid)",
+        "top_exposed(packing_box)",
+        "top_exposed(rolling_pin)",
+        "top_exposed(whisk)"
+      ],
+      "scene_signature": "sym-efed6da3a3f5e33e",
+      "rack_occupancy": null
+    },
+    "constraint_trace": [
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s1_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s1_d2",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s1_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d1->SG1_s1_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d1 before SG1_s1_d3",
+        "involved_subgoals": [
+          "SG1_s1_d1",
+          "SG1_s1_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d2->SG1_s1_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d2 before SG1_s1_d3",
+        "involved_subgoals": [
+          "SG1_s1_d2",
+          "SG1_s1_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s1_d3->SG2_s1a",
+        "status": "satisfied",
+        "selected_option": "SG1_s1_d3 before SG2_s1a",
+        "involved_subgoals": [
+          "SG1_s1_d3",
+          "SG2_s1a"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s2_d1->SG1_s2_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s2_d1 before SG1_s2_d2",
+        "involved_subgoals": [
+          "SG1_s2_d1",
+          "SG1_s2_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s2_d1->SG1_s2_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s2_d1 before SG1_s2_d3",
+        "involved_subgoals": [
+          "SG1_s2_d1",
+          "SG1_s2_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s2_d2->SG1_s2_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s2_d2 before SG1_s2_d3",
+        "involved_subgoals": [
+          "SG1_s2_d2",
+          "SG1_s2_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s2_d3->SG2_s1a",
+        "status": "satisfied",
+        "selected_option": "SG1_s2_d3 before SG2_s1a",
+        "involved_subgoals": [
+          "SG1_s2_d3",
+          "SG2_s1a"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s3_d1->SG1_s3_d2",
+        "status": "satisfied",
+        "selected_option": "SG1_s3_d1 before SG1_s3_d2",
+        "involved_subgoals": [
+          "SG1_s3_d1",
+          "SG1_s3_d2"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s3_d1->SG1_s3_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s3_d1 before SG1_s3_d3",
+        "involved_subgoals": [
+          "SG1_s3_d1",
+          "SG1_s3_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s3_d2->SG1_s3_d3",
+        "status": "satisfied",
+        "selected_option": "SG1_s3_d2 before SG1_s3_d3",
+        "involved_subgoals": [
+          "SG1_s3_d2",
+          "SG1_s3_d3"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG1_s3_d3->SG2_s1a",
+        "status": "satisfied",
+        "selected_option": "SG1_s3_d3 before SG2_s1a",
+        "involved_subgoals": [
+          "SG1_s3_d3",
+          "SG2_s1a"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG2_s1a->SG2_s1b",
+        "status": "satisfied",
+        "selected_option": "SG2_s1a before SG2_s1b",
+        "involved_subgoals": [
+          "SG2_s1a",
+          "SG2_s1b"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG2_s1a->SG2_s1c",
+        "status": "satisfied",
+        "selected_option": "SG2_s1a before SG2_s1c",
+        "involved_subgoals": [
+          "SG2_s1a",
+          "SG2_s1c"
+        ],
+        "details": {
+          "immutable": true
+        }
+      },
+      {
+        "constraint_type": "hard_dag",
+        "constraint_id": "edge:SG2_s1b->SG2_s1c",
+        "status": "satisfied",
+        "selected_option": "SG2_s1b before SG2_s1c",
+        "involved_subgoals": [
+          "SG2_s1b",
+          "SG2_s1c"
+        ],
+        "details": {
+          "immutable": true
+        }
+      }
+    ]
+  },
   "search_stats": {
-    "states_popped": 7,
-    "states_expanded": 7,
-    "edges_generated": 6,
-    "dominated_states_pruned": 0,
+    "states_popped": 271,
+    "states_expanded": 270,
+    "edges_generated": 366,
+    "dominated_states_pruned": 57,
     "static_candidates_rejected": 0,
     "lazy_checks_executed": 0,
     "lazy_cache_hits": 0,
-    "elapsed_ms": 0
+    "elapsed_ms": 31
   },
-  "rejections": [
-    {
-      "scope": "search",
-      "reason_code": "FRONTIER_EXHAUSTED",
-      "message": "the feasible search frontier was exhausted without a complete plan",
-      "subgoal_id": null,
-      "candidate_id": null,
-      "group_id": null
-    }
-  ],
+  "rejections": [],
   "diagnostics": {
-    "blocked_subgoals": [
-      "SG1_d3"
-    ],
+    "blocked_subgoals": [],
     "groups_without_common_ee": [],
-    "unmet_preconditions": [
-      {
-        "subgoal_id": "SG1_d3",
-        "fluent": "clear(lid)"
-      },
-      {
-        "subgoal_id": "SG1_d3",
-        "fluent": "fits({baguette,cereal,pin_rolling_pin,whisk,lid}, lid)"
-      }
-    ],
+    "unmet_preconditions": [],
     "constraint_blockers": [],
-    "frontier_exhausted": true,
+    "frontier_exhausted": false,
     "notes": []
   },
   "replan_trace": null
