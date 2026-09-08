@@ -21,7 +21,8 @@
           "execution_signature": {
             "motion_planning_status": null,
             "controller_status": null
-          }
+          },
+          "detail_id": null
         },
         "diagnosis_summary": {
           "source_failure_type": "gripper 6d-pose",
@@ -36,7 +37,6 @@
         "recovery_summary": {
           "recovery_category": "REPLAN_MOTION",
           "action": {
-            "action_type": "CHANGE_APPROACH",
             "target": {
               "subgoal_id": null,
               "object_id": null,
@@ -47,7 +47,8 @@
             },
             "parameters": {
               "source_correction": "Move the left gripper to the left significantly and downward significantly."
-            }
+            },
+            "recovery_type": "CHANGE_APPROACH"
           },
           "changes": [],
           "routing": {
@@ -86,7 +87,8 @@
           "execution_signature": {
             "motion_planning_status": null,
             "controller_status": null
-          }
+          },
+          "detail_id": null
         },
         "diagnosis_summary": {
           "source_failure_type": "gripper state",
@@ -95,13 +97,12 @@
             "code": "RELEASE_FAILURE",
             "description": "The gripper failed to properly release the target object during placement."
           },
-          "affected_module": "Controller",
+          "affected_module": "M5",
           "confidence": 0.95
         },
         "recovery_summary": {
           "recovery_category": "RETRY_EXECUTION",
           "action": {
-            "action_type": "RETRY_ACTION",
             "target": {
               "subgoal_id": null,
               "object_id": null,
@@ -112,7 +113,8 @@
             },
             "parameters": {
               "source_correction": "Open the left gripper"
-            }
+            },
+            "recovery_type": "RETRY_ACTION"
           },
           "changes": [],
           "routing": {
@@ -151,7 +153,8 @@
           "execution_signature": {
             "motion_planning_status": null,
             "controller_status": null
-          }
+          },
+          "detail_id": null
         },
         "diagnosis_summary": {
           "source_failure_type": "gripper 6d-pose",
@@ -166,7 +169,6 @@
         "recovery_summary": {
           "recovery_category": "REPLAN_MOTION",
           "action": {
-            "action_type": "CHANGE_APPROACH",
             "target": {
               "subgoal_id": null,
               "object_id": null,
@@ -177,7 +179,8 @@
             },
             "parameters": {
               "source_correction": "Move the left gripper to the backward significantly and downward slightly."
-            }
+            },
+            "recovery_type": "CHANGE_APPROACH"
           },
           "changes": [],
           "routing": {
@@ -216,7 +219,8 @@
           "execution_signature": {
             "motion_planning_status": null,
             "controller_status": null
-          }
+          },
+          "detail_id": null
         },
         "diagnosis_summary": {
           "source_failure_type": "wrong order",
@@ -231,7 +235,6 @@
         "recovery_summary": {
           "recovery_category": "REPLAN_SUBGOAL",
           "action": {
-            "action_type": "REORDER_SUBGOALS",
             "target": {
               "subgoal_id": null,
               "object_id": null,
@@ -253,7 +256,8 @@
                 "rotate_grasped_object",
                 "release"
               ]
-            }
+            },
+            "recovery_type": "REORDER_SUBGOALS"
           },
           "changes": [],
           "routing": {
@@ -292,7 +296,8 @@
           "execution_signature": {
             "motion_planning_status": null,
             "controller_status": null
-          }
+          },
+          "detail_id": null
         },
         "diagnosis_summary": {
           "source_failure_type": "contradictory subtasks",
@@ -307,7 +312,6 @@
         "recovery_summary": {
           "recovery_category": "REPLAN_SUBGOAL",
           "action": {
-            "action_type": "REDECOMPOSE_SUBGOAL",
             "target": {
               "subgoal_id": null,
               "object_id": null,
@@ -326,7 +330,8 @@
                 "grasp the stick",
                 "push the gray cube forward"
               ]
-            }
+            },
+            "recovery_type": "REDECOMPOSE_SUBGOAL"
           },
           "changes": [],
           "routing": {
@@ -365,7 +370,8 @@
           "execution_signature": {
             "motion_planning_status": null,
             "controller_status": null
-          }
+          },
+          "detail_id": null
         },
         "diagnosis_summary": {
           "source_failure_type": "wrong object state or placement",
@@ -380,7 +386,6 @@
         "recovery_summary": {
           "recovery_category": "REPLAN_SUBGOAL",
           "action": {
-            "action_type": "UPDATE_CONDITION",
             "target": {
               "subgoal_id": null,
               "object_id": null,
@@ -412,7 +417,8 @@
                 "move grasped mustard bottle to cupboard",
                 "release mustard bottle"
               ]
-            }
+            },
+            "recovery_type": "UPDATE_CONDITION"
           },
           "changes": [],
           "routing": {
@@ -451,7 +457,8 @@
           "execution_signature": {
             "motion_planning_status": null,
             "controller_status": null
-          }
+          },
+          "detail_id": null
         },
         "diagnosis_summary": {
           "source_failure_type": "missing subtask",
@@ -466,7 +473,6 @@
         "recovery_summary": {
           "recovery_category": "REPLAN_SUBGOAL",
           "action": {
-            "action_type": "REDECOMPOSE_SUBGOAL",
             "target": {
               "subgoal_id": null,
               "object_id": null,
@@ -502,7 +508,8 @@
                 "move grasped laptop lid to the side",
                 "release laptop lid"
               ]
-            }
+            },
+            "recovery_type": "REDECOMPOSE_SUBGOAL"
           },
           "changes": [],
           "routing": {
@@ -530,7 +537,7 @@
           "task_id": null,
           "subgoal_id": null,
           "subgoal_description": "push the azure button down",
-          "action_type": "push_down",
+          "action_type": "null",
           "target": {
             "object_id": null,
             "object_class": "button"
@@ -541,7 +548,8 @@
           "execution_signature": {
             "motion_planning_status": null,
             "controller_status": "FAIL"
-          }
+          },
+          "detail_id": null
         },
         "diagnosis_summary": {
           "source_failure_type": "translation",
@@ -550,13 +558,12 @@
             "code": "CONTROL_ERROR",
             "description": "The button push failed because of a translation error in the end-effector positioning relative to the button."
           },
-          "affected_module": "Controller",
+          "affected_module": "M5",
           "confidence": 0.95
         },
         "recovery_summary": {
           "recovery_category": "RETRY_EXECUTION",
           "action": {
-            "action_type": "APPLY_OFFSET",
             "target": {
               "subgoal_id": null,
               "object_id": null,
@@ -565,7 +572,8 @@
               "ee_id": null,
               "tool_id": null
             },
-            "parameters": {}
+            "parameters": {},
+            "recovery_type": "APPLY_OFFSET"
           },
           "changes": [],
           "routing": {
@@ -604,7 +612,8 @@
           "execution_signature": {
             "motion_planning_status": null,
             "controller_status": "FAIL"
-          }
+          },
+          "detail_id": null
         },
         "diagnosis_summary": {
           "source_failure_type": "translation",
@@ -613,13 +622,12 @@
             "code": "GRASP_FAILURE",
             "description": "The gripper missed the door handle because of a translation error in its positioning."
           },
-          "affected_module": "Controller",
+          "affected_module": "M5",
           "confidence": 0.97
         },
         "recovery_summary": {
           "recovery_category": "RETRY_EXECUTION",
           "action": {
-            "action_type": "APPLY_OFFSET",
             "target": {
               "subgoal_id": null,
               "object_id": null,
@@ -628,7 +636,8 @@
               "ee_id": null,
               "tool_id": null
             },
-            "parameters": {}
+            "parameters": {},
+            "recovery_type": "APPLY_OFFSET"
           },
           "changes": [],
           "routing": {
@@ -667,7 +676,8 @@
           "execution_signature": {
             "motion_planning_status": null,
             "controller_status": "FAIL"
-          }
+          },
+          "detail_id": null
         },
         "diagnosis_summary": {
           "source_failure_type": "slip",
@@ -676,13 +686,12 @@
             "code": "SLIP",
             "description": "The red cube slipped from the gripper while it was being moved toward the target."
           },
-          "affected_module": "Controller",
+          "affected_module": "M5",
           "confidence": 1.0
         },
         "recovery_summary": {
           "recovery_category": "RETRY_EXECUTION",
           "action": {
-            "action_type": "RETRY_ACTION",
             "target": {
               "subgoal_id": null,
               "object_id": null,
@@ -693,7 +702,8 @@
             },
             "parameters": {
               "failed_primitive": "move_grasped_object"
-            }
+            },
+            "recovery_type": "RETRY_ACTION"
           },
           "changes": [],
           "routing": {

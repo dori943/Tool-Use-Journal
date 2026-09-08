@@ -12,10 +12,10 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from tuj.m6.diagnosis import validate_diagnosis_output
-from tuj.m6.diagnosis_config import get_diagnosis_model
-from tuj.m6.openai_vlm_diagnoser import OpenAIVLMFailureDiagnoser
-from tuj.m6.schemas import empty_failure_context
+from tuj.m6_diagnosis.diagnosis import validate_diagnosis_output
+from tuj.m6_diagnosis.diagnosis_config import get_diagnosis_model
+from tuj.m6_diagnosis.openai_vlm_diagnoser import OpenAIVLMFailureDiagnoser
+from tuj.m6_diagnosis.schemas import empty_failure_context
 
 
 SAMPLE_FAILURE_CONTEXT = {

@@ -28,6 +28,12 @@
            m3_intrinsic.json                        ← M3 Metric & Physical Grounding
   m4.json                                           ← M4 Task Planner
   m5/  (+ m5.json = m5_summary.json 복사본)          ← M5 Motion Planner
+  m5/subgoal_result.json (있으면)                     ← M5→M6 공식 FAIL/SUCCESS contract
+  m6/  (FAIL 시)                                      ← M6 Diagnosis / Recovery Dispatch
+
+M5 실행 후 ``m5/subgoal_result.json`` 이 FAIL 이면 M6 ``run_m6_e2e`` 를 호출한다.
+SUCCESS 이거나 파일이 없으면 M6 를 호출하지 않는다 (m5_failure.json fallback 없음).
+실제 module recovery 재실행과 ``process_recovery_outcome`` 은 아직 연결하지 않는다.
 
 M4 결과 파일은 모듈별 명명을 맞추려고 m4.json 으로 쓴다 —
 run_m4_task_planner.py 를 직접 돌리면 같은 내용이 task_planner.json 으로 나온다.
@@ -405,6 +411,192 @@ def stage_m5(task, out, args):
 
 
 # ══════════════════════════════════════════════════════════════════════
+# M6 Diagnose & Recovery Router (orchestration only; M1–M5 unchanged)
+# ══════════════════════════════════════════════════════════════════════
+
+PIPELINE_MODULES = ("M1", "M2", "M3", "M4", "M5")
+_VALID_M5_RESULT_STATUSES = frozenset({"SUCCESS", "FAIL"})
+
+
+class M5SubgoalResultError(ValueError):
+    """Raised when m5/subgoal_result.json violates the official M5→M6 contract."""
+
+
+def planned_downstream_chain(restart_from: str) -> list[str]:
+    """Expand restart_from into the orchestration downstream module chain.
+
+    M6 ``rerun_modules`` is local-target only; run.py owns pipeline dependency
+    expansion (M3 → M3,M4,M5).
+    """
+    if not isinstance(restart_from, str) or not restart_from.strip():
+        raise ValueError("restart_from is required")
+    module = restart_from.strip()
+    if module not in PIPELINE_MODULES:
+        raise ValueError(
+            f"restart_from {module!r} is not a pipeline module "
+            f"(expected one of {list(PIPELINE_MODULES)})"
+        )
+    index = PIPELINE_MODULES.index(module)
+    return list(PIPELINE_MODULES[index:])
+
+
+def read_m5_subgoal_result(path: Path) -> dict | None:
+    """Read official M5 subgoal_result.json.
+
+    Returns None when the file is missing (contract producer not yet present).
+    Raises M5SubgoalResultError for invalid present files. Does not fall back to
+    m5_failure.json and does not normalize aliases such as FAILED→FAIL.
+    """
+    path = Path(path)
+    if not path.is_file():
+        return None
+    try:
+        raw = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise M5SubgoalResultError(
+            f"invalid or unreadable subgoal_result.json: {path}"
+        ) from exc
+    if not isinstance(raw, dict):
+        raise M5SubgoalResultError(
+            f"subgoal_result.json must be a JSON object: {path}"
+        )
+
+    subgoal_id = raw.get("subgoal_id")
+    if not isinstance(subgoal_id, str) or not subgoal_id.strip():
+        raise M5SubgoalResultError("subgoal_result.json missing subgoal_id")
+    status = raw.get("status")
+    if not isinstance(status, str) or not status.strip():
+        raise M5SubgoalResultError("subgoal_result.json missing status")
+    status = status.strip()
+    if status not in _VALID_M5_RESULT_STATUSES:
+        raise M5SubgoalResultError(
+            "subgoal_result.status must be 'SUCCESS' or 'FAIL' "
+            f"(got {status!r}); aliases such as FAILED/PASS/OK are rejected"
+        )
+    return {
+        "subgoal_id": subgoal_id.strip(),
+        "status": status,
+        "phase": raw.get("phase"),
+        "failure_code": raw.get("failure_code"),
+        "detail": raw.get("detail"),
+    }
+
+
+def _memory_path_for_m6(args) -> Path | None:
+    """Reuse run.py --memory when it points at a real file; else M6 default."""
+    raw = getattr(args, "memory", None)
+    if raw is None or str(raw).strip().lower() == "none":
+        return None
+    path = Path(raw)
+    if path.is_file():
+        return path
+    return None
+
+
+def maybe_invoke_m6_after_m5(task: str, out: Path, args) -> dict | None:
+    """Inspect M5 subgoal_result and optionally run M6 Phase A (dispatch only).
+
+    Does **not** execute target-module recovery and does **not** call
+    ``process_recovery_outcome`` (no recovery_result yet → no Runtime Experience).
+    """
+    if getattr(args, "skip_m6", False):
+        print("[M6] --skip-m6 로 생략")
+        return None
+
+    result_path = Path(out) / "m5" / "subgoal_result.json"
+    try:
+        m5_result = read_m5_subgoal_result(result_path)
+    except M5SubgoalResultError as exc:
+        sys.exit(f"\n[중단] M5→M6 contract invalid: {exc}")
+
+    if m5_result is None:
+        print(
+            "[M6] M5 subgoal_result.json not found.\n"
+            "     M6 integration requires the official M5 subgoal-result contract.\n"
+            "     (m5_failure.json is NOT used as a fallback trigger.)"
+        )
+        return {
+            "invoked": False,
+            "reason": "missing_subgoal_result",
+            "recovery_executed": False,
+            "runtime_experience_written": False,
+        }
+
+    if m5_result["status"] == "SUCCESS":
+        print(f"[M6] M5 subgoal result: SUCCESS ({m5_result['subgoal_id']}) - M6 bypass")
+        return {
+            "invoked": False,
+            "reason": "success",
+            "m5_result": m5_result,
+            "recovery_executed": False,
+            "runtime_experience_written": False,
+        }
+
+    print("[M6] M5 subgoal result: FAIL")
+    print(f"[M6] Invoking diagnosis/recovery for {m5_result['subgoal_id']}")
+
+    from tuj.m6_diagnosis import M6E2EError, run_m6_e2e
+
+    memory_path = _memory_path_for_m6(args)
+    try:
+        phase_a = run_m6_e2e(
+            task_id=task,
+            subgoal_id=m5_result["subgoal_id"],
+            output_root=Path(out).parent,
+            project_root=ROOT,
+            memory_path=memory_path,
+            save=True,
+            print_summary=False,
+        )
+    except M6E2EError as exc:
+        sys.exit(f"\n[중단] M6 Phase A failed: {exc}")
+    except Exception as exc:  # noqa: BLE001 - surface loudly at pipeline boundary
+        sys.exit(f"\n[중단] M6 Phase A failed: {exc}")
+
+    recovery = phase_a.get("recovery") or {}
+    routing = recovery.get("routing") or {}
+    dispatch = phase_a.get("dispatch") or {}
+    restart_from = routing.get("restart_from") or dispatch.get("target_module")
+    try:
+        chain = planned_downstream_chain(str(restart_from))
+    except ValueError:
+        chain = []
+
+    target_module = dispatch.get("target_module")
+    recovery_type = dispatch.get("recovery_type")
+    request_path = dispatch.get("request_path")
+
+    print(f"[M6] Target module: {target_module}")
+    print(f"[M6] Recovery type: {recovery_type}")
+    print(f"[M6] Recovery request: {request_path}")
+    print(f"[M6] Restart from: {restart_from}")
+    if chain:
+        print(f"[M6] Planned downstream chain: {' -> '.join(chain)}")
+    else:
+        print(
+            f"[M6] Planned downstream chain: "
+            f"(unavailable for restart_from={restart_from!r})"
+        )
+    print("[M6] Recovery-aware module execution not integrated yet.")
+    print(
+        "[M6] process_recovery_outcome not called "
+        "(no post-recovery M5 subgoal_result / recovery_result)."
+    )
+
+    return {
+        "invoked": True,
+        "reason": "fail",
+        "m5_result": m5_result,
+        "phase_a": phase_a,
+        "planned_downstream_chain": chain,
+        "recovery_executed": False,
+        "runtime_experience_written": False,
+        # Future hook: execute_recovery_target(module, recovery_request_path)
+        # then re-run planned_downstream_chain and call process_recovery_outcome.
+    }
+
+
+# ══════════════════════════════════════════════════════════════════════
 
 def build_parser():
     p = argparse.ArgumentParser(
@@ -444,6 +636,8 @@ def build_parser():
                    help="해당 모듈까지만 실행")
     p.add_argument("--skip-m4", action="store_true")
     p.add_argument("--skip-m5", action="store_true")
+    p.add_argument("--skip-m6", action="store_true",
+                   help="M5 이후 M6 Diagnose/Recovery Router 호출 생략")
     p.add_argument("--m5-environment", default=None,
                    help="M5 초기 world 캡처에 쓸 환경 이름 (기본: 태스크 기본값)")
     p.add_argument("--m5-validate-only", action="store_true",
@@ -555,6 +749,9 @@ def main():
         return
     banner("M5  Motion Planner")
     stage_m5(task, out, args)
+
+    banner("M6  Diagnose & Recovery Router")
+    maybe_invoke_m6_after_m5(task, out, args)
 
     banner(f"DONE  -> {out}")
 

@@ -92,9 +92,9 @@ class DiagnoseRouter:
         apply_recovery_output(recovery, recovery_output)
 
         logger.debug(
-            "recovery routed category=%s action_type=%s restart_from=%s",
+            "recovery routed category=%s recovery_type=%s restart_from=%s",
             recovery["recovery_category"],
-            recovery["action"].get("action_type"),
+            recovery["action"].get("recovery_type"),
             recovery["routing"].get("restart_from"),
         )
 

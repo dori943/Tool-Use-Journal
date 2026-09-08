@@ -12,14 +12,14 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from tuj.m6.evidence import prepare_recovery_evidence
-from tuj.m6 import DiagnoseRouter, create_failure_diagnoser, get_diagnoser_backend
-from tuj.m6.recovery_config import create_recovery_router, get_recovery_router_backend
-from tuj.m6.context_similarity import evaluate_all_candidates
-from tuj.m6.retrieval_config import DEFAULT_SIMILARITY_THRESHOLD, RetrievalConfig
-from tuj.m6.retrieval_query import build_retrieval_query
-from tuj.m6.memory_adapter import DEFAULT_MEMORY_PATH, MemoryAdapter
-from tuj.m6.prompts import build_failure_diagnosis_payload
+from tuj.m6_diagnosis.evidence import prepare_recovery_evidence
+from tuj.m6_diagnosis import DiagnoseRouter, create_failure_diagnoser, get_diagnoser_backend
+from tuj.m6_diagnosis.recovery_config import create_recovery_router, get_recovery_router_backend
+from tuj.m6_diagnosis.context_similarity import evaluate_all_candidates
+from tuj.m6_diagnosis.retrieval_config import DEFAULT_SIMILARITY_THRESHOLD, RetrievalConfig
+from tuj.m6_diagnosis.retrieval_query import build_retrieval_query
+from tuj.m6_diagnosis.memory_adapter import DEFAULT_MEMORY_PATH, MemoryAdapter
+from tuj.m6_diagnosis.prompts import build_failure_diagnosis_payload
 
 
 M6_DEBUG_CONTEXT_ENV = "M6_DEBUG_CONTEXT"
@@ -302,7 +302,7 @@ def _print_retrieval_result(
     print(f"decision_mode: {recovery.get('decision_mode')}")
     print(f"guidance.experience_ids: {guidance.get('experience_ids') or []}")
     print(f"recovery_category: {recovery.get('recovery_category')}")
-    print(f"action.action_type: {action.get('action_type')}")
+    print(f"action.recovery_type: {action.get('recovery_type')}")
     print(f"action.target_module: {action.get('target_module')}")
     print(f"routing.restart_from: {routing.get('restart_from')}")
     print(f"routing.rerun_modules: {routing.get('rerun_modules') or []}")

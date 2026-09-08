@@ -7,23 +7,23 @@ from pathlib import Path
 from types import SimpleNamespace
 from unittest import mock
 
-from tuj.m6.diagnosis import (
+from tuj.m6_diagnosis.diagnosis import (
     DiagnosisAPIError,
     DiagnosisResponseError,
     DiagnosisValidationError,
     MockFailureDiagnoser,
     validate_diagnosis_output,
 )
-from tuj.m6.diagnosis_config import create_failure_diagnoser, get_diagnoser_backend
-from tuj.m6.image_utils import ImagePathError, local_image_to_data_url
-from tuj.m6.memory_adapter import DEFAULT_MEMORY_PATH
-from tuj.m6.openai_vlm_diagnoser import (
+from tuj.m6_diagnosis.diagnosis_config import create_failure_diagnoser, get_diagnoser_backend
+from tuj.m6_diagnosis.image_utils import ImagePathError, local_image_to_data_url
+from tuj.m6_diagnosis.memory_adapter import DEFAULT_MEMORY_PATH
+from tuj.m6_diagnosis.openai_vlm_diagnoser import (
     GeneratedFailureDiagnosis,
     MissingOpenAIAPIKeyError,
     OpenAIVLMFailureDiagnoser,
     build_openai_diagnosis_input,
 )
-from tuj.m6.prompts import build_failure_diagnosis_payload
+from tuj.m6_diagnosis.prompts import build_failure_diagnosis_payload
 
 
 def _make_failure_context(**overrides) -> dict:
@@ -37,7 +37,13 @@ def _make_failure_context(**overrides) -> dict:
             "selected_object_id": "obj-1",
             "selected_object_class": "spatula",
         },
-        "verification": {"result": "FAIL", "violated_predicates": []},
+        "m5_result": {
+            "subgoal_id": "sg-1",
+            "status": "FAIL",
+            "phase": "planning",
+            "failure_code": "IK_FAILURE",
+            "detail": None,
+        },
         "scene": {"nodes": [], "relations": [], "object_states": {}},
         "grounding": {},
         "task_plan": {"selected_ee": "2F", "selected_tool": None},
@@ -109,7 +115,7 @@ class OpenAIVLMDiagnosisTests(unittest.TestCase):
         diagnoser = OpenAIVLMFailureDiagnoser(client=_FakeOpenAIClient(fake_responses))
 
         with mock.patch(
-            "tuj.m6.openai_vlm_diagnoser.validate_diagnosis_output",
+            "tuj.m6_diagnosis.openai_vlm_diagnoser.validate_diagnosis_output",
             wraps=validate_diagnosis_output,
         ) as validator:
             diagnoser.diagnose(_make_failure_context(), [])
@@ -145,7 +151,7 @@ class OpenAIVLMDiagnosisTests(unittest.TestCase):
 
     def test_affected_module_mismatch_rejected(self):
         fake_responses = _FakeResponsesClient(
-            _valid_generated_diagnosis(affected_module="Controller")
+            _valid_generated_diagnosis(affected_module="M2")
         )
         diagnoser = OpenAIVLMFailureDiagnoser(client=_FakeOpenAIClient(fake_responses))
 
@@ -197,6 +203,11 @@ class OpenAIVLMDiagnosisTests(unittest.TestCase):
         self.assertIn("past_diagnosis", serialized)
         self.assertNotIn("past_recovery", serialized)
         self.assertNotIn('"outcome"', serialized)
+        self.assertEqual(
+            payload["current_failure_context"]["m5_result"]["failure_code"],
+            "IK_FAILURE",
+        )
+        self.assertNotIn("verification", payload["current_failure_context"])
 
     def test_text_only_request_has_no_image_inputs(self):
         _, content, image_count = build_openai_diagnosis_input(_make_failure_context(), [])

@@ -3,8 +3,16 @@
 from __future__ import annotations
 
 import logging
+from copy import deepcopy
 
 logger = logging.getLogger(__name__)
+
+
+def _normalize_past_recovery_action(action) -> dict:
+    """Keep past recovery actions on the canonical recovery_type key."""
+    from .recovery_router import normalize_recovery_action
+
+    return normalize_recovery_action(deepcopy(action) if action else {})
 
 
 def _retrieval_meta(item: dict) -> dict:
@@ -31,7 +39,10 @@ def prepare_diagnosis_evidence(retrieved_results: list[dict]) -> list[dict]:
                 "experience_id": experience.get("experience_id"),
                 "retrieval": _retrieval_meta(item),
                 "past_context": {
+                    "subgoal_id": context_signature.get("subgoal_id"),
                     "subgoal_description": context_signature.get("subgoal_description"),
+                    # Optional; absent on legacy experiences — never required for retrieval.
+                    "detail_id": context_signature.get("detail_id"),
                     "action_type": context_signature.get("action_type"),
                     "target": dict(context_signature.get("target") or {}),
                     "violated_predicates": list(context_signature.get("violated_predicates") or []),
@@ -83,7 +94,9 @@ def prepare_recovery_evidence(retrieved_results: list[dict]) -> list[dict]:
                 },
                 "past_recovery": {
                     "recovery_category": recovery_summary.get("recovery_category"),
-                    "action": recovery_summary.get("action"),
+                    "action": _normalize_past_recovery_action(
+                        recovery_summary.get("action")
+                    ),
                     "changes": list(recovery_summary.get("changes") or []),
                     "routing": dict(recovery_summary.get("routing") or {}),
                 },

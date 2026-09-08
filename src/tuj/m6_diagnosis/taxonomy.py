@@ -16,7 +16,7 @@ FAILURE_MODULES = {
     "METRIC_REASONING": "M3",
     "EE_SELECTION": "M4",
     "PLANNING": "M5",
-    "EXECUTION_CONTROL": "Controller",
+    "EXECUTION_CONTROL": "M5",
     "ENVIRONMENT_CHANGE": "M1",
 }
 
@@ -37,7 +37,7 @@ RECOVERY_CATEGORY_MODULES = {
     "REMEASURE": "M3",
     "RESELECT_EE": "M4",
     "REPLAN_MOTION": "M5",
-    "RETRY_EXECUTION": "Controller",
+    "RETRY_EXECUTION": "M5",
     "UPDATE_SCENE": "M1",
     "ESCALATE_REPLAN": "M2",
 }
@@ -56,10 +56,10 @@ RECOVERY_ACTION_MODULES = {
     "REPLAN_MOTION": "M5",
     "CHANGE_APPROACH": "M5",
     "ADD_WAYPOINT": "M5",
-    "RETRY_ACTION": "Controller",
-    "ADJUST_FORCE": "Controller",
-    "ADJUST_SPEED": "Controller",
-    "APPLY_OFFSET": "Controller",
+    "RETRY_ACTION": "M5",
+    "ADJUST_FORCE": "M5",
+    "ADJUST_SPEED": "M5",
+    "APPLY_OFFSET": "M5",
     "UPDATE_OBJECT_STATE": "M1",
     "UPDATE_RELATION": "M1",
     "INVALIDATE_SCENE_INFO": "M1",
@@ -138,5 +138,5 @@ RECOVERY_ROUTING_PROFILES = {
 }
 
 VALID_ROUTING_MODULES = frozenset(
-    {"M0", "M1", "M2", "M3", "M4", "M5", "Controller", "M6"}
+    {"M0", "M1", "M2", "M3", "M4", "M5", "M6"}
 )

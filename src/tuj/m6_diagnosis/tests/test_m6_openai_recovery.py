@@ -6,8 +6,8 @@ from unittest import mock
 
 from pydantic import ValidationError
 
-from tuj.m6.memory_adapter import DEFAULT_MEMORY_PATH
-from tuj.m6.openai_recovery_router import (
+from tuj.m6_diagnosis.memory_adapter import DEFAULT_MEMORY_PATH
+from tuj.m6_diagnosis.openai_recovery_router import (
     GeneratedRecoveryAction,
     GeneratedRecoveryDecision,
     MissingOpenAIAPIKeyError,
@@ -15,16 +15,16 @@ from tuj.m6.openai_recovery_router import (
     _parsed_recovery_to_output,
     build_openai_recovery_input,
 )
-from tuj.m6.prompts import build_recovery_router_payload
-from tuj.m6.recovery_config import create_recovery_router, get_recovery_router_backend
-from tuj.m6.recovery_router import (
+from tuj.m6_diagnosis.prompts import build_recovery_router_payload
+from tuj.m6_diagnosis.recovery_config import create_recovery_router, get_recovery_router_backend
+from tuj.m6_diagnosis.recovery_router import (
     MockRecoveryRouter,
     RecoveryAPIError,
     RecoveryResponseError,
     RecoveryValidationError,
     validate_recovery_output,
 )
-from tuj.m6.schemas import empty_recovery
+from tuj.m6_diagnosis.schemas import empty_recovery
 
 
 def _make_failure_context(**overrides) -> dict:
@@ -38,7 +38,13 @@ def _make_failure_context(**overrides) -> dict:
             "selected_object_id": "obj-1",
             "selected_object_class": "spatula",
         },
-        "verification": {"result": "FAIL", "violated_predicates": []},
+        "m5_result": {
+            "subgoal_id": "sg-1",
+            "status": "FAIL",
+            "phase": "execution",
+            "failure_code": "GRASP_FAILURE",
+            "detail": None,
+        },
         "scene": {"nodes": [], "relations": [], "object_states": {}},
         "grounding": {},
         "task_plan": {"selected_ee": "2F", "selected_tool": None},
@@ -82,7 +88,7 @@ def _make_recovery_evidence(experience_id: str = "exp-1") -> dict:
         },
         "past_recovery": {
             "recovery_category": "REPLAN_MOTION",
-            "action": {"action_type": "CHANGE_APPROACH"},
+            "action": {"recovery_type": "CHANGE_APPROACH"},
             "routing": {"restart_from": "M5", "rerun_modules": ["M5"]},
         },
         "outcome": {"status": "NOT_EXECUTED", "verification_result": None},
@@ -94,7 +100,7 @@ def _valid_generated_recovery(**overrides) -> GeneratedRecoveryDecision:
     payload = {
         "recovery_category": "REPLAN_MOTION",
         "action": {
-            "action_type": "CHANGE_APPROACH",
+            "recovery_type": "CHANGE_APPROACH",
             "target_module": "M5",
             "target": {
                 "subgoal_id": "sg-1",
@@ -116,19 +122,30 @@ def _valid_generated_recovery(**overrides) -> GeneratedRecoveryDecision:
 
 
 class _FakeResponsesClient:
-    def __init__(self, parsed=None, *, error: Exception | None = None):
+    def __init__(self, parsed=None, *, error: Exception | None = None, parsed_sequence=None):
         self.parsed = parsed
+        self.parsed_sequence = list(parsed_sequence) if parsed_sequence is not None else None
         self.error = error
         self.last_kwargs = None
+        self.call_count = 0
+        self.kwargs_history = []
 
     def parse(self, **kwargs):
+        self.call_count += 1
         self.last_kwargs = kwargs
+        self.kwargs_history.append(kwargs)
         if self.error is not None:
             raise self.error
+        if self.parsed_sequence is not None:
+            if not self.parsed_sequence:
+                raise AssertionError("no remaining fake parsed responses")
+            parsed = self.parsed_sequence.pop(0)
+        else:
+            parsed = self.parsed
         return SimpleNamespace(
             id="resp-test",
             status="completed",
-            output_parsed=self.parsed,
+            output_parsed=parsed,
         )
 
 
@@ -146,7 +163,7 @@ class OpenAIRecoveryRouterTests(unittest.TestCase):
         result = router.route(_make_failure_context(), _make_diagnosis(), "DIAGNOSIS_GUIDED", [])
 
         self.assertEqual(result["recovery_category"], "REPLAN_MOTION")
-        self.assertEqual(result["action"]["action_type"], "CHANGE_APPROACH")
+        self.assertEqual(result["action"]["recovery_type"], "CHANGE_APPROACH")
         self.assertEqual(result["action"]["target_module"], "M5")
 
     def test_existing_recovery_validator_is_called(self):
@@ -155,7 +172,7 @@ class OpenAIRecoveryRouterTests(unittest.TestCase):
         )
 
         with mock.patch(
-            "tuj.m6.openai_recovery_router.validate_recovery_output",
+            "tuj.m6_diagnosis.openai_recovery_router.validate_recovery_output",
             wraps=validate_recovery_output,
         ) as validator:
             router.route(_make_failure_context(), _make_diagnosis(), "DIAGNOSIS_GUIDED", [])
@@ -181,7 +198,7 @@ class OpenAIRecoveryRouterTests(unittest.TestCase):
                 **parsed.model_dump(),
                 "action": {
                     **parsed.action.model_dump(),
-                    "action_type": "UNKNOWN_ACTION",
+                    "recovery_type": "UNKNOWN_ACTION",
                 },
             }
         )
@@ -194,7 +211,7 @@ class OpenAIRecoveryRouterTests(unittest.TestCase):
         parsed = _valid_generated_recovery(
             recovery_category="REPLAN_MOTION",
             action={
-                "action_type": "RESELECT_EE",
+                "recovery_type": "RESELECT_EE",
                 "target_module": "M4",
                 "target": _valid_generated_recovery().action.target.model_dump(),
             },
@@ -208,7 +225,7 @@ class OpenAIRecoveryRouterTests(unittest.TestCase):
     def test_target_module_mismatch_rejected(self):
         parsed = _valid_generated_recovery(
             action={
-                "action_type": "CHANGE_APPROACH",
+                "recovery_type": "CHANGE_APPROACH",
                 "target_module": "M2",
                 "target": _valid_generated_recovery().action.target.model_dump(),
             },
@@ -253,14 +270,14 @@ class OpenAIRecoveryRouterTests(unittest.TestCase):
     def test_mock_backend_remains_unchanged(self):
         result = MockRecoveryRouter().route(
             _make_failure_context(),
-            _make_diagnosis(failure_type="EXECUTION_CONTROL", failure_cause={"code": "GRASP_FAILURE", "description": "grasp failed"}, affected_module="Controller"),
+            _make_diagnosis(failure_type="EXECUTION_CONTROL", failure_cause={"code": "GRASP_FAILURE", "description": "grasp failed"}, affected_module="M5"),
             "DIAGNOSIS_GUIDED",
             [],
         )
 
         self.assertEqual(result["recovery_category"], "RETRY_EXECUTION")
-        self.assertEqual(result["action"]["action_type"], "RETRY_ACTION")
-        self.assertEqual(result["action"]["target_module"], "Controller")
+        self.assertEqual(result["action"]["recovery_type"], "RETRY_ACTION")
+        self.assertEqual(result["action"]["target_module"], "M5")
 
     def test_experience_guided_request_contains_filtered_recovery_evidence(self):
         evidence = [_make_recovery_evidence("exp-match")]
@@ -287,7 +304,28 @@ class OpenAIRecoveryRouterTests(unittest.TestCase):
 
         past_recovery = payload["filtered_recovery_evidence"][0]["past_recovery"]
         self.assertEqual(past_recovery["recovery_category"], "REPLAN_MOTION")
-        self.assertEqual(past_recovery["action"]["action_type"], "CHANGE_APPROACH")
+        self.assertEqual(past_recovery["action"]["recovery_type"], "CHANGE_APPROACH")
+
+    def test_openai_payload_preserves_outcome_and_source_including_fail(self):
+        evidence = [
+            {
+                **_make_recovery_evidence("runtime_fail_001"),
+                "outcome": {"status": "FAIL", "verification_result": "FAIL"},
+                "source": "runtime",
+            }
+        ]
+        payload = build_recovery_router_payload(
+            _make_failure_context(),
+            _make_diagnosis(),
+            "EXPERIENCE_GUIDED",
+            evidence,
+        )
+
+        item = payload["filtered_recovery_evidence"][0]
+        self.assertEqual(item["experience_id"], "runtime_fail_001")
+        self.assertEqual(item["outcome"]["status"], "FAIL")
+        self.assertEqual(item["outcome"]["verification_result"], "FAIL")
+        self.assertEqual(item["source"], "runtime")
 
     def test_diagnosis_guided_works_with_empty_recovery_evidence(self):
         router = OpenAIRecoveryRouter(
@@ -296,8 +334,8 @@ class OpenAIRecoveryRouterTests(unittest.TestCase):
                     _valid_generated_recovery(
                         recovery_category="RETRY_EXECUTION",
                         action={
-                            "action_type": "RETRY_ACTION",
-                            "target_module": "Controller",
+                            "recovery_type": "RETRY_ACTION",
+                            "target_module": "M5",
                             "target": {
                                 "subgoal_id": "sg-1",
                                 "object_id": "obj-1",
@@ -308,8 +346,8 @@ class OpenAIRecoveryRouterTests(unittest.TestCase):
                             },
                         },
                         routing={
-                            "restart_from": "Controller",
-                            "rerun_modules": ["Controller"],
+                            "restart_from": "M5",
+                            "rerun_modules": ["M5"],
                             "invalidate": [],
                         },
                     )
@@ -322,7 +360,7 @@ class OpenAIRecoveryRouterTests(unittest.TestCase):
             _make_diagnosis(
                 failure_type="EXECUTION_CONTROL",
                 failure_cause={"code": "GRASP_FAILURE", "description": "grasp failed"},
-                affected_module="Controller",
+                affected_module="M5",
             ),
             "DIAGNOSIS_GUIDED",
             [],
@@ -438,6 +476,93 @@ class OpenAIRecoveryRouterTests(unittest.TestCase):
 
         with self.assertRaises(ValidationError):
             GeneratedRecoveryAction.model_validate(action_payload)
+
+    def test_incoherent_openai_recovery_triggers_one_corrective_retry_then_passes(self):
+        incoherent = _valid_generated_recovery(
+            recovery_category="ESCALATE_REPLAN",
+            action={
+                "recovery_type": "RESTART_PIPELINE",
+                "target_module": "M2",
+                "target": _valid_generated_recovery().action.target.model_dump(),
+            },
+            routing={
+                "restart_from": "M1",
+                "rerun_modules": ["M1", "M2"],
+                "invalidate": [],
+            },
+        )
+        coherent = _valid_generated_recovery()
+        fake = _FakeResponsesClient(parsed_sequence=[incoherent, coherent])
+        router = OpenAIRecoveryRouter(client=_FakeOpenAIClient(fake))
+
+        result = router.route(
+            _make_failure_context(
+                history={
+                    "retry_count": 0,
+                    "previous_diagnoses": [],
+                    "previous_recoveries": [],
+                    "previous_outcomes": [],
+                }
+            ),
+            _make_diagnosis(
+                failure_type="PLANNING",
+                failure_cause={"code": "IK_FAILURE", "description": "ik"},
+                affected_module="M5",
+                confidence=0.95,
+            ),
+            "DIAGNOSIS_GUIDED",
+            [],
+        )
+
+        self.assertEqual(fake.call_count, 2)
+        self.assertEqual(router.last_coherence_corrective_retries, 1)
+        self.assertEqual(result["recovery_category"], "REPLAN_MOTION")
+        self.assertEqual(result["action"]["recovery_type"], "CHANGE_APPROACH")
+        self.assertEqual(result["action"]["target_module"], "M5")
+        # Corrective text is appended on retry.
+        retry_content = fake.kwargs_history[1]["input"][0]["content"]
+        self.assertGreaterEqual(len(retry_content), 2)
+        self.assertIn("inconsistent with the diagnosis", retry_content[-1]["text"])
+
+    def test_incoherent_openai_recovery_fails_loudly_after_corrective_retry(self):
+        incoherent = _valid_generated_recovery(
+            recovery_category="ESCALATE_REPLAN",
+            action={
+                "recovery_type": "RESTART_PIPELINE",
+                "target_module": "M2",
+                "target": _valid_generated_recovery().action.target.model_dump(),
+            },
+            routing={
+                "restart_from": "M1",
+                "rerun_modules": ["M1", "M2"],
+                "invalidate": [],
+            },
+        )
+        fake = _FakeResponsesClient(parsed_sequence=[incoherent, incoherent])
+        router = OpenAIRecoveryRouter(client=_FakeOpenAIClient(fake))
+
+        with self.assertRaises(RecoveryResponseError) as ctx:
+            router.route(
+                _make_failure_context(
+                    history={
+                        "retry_count": 0,
+                        "previous_diagnoses": [],
+                        "previous_recoveries": [],
+                        "previous_outcomes": [],
+                    }
+                ),
+                _make_diagnosis(
+                    failure_type="PLANNING",
+                    failure_cause={"code": "IK_FAILURE", "description": "ik"},
+                    affected_module="M5",
+                    confidence=0.95,
+                ),
+                "DIAGNOSIS_GUIDED",
+                [],
+            )
+
+        self.assertEqual(fake.call_count, 2)
+        self.assertIn("corrective retry", str(ctx.exception))
 
 
 if __name__ == "__main__":

@@ -3,34 +3,37 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from tuj.m6 import DiagnoseRouter, FailureContextBuilder, MemoryAdapter
-from tuj.m6.context_similarity import (
+from tuj.m6_diagnosis import DiagnoseRouter, FailureContextBuilder, MemoryAdapter
+from tuj.m6_diagnosis.context_similarity import (
     compute_context_similarity,
     evaluate_all_candidates,
     rank_experiences,
 )
-from tuj.m6.diagnosis import (
+from tuj.m6_diagnosis.diagnosis import (
     DIAGNOSIS_EVIDENCE_ALLOWED_KEYS,
     DiagnosisValidationError,
     MockFailureDiagnoser,
     apply_diagnosis_output,
     validate_diagnosis_output,
 )
-from tuj.m6.diagnosis_aware_selection import (
+from tuj.m6_diagnosis.diagnosis_aware_selection import (
     DiagnosisAwareExperienceSelector,
     filter_recovery_evidence_by_ids,
 )
-from tuj.m6.evidence import prepare_diagnosis_evidence, prepare_recovery_evidence
-from tuj.m6.recovery_router import (
+from tuj.m6_diagnosis.evidence import prepare_diagnosis_evidence, prepare_recovery_evidence
+from tuj.m6_diagnosis.recovery_router import (
     MockRecoveryRouter,
+    RecoveryCoherenceError,
     RecoveryValidationError,
     apply_recovery_output,
+    build_past_recoveries,
     resolve_recovery_decision,
+    validate_diagnosis_recovery_coherence,
     validate_recovery_output,
 )
-from tuj.m6.retrieval_config import POSSIBLE_FIELD_COUNT, RetrievalConfig
-from tuj.m6.retrieval_query import build_retrieval_query
-from tuj.m6.schemas import empty_recovery
+from tuj.m6_diagnosis.retrieval_config import POSSIBLE_FIELD_COUNT, RetrievalConfig
+from tuj.m6_diagnosis.retrieval_query import build_retrieval_query
+from tuj.m6_diagnosis.schemas import empty_recovery
 
 
 def _make_failure_context(**overrides) -> dict:
@@ -39,6 +42,8 @@ def _make_failure_context(**overrides) -> dict:
         "task": {"task_id": "task-1", "instruction": "demo"},
         "subgoal": {
             "subgoal_id": "sg-1",
+            "parent_subgoal_id": None,
+            "detail_id": None,
             "description": None,
             "action_type": None,
             "target_object_ids": [],
@@ -48,12 +53,7 @@ def _make_failure_context(**overrides) -> dict:
             "postconditions": [],
             "invariants": [],
         },
-        "verification": {
-            "result": "FAIL",
-            "expected_state": [],
-            "observed_state": [],
-            "violated_predicates": [],
-        },
+        "m5_result": None,
         "scene": {"nodes": [], "relations": [], "object_states": {}},
         "grounding": {
             "physical_properties": {},
@@ -139,6 +139,7 @@ def _make_experience(
             "task_id": None,
             "subgoal_id": None,
             "subgoal_description": subgoal_description,
+            "detail_id": None,
             "action_type": action_type,
             "target": {"object_id": object_id, "object_class": object_class},
             "violated_predicates": violated_predicates or [],
@@ -158,7 +159,7 @@ def _make_experience(
         },
         "recovery_summary": {
             "recovery_category": recovery_category,
-            "action": {"action_type": recovery_action_type},
+            "action": {"recovery_type": recovery_action_type},
             "changes": [],
             "routing": {"restart_from": None, "rerun_modules": [], "invalidate": []},
             "outcome": {"status": outcome_status, "verification_result": None},
@@ -221,6 +222,91 @@ class RetrievalQueryTests(unittest.TestCase):
         self.assertEqual(query["target"]["object_id"], "spatula_03")
         self.assertEqual(query["target"]["object_class"], "spatula")
 
+    def test_selected_object_id_preferred_over_target_object_ids(self):
+        failure_context = _make_failure_context(
+            subgoal={
+                "action_type": "acquire",
+                "selected_object_id": "obj_ladle_ladle",
+                "selected_object_class": "ladle",
+                "target_object_ids": ["obj_block_block_1"],
+            }
+        )
+
+        query = build_retrieval_query(failure_context)
+
+        self.assertEqual(query["target"]["object_id"], "obj_ladle_ladle")
+        self.assertEqual(query["target"]["object_class"], "ladle")
+
+    def test_target_object_ids_fallback_when_selected_object_id_missing(self):
+        failure_context = _make_failure_context(
+            subgoal={
+                "action_type": "acquire",
+                "selected_object_id": None,
+                "selected_object_class": None,
+                "target_object_ids": ["obj_block_block_1"],
+            },
+            scene={
+                "nodes": [{"id": "obj_block_block_1", "class": "block"}],
+                "relations": [],
+                "object_states": {},
+            },
+        )
+
+        query = build_retrieval_query(failure_context)
+
+        self.assertEqual(query["target"]["object_id"], "obj_block_block_1")
+        self.assertEqual(query["target"]["object_class"], "block")
+
+    def test_object_class_not_inferred_from_object_id_string(self):
+        failure_context = _make_failure_context(
+            subgoal={
+                "selected_object_id": "obj_ladle_ladle",
+                "selected_object_class": None,
+                "target_object_ids": ["obj_block_block_1"],
+            }
+        )
+
+        query = build_retrieval_query(failure_context)
+
+        self.assertEqual(query["target"]["object_id"], "obj_ladle_ladle")
+        self.assertIsNone(query["target"]["object_class"])
+
+    def test_target_null_when_no_selected_or_target_ids(self):
+        failure_context = _make_failure_context(
+            subgoal={
+                "selected_object_id": None,
+                "selected_object_class": "ladle",
+                "target_object_ids": [],
+            }
+        )
+
+        query = build_retrieval_query(failure_context)
+
+        self.assertIsNone(query["target"]["object_id"])
+        self.assertIsNone(query["target"]["object_class"])
+
+    def test_c1_1_failure_context_retrieval_query_smoke(self):
+        from pathlib import Path
+
+        artifact = Path(__file__).resolve().parents[4] / "output" / "c1_1" / "m6" / "failure_context.json"
+        if not artifact.exists():
+            self.skipTest("output/c1_1/m6/failure_context.json is not available")
+
+        import json
+
+        failure_context = json.loads(artifact.read_text(encoding="utf-8"))
+        query = build_retrieval_query(failure_context)
+
+        self.assertEqual(query["action_type"], "acquire")
+        self.assertEqual(query["target"]["object_id"], "obj_ladle_ladle")
+        self.assertEqual(query["target"]["object_class"], "ladle")
+        self.assertEqual(query["selected_ee"], "2F")
+        self.assertEqual(query["selected_tool"], "ladle")
+        self.assertEqual(query["execution_signature"]["motion_planning_status"], "FAILED")
+        self.assertIsNone(query["execution_signature"]["controller_status"])
+
+
+
 
 class ContextSimilarityTests(unittest.TestCase):
     def test_missing_fields_are_ignored_not_penalized(self):
@@ -272,6 +358,7 @@ class ContextSimilarityTests(unittest.TestCase):
     def test_description_differences_do_not_change_similarity(self):
         base_subgoal = {
             "action_type": "acquire",
+            "selected_object_id": "spatula_03",
             "selected_object_class": "spatula",
         }
         query_a = build_retrieval_query(
@@ -334,11 +421,19 @@ class ContextSimilarityTests(unittest.TestCase):
         self.assertIn("target.object_id", result["similarity_breakdown"]["matched_fields"])
 
     def test_violated_predicates_use_jaccard(self):
-        query = build_retrieval_query(
-            _make_failure_context(
-                verification={"violated_predicates": ["holding(a)", "aligned(a)"]},
-            )
-        )
+        # Similarity still supports M0 context_signature.violated_predicates when
+        # both sides are present; Failure Context no longer supplies this feature.
+        query = {
+            "action_type": None,
+            "target": {"object_id": None, "object_class": None},
+            "violated_predicates": ["holding(a)", "aligned(a)"],
+            "selected_ee": None,
+            "selected_tool": None,
+            "execution_signature": {
+                "motion_planning_status": None,
+                "controller_status": None,
+            },
+        }
         context_signature = {
             "violated_predicates": ["holding(a)", "closed(gripper)"],
         }
@@ -351,12 +446,25 @@ class ContextSimilarityTests(unittest.TestCase):
             ["verification.violated_predicates"],
         )
 
+    def test_failure_context_violated_predicates_are_missing_for_retrieval(self):
+        query = build_retrieval_query(_make_failure_context())
+        self.assertEqual(query["violated_predicates"], [])
+        context_signature = {
+            "violated_predicates": ["holding(a)", "closed(gripper)"],
+        }
+        result = compute_context_similarity(query, context_signature)
+        self.assertNotIn(
+            "verification.violated_predicates",
+            result["similarity_breakdown"]["compared_fields"],
+        )
+
     def test_comparison_coverage_is_separate_from_similarity(self):
         query = build_retrieval_query(
             _make_failure_context(
                 subgoal={
                     "description": "Acquire spatula",
                     "action_type": "acquire",
+                    "selected_object_id": "spatula_03",
                     "selected_object_class": "spatula",
                 }
             )
@@ -447,6 +555,7 @@ class ContextSimilarityTests(unittest.TestCase):
             subgoal={
                 "description": "Acquire spatula",
                 "action_type": "acquire",
+                "selected_object_id": "spatula_03",
                 "selected_object_class": "spatula",
             },
             task_plan={"selected_ee": "2F"},
@@ -531,6 +640,7 @@ class CandidateValidityTests(unittest.TestCase):
         failure_context = _make_failure_context(
             subgoal={
                 "action_type": "acquire",
+                "selected_object_id": "spatula_03",
                 "selected_object_class": "spatula",
             },
         )
@@ -557,6 +667,7 @@ class CandidateValidityTests(unittest.TestCase):
             _make_failure_context(
                 subgoal={
                     "action_type": "acquire",
+                    "selected_object_id": "spatula_03",
                     "selected_object_class": "spatula",
                     "description": "Approach the wooden spatula",
                 }
@@ -642,7 +753,7 @@ class DiagnosisTests(unittest.TestCase):
                 {
                     "failure_type": "PLANNING",
                     "failure_cause": {"code": "INVALID_APPROACH"},
-                    "affected_module": "Controller",
+                    "affected_module": "M2",
                     "evidence": [],
                     "confidence": 0.5,
                 }
@@ -703,7 +814,7 @@ class DiagnosisTests(unittest.TestCase):
                         "code": "GRASP_FAILURE",
                         "description": "past only",
                     },
-                    "affected_module": "Controller",
+                    "affected_module": "M5",
                     "confidence": 0.99,
                 },
                 "source": "offline_seed",
@@ -718,7 +829,7 @@ class DiagnosisTests(unittest.TestCase):
 
     def test_router_applies_validated_diagnosis(self):
         result = DiagnoseRouter(failure_diagnoser=MockFailureDiagnoser()).run(
-            {"verification": {"result": "FAIL"}}
+            {"m5_result": {"status": "FAIL"}}
         )
 
         self.assertEqual(result["diagnosis"]["failure_type"], "PLANNING")
@@ -816,7 +927,7 @@ class DiagnosisAwareSelectionTests(unittest.TestCase):
                     "exp-partial-module",
                     failure_type="PLANNING",
                     failure_cause_code="INVALID_APPROACH",
-                    affected_module="Controller",
+                    affected_module="M2",
                 )
             )
         ]
@@ -890,7 +1001,7 @@ class DiagnosisAwareSelectionTests(unittest.TestCase):
                     "exp-reject",
                     failure_type="EXECUTION_CONTROL",
                     failure_cause_code="GRASP_FAILURE",
-                    affected_module="Controller",
+                    affected_module="M5",
                 )
             ),
         ]
@@ -922,7 +1033,7 @@ class DiagnosisAwareSelectionTests(unittest.TestCase):
                                     object_class="spatula",
                                     failure_type="EXECUTION_CONTROL",
                                     failure_cause_code="GRASP_FAILURE",
-                                    affected_module="Controller",
+                                    affected_module="M5",
                                 )
                             ]
                         }
@@ -937,9 +1048,10 @@ class DiagnosisAwareSelectionTests(unittest.TestCase):
             pipeline_state = {
                 "subgoal": {
                     "action_type": "acquire",
+                    "selected_object_id": "spatula_03",
                     "selected_object_class": "spatula",
                 },
-                "verification": {"result": "FAIL"},
+                "m5_result": {"status": "FAIL"},
             }
             result = DiagnoseRouter(memory_adapter=adapter).run(pipeline_state)
 
@@ -976,9 +1088,10 @@ class DiagnosisAwareSelectionTests(unittest.TestCase):
             pipeline_state = {
                 "subgoal": {
                     "action_type": "acquire",
+                    "selected_object_id": "spatula_03",
                     "selected_object_class": "spatula",
                 },
-                "verification": {"result": "FAIL"},
+                "m5_result": {"status": "FAIL"},
             }
             result = DiagnoseRouter(memory_adapter=adapter).run(pipeline_state)
 
@@ -1008,13 +1121,13 @@ class DiagnosisAwareSelectionTests(unittest.TestCase):
     def test_output_memory_json_is_not_modified_by_router(self):
         from hashlib import sha256
 
-        from tuj.m6.memory_adapter import DEFAULT_MEMORY_PATH
+        from tuj.m6_diagnosis.memory_adapter import DEFAULT_MEMORY_PATH
 
         if not DEFAULT_MEMORY_PATH.exists():
             self.skipTest("output/memory.json is not available in this environment")
 
         before_digest = sha256(DEFAULT_MEMORY_PATH.read_bytes()).hexdigest()
-        DiagnoseRouter().run({"verification": {"result": "FAIL"}})
+        DiagnoseRouter().run({"m5_result": {"status": "FAIL"}})
         after_digest = sha256(DEFAULT_MEMORY_PATH.read_bytes()).hexdigest()
 
         self.assertEqual(before_digest, after_digest)
@@ -1032,11 +1145,12 @@ MOCK_SIMILAR_PIPELINE_STATE = {
         "selected_object_class": "spatula",
         "postconditions": ["holding(spatula)"],
     },
-    "verification": {
-        "result": "FAIL",
-        "expected_state": ["aligned(spatula)"],
-        "observed_state": ["misaligned(spatula)"],
-        "violated_predicates": [],
+    "m5_result": {
+        "subgoal_id": "sg-spatula-acquire",
+        "status": "FAIL",
+        "phase": "planning",
+        "failure_code": "INVALID_APPROACH",
+        "detail": None,
     },
     "task_plan": {"selected_ee": "2F", "selected_tool": None},
     "motion_plan": {"planning_status": None},
@@ -1055,11 +1169,12 @@ MOCK_DISSIMILAR_PIPELINE_STATE = {
         "selected_object_class": "card",
         "postconditions": ["holding(card)"],
     },
-    "verification": {
-        "result": "FAIL",
-        "expected_state": ["holding(card)"],
-        "observed_state": ["not_holding(card)"],
-        "violated_predicates": ["holding(card)"],
+    "m5_result": {
+        "subgoal_id": "sg-card-extract",
+        "status": "FAIL",
+        "phase": "execution",
+        "failure_code": "GRASP_FAILURE",
+        "detail": "gripper closed without holding(card)",
     },
     "motion_plan": {
         "planning_status": "SUCCESS",
@@ -1092,9 +1207,9 @@ class TestBContextTests(unittest.TestCase):
         self.assertFalse(execution["gripper"]["contact_detected"])
         self.assertEqual(execution["gripper"]["force"], 0.0)
 
-        verification = MOCK_DISSIMILAR_PIPELINE_STATE["verification"]
-        self.assertEqual(verification["result"], "FAIL")
-        self.assertIn("holding(card)", verification["violated_predicates"])
+        m5_result = MOCK_DISSIMILAR_PIPELINE_STATE["m5_result"]
+        self.assertEqual(m5_result["status"], "FAIL")
+        self.assertEqual(m5_result["failure_code"], "GRASP_FAILURE")
 
     def test_failure_context_builder_preserves_test_b_execution_signals(self):
         context = FailureContextBuilder().build(MOCK_DISSIMILAR_PIPELINE_STATE)
@@ -1104,9 +1219,12 @@ class TestBContextTests(unittest.TestCase):
         self.assertIn("close_gripper", context["execution"]["executed_actions"])
         self.assertFalse(context["execution"]["gripper"]["contact_detected"])
         self.assertEqual(context["execution"]["gripper"]["force"], 0.0)
-        self.assertEqual(context["verification"]["result"], "FAIL")
-        self.assertIn("holding(card)", context["verification"]["violated_predicates"])
-
+        self.assertEqual(context["m5_result"]["status"], "FAIL")
+        self.assertEqual(context["m5_result"]["failure_code"], "GRASP_FAILURE")
+        self.assertNotIn("verification", context)
+        self.assertNotIn("expected_state", context)
+        self.assertNotIn("observed_state", context)
+        self.assertNotIn("violated_predicates", context)
 
 def _make_valid_recovery(**overrides) -> dict:
     recovery = empty_recovery()
@@ -1125,7 +1243,7 @@ def _make_valid_recovery(**overrides) -> dict:
             },
             "recovery_category": "REPLAN_MOTION",
             "action": {
-                "action_type": "CHANGE_APPROACH",
+                "recovery_type": "CHANGE_APPROACH",
                 "target_module": "M5",
                 "target": {
                     "subgoal_id": "sg-1",
@@ -1160,7 +1278,7 @@ class RecoveryRouterTests(unittest.TestCase):
 
     def test_invalid_action_type_rejected(self):
         recovery = _make_valid_recovery()
-        recovery["action"]["action_type"] = "UNKNOWN_ACTION"
+        recovery["action"]["recovery_type"] = "UNKNOWN_ACTION"
         with self.assertRaises(RecoveryValidationError):
             validate_recovery_output(recovery)
 
@@ -1168,7 +1286,7 @@ class RecoveryRouterTests(unittest.TestCase):
         recovery = _make_valid_recovery(
             recovery_category="REPLAN_MOTION",
             action={
-                "action_type": "RESELECT_EE",
+                "recovery_type": "RESELECT_EE",
                 "target_module": "M4",
                 "target": _make_valid_recovery()["action"]["target"],
                 "parameters": {},
@@ -1243,7 +1361,7 @@ class RecoveryRouterTests(unittest.TestCase):
                 "exp-reject",
                 failure_type="EXECUTION_CONTROL",
                 failure_cause_code="GRASP_FAILURE",
-                affected_module="Controller",
+                affected_module="M5",
             )
         )
         all_evidence = prepare_recovery_evidence([selected, rejected])
@@ -1251,7 +1369,7 @@ class RecoveryRouterTests(unittest.TestCase):
 
         result = DiagnoseRouter(
             memory_adapter=_StubRetrievalAdapter([selected, rejected]),
-        ).run({"verification": {"result": "FAIL"}})
+        ).run({"m5_result": {"status": "FAIL"}})
 
         self.assertEqual(result["recovery"]["decision_mode"], "EXPERIENCE_GUIDED")
         self.assertEqual(result["recovery"]["guidance"]["experience_ids"], ["exp-match"])
@@ -1280,7 +1398,7 @@ class RecoveryRouterTests(unittest.TestCase):
         apply_recovery_output(recovery, result)
 
         self.assertEqual(recovery["recovery_category"], "REPLAN_MOTION")
-        self.assertEqual(recovery["action"]["action_type"], "CHANGE_APPROACH")
+        self.assertEqual(recovery["action"]["recovery_type"], "CHANGE_APPROACH")
         self.assertEqual(recovery["guidance"]["past_recoveries"], [])
 
     def test_invalid_approach_maps_to_replan_motion_change_approach_m5(self):
@@ -1294,7 +1412,7 @@ class RecoveryRouterTests(unittest.TestCase):
         self.assertEqual(target_module, "M5")
 
     def test_test_a_results_in_experience_guided_recovery(self):
-        from tuj.m6.memory_adapter import DEFAULT_MEMORY_PATH
+        from tuj.m6_diagnosis.memory_adapter import DEFAULT_MEMORY_PATH
 
         if not DEFAULT_MEMORY_PATH.exists():
             self.skipTest("output/memory.json is not available in this environment")
@@ -1308,13 +1426,13 @@ class RecoveryRouterTests(unittest.TestCase):
         self.assertEqual(result["recovery"]["decision_mode"], "EXPERIENCE_GUIDED")
         self.assertEqual(result["recovery"]["guidance"]["experience_ids"], ["VF-SPAT-007"])
         self.assertEqual(result["recovery"]["recovery_category"], "REPLAN_MOTION")
-        self.assertEqual(result["recovery"]["action"]["action_type"], "CHANGE_APPROACH")
+        self.assertEqual(result["recovery"]["action"]["recovery_type"], "CHANGE_APPROACH")
         self.assertEqual(result["recovery"]["action"]["target_module"], "M5")
         self.assertEqual(result["recovery"]["routing"]["restart_from"], "M5")
         self.assertEqual(result["recovery"]["routing"]["rerun_modules"], ["M5"])
 
     def test_test_b_results_in_diagnosis_guided_recovery(self):
-        from tuj.m6.memory_adapter import DEFAULT_MEMORY_PATH
+        from tuj.m6_diagnosis.memory_adapter import DEFAULT_MEMORY_PATH
 
         if not DEFAULT_MEMORY_PATH.exists():
             self.skipTest("output/memory.json is not available in this environment")
@@ -1328,7 +1446,7 @@ class RecoveryRouterTests(unittest.TestCase):
         self.assertEqual(result["recovery"]["decision_mode"], "DIAGNOSIS_GUIDED")
         self.assertEqual(result["recovery"]["guidance"]["experience_ids"], [])
         self.assertEqual(result["recovery"]["recovery_category"], "REPLAN_MOTION")
-        self.assertEqual(result["recovery"]["action"]["action_type"], "CHANGE_APPROACH")
+        self.assertEqual(result["recovery"]["action"]["recovery_type"], "CHANGE_APPROACH")
         self.assertEqual(result["recovery"]["action"]["target_module"], "M5")
 
     def test_recovery_router_does_not_modify_retrieval_similarity_data(self):
@@ -1350,8 +1468,12 @@ class RecoveryRouterTests(unittest.TestCase):
 
         DiagnoseRouter(memory_adapter=_StubRetrievalAdapter(retrieved)).run(
             {
-                "subgoal": {"action_type": "acquire", "selected_object_class": "spatula"},
-                "verification": {"result": "FAIL"},
+                "subgoal": {
+                    "action_type": "acquire",
+                    "selected_object_id": "spatula_03",
+                    "selected_object_class": "spatula",
+                },
+                "m5_result": {"status": "FAIL"},
             }
         )
 
@@ -1380,7 +1502,7 @@ class RecoveryRouterTests(unittest.TestCase):
         }
 
         result = DiagnoseRouter(memory_adapter=_StubRetrievalAdapter(retrieved)).run(
-            {"verification": {"result": "FAIL"}}
+            {"m5_result": {"status": "FAIL"}}
         )
 
         self.assertEqual(result["diagnosis"]["failure_type"], expected_diagnosis["failure_type"])
@@ -1395,7 +1517,7 @@ class RecoveryRouterTests(unittest.TestCase):
     def test_output_memory_json_is_not_modified_by_recovery_router(self):
         from hashlib import sha256
 
-        from tuj.m6.memory_adapter import DEFAULT_MEMORY_PATH
+        from tuj.m6_diagnosis.memory_adapter import DEFAULT_MEMORY_PATH
 
         if not DEFAULT_MEMORY_PATH.exists():
             self.skipTest("output/memory.json is not available in this environment")
@@ -1446,7 +1568,7 @@ class EvidenceTests(unittest.TestCase):
         self.assertEqual(evidence["experience_id"], "exp-2")
         self.assertEqual(evidence["source"], "offline_seed")
         self.assertEqual(evidence["past_recovery"]["recovery_category"], "REPLAN_MOTION")
-        self.assertEqual(evidence["past_recovery"]["action"]["action_type"], "CHANGE_APPROACH")
+        self.assertEqual(evidence["past_recovery"]["action"]["recovery_type"], "CHANGE_APPROACH")
         self.assertEqual(evidence["outcome"]["status"], "NOT_EXECUTED")
 
 
@@ -1544,7 +1666,7 @@ class M6Tests(unittest.TestCase):
         state = {
             "failure_id": "f-1",
             "task": {"task_id": "t-1", "unknown": "ignored"},
-            "verification": {"result": "FAIL"},
+            "m5_result": {"status": "FAIL", "failure_code": "IK_FAILURE"},
             "execution": {"controller_status": "COMPLETED", "gripper": {"force": 2.0}},
             "unknown_section": {"ignored": True},
         }
@@ -1552,9 +1674,10 @@ class M6Tests(unittest.TestCase):
 
         self.assertEqual(context["failure_id"], "f-1")
         self.assertEqual(context["task"], {"task_id": "t-1", "instruction": None})
-        self.assertEqual(context["verification"]["result"], "FAIL")
+        self.assertEqual(context["m5_result"]["status"], "FAIL")
+        self.assertEqual(context["m5_result"]["failure_code"], "IK_FAILURE")
         self.assertEqual(context["execution"]["gripper"]["force"], 2.0)
-
+        self.assertNotIn("verification", context)
     def test_router_with_empty_context_keeps_retrieval_empty_and_runs_diagnosis(self):
         with tempfile.TemporaryDirectory() as temp_dir:
             memory_path = Path(temp_dir) / "memory.json"
@@ -1575,7 +1698,7 @@ class M6Tests(unittest.TestCase):
                 encoding="utf-8",
             )
             adapter = MemoryAdapter(memory_path=memory_path)
-            result = DiagnoseRouter(memory_adapter=adapter).run({"verification": {"result": "FAIL"}})
+            result = DiagnoseRouter(memory_adapter=adapter).run({"m5_result": {"status": "FAIL"}})
 
         self.assertEqual(result["diagnosis"]["memory_context"]["retrieved_experiences"], [])
         self.assertEqual(result["diagnosis"]["memory_context"]["diagnosis_evidence"], [])
@@ -1616,7 +1739,7 @@ class M6Tests(unittest.TestCase):
                     "selected_object_id": "spatula",
                     "selected_object_class": "spatula",
                 },
-                "verification": {"result": "FAIL"},
+                "m5_result": {"status": "FAIL"},
             }
             result = DiagnoseRouter(memory_adapter=adapter).run(pipeline_state)
 
@@ -1636,7 +1759,7 @@ class M6Tests(unittest.TestCase):
                             "exp-1",
                             failure_type="EXECUTION_CONTROL",
                             failure_cause_code="GRASP_FAILURE",
-                            affected_module="Controller",
+                            affected_module="M5",
                         )
                     )
                 ]
@@ -1665,6 +1788,434 @@ class M6Tests(unittest.TestCase):
 
         self.assertEqual(len(ranked), 1)
         self.assertEqual(ranked[0]["experience"]["experience_id"], "exp-match")
+
+
+
+
+class DiagnosisRecoveryCoherenceTests(unittest.TestCase):
+    def _planning_ik_context(self, **history_overrides) -> dict:
+        history = {
+            "retry_count": 0,
+            "previous_diagnoses": [],
+            "previous_recoveries": [],
+            "previous_outcomes": [],
+        }
+        history.update(history_overrides)
+        return _make_failure_context(history=history)
+
+    def _planning_ik_diagnosis(self) -> dict:
+        return {
+            "failure_type": "PLANNING",
+            "failure_cause": {"code": "IK_FAILURE", "description": "ik failed"},
+            "affected_module": "M5",
+            "confidence": 0.95,
+        }
+
+    def _recovery(
+        self,
+        *,
+        category: str,
+        recovery_type: str,
+        target_module: str,
+        restart_from: str,
+        rerun_modules: list[str],
+        invalidate: list | None = None,
+    ) -> dict:
+        return {
+            "decision_mode": "DIAGNOSIS_GUIDED",
+            "guidance": {
+                "experience_ids": [],
+                "past_recoveries": [],
+                "recovery_evidence": [],
+                "selection": {
+                    "selected_experience_ids": [],
+                    "selection_count": 0,
+                    "selection_audit": [],
+                },
+            },
+            "recovery_category": category,
+            "action": {
+                "recovery_type": recovery_type,
+                "target_module": target_module,
+                "target": {
+                    "subgoal_id": "sg-1",
+                    "object_id": "obj-1",
+                    "property": None,
+                    "relation": None,
+                    "ee_id": None,
+                    "tool_id": None,
+                },
+                "parameters": {},
+            },
+            "routing": {
+                "restart_from": restart_from,
+                "rerun_modules": list(rerun_modules),
+                "invalidate": list(invalidate or []),
+            },
+            "outcome": {"status": None, "verification_result": None},
+            "metadata": {"attempt": 1, "created_at": None},
+        }
+
+    def test_planning_ik_local_replan_motion_passes(self):
+        recovery = self._recovery(
+            category="REPLAN_MOTION",
+            recovery_type="CHANGE_APPROACH",
+            target_module="M5",
+            restart_from="M5",
+            rerun_modules=["M5"],
+        )
+        validate_recovery_output(recovery)
+        validate_diagnosis_recovery_coherence(
+            self._planning_ik_context(),
+            self._planning_ik_diagnosis(),
+            recovery,
+        )
+
+    def test_planning_ik_first_attempt_restart_pipeline_fails(self):
+        recovery = self._recovery(
+            category="ESCALATE_REPLAN",
+            recovery_type="RESTART_PIPELINE",
+            target_module="M2",
+            restart_from="M1",
+            rerun_modules=["M1", "M2"],
+        )
+        validate_recovery_output(recovery)
+        with self.assertRaises(RecoveryCoherenceError):
+            validate_diagnosis_recovery_coherence(
+                self._planning_ik_context(),
+                self._planning_ik_diagnosis(),
+                recovery,
+            )
+
+    def test_planning_ik_escalation_allowed_after_local_fail(self):
+        context = self._planning_ik_context(
+            retry_count=1,
+            previous_recoveries=[
+                {
+                    "recovery_category": "REPLAN_MOTION",
+                    "action": {
+                        "recovery_type": "CHANGE_APPROACH",
+                        "target_module": "M5",
+                    },
+                    "outcome": {"status": "FAIL", "verification_result": "FAIL"},
+                }
+            ],
+        )
+        recovery = self._recovery(
+            category="ESCALATE_REPLAN",
+            recovery_type="RESTART_PIPELINE",
+            target_module="M2",
+            restart_from="M1",
+            rerun_modules=["M1", "M2"],
+        )
+        validate_recovery_output(recovery)
+        validate_diagnosis_recovery_coherence(
+            context,
+            self._planning_ik_diagnosis(),
+            recovery,
+        )
+
+    def test_ee_selection_local_reselect_passes(self):
+        recovery = self._recovery(
+            category="RESELECT_EE",
+            recovery_type="RESELECT_EE",
+            target_module="M4",
+            restart_from="M4",
+            rerun_modules=["M4"],
+        )
+        validate_diagnosis_recovery_coherence(
+            _make_failure_context(),
+            {
+                "failure_type": "EE_SELECTION",
+                "failure_cause": {"code": "INCOMPATIBLE_EE"},
+                "affected_module": "M4",
+            },
+            recovery,
+        )
+
+    def test_ee_selection_with_replan_motion_fails(self):
+        recovery = self._recovery(
+            category="REPLAN_MOTION",
+            recovery_type="CHANGE_APPROACH",
+            target_module="M5",
+            restart_from="M5",
+            rerun_modules=["M5"],
+        )
+        with self.assertRaises(RecoveryCoherenceError):
+            validate_diagnosis_recovery_coherence(
+                _make_failure_context(),
+                {
+                    "failure_type": "EE_SELECTION",
+                    "failure_cause": {"code": "INCOMPATIBLE_EE"},
+                    "affected_module": "M4",
+                },
+                recovery,
+            )
+
+    def test_metric_reasoning_remeasure_passes(self):
+        recovery = self._recovery(
+            category="REMEASURE",
+            recovery_type="REMEASURE_PROPERTY",
+            target_module="M3",
+            restart_from="M3",
+            rerun_modules=["M3"],
+        )
+        validate_diagnosis_recovery_coherence(
+            _make_failure_context(),
+            {
+                "failure_type": "METRIC_REASONING",
+                "failure_cause": {"code": "WRONG_MASS_ESTIMATE"},
+                "affected_module": "M3",
+            },
+            recovery,
+        )
+
+    def test_execution_control_retry_passes(self):
+        recovery = self._recovery(
+            category="RETRY_EXECUTION",
+            recovery_type="RETRY_ACTION",
+            target_module="M5",
+            restart_from="M5",
+            rerun_modules=["M5"],
+        )
+        validate_diagnosis_recovery_coherence(
+            _make_failure_context(),
+            {
+                "failure_type": "EXECUTION_CONTROL",
+                "failure_cause": {"code": "GRASP_FAILURE"},
+                "affected_module": "M5",
+            },
+            recovery,
+        )
+
+    def test_task_decomposition_replan_subgoal_passes(self):
+        recovery = self._recovery(
+            category="REPLAN_SUBGOAL",
+            recovery_type="REDECOMPOSE_SUBGOAL",
+            target_module="M2",
+            restart_from="M2",
+            rerun_modules=["M2"],
+        )
+        validate_diagnosis_recovery_coherence(
+            _make_failure_context(),
+            {
+                "failure_type": "TASK_DECOMPOSITION",
+                "failure_cause": {"code": "MISSING_SUBGOAL"},
+                "affected_module": "M2",
+            },
+            recovery,
+        )
+
+    def test_runtime_fail_evidence_does_not_force_escalation(self):
+        # First attempt + FAIL past experience evidence must NOT justify restart.
+        recovery = self._recovery(
+            category="ESCALATE_REPLAN",
+            recovery_type="RESTART_PIPELINE",
+            target_module="M2",
+            restart_from="M1",
+            rerun_modules=["M1", "M2"],
+        )
+        with self.assertRaises(RecoveryCoherenceError):
+            validate_diagnosis_recovery_coherence(
+                self._planning_ik_context(),
+                self._planning_ik_diagnosis(),
+                recovery,
+            )
+
+
+class PastRecoveriesGuidanceTests(unittest.TestCase):
+    def _base_evidence(self, **overrides) -> dict:
+        evidence = {
+            "experience_id": "exp-1",
+            "past_recovery": {
+                "recovery_category": "REPLAN_MOTION",
+                "action": {"recovery_type": "CHANGE_APPROACH"},
+                "routing": {
+                    "restart_from": "M5",
+                    "rerun_modules": ["M5"],
+                    "invalidate": [],
+                },
+            },
+            "outcome": {"status": "NOT_EXECUTED", "verification_result": None},
+            "source": "offline_seed",
+        }
+        evidence.update(overrides)
+        return evidence
+
+    def test_runtime_pass_preserves_outcome_and_source(self):
+        evidence = [
+            self._base_evidence(
+                experience_id="runtime_pass_001",
+                outcome={"status": "PASS", "verification_result": "PASS"},
+                source="runtime",
+            )
+        ]
+
+        past = build_past_recoveries(evidence)
+
+        self.assertEqual(len(past), 1)
+        self.assertEqual(past[0]["experience_id"], "runtime_pass_001")
+        self.assertEqual(past[0]["recovery_type"], "CHANGE_APPROACH")
+        self.assertEqual(past[0]["outcome"]["status"], "PASS")
+        self.assertEqual(past[0]["outcome"]["verification_result"], "PASS")
+        self.assertEqual(past[0]["source"], "runtime")
+        self.assertNotIn("action_type", past[0])
+
+    def test_runtime_fail_is_preserved_as_negative_evidence(self):
+        evidence = [
+            self._base_evidence(
+                experience_id="runtime_fail_001",
+                outcome={"status": "FAIL", "verification_result": "FAIL"},
+                source="runtime",
+            )
+        ]
+
+        past = build_past_recoveries(evidence)
+
+        self.assertEqual(len(past), 1)
+        self.assertEqual(past[0]["outcome"]["status"], "FAIL")
+        self.assertEqual(past[0]["outcome"]["verification_result"], "FAIL")
+        self.assertEqual(past[0]["source"], "runtime")
+
+    def test_offline_not_executed_preserves_unverified_prior(self):
+        evidence = [
+            self._base_evidence(
+                experience_id="offline_001",
+                outcome={"status": "NOT_EXECUTED", "verification_result": None},
+                source="offline_seed",
+            )
+        ]
+
+        past = build_past_recoveries(evidence)
+
+        self.assertEqual(past[0]["outcome"]["status"], "NOT_EXECUTED")
+        self.assertIsNone(past[0]["outcome"]["verification_result"])
+        self.assertEqual(past[0]["source"], "offline_seed")
+
+    def test_legacy_action_type_normalized_to_recovery_type(self):
+        evidence = [
+            self._base_evidence(
+                past_recovery={
+                    "recovery_category": "REPLAN_MOTION",
+                    "action": {"action_type": "CHANGE_APPROACH"},
+                    "routing": {"restart_from": "M5", "rerun_modules": ["M5"], "invalidate": []},
+                }
+            )
+        ]
+
+        past = build_past_recoveries(evidence)
+
+        self.assertEqual(past[0]["recovery_type"], "CHANGE_APPROACH")
+        self.assertNotIn("action_type", past[0])
+
+    def test_missing_outcome_and_source_are_null_safe(self):
+        evidence = [
+            {
+                "experience_id": "legacy_001",
+                "past_recovery": {
+                    "recovery_category": "REPLAN_MOTION",
+                    "action": {"recovery_type": "CHANGE_APPROACH"},
+                    "routing": {},
+                },
+            }
+        ]
+
+        past = build_past_recoveries(evidence)
+
+        self.assertEqual(past[0]["outcome"], {})
+        self.assertIsNone(past[0]["source"])
+
+    def test_apply_recovery_output_keeps_fail_past_recovery_for_experience_guided(self):
+        evidence = [
+            self._base_evidence(
+                experience_id="runtime_fail_001",
+                outcome={"status": "FAIL", "verification_result": "FAIL"},
+                source="runtime",
+            )
+        ]
+        result = MockRecoveryRouter().route(
+            _make_failure_context(),
+            {
+                "failure_type": "PLANNING",
+                "failure_cause": {"code": "INVALID_APPROACH"},
+                "affected_module": "M5",
+            },
+            "EXPERIENCE_GUIDED",
+            evidence,
+        )
+
+        recovery = empty_recovery()
+        recovery["decision_mode"] = "EXPERIENCE_GUIDED"
+        recovery["guidance"]["experience_ids"] = ["runtime_fail_001"]
+        recovery["guidance"]["recovery_evidence"] = evidence
+        apply_recovery_output(recovery, result)
+
+        self.assertEqual(recovery["decision_mode"], "EXPERIENCE_GUIDED")
+        self.assertEqual(len(recovery["guidance"]["past_recoveries"]), 1)
+        past = recovery["guidance"]["past_recoveries"][0]
+        self.assertEqual(past["experience_id"], "runtime_fail_001")
+        self.assertEqual(past["recovery_type"], "CHANGE_APPROACH")
+        self.assertEqual(past["outcome"]["status"], "FAIL")
+        self.assertEqual(past["source"], "runtime")
+
+
+class RecoveryRenameTests(unittest.TestCase):
+    def test_recovery_output_uses_recovery_type_not_action_type(self):
+        result = MockRecoveryRouter().route(
+            _make_failure_context(),
+            {
+                "failure_type": "PLANNING",
+                "failure_cause": {"code": "INVALID_APPROACH"},
+                "affected_module": "M5",
+            },
+            "DIAGNOSIS_GUIDED",
+            [],
+        )
+        self.assertIn("recovery_type", result["action"])
+        self.assertNotIn("action_type", result["action"])
+        self.assertEqual(result["action"]["recovery_type"], "CHANGE_APPROACH")
+
+    def test_legacy_recovery_action_type_normalized_on_read(self):
+        from tuj.m6_diagnosis.recovery_router import normalize_recovery_action
+
+        normalized = normalize_recovery_action({"action_type": "CHANGE_APPROACH", "target_module": "M5"})
+        self.assertEqual(normalized["recovery_type"], "CHANGE_APPROACH")
+        self.assertNotIn("action_type", normalized)
+
+
+class MemoryMigrationCompatibilityTests(unittest.TestCase):
+    def test_default_memory_uses_recovery_type_and_keeps_context_action_type(self):
+        from tuj.m6_diagnosis.memory_adapter import DEFAULT_MEMORY_PATH
+
+        if not DEFAULT_MEMORY_PATH.exists():
+            self.skipTest("output/memory.json is not available in this environment")
+
+        memory = json.loads(DEFAULT_MEMORY_PATH.read_text(encoding="utf-8"))
+        experiences = memory["failure_recovery_experience"]["experiences"]
+        self.assertEqual(len(experiences), 10)
+        for experience in experiences:
+            self.assertIn("action_type", experience["context_signature"])
+            action = experience["recovery_summary"]["action"]
+            self.assertIn("recovery_type", action)
+            self.assertNotIn("action_type", action)
+
+    def test_memory_adapter_normalizes_legacy_recovery_action_type(self):
+        temp_dir = tempfile.TemporaryDirectory()
+        try:
+            memory_path = Path(temp_dir.name) / "memory.json"
+            experience = _make_experience("legacy-1", action_type="acquire", object_class="spatula")
+            experience["recovery_summary"]["action"] = {"action_type": "CHANGE_APPROACH"}
+            memory_path.write_text(
+                json.dumps({"failure_recovery_experience": {"experiences": [experience]}}),
+                encoding="utf-8",
+            )
+            adapter = MemoryAdapter(memory_path=memory_path)
+            loaded = adapter._load_experiences()[0]
+            self.assertEqual(loaded["recovery_summary"]["action"]["recovery_type"], "CHANGE_APPROACH")
+            self.assertNotIn("action_type", loaded["recovery_summary"]["action"])
+            self.assertEqual(loaded["context_signature"]["action_type"], "acquire")
+        finally:
+            temp_dir.cleanup()
 
 
 if __name__ == "__main__":

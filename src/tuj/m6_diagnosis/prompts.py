@@ -44,7 +44,10 @@ def build_failure_diagnosis_instructions() -> str:
         "8. Even with incomplete information, choose the best-supported canonical diagnosis.\n"
         "9. Return confidence as a numeric value between 0 and 1.\n"
         "10. failure_type, failure_cause.code, and affected_module must all be consistent "
-        "with the fixed vocabulary mapping."
+        "with the fixed vocabulary mapping.\n"
+        "11. m5_result (status/phase/failure_code/detail) is local M5 evidence only; "
+        "do not copy m5_result.failure_code as the canonical failure_cause without "
+        "considering upstream M1–M4 evidence."
     )
 
 
@@ -54,12 +57,12 @@ def _failure_context_for_prompt(failure_context: dict) -> dict[str, Any]:
         "failure_id": failure_context.get("failure_id"),
         "task": failure_context.get("task"),
         "subgoal": failure_context.get("subgoal"),
-        "verification": failure_context.get("verification"),
         "scene": failure_context.get("scene"),
         "grounding": failure_context.get("grounding"),
         "task_plan": failure_context.get("task_plan"),
         "motion_plan": failure_context.get("motion_plan"),
         "execution": failure_context.get("execution"),
+        "m5_result": failure_context.get("m5_result"),
         "history": failure_context.get("history"),
         "observation": {
             "before_image": observation.get("before_image"),
@@ -112,22 +115,63 @@ def build_recovery_router_instructions() -> str:
         "You are the recovery routing component of a robotic manipulation system.\n"
         "Generate one canonical recovery decision and routing plan for the current failure.\n"
         "\n"
+        "Recovery selection hierarchy (highest priority first):\n"
+        "1. Current diagnosis is the primary constraint.\n"
+        "2. Prefer the most local recovery that directly addresses the diagnosed failure "
+        "in the affected module.\n"
+        "3. Use selected past experience evidence as supplementary guidance only.\n"
+        "4. Choose a broader recovery only when local recovery in the affected module is "
+        "insufficient given explicit current-context evidence.\n"
+        "5. Escalate/restart the pipeline only with explicit justification from history "
+        "or current context; never as a default first attempt.\n"
+        "\n"
         "Important rules:\n"
         "1. Use the current diagnosis as the primary evidence for recovery selection.\n"
         "2. Inspect raw evidence from the current failure context.\n"
         "3. In EXPERIENCE_GUIDED mode, past recovery experiences are supplementary only.\n"
         "4. Do not treat offline NOT_EXECUTED recoveries as verified successes.\n"
         "5. Runtime PASS recoveries may be positive evidence in similar contexts.\n"
-        "6. Runtime FAIL recoveries may be negative evidence against repeating the same recovery.\n"
-        "7. Use only labels from the provided fixed recovery vocabulary.\n"
-        "8. Keep recovery target/routing logically consistent with the current diagnosis.\n"
-        "9. Rerun only the minimum necessary modules; avoid unnecessary full pipeline restarts.\n"
-        "10. Do not execute recovery; only generate recovery decision and routing.\n"
-        "11. Do not generate outcome fields; recovery has not been executed yet.\n"
-        "12. Select one primary recovery action.\n"
-        "13. Do not copy a past recovery automatically; decide from current evidence first.\n"
-        "14. decision_mode and guidance are already fixed by the pipeline; do not change them.\n"
-        "15. Return only recovery_category, action, and routing."
+        "6. Runtime FAIL recoveries may be negative evidence against repeating the same "
+        "recovery; they are NOT an automatic trigger for pipeline escalation.\n"
+        "7. Prefer the most local recovery that directly addresses the diagnosed failure.\n"
+        "8. If the diagnosed failure belongs to M5 PLANNING, prefer an M5-local "
+        "REPLAN_MOTION recovery before escalating to upstream modules.\n"
+        "9. Do not restart or redecompose the pipeline when a local recovery in the "
+        "affected module is sufficient.\n"
+        "10. Select the minimum necessary rerun scope; avoid unnecessary full pipeline "
+        "restarts.\n"
+        "11. ESCALATE_REPLAN / RESTART_PIPELINE are fallback escalations, not first-choice "
+        "recoveries on a clear local diagnosis with retry_count=0 and empty previous "
+        "recoveries.\n"
+        "12. Use only labels from the provided fixed recovery vocabulary.\n"
+        "13. Keep recovery category/target/routing logically consistent with the current "
+        "diagnosis.\n"
+        "14. Do not execute recovery; only generate recovery decision and routing.\n"
+        "15. Do not generate outcome fields; recovery has not been executed yet.\n"
+        "16. Select one primary recovery_type from the canonical recovery vocabulary.\n"
+        "17. Do not copy a past recovery automatically; decide from current evidence first.\n"
+        "18. decision_mode and guidance are already fixed by the pipeline; do not change them.\n"
+        "19. Return only recovery_category, action (with recovery_type), and routing."
+    )
+
+
+def build_recovery_coherence_correction_text(
+    *,
+    diagnosis: dict,
+    previous_error: str,
+) -> str:
+    failure_cause = diagnosis.get("failure_cause") or {}
+    return (
+        "The previous recovery was inconsistent with the diagnosis.\n"
+        f"Validation error: {previous_error}\n"
+        f"Diagnosis failure_type={diagnosis.get('failure_type')!r}, "
+        f"cause={failure_cause.get('code')!r}, "
+        f"affected_module={diagnosis.get('affected_module')!r}.\n"
+        "A first-attempt local recovery in the affected module is required unless the "
+        "current failure context history contains explicit escalation evidence "
+        "(retry_count > 0 with a prior local recovery FAIL).\n"
+        "Generate a new canonical recovery that is coherent with the diagnosis. "
+        "Return structured output only."
     )
 
 

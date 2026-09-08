@@ -8,17 +8,25 @@ from typing import Any, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
-from .prompts import build_recovery_router_instructions, build_recovery_router_text
+from .prompts import (
+    build_recovery_coherence_correction_text,
+    build_recovery_router_instructions,
+    build_recovery_router_text,
+)
 from .recovery_config import get_recovery_model
 from .recovery_router import (
     RecoveryAPIError,
+    RecoveryCoherenceError,
     RecoveryResponseError,
     RecoveryValidationError,
     build_past_recoveries,
+    validate_diagnosis_recovery_coherence,
     validate_recovery_output,
 )
 
 logger = logging.getLogger(__name__)
+
+MAX_COHERENCE_CORRECTIVE_RETRIES = 1
 
 
 class MissingOpenAIAPIKeyError(RecoveryAPIError):
@@ -48,7 +56,7 @@ class GeneratedRecoveryTarget(BaseModel):
 class GeneratedRecoveryAction(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    action_type: str = Field(min_length=1)
+    recovery_type: str = Field(min_length=1)
     target_module: str = Field(min_length=1)
     target: GeneratedRecoveryTarget
 
@@ -95,7 +103,7 @@ def _parsed_recovery_to_output(parsed: GeneratedRecoveryDecision) -> dict:
     return {
         "recovery_category": parsed.recovery_category,
         "action": {
-            "action_type": parsed.action.action_type,
+            "recovery_type": parsed.action.recovery_type,
             "target_module": parsed.action.target_module,
             "target": parsed.action.target.model_dump(),
             "parameters": {},
@@ -143,6 +151,7 @@ def _validate_router_output(
         "metadata": {"attempt": 1, "created_at": None},
     }
     validate_recovery_output(probe_recovery)
+    validate_diagnosis_recovery_coherence(failure_context, diagnosis, probe_recovery)
 
 
 class OpenAIRecoveryRouter:
@@ -151,6 +160,7 @@ class OpenAIRecoveryRouter:
     def __init__(self, model: str | None = None, client: _OpenAIClient | None = None):
         self.model = get_recovery_model(model)
         self._client = client
+        self.last_coherence_corrective_retries = 0
 
     def _openai_client(self) -> _OpenAIClient:
         if self._client is not None:
@@ -167,6 +177,45 @@ class OpenAIRecoveryRouter:
             ) from error
         self._client = OpenAI()
         return self._client
+
+    def _parse_response(self, response: Any) -> GeneratedRecoveryDecision:
+        parsed = getattr(response, "output_parsed", None)
+        if parsed is None:
+            response_id = str(getattr(response, "id", "unknown"))
+            status = str(getattr(response, "status", "unknown"))
+            raise RecoveryResponseError(
+                f"OpenAI response {response_id!r} had no parsed output (status={status})"
+            )
+        if isinstance(parsed, GeneratedRecoveryDecision):
+            return parsed
+        try:
+            return GeneratedRecoveryDecision.model_validate(parsed)
+        except ValidationError as error:
+            raise RecoveryResponseError(
+                "OpenAI response did not match the recovery decision schema"
+            ) from error
+
+    def _request_recovery(
+        self,
+        *,
+        instructions: str,
+        content: list[dict[str, Any]],
+    ) -> GeneratedRecoveryDecision:
+        try:
+            response = self._openai_client().responses.parse(
+                model=self.model,
+                instructions=instructions,
+                input=[{"role": "user", "content": content}],
+                text_format=GeneratedRecoveryDecision,
+                store=False,
+            )
+        except MissingOpenAIAPIKeyError:
+            raise
+        except Exception as error:  # noqa: BLE001 - SDK error surface varies
+            raise RecoveryAPIError(
+                f"OpenAI Responses request failed ({type(error).__name__})"
+            ) from error
+        return self._parse_response(response)
 
     def route(
         self,
@@ -189,36 +238,8 @@ class OpenAIRecoveryRouter:
             len(recovery_evidence),
         )
 
-        try:
-            response = self._openai_client().responses.parse(
-                model=self.model,
-                instructions=instructions,
-                input=[{"role": "user", "content": content}],
-                text_format=GeneratedRecoveryDecision,
-                store=False,
-            )
-        except MissingOpenAIAPIKeyError:
-            raise
-        except Exception as error:  # noqa: BLE001 - SDK error surface varies
-            raise RecoveryAPIError(
-                f"OpenAI Responses request failed ({type(error).__name__})"
-            ) from error
-
-        parsed = getattr(response, "output_parsed", None)
-        if parsed is None:
-            response_id = str(getattr(response, "id", "unknown"))
-            status = str(getattr(response, "status", "unknown"))
-            raise RecoveryResponseError(
-                f"OpenAI response {response_id!r} had no parsed output (status={status})"
-            )
-        if not isinstance(parsed, GeneratedRecoveryDecision):
-            try:
-                parsed = GeneratedRecoveryDecision.model_validate(parsed)
-            except ValidationError as error:
-                raise RecoveryResponseError(
-                    "OpenAI response did not match the recovery decision schema"
-                ) from error
-
+        self.last_coherence_corrective_retries = 0
+        parsed = self._request_recovery(instructions=instructions, content=content)
         recovery_output = _parsed_recovery_to_output(parsed)
         recovery_output["past_recoveries"] = (
             build_past_recoveries(recovery_evidence)
@@ -234,14 +255,50 @@ class OpenAIRecoveryRouter:
                 decision_mode=decision_mode,
                 recovery_evidence=recovery_evidence,
             )
-        except RecoveryValidationError as error:
-            raise RecoveryResponseError(str(error)) from error
+        except (RecoveryValidationError, RecoveryCoherenceError) as first_error:
+            # One corrective retry for incoherent/invalid structured output only.
+            self.last_coherence_corrective_retries = 1
+            logger.warning(
+                "openai recovery coherence/validation failed; requesting corrective retry once: %s",
+                first_error,
+            )
+            correction = build_recovery_coherence_correction_text(
+                diagnosis=diagnosis,
+                previous_error=str(first_error),
+            )
+            retry_content = list(content) + [
+                {"type": "input_text", "text": correction}
+            ]
+            parsed = self._request_recovery(
+                instructions=instructions,
+                content=retry_content,
+            )
+            recovery_output = _parsed_recovery_to_output(parsed)
+            recovery_output["past_recoveries"] = (
+                build_past_recoveries(recovery_evidence)
+                if decision_mode == "EXPERIENCE_GUIDED"
+                else []
+            )
+            try:
+                _validate_router_output(
+                    recovery_output,
+                    failure_context=failure_context,
+                    diagnosis=diagnosis,
+                    decision_mode=decision_mode,
+                    recovery_evidence=recovery_evidence,
+                )
+            except (RecoveryValidationError, RecoveryCoherenceError) as second_error:
+                raise RecoveryResponseError(
+                    "OpenAI recovery remained incoherent after one corrective retry: "
+                    f"{second_error}"
+                ) from second_error
 
         logger.debug(
-            "openai recovery result category=%s action_type=%s target_module=%s restart_from=%s",
+            "openai recovery result category=%s recovery_type=%s target_module=%s restart_from=%s corrective_retries=%s",
             recovery_output["recovery_category"],
-            recovery_output["action"]["action_type"],
+            recovery_output["action"]["recovery_type"],
             recovery_output["action"]["target_module"],
             recovery_output["routing"]["restart_from"],
+            self.last_coherence_corrective_retries,
         )
         return recovery_output

@@ -6,11 +6,16 @@ def empty_failure_context() -> dict:
         "failure_id": None,
         "task": {"task_id": None, "instruction": None},
         "subgoal": {
-            "subgoal_id": None, "description": None, "action_type": None,
+            # subgoal_id = current execution unit (M5 detail id when failing a detail).
+            "subgoal_id": None,
+            # parent_subgoal_id / description come from M2 parent; detail_id from M2 detail.
+            "parent_subgoal_id": None,
+            "detail_id": None,
+            "description": None,
+            "action_type": None,
             "target_object_ids": [], "selected_object_id": None, "selected_object_class": None,
             "preconditions": [], "postconditions": [], "invariants": [],
         },
-        "verification": {"result": None, "expected_state": [], "observed_state": [], "violated_predicates": []},
         "scene": {"nodes": [], "relations": [], "object_states": {}},
         "grounding": {"physical_properties": {}, "geometry": {}, "metric_relations": {}, "ee_feasibility": {}, "confidence": {}},
         "task_plan": {"selected_ee": None, "selected_tool": None, "ee_candidates": [], "selection_score": None, "selection_reason": None, "final_order": [], "swap_plan": []},
@@ -20,8 +25,20 @@ def empty_failure_context() -> dict:
             "gripper": {"command": None, "position": None, "contact_detected": None, "force": None},
             "timeout": False, "error": None,
         },
+        # Final M5 subgoal outcome (from m5/subgoal_result.json); None when absent.
+        "m5_result": None,
         "observation": {"before_image": None, "after_image": None, "before_scene": None, "after_scene": None},
         "history": {"retry_count": 0, "previous_diagnoses": [], "previous_recoveries": [], "previous_outcomes": []},
+    }
+
+
+def empty_m5_result() -> dict:
+    return {
+        "subgoal_id": None,
+        "status": None,
+        "phase": None,
+        "failure_code": None,
+        "detail": None,
     }
 
 
@@ -51,7 +68,7 @@ def empty_recovery() -> dict:
         },
         "recovery_category": None,
         "action": {
-            "action_type": None, "target_module": None,
+            "recovery_type": None, "target_module": None,
             "target": {"subgoal_id": None, "object_id": None, "property": None, "relation": None, "ee_id": None, "tool_id": None},
             "parameters": {},
         },

@@ -15,39 +15,65 @@ def _is_present(value: Any) -> bool:
     return True
 
 
-def _first_present_object_id(subgoal: dict) -> str | None:
-    selected = subgoal.get("selected_object_id")
-    if _is_present(selected):
-        return selected
+def _class_from_scene(failure_context: dict, object_id: str) -> str | None:
+    """Join object_id to an explicit scene node class; never parse the id string."""
+    scene = failure_context.get("scene") or {}
+    for node in scene.get("nodes") or []:
+        if not isinstance(node, dict):
+            continue
+        if node.get("id") == object_id:
+            node_class = node.get("class")
+            return node_class if _is_present(node_class) else None
+    return None
+
+
+def _resolve_target(failure_context: dict) -> dict[str, str | None]:
+    """Resolve retrieval target from the object currently being manipulated.
+
+    Priority for object_id:
+    1. subgoal.selected_object_id
+    2. first present subgoal.target_object_ids entry
+    3. null
+
+    object_class comes only from an explicit source matching that choice:
+    - selected_object_id → subgoal.selected_object_class (or null)
+    - target_object_ids fallback → scene.nodes join (or null)
+    """
+    subgoal = failure_context.get("subgoal") or {}
+    selected_id = subgoal.get("selected_object_id")
+    if _is_present(selected_id):
+        selected_class = subgoal.get("selected_object_class")
+        return {
+            "object_id": selected_id,
+            "object_class": selected_class if _is_present(selected_class) else None,
+        }
+
     for item in subgoal.get("target_object_ids") or []:
         if _is_present(item):
-            return item
-    return None
+            return {
+                "object_id": item,
+                "object_class": _class_from_scene(failure_context, item),
+            }
 
-
-def _first_present_object_class(subgoal: dict) -> str | None:
-    selected = subgoal.get("selected_object_class")
-    if _is_present(selected):
-        return selected
-    return None
+    return {"object_id": None, "object_class": None}
 
 
 def build_retrieval_query(failure_context: dict) -> dict:
     """Extract only retrieval-relevant fields from the failure context."""
     subgoal = failure_context.get("subgoal") or {}
-    verification = failure_context.get("verification") or {}
     task_plan = failure_context.get("task_plan") or {}
     motion_plan = failure_context.get("motion_plan") or {}
     execution = failure_context.get("execution") or {}
 
+    # Failure Context no longer carries verification / violated_predicates.
+    # Keep an empty list for retrieval-query schema compatibility with M0
+    # context_signature.violated_predicates; empty → treated as missing and
+    # excluded from similarity comparison (see context_similarity._is_present).
     return {
         "subgoal_description": subgoal.get("description"),
         "action_type": subgoal.get("action_type"),
-        "target": {
-            "object_id": _first_present_object_id(subgoal),
-            "object_class": _first_present_object_class(subgoal),
-        },
-        "violated_predicates": list(verification.get("violated_predicates") or []),
+        "target": _resolve_target(failure_context),
+        "violated_predicates": [],
         "selected_ee": task_plan.get("selected_ee"),
         "selected_tool": task_plan.get("selected_tool"),
         "execution_signature": {

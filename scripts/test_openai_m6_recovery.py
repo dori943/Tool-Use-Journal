@@ -12,10 +12,10 @@ SRC = ROOT / "src"
 if str(SRC) not in sys.path:
     sys.path.insert(0, str(SRC))
 
-from tuj.m6.openai_recovery_router import OpenAIRecoveryRouter
-from tuj.m6.recovery_config import get_recovery_model
-from tuj.m6.recovery_router import apply_recovery_output, validate_recovery_output
-from tuj.m6.schemas import empty_failure_context, empty_recovery
+from tuj.m6_diagnosis.openai_recovery_router import OpenAIRecoveryRouter
+from tuj.m6_diagnosis.recovery_config import get_recovery_model
+from tuj.m6_diagnosis.recovery_router import apply_recovery_output, validate_recovery_output
+from tuj.m6_diagnosis.schemas import empty_failure_context, empty_recovery
 
 
 SAMPLE_FAILURE_CONTEXT = {
