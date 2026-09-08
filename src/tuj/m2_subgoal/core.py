@@ -438,17 +438,22 @@ def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None)
                 members = _set_members(b.get("?targets") or b.get("?o"))
                 if "?tool" in members:
                     continue
-                # 물체 1개면 묶기 판정 불필요 → 질의 생략 (not_queried).
-                # 단 분할된 자식 서브골은 1개여도 발행한다 — 측정 모듈이 서브골별
-                # 서브그래프를 질의 기준으로 조립하므로, 재검증 겸 자기 몫을 남긴다.
-                if len(members) < 2 and "split_from" not in subgoal:
+                # 물체 1개면 "묶어서 한 번에" 판정은 의미가 없어 생략한다 (not_queried).
+                # 단 분할된 자식 서브골은 1개여도 발행한다 — 자기 몫을 남겨 재검증한다.
+                # 0908: act_space_clear(이동 통로가 비었나)는 물체 1개여도 의미가 있으므로
+                # 이 생략에서 뺀다. 종전에는 batch_feasible과 같은 분기라 c1_2 flatten
+                # (반죽 1개)의 통로 판정이 아예 돌지 않았다.
+                if (head == "batch_feasible" and len(members) < 2
+                        and "split_from" not in subgoal):
                     continue
                 actors = ([{"type": "object", "id": t} for t in tool_ids]
                           if tool_ids else [{"type": "ee_pool"}])
                 call = {"kind": "batch" if head == "batch_feasible" else "swept_space",
                         "action_type": subgoal["kind"], "member_ids": members}
                 if head == "act_space_clear":
-                    rid = b.get("?r")
+                    # 0908: flatten은 목적지 변수가 ?work다 (?r이 아니라). ?r만 보던 탓에
+                    # c1_2의 통로 판정이 발행되지 않았다.
+                    rid = b.get("?r") or b.get("?work")
                     if rid in (None, "tool_rest"):
                         continue
                     call["to"] = rid

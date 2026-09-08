@@ -28,64 +28,14 @@ _ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), ".."))
 sys.path.insert(0, os.path.join(_ROOT, "src"))
 sys.path.insert(0, _ROOT)                      # task_registry (단일 출처)
 
-import numpy as np
-
-from tuj.m1_scene.abstraction import build_m1, serialize
-from tuj.m2_subgoal.ground import ensure_measurements, load_ee_pool, load_scene
+from tuj.m2_subgoal.ground import load_scene
 from tuj.m2_subgoal.ingest import apply_grounding, measurement_feedback, update_confidence
 from tuj.m2_subgoal.pipeline import run_m2
 from tuj.m2_subgoal.regroup import split_by_partition
 from tuj.m2_subgoal.rough import LLMRough
 from task_registry import instruction as task_instruction
 
-RNG = np.random.default_rng(0)          # mock 점군 결정론
 MAX_REDECOMPOSE = 2                     # 피드백 재분해 상한 (왕복이 없어 M2 안에서 끝낸다)
-
-
-def box_points(center_mm, size_mm, n=400):
-    c, s = np.asarray(center_mm, float), np.asarray(size_mm, float)
-    return c + (RNG.random((n, 3)) - 0.5) * s
-
-
-def spec_to_objects(spec):
-    return [{"name": name, "cls": cls, "points": box_points(c, s)}
-            for name, cls, c, s in spec]
-
-
-# ── 씬 스펙: (name, class, center_mm, bbox_mm) — 예빈 env 근사 ──────────────
-
-def scene_c1_1():
-    spec = []
-    for i in range(12):                  # 레고 12개, 테이블 위 분산
-        spec.append((f"block_{i}", "block",
-                     [420 + 30 * (i % 4), -90 + 30 * (i // 4), 810], [20, 20, 12]))
-    spec += [
-        ("light_plate", "plate", [250, 250, 810], [200, 220, 10]),
-        ("heavy_plate", "plate", [250, -250, 810], [200, 220, 10]),
-        ("bottle_distractor", "bottle", [150, 150, 860], [60, 60, 120]),
-        ("collection_zone_visual", "collection_zone", [650, 0, 802], [250, 180, 4]),
-    ]
-    task = task_instruction("c1_1")     # 지시문 출처: task_registry
-    return task, spec
-
-
-def scene_c2_1():
-    spec = [
-        ("apple", "apple", [420, -150, 840], [75, 75, 75]),
-        ("bread", "bread", [470, -60, 830], [100, 60, 50]),
-        ("mug", "mug", [430, 40, 845], [90, 80, 95]),
-        ("plate", "plate", [500, 140, 808], [200, 200, 15]),
-        ("spoon", "spoon", [380, 210, 805], [150, 30, 10]),
-        ("green_tray", "tray", [680, -200, 818], [250, 180, 35]),
-        ("blue_tray", "tray", [700, 0, 818], [250, 180, 35]),
-        ("red_tray", "tray", [680, 200, 818], [250, 180, 35]),
-    ]
-    task = task_instruction("c2_1")     # 지시문 출처: task_registry
-    return task, spec
-
-
-# mock M1 을 만들 수 있는 태스크만 등록한다 (나머지는 실제 m1.json 필요).
-MOCK_SCENES = {"c1_1": scene_c1_1, "c2_1": scene_c2_1}
 
 
 def _serialized(m1: dict) -> dict:
@@ -101,9 +51,6 @@ def main():
         m1_json = sys.argv[sys.argv.index("--m1-json") + 1]
     tdir = (os.path.abspath(sys.argv[sys.argv.index("--output-dir") + 1])
             if "--output-dir" in sys.argv else os.path.join("output", name))
-    robot_spec = (sys.argv[sys.argv.index("--robot-spec") + 1]
-                  if "--robot-spec" in sys.argv
-                  else os.path.join(_ROOT, "configs", "robot_spec.json"))
     os.makedirs(tdir, exist_ok=True)
     if not m1_json and os.path.exists(os.path.join(tdir, "m1.json")):
         m1_json = os.path.join(tdir, "m1.json")             # M1 모듈 출력 자동 사용
@@ -118,21 +65,14 @@ def main():
                  "  task_registry.py 의 TASKS 에 instruction 을 등록하십시오.")
     print(f"[M2] 지시문: {task}")
 
-    if m1_json:                          # 실제 M1 출력 (접지값 포함)
-        m1 = load_scene(m1_json)
-        print(f"[M1] {m1_json} 사용")
-    else:                                # mock M1 (씬 근사 수치)
-        make_scene = MOCK_SCENES.get(name)
-        if make_scene is None:
-            sys.exit(f"[중단] '{name}' 은 mock 씬이 없습니다.\n"
-                     f"  먼저 run_m1 으로 output/{name}/m1.json 을 만드십시오.")
-        _, spec = make_scene()
-        m1 = serialize(build_m1(spec_to_objects(spec)))
-        print("[M1] mock 수치 사용 (실제 M1 JSON 없음)")
+    # M1&M3 통합 후 접지값(ee/reachability/predicates/물성)은 m1.json에 실려 온다.
+    # mock 씬 폴백은 없앴다 — 접지값이 없으면 술어가 전부 unknown이라 판정이 무의미하다.
+    if not m1_json:
+        sys.exit(f"[중단] {tdir}/m1.json 이 없습니다.\n"
+                 f"  먼저 python scripts/run_m1.py {name} 을 돌리십시오.")
+    m1 = load_scene(m1_json)
+    print(f"[M1] {m1_json} 사용")
 
-    ee_pool, reach_mm = load_ee_pool(robot_spec)
-    for line in ensure_measurements(m1, ee_pool, reach_mm, out_dir=tdir):
-        print(line)
     m1s = _serialized(m1)
 
     rough = LLMRough()                          # 서브골 생성은 항상 LLM
