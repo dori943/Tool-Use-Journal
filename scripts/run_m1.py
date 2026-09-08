@@ -666,6 +666,8 @@ def main():
     backend_name = _argument("--backend", "siphy")
     model = _argument("--model", "gpt-4o-mini")
     memory_path = _argument("--memory", str(ROOT / "output" / "memory.json"))
+    bbox_threshold = float(_argument("--m0-bbox-threshold", "0.25"))
+    density_threshold = float(_argument("--m0-density-threshold", "0.20"))
     if backend_name not in ("siphy", "mock"):
         sys.exit(f"[err] unsupported backend {backend_name!r}; use siphy or mock")
     if name not in TASK_ENVS:
@@ -890,7 +892,22 @@ def main():
     ee_pool, reach_mm = _ee_pool()
     backend = (SiPhyBackend(model=model, repo_root=ROOT, verbose=True)
                if backend_name == "siphy" else MockBackend())
-    memory = None if memory_path == "none" else PropertyMemory(memory_path, task_id=name)
+    memory = None if memory_path == "none" else PropertyMemory(
+        memory_path, task_id=name,
+        bbox_relative_threshold=bbox_threshold,
+        density_relative_threshold=density_threshold)
+    retrieval_debug: dict = {}
+    density_infer = None
+    if memory is not None:
+        if backend_name == "siphy":
+            from tuj.m0_memory import DensityOnlyBackend
+            density_backend = DensityOnlyBackend(
+                model=backend.model, client=backend.client, repo_root=ROOT)
+            density_infer = density_backend.infer
+        else:
+            from tuj.m0_memory import DensityOnlyResult
+            density_infer = lambda _crop: DensityOnlyResult(
+                None, False, error="mock backend: C3 density disabled")
     stats = ground_scene(
         m1,
         backend=backend,
@@ -900,7 +917,14 @@ def main():
         crops_dir=OUT / "crops",
         logger=lambda **event: print("  [M1]", event),
         source=backend_name,
+        density_infer=density_infer,
+        retrieval_debug=retrieval_debug,
     )
+    if memory is not None:
+        (OUT / "m0_retrieval.json").write_text(
+            json.dumps({"round": "m1", "objects": retrieval_debug},
+                       ensure_ascii=False, indent=2),
+            encoding="utf-8")
     (OUT / "m1.json").write_text(
         json.dumps(serialize(m1), ensure_ascii=False, indent=2), encoding="utf-8")
     (OUT / "m1_world.json").write_text(
@@ -915,6 +939,7 @@ def main():
         update = stats["memory_update"]
         print(f"[M1] memory update: new={update['new']} upgraded={update['upgraded']} "
               f"kept={update['kept']} -> {memory_path}")
+        print(f"[M1] m0_retrieval -> {OUT / 'm0_retrieval.json'}")
     print(f"[M1] nodes={len(m1['nodes'])} edges={len(m1['edges'])} "
           f"crops={len(list((OUT / 'crops').glob('*.png')))}")
     for e in m1["edges"]:

@@ -75,4 +75,17 @@ class UnifiedMemoryStore:
     def save(self):
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(
-            json.dumps(self.document, ensure_ascii=False, indent=2), encoding="utf-8")
+            json.dumps(self._json_sanitize(self.document), ensure_ascii=False, indent=2),
+            encoding="utf-8")
+
+    @classmethod
+    def _json_sanitize(cls, value):
+        """Replace NaN/Inf so strict JSON consumers do not reject the file."""
+        if isinstance(value, dict):
+            return {k: cls._json_sanitize(v) for k, v in value.items()}
+        if isinstance(value, list):
+            return [cls._json_sanitize(v) for v in value]
+        if isinstance(value, float) and (value != value
+                                         or value in (float("inf"), float("-inf"))):
+            return None
+        return value
