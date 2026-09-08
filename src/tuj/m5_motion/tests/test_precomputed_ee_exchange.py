@@ -300,6 +300,15 @@ class _CollisionChecker:
         )
 
 
+class _ForwardKinematics:
+    def __init__(self, pose: Pose) -> None:
+        self.pose = pose
+
+    def forward_pose_world(self, joint_positions_rad):
+        assert len(joint_positions_rad) == 6
+        return self.pose.position_m, self.pose.orientation_xyzw
+
+
 def _setup(tmp_path: Path, *, portable: bool = False):
     request = _request()
     contexts = _contexts("2F", "3F")
@@ -322,6 +331,9 @@ def _setup(tmp_path: Path, *, portable: bool = False):
     _write_attach(tmp_path, attach_target, shared=portable)
     attach_planner = PrecomputedEEAttachPlanner(
         PrecomputedEEAttachRegistry(tmp_path),
+        forward_kinematics=_ForwardKinematics(
+            request.world.robot_state.eef_pose
+        ),
         joint_position_limits_rad=[(-6.3, 6.3)] * 6,
         log=lambda _: None,
     )
@@ -427,6 +439,9 @@ def test_portable_return_and_attach_are_reused_across_environments(
     )
     delta = (2.5, -3.2, 0.12)
     request = _translate_request(request, delta)
+    exchange.attach_planner.forward_kinematics = _ForwardKinematics(
+        request.world.robot_state.eef_pose
+    )
     contexts = {
         key: value.model_copy(
             update={
@@ -455,6 +470,25 @@ def test_portable_return_and_attach_are_reused_across_environments(
             value + offset
             for value, offset in zip(returned.start_eef_pose.position_m, delta)
         )
+    )
+
+
+def test_portable_exchange_rejects_rack_motion_with_unchanged_robot_fk(
+    tmp_path: Path,
+) -> None:
+    request, contexts, _, exchange = _setup(tmp_path, portable=True)
+    request = _translate_request(request, (2.5, -3.2, 0.12))
+
+    with pytest.raises(PrecomputedEEPathError) as captured:
+        exchange.plan(
+            request,
+            collision_contexts=contexts,
+            collision_checker=_CollisionChecker(),
+        )
+
+    assert (
+        captured.value.failure_code
+        is EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH
     )
 
 

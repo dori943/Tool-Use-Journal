@@ -1258,6 +1258,7 @@ class ToolUseJournalMotionRequestPlanner:
                 registry_root,
                 trajectory_paths=ee_attach_trajectory_paths,
             ),
+            forward_kinematics=kinematics,
             start_tolerance_rad=ee_attach_start_tolerance_rad,
             joint_position_limits_rad=getattr(
                 kinematics, "joint_limits_rad", None
