@@ -252,7 +252,11 @@ class GraspRetentionEvaluator:
                 observed=dict(validation),
             )
         state = report.final_robot_state
-        expected = request.task.tool
+        expected = (
+            request.task.goal.target_object_id
+            or next(iter(request.task.target_ids), None)
+            or request.task.tool
+        )
         if state is None or expected is None:
             return _result(
                 request,
@@ -391,6 +395,11 @@ class TaskAwareGoalEvaluator:
             and task.goal.target_region_id in request.world.objects
             and bool(task.target_ids)
         ):
+            held_target = request.world.robot_state.held_tool_id
+            if held_target is not None and held_target in task.target_ids:
+                return CompositeGoalEvaluator(
+                    (self._above_region, self._grasp)
+                ).evaluate(request, report, observed_world)
             return self._above_region.evaluate(request, report, observed_world)
         if (
             is_release_task(task)

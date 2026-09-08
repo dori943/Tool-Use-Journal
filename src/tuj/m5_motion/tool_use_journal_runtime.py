@@ -493,6 +493,7 @@ class ToolUseJournalEERuntime:
         self._captured_gripper_action: np.ndarray | None = None
         self._attachment: AttachedObjectState | None = None
         self._held_tool_id: str | None = None
+        self._contact_friction_retention: Any | None = None
         self._breakable_runtime: _BreakableAttachmentRuntime | None = None
         self._last_attachment_break: AttachmentBreakObservation | None = None
         self._render_callback: Callable[[object], None] | None = None
@@ -1189,6 +1190,7 @@ class ToolUseJournalEERuntime:
             if retention is not None and hasattr(retention, "close"):
                 retention.close()
             self.scripted_grasp_retention = None
+            self._contact_friction_retention = None
         return self._gripper_command
 
     def capture_gripper_hold(self) -> None:
@@ -1906,12 +1908,27 @@ class ToolUseJournalEERuntime:
             raise ToolUseJournalRuntimeError(
                 "checkpoint held tool disagrees with attached object"
             )
+        if held_tool_id is not None and attachment is None:
+            if self._active_ee != "2F" or not grasp_engaged:
+                raise ToolUseJournalRuntimeError(
+                    "checkpoint contact-friction hold requires an engaged 2F gripper"
+                )
+            contact = self.object_contact_metrics(held_tool_id)
+            groups = set(contact.contact_groups)
+            left_contact = any(group.startswith("left_finger") for group in groups)
+            right_contact = any(group.startswith("right_finger") for group in groups)
+            if contact.contact_count < 2 or not (left_contact and right_contact):
+                raise ToolUseJournalRuntimeError(
+                    "checkpoint contact-friction hold lacks bilateral finger contact: "
+                    f"count={contact.contact_count}, groups={sorted(groups)}"
+                )
 
         self._gripper_command = command
         self._grasp_engaged = bool(grasp_engaged)
         self._captured_gripper_action = captured.copy() if captured is not None else None
         self._attachment = attachment
         self._held_tool_id = held_tool_id
+        self._contact_friction_retention = None
         self._last_attachment_break = None
         self._breakable_runtime = (
             _BreakableAttachmentRuntime()
@@ -1921,6 +1938,19 @@ class ToolUseJournalEERuntime:
         )
         if attachment is not None and attachment.mode is AttachmentMode.KINEMATIC:
             self.synchronize_attached_object()
+        elif held_tool_id is not None:
+            from tuj.m5_motion.physical_grasp import (
+                ContactFrictionRetentionMonitor,
+            )
+            from tuj.m5_motion.profiles import PhysicalGraspProfile
+
+            self._contact_friction_retention = (
+                ContactFrictionRetentionMonitor.from_runtime(
+                    self,
+                    held_tool_id,
+                    PhysicalGraspProfile(),
+                )
+            )
 
     def synchronize_attached_object(self) -> None:
         """Project the attached object's free joint onto the grasp transform."""
@@ -3222,6 +3252,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
         if retention is not None:
             action = retention.before_tick(action)
         env = self.runtime.env
+        contact_retention = self.runtime._contact_friction_retention
         model, data = _raw_model_data(env)
         try:
             control_timestep = float(env.control_timestep)  # type: ignore[attr-defined]
@@ -3270,6 +3301,8 @@ class ToolUseJournalControllerTrajectoryPlayer(
         # Use MuJoCo time as the source of truth across EE topology swaps.
         if retention is not None:
             retention.after_tick(float(data.time))
+        if contact_retention is not None:
+            contact_retention.after_tick(float(data.time))
         if getattr(self.runtime, "scripted_render", False):
             self.runtime.render()
         factor = getattr(self.runtime, "scripted_realtime_factor", 0.)

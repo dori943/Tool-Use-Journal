@@ -21,8 +21,10 @@ import numpy as np
 
 from tuj.m5_motion.profiles import PhysicalGraspProfile
 from tuj.m5_motion.schema import (
+    AttachedObjectTransform,
     ExecutionReport,
     ExecutionStatus,
+    FailureObservation,
     KeyframeEventType,
     KeyframePlanArtifact,
     KeyframePlanCandidate,
@@ -31,8 +33,11 @@ from tuj.m5_motion.schema import (
     SimulationRun,
 )
 from tuj.m5_motion.task_semantics import is_acquire_task, is_release_task
+from tuj.m5_motion.tool_use_journal import _raw_model_data
 from tuj.m5_motion.tool_use_journal_runtime import (
+    AttachmentBreakObservation,
     ToolUseJournalControllerTrajectoryPlayer,
+    ToolUseJournalAttachmentBroken,
     ToolUseJournalEERuntime,
 )
 
@@ -775,33 +780,9 @@ class PhysicalGraspMonitor:
         )
 
     def relative_transform(self) -> dict[str, Any]:
-        position, rotation = _object_pose(self.runtime, self.object_id)
-        reference_kind, reference_name, reference_position, reference_rotation = (
-            self.runtime._grasp_reference(self.runtime.env)
-        )
-        reference_rotation = np.asarray(reference_rotation, dtype=float)
-        translation = reference_rotation.T @ (
-            position - np.asarray(reference_position, dtype=float)
-        )
-        relative_rotation = reference_rotation.T @ rotation
-        _, _, free_joint_name = self.runtime._object_free_joint(
-            self.runtime.env, self.object_id
-        )
-        return {
-            "object_id": self.object_id,
-            "free_joint_name": str(free_joint_name),
-            "reference_kind": str(reference_kind),
-            "reference_name": str(reference_name),
-            "position_in_reference_m": [float(value) for value in translation],
-            "orientation_in_reference_xyzw": list(
-                _matrix_quaternion_xyzw(relative_rotation)
-            ),
-            # Keep the rotation matrix as diagnostic evidence; the fields above
-            # form the planning contract consumed by AttachedObjectTransform.
-            "rotation_matrix": [
-                [float(value) for value in row] for row in relative_rotation
-            ],
-        }
+        return _contact_friction_transform(
+            self.runtime, self.object_id
+        ).model_dump(mode="json")
 
     def summary(self) -> dict[str, Any]:
         if not self.samples:
@@ -877,6 +858,165 @@ def _object_pose(
     except (AttributeError, KeyError, TypeError, ValueError, IndexError) as error:
         raise ValueError(f"physical grasp object {object_id!r} is absent") from error
     return position, rotation
+
+
+def _contact_friction_transform(
+    runtime: ToolUseJournalEERuntime,
+    object_id: str,
+) -> AttachedObjectTransform:
+    position, rotation = _object_pose(runtime, object_id)
+    reference_kind, reference_name, reference_position, reference_rotation = (
+        runtime._grasp_reference(runtime.env)
+    )
+    reference_rotation = np.asarray(reference_rotation, dtype=float)
+    translation = reference_rotation.T @ (
+        position - np.asarray(reference_position, dtype=float)
+    )
+    relative_rotation = reference_rotation.T @ rotation
+    _, _, free_joint_name = runtime._object_free_joint(runtime.env, object_id)
+    return AttachedObjectTransform(
+        object_id=object_id,
+        free_joint_name=str(free_joint_name),
+        reference_kind=str(reference_kind),
+        reference_name=str(reference_name),
+        position_in_reference_m=tuple(float(value) for value in translation),
+        orientation_in_reference_xyzw=_matrix_quaternion_xyzw(relative_rotation),
+    )
+
+
+@dataclass(slots=True)
+class ContactFrictionRetentionMonitor:
+    """Fail closed when a contact-held object is lost or slips during motion."""
+
+    runtime: ToolUseJournalEERuntime
+    object_id: str
+    profile: PhysicalGraspProfile
+    reference_transform: AttachedObjectTransform
+    last_valid_contact_time_s: float
+    samples: list[dict[str, Any]] = field(default_factory=list)
+
+    @classmethod
+    def from_runtime(
+        cls,
+        runtime: ToolUseJournalEERuntime,
+        object_id: str,
+        profile: PhysicalGraspProfile,
+        *,
+        simulation_time_s: float | None = None,
+    ) -> "ContactFrictionRetentionMonitor":
+        if simulation_time_s is None:
+            _model, data = _raw_model_data(runtime.env)
+            simulation_time_s = float(data.time)
+        return cls(
+            runtime=runtime,
+            object_id=object_id,
+            profile=profile,
+            reference_transform=_contact_friction_transform(runtime, object_id),
+            last_valid_contact_time_s=float(simulation_time_s),
+        )
+
+    @classmethod
+    def from_grasp(
+        cls, monitor: PhysicalGraspMonitor
+    ) -> "ContactFrictionRetentionMonitor":
+        last_time = (
+            float(monitor.samples[-1]["simulation_time_s"])
+            if monitor.samples
+            else 0.0
+        )
+        return cls(
+            runtime=monitor.runtime,
+            object_id=monitor.object_id,
+            profile=monitor.profile,
+            reference_transform=_contact_friction_transform(
+                monitor.runtime, monitor.object_id
+            ),
+            last_valid_contact_time_s=last_time,
+        )
+
+    def transform(self) -> AttachedObjectTransform:
+        return _contact_friction_transform(self.runtime, self.object_id)
+
+    def after_tick(self, simulation_time_s: float) -> None:
+        contact = self.runtime.object_contact_metrics(self.object_id)
+        groups = set(contact.contact_groups)
+        bilateral = (
+            any(group.startswith("left_finger") for group in groups)
+            and any(group.startswith("right_finger") for group in groups)
+        )
+        valid_contact = (
+            bilateral
+            and contact.normal_force_n
+            >= self.profile.validation.minimum_normal_force_n
+        )
+        if valid_contact:
+            self.last_valid_contact_time_s = float(simulation_time_s)
+
+        current = self.transform()
+        reference_position = np.asarray(
+            self.reference_transform.position_in_reference_m, dtype=float
+        )
+        current_position = np.asarray(
+            current.position_in_reference_m, dtype=float
+        )
+        position_error = float(np.linalg.norm(current_position - reference_position))
+        reference_quaternion = np.asarray(
+            self.reference_transform.orientation_in_reference_xyzw, dtype=float
+        )
+        current_quaternion = np.asarray(
+            current.orientation_in_reference_xyzw, dtype=float
+        )
+        quaternion_dot = float(
+            np.clip(abs(np.dot(reference_quaternion, current_quaternion)), 0.0, 1.0)
+        )
+        orientation_error = 2.0 * math.acos(quaternion_dot)
+        contact_lost = (
+            float(simulation_time_s) - self.last_valid_contact_time_s
+            > self.profile.validation.contact_loss_grace_s
+        )
+        reasons: list[str] = []
+        if contact_lost:
+            reasons.append("CONTACT_FRICTION_CONTACT_LOST")
+        if (
+            position_error
+            > self.profile.validation.maximum_retention_translation_drift_m
+        ):
+            reasons.append("CONTACT_FRICTION_TRANSLATION_SLIP")
+        if (
+            orientation_error
+            > self.profile.validation.maximum_retention_orientation_drift_rad
+        ):
+            reasons.append("CONTACT_FRICTION_ORIENTATION_SLIP")
+        sample = {
+            "simulation_time_s": float(simulation_time_s),
+            "valid_contact": valid_contact,
+            "contact_count": contact.contact_count,
+            "contact_groups": sorted(groups),
+            "normal_force_n": contact.normal_force_n,
+            "position_error_m": position_error,
+            "orientation_error_rad": orientation_error,
+            "reasons": reasons,
+        }
+        self.samples.append(sample)
+        if reasons:
+            self.runtime._held_tool_id = None
+            self.runtime._contact_friction_retention = None
+            raise ToolUseJournalAttachmentBroken(
+                AttachmentBreakObservation(
+                    object_id=self.object_id,
+                    reasons=tuple(reasons),
+                    simulation_time_s=float(simulation_time_s),
+                    required_force_n=(
+                        self.profile.validation.minimum_normal_force_n
+                    ),
+                    required_torque_nm=0.0,
+                    position_error_m=position_error,
+                    orientation_error_rad=orientation_error,
+                    contact_count=contact.contact_count,
+                    contact_force_n=contact.normal_force_n,
+                    contact_groups=contact.contact_groups,
+                )
+            )
 
 
 class PhysicalGraspControllerTrajectoryPlayer(
@@ -993,13 +1133,17 @@ class PhysicalGraspControllerTrajectoryPlayer(
             run.model_copy(update={"plan": runtime_plan}), report_id=report_id
         )
         validation = self.monitor.summary()
+        trajectory_status = report.status
         succeeded = (
             validation["status"] == "SUCCESS"
-            and report.status is ExecutionStatus.SUCCESS
+            and trajectory_status is ExecutionStatus.SUCCESS
         )
         if succeeded:
             self.runtime.mark_contact_friction_object_as_tool(
                 self.monitor.object_id
+            )
+            self.runtime._contact_friction_retention = (
+                ContactFrictionRetentionMonitor.from_grasp(self.monitor)
             )
         final_state = report.final_robot_state
         if final_state is not None:
@@ -1009,9 +1153,28 @@ class PhysicalGraspControllerTrajectoryPlayer(
                     "attached_object_id": None,
                 }
             )
+        final_status = trajectory_status
+        failure = report.failure
+        if trajectory_status is ExecutionStatus.SUCCESS and not succeeded:
+            final_status = ExecutionStatus.FAILED
+            failure = FailureObservation(
+                code="GRASP_RETENTION_FAILED",
+                category="PHYSICAL_GRASP",
+                message=(
+                    f"contact-friction grasp of {self.monitor.object_id!r} "
+                    "did not satisfy formation, lift, and retention requirements"
+                ),
+                expected={
+                    "validation_status": "SUCCESS",
+                    "held_tool_id": self.monitor.object_id,
+                },
+                observed=dict(validation),
+            )
         return report.model_copy(
             update={
+                "status": final_status,
                 "final_robot_state": final_state,
+                "failure": failure,
                 "metadata": {
                     **report.metadata,
                     "grasp_execution_mode": (
@@ -1023,9 +1186,9 @@ class PhysicalGraspControllerTrajectoryPlayer(
                     ),
                     "physical_grasp_execution_succeeded": succeeded,
                     "trajectory_execution_status": (
-                        report.status.value
-                        if isinstance(report.status, ExecutionStatus)
-                        else str(report.status)
+                        trajectory_status.value
+                        if isinstance(trajectory_status, ExecutionStatus)
+                        else str(trajectory_status)
                     ),
                 },
             }

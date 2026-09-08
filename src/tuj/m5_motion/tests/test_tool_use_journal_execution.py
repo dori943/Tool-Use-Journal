@@ -4,9 +4,13 @@ from types import SimpleNamespace
 
 import pytest
 
+from tuj.m5_motion.attachment_retarget import attachment_transform
 from tuj.m5_motion.schema import (
+    AttachedObjectTransform,
     ArtifactProvenance,
     CollisionContext,
+    ExecutionReport,
+    ExecutionStatus,
     GoalType,
     ModuleName,
     MotionGoal,
@@ -16,10 +20,12 @@ from tuj.m5_motion.schema import (
     RobotState,
     SceneRef,
     SegmentType,
+    SimulationMetrics,
     TrajectorySegment,
     TrajectoryWaypoint,
     WorldSnapshot,
 )
+import tuj.m5_motion.tool_use_journal_execution as execution_module
 from tuj.m5_motion.tool_use_journal_execution import (
     ToolUseJournalExecutionAdapter,
 )
@@ -159,3 +165,95 @@ def test_adapter_refuses_unscoped_collision_execution() -> None:
 
     with pytest.raises(ValueError, match="no event-scoped collision contexts"):
         adapter.player(request, plan, 0)
+
+
+def test_world_snapshot_normalizes_and_carries_contact_friction_transform(
+    monkeypatch,
+) -> None:
+    request, _ = _request_and_plan()
+    request.task.tool = "part"
+    final_state = request.world.robot_state.model_copy(
+        update={"held_tool_id": "part"}
+    )
+    raw_transform = {
+        "object_id": "part",
+        "free_joint_name": "part_free",
+        "reference_kind": "body",
+        "reference_name": "right_hand",
+        "position_in_reference_m": [0.0, 0.0, 0.1],
+        "orientation_in_reference_xyzw": [0.0, 0.0, 0.0, 1.0],
+        "rotation_matrix": [
+            [1.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, 1.0],
+        ],
+    }
+
+    class _EnvironmentAdapter:
+        def __init__(self, env):
+            del env
+
+        def world_snapshot(self, **kwargs):
+            del kwargs
+            return request.world.model_copy(deep=True)
+
+    monkeypatch.setattr(
+        execution_module, "ToolUseJournalEnvironmentAdapter", _EnvironmentAdapter
+    )
+    runtime = SimpleNamespace(
+        env=object(), attachment=None, attached_object_id=None
+    )
+    adapter = ToolUseJournalExecutionAdapter(runtime, compiler=_Compiler())
+    report = ExecutionReport(
+        report_id="report:pick",
+        run_id="run:pick",
+        plan_id="plan:pick",
+        provenance=_provenance(
+            "report-artifact:pick", "ExecutionReport", ModuleName.MOTION_PLANNER
+        ),
+        status=ExecutionStatus.SUCCESS,
+        final_robot_state=final_state,
+        metrics=SimulationMetrics(
+            executed_duration_s=0.1,
+            max_joint_tracking_error_rad=0.0,
+        ),
+        metadata={
+            "physical_grasp_execution_succeeded": True,
+            "physical_grasp_transform": raw_transform,
+        },
+    )
+
+    picked_world = adapter.world_snapshot(request, report)
+    stored = picked_world.metadata["contact_friction_held_objects"]["part"]
+    assert "rotation_matrix" not in stored
+    assert AttachedObjectTransform.model_validate(stored).object_id == "part"
+
+    transport_request = request.model_copy(
+        update={"world": picked_world}, deep=True
+    )
+    transport_report = report.model_copy(
+        update={
+            "report_id": "report:transport",
+            "final_robot_state": final_state,
+            "metadata": {},
+        }
+    )
+    transported_world = adapter.world_snapshot(
+        transport_request, transport_report
+    )
+    assert transported_world.metadata["contact_friction_held_objects"] == {
+        "part": stored
+    }
+    assert attachment_transform(transported_world, "part").object_id == "part"
+
+    released_report = report.model_copy(
+        update={
+            "report_id": "report:release",
+            "final_robot_state": final_state.model_copy(
+                update={"held_tool_id": None}
+            ),
+            "metadata": {},
+        }
+    )
+    released_world = adapter.world_snapshot(transport_request, released_report)
+    assert released_world.metadata["contact_friction_held_objects"] == {}

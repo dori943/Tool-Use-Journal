@@ -124,6 +124,8 @@ class GraspValidationProfile:
     final_hold_duration_s: float = 1.0
     minimum_normal_force_n: float = 0.1
     max_friction_utilization: float = 0.95
+    maximum_retention_translation_drift_m: float = 0.005
+    maximum_retention_orientation_drift_rad: float = math.radians(5.0)
 
     def __post_init__(self) -> None:
         for name in (
@@ -131,6 +133,8 @@ class GraspValidationProfile:
             "contact_loss_grace_s",
             "final_hold_duration_s",
             "minimum_normal_force_n",
+            "maximum_retention_translation_drift_m",
+            "maximum_retention_orientation_drift_rad",
         ):
             _positive(name, getattr(self, name))
         for name in ("required_contact_ticks", "contact_freeze_ticks"):
@@ -314,6 +318,18 @@ class PhysicalGraspProfile:
                 raw.get(
                     "max_friction_utilization",
                     defaults.validation.max_friction_utilization,
+                )
+            ),
+            maximum_retention_translation_drift_m=float(
+                raw.get(
+                    "maximum_retention_translation_drift_m",
+                    defaults.validation.maximum_retention_translation_drift_m,
+                )
+            ),
+            maximum_retention_orientation_drift_rad=float(
+                raw.get(
+                    "maximum_retention_orientation_drift_rad",
+                    defaults.validation.maximum_retention_orientation_drift_rad,
                 )
             ),
         )

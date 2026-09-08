@@ -328,6 +328,30 @@ def test_transport_to_physical_region_evaluates_above_not_containment() -> None:
     assert result.observed["above_target_ids"] == ["block"]
 
 
+def test_transport_of_held_target_requires_retention_and_above_region() -> None:
+    request = _request(target_x_m=0.04)
+    request.task.action_type = "transport"
+    request.world.robot_state.held_tool_id = "block"
+    request.world.objects["block"]["pose"]["position_m"][2] = 0.02
+    report = _report()
+    report.final_robot_state.held_tool_id = None
+
+    lost = TaskAwareGoalEvaluator().evaluate(
+        request,
+        report,
+        request.world,
+    )
+    assert lost.status is GoalEvaluationStatus.FAILED
+
+    report.final_robot_state.held_tool_id = "block"
+    retained = TaskAwareGoalEvaluator().evaluate(
+        request,
+        report,
+        request.world,
+    )
+    assert retained.status is GoalEvaluationStatus.SATISFIED
+
+
 def test_place_into_region_requires_detachment_and_containment() -> None:
     request = _request(target_x_m=0.04)
     request.task.action_type = "place"

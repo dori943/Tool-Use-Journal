@@ -7,9 +7,11 @@ planning without pretending that an already-held object is a new grasp.
 
 from __future__ import annotations
 
+import copy
 from dataclasses import asdict, dataclass
 import hashlib
 import json
+import math
 from pathlib import Path
 from typing import Any, Mapping
 
@@ -291,20 +293,87 @@ def restore_runtime_checkpoint(
             f"unsupported model signature kind {signature_kind!r}"
         )
 
-    _restore_runtime_state(runtime.env, state)
-    runtime.restore_logical_state(
-        gripper_command=float(logical.get("gripper_command", -1.0)),
-        grasp_engaged=bool(logical.get("grasp_engaged", False)),
-        captured_gripper_action=captured_values,
-        attachment=attachment,
-        held_tool_id=(
-            str(logical["held_tool_id"])
-            if logical.get("held_tool_id") is not None
+    current_state = _capture_runtime_state(runtime.env)
+    qpos_layout = {name: len(values) for name, values in state.qpos_by_joint.items()}
+    qvel_layout = {name: len(values) for name, values in state.qvel_by_joint.items()}
+    current_qpos_layout = {
+        name: len(values) for name, values in current_state.qpos_by_joint.items()
+    }
+    current_qvel_layout = {
+        name: len(values) for name, values in current_state.qvel_by_joint.items()
+    }
+    if (
+        qpos_layout != current_qpos_layout
+        or qvel_layout != current_qvel_layout
+        or set(state.ctrl_by_actuator) != set(current_state.ctrl_by_actuator)
+    ):
+        raise RuntimeCheckpointError(
+            "checkpoint named-state topology does not match"
+        )
+    numeric_values = [
+        state.simulation_time_s,
+        *state.ctrl_by_actuator.values(),
+        *(value for values in state.qpos_by_joint.values() for value in values),
+        *(value for values in state.qvel_by_joint.values() for value in values),
+    ]
+    if not all(math.isfinite(value) for value in numeric_values):
+        raise RuntimeCheckpointError("checkpoint physical state must be finite")
+
+    previous_logical = {
+        "gripper_command": runtime._gripper_command,
+        "grasp_engaged": runtime._grasp_engaged,
+        "captured_gripper_action": (
+            runtime._captured_gripper_action.copy()
+            if runtime._captured_gripper_action is not None
             else None
         ),
-        attachment_position_tolerance_m=attachment_position_tolerance_m,
-        attachment_orientation_tolerance_rad=attachment_orientation_tolerance_rad,
-    )
+        "attachment": runtime._attachment,
+        "held_tool_id": runtime._held_tool_id,
+        "contact_friction_retention": runtime._contact_friction_retention,
+        "last_attachment_break": runtime._last_attachment_break,
+        "breakable_runtime": copy.deepcopy(runtime._breakable_runtime),
+    }
+    try:
+        _restore_runtime_state(runtime.env, state)
+        runtime.restore_logical_state(
+            gripper_command=float(logical.get("gripper_command", -1.0)),
+            grasp_engaged=bool(logical.get("grasp_engaged", False)),
+            captured_gripper_action=captured_values,
+            attachment=attachment,
+            held_tool_id=(
+                str(logical["held_tool_id"])
+                if logical.get("held_tool_id") is not None
+                else None
+            ),
+            attachment_position_tolerance_m=attachment_position_tolerance_m,
+            attachment_orientation_tolerance_rad=attachment_orientation_tolerance_rad,
+        )
+    except Exception as error:
+        try:
+            _restore_runtime_state(runtime.env, current_state)
+        except Exception as rollback_error:  # pragma: no cover - catastrophic MuJoCo failure
+            raise RuntimeCheckpointError(
+                "checkpoint restore failed and physical rollback also failed: "
+                f"{rollback_error}"
+            ) from error
+        finally:
+            runtime._gripper_command = previous_logical["gripper_command"]
+            runtime._grasp_engaged = previous_logical["grasp_engaged"]
+            runtime._captured_gripper_action = previous_logical[
+                "captured_gripper_action"
+            ]
+            runtime._attachment = previous_logical["attachment"]
+            runtime._held_tool_id = previous_logical["held_tool_id"]
+            runtime._contact_friction_retention = previous_logical[
+                "contact_friction_retention"
+            ]
+            runtime._last_attachment_break = previous_logical[
+                "last_attachment_break"
+            ]
+            runtime._breakable_runtime = previous_logical["breakable_runtime"]
+        raise RuntimeCheckpointError(
+            f"checkpoint restore rejected and was rolled back: {error}"
+        ) from error
     return RuntimeCheckpointRestore(
         path=source,
         progress=dict(progress),

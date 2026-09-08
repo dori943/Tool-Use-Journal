@@ -5,6 +5,7 @@ from types import SimpleNamespace
 import numpy as np
 import pytest
 
+import tuj.m5_motion.physical_grasp as physical_grasp_module
 from tuj.m5_motion.grasp_geometry import (
     TWO_FINGER_OPPOSED_CONTACT,
     TwoFingerOpposedContactBinder,
@@ -13,6 +14,8 @@ from tuj.m5_motion.grasp_geometry import (
     support_clearance_context,
 )
 from tuj.m5_motion.physical_grasp import (
+    ContactFrictionRetentionMonitor,
+    PhysicalGraspControllerTrajectoryPlayer,
     PhysicalGraspMonitor,
     RetargetedAcquireKeyframeProvider,
     RuntimeGraspParameters,
@@ -25,7 +28,10 @@ from tuj.m5_motion.profiles import (
     PhysicalGraspProfile,
 )
 from tuj.m5_motion.schema import (
+    AttachedObjectTransform,
     ArtifactProvenance,
+    ExecutionReport,
+    ExecutionStatus,
     GoalType,
     KeyframeEventType,
     KeyframePlanArtifact,
@@ -34,14 +40,26 @@ from tuj.m5_motion.schema import (
     KeyframeType,
     ModuleName,
     MotionGoal,
+    MotionPlan,
     MotionPlanRequest,
     MotionTask,
     RelativeKeyframeSpec,
     RobotState,
     SceneRef,
+    SegmentType,
+    SimulationConfig,
+    SimulationMetrics,
+    SimulationRun,
     StrategyGenerationProvenance,
     StrategyGeneratorKind,
+    TrajectorySegment,
+    TrajectoryWaypoint,
     WorldSnapshot,
+)
+from tuj.m5_motion.tool_use_journal_runtime import (
+    AttachmentContactMetrics,
+    ToolUseJournalAttachmentBroken,
+    ToolUseJournalControllerTrajectoryPlayer,
 )
 
 
@@ -105,6 +123,200 @@ def _artifact() -> KeyframePlanArtifact:
             )
         ],
     )
+
+
+def _simulation_run() -> SimulationRun:
+    state = RobotState(
+        robot_id="robot",
+        joint_names=["j1"],
+        joint_positions_rad=[0.0],
+    )
+    plan = MotionPlan(
+        plan_id="plan",
+        request_id="request",
+        provenance=ArtifactProvenance(
+            artifact_id="plan-artifact",
+            artifact_type="MotionPlan",
+            produced_by=ModuleName.MOTION_PLANNER,
+            invocation_id="fixture-plan",
+        ),
+        scene_signature="scene",
+        robot_id="robot",
+        joint_names=["j1"],
+        duration_s=0.1,
+        segments=[
+            TrajectorySegment(
+                segment_id="segment",
+                segment_type=SegmentType.CUSTOM,
+                start_time_s=0.0,
+                end_time_s=0.1,
+                waypoints=[
+                    TrajectoryWaypoint(
+                        time_from_start_s=0.0,
+                        joint_positions_rad=[0.0],
+                    ),
+                    TrajectoryWaypoint(
+                        time_from_start_s=0.1,
+                        joint_positions_rad=[0.0],
+                    ),
+                ],
+                collision_checked=True,
+            )
+        ],
+        expected_final_state=state,
+    )
+    return SimulationRun(
+        run_id="run",
+        provenance=ArtifactProvenance(
+            artifact_id="run-artifact",
+            artifact_type="SimulationRun",
+            produced_by=ModuleName.MOTION_PLANNER,
+            invocation_id="fixture-run",
+        ),
+        plan=plan,
+        config=SimulationConfig(),
+    )
+
+
+def test_failed_retention_changes_successful_trajectory_report_to_failed(
+    monkeypatch,
+) -> None:
+    run = _simulation_run()
+    trajectory_report = ExecutionReport(
+        report_id="report",
+        run_id=run.run_id,
+        plan_id=run.plan.plan_id,
+        provenance=ArtifactProvenance(
+            artifact_id="report-artifact",
+            artifact_type="ExecutionReport",
+            produced_by=ModuleName.MOTION_PLANNER,
+            invocation_id="fixture-report",
+        ),
+        status=ExecutionStatus.SUCCESS,
+        final_robot_state=run.plan.expected_final_state,
+        metrics=SimulationMetrics(
+            executed_duration_s=0.1,
+            max_joint_tracking_error_rad=0.0,
+        ),
+    )
+    monkeypatch.setattr(
+        ToolUseJournalControllerTrajectoryPlayer,
+        "execute",
+        lambda self, run, report_id=None: trajectory_report,
+    )
+    runtime = SimpleNamespace(
+        held_tool_id=None,
+        attached_object_id=None,
+        mark_contact_friction_object_as_tool=lambda object_id: pytest.fail(
+            f"failed grasp unexpectedly marked {object_id!r} as held"
+        ),
+    )
+    monitor = SimpleNamespace(
+        object_id="part",
+        summary=lambda: {
+            "status": "FAILED",
+            "object_id": "part",
+            "contact_formation": {"status": "FAILED"},
+            "grasp_retention": {"status": "FAILED"},
+        },
+    )
+    player = PhysicalGraspControllerTrajectoryPlayer(
+        runtime,
+        monitor=monitor,
+    )
+
+    report = player.execute(run)
+
+    assert report.status is ExecutionStatus.FAILED
+    assert report.failure is not None
+    assert report.failure.code == "GRASP_RETENTION_FAILED"
+    assert report.final_robot_state.held_tool_id is None
+    assert report.metadata["physical_grasp_execution_succeeded"] is False
+    assert report.metadata["trajectory_execution_status"] == "SUCCESS"
+
+
+def test_transport_retention_monitor_clears_held_state_after_contact_loss(
+    monkeypatch,
+) -> None:
+    transform = AttachedObjectTransform(
+        object_id="part",
+        free_joint_name="part_free",
+        reference_kind="body",
+        reference_name="right_hand",
+        position_in_reference_m=(0.0, 0.0, 0.1),
+        orientation_in_reference_xyzw=(0.0, 0.0, 0.0, 1.0),
+    )
+    monkeypatch.setattr(
+        physical_grasp_module,
+        "_contact_friction_transform",
+        lambda runtime, object_id: transform,
+    )
+    runtime = SimpleNamespace(
+        _held_tool_id="part",
+        _contact_friction_retention=None,
+        object_contact_metrics=lambda object_id: AttachmentContactMetrics(),
+    )
+    monitor = ContactFrictionRetentionMonitor(
+        runtime=runtime,
+        object_id="part",
+        profile=PhysicalGraspProfile(),
+        reference_transform=transform,
+        last_valid_contact_time_s=0.0,
+    )
+    runtime._contact_friction_retention = monitor
+
+    monitor.after_tick(0.05)
+    with pytest.raises(ToolUseJournalAttachmentBroken) as caught:
+        monitor.after_tick(0.07)
+
+    assert "CONTACT_FRICTION_CONTACT_LOST" in caught.value.observation.reasons
+    assert runtime._held_tool_id is None
+    assert runtime._contact_friction_retention is None
+
+
+def test_transport_retention_monitor_rejects_relative_pose_drift(
+    monkeypatch,
+) -> None:
+    reference = AttachedObjectTransform(
+        object_id="part",
+        free_joint_name="part_free",
+        reference_kind="body",
+        reference_name="right_hand",
+        position_in_reference_m=(0.0, 0.0, 0.1),
+        orientation_in_reference_xyzw=(0.0, 0.0, 0.0, 1.0),
+    )
+    shifted = reference.model_copy(
+        update={"position_in_reference_m": (0.01, 0.0, 0.1)}
+    )
+    monkeypatch.setattr(
+        physical_grasp_module,
+        "_contact_friction_transform",
+        lambda runtime, object_id: shifted,
+    )
+    contact = AttachmentContactMetrics(
+        contact_count=2,
+        normal_force_n=1.0,
+        contact_groups=("left_fingerpad", "right_fingerpad"),
+    )
+    runtime = SimpleNamespace(
+        _held_tool_id="part",
+        _contact_friction_retention=None,
+        object_contact_metrics=lambda object_id: contact,
+    )
+    monitor = ContactFrictionRetentionMonitor(
+        runtime=runtime,
+        object_id="part",
+        profile=PhysicalGraspProfile(),
+        reference_transform=reference,
+        last_valid_contact_time_s=0.0,
+    )
+    runtime._contact_friction_retention = monitor
+
+    with pytest.raises(ToolUseJournalAttachmentBroken) as caught:
+        monitor.after_tick(0.01)
+
+    assert "CONTACT_FRICTION_TRANSLATION_SLIP" in caught.value.observation.reasons
+    assert runtime._held_tool_id is None
 
 
 def test_contact_friction_decorator_removes_synthetic_attachment() -> None:

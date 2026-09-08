@@ -16,6 +16,7 @@ from tuj.m5_motion.physical_grasp import (
 )
 from tuj.m5_motion.profiles import PhysicalGraspProfile
 from tuj.m5_motion.schema import (
+    AttachedObjectTransform,
     CollisionContext,
     ExecutionReport,
     MotionPlan,
@@ -41,6 +42,22 @@ CollisionProbeSource = (
     Mapping[str, MuJoCoCollisionModelRegistry]
     | Callable[[MotionPlanRequest, MotionPlan, int], MuJoCoCollisionModelRegistry]
 )
+
+
+_CONTACT_FRICTION_HELD_METADATA_KEY = "contact_friction_held_objects"
+
+
+def _canonical_attached_object_transform(
+    value: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Validate the planning contract while discarding diagnostic-only fields."""
+
+    payload = {
+        name: value[name]
+        for name in AttachedObjectTransform.model_fields
+        if name in value
+    }
+    return AttachedObjectTransform.model_validate(payload).model_dump(mode="json")
 
 
 class ToolUseJournalExecutionAdapter:
@@ -243,16 +260,36 @@ class ToolUseJournalExecutionAdapter:
         )
         if report.final_robot_state is not None:
             world.robot_state = report.final_robot_state.model_copy(deep=True)
+        held: dict[str, dict[str, Any]] = {}
+        held_object_id = world.robot_state.held_tool_id
+        previous_holds = request.world.metadata.get(
+            _CONTACT_FRICTION_HELD_METADATA_KEY, {}
+        )
+        if held_object_id is not None and isinstance(previous_holds, Mapping):
+            previous_transform = previous_holds.get(held_object_id)
+            if isinstance(previous_transform, Mapping):
+                held[held_object_id] = _canonical_attached_object_transform(
+                    previous_transform
+                )
+        retention = getattr(
+            self.runtime, "_contact_friction_retention", None
+        )
+        if (
+            held_object_id is not None
+            and retention is not None
+            and getattr(retention, "object_id", None) == held_object_id
+        ):
+            held[held_object_id] = retention.transform().model_dump(mode="json")
         transform = report.metadata.get("physical_grasp_transform")
         if (
             report.metadata.get("physical_grasp_execution_succeeded") is True
             and isinstance(transform, Mapping)
         ):
-            held = dict(world.metadata.get("contact_friction_held_objects", {}))
-            held[str(transform.get("object_id") or request.task.tool)] = dict(
-                transform
-            )
-            world.metadata["contact_friction_held_objects"] = held
+            canonical = _canonical_attached_object_transform(transform)
+            object_id = str(canonical.get("object_id") or request.task.tool)
+            if world.robot_state.held_tool_id == object_id:
+                held[object_id] = canonical
+        world.metadata[_CONTACT_FRICTION_HELD_METADATA_KEY] = held
         return world
 
     def orchestrator(self, **kwargs: Any) -> SelectedPlanSimulationOrchestrator:

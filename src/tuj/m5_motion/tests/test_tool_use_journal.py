@@ -607,6 +607,82 @@ def test_runtime_checkpoint_accepts_legacy_v1_after_named_layout_check(
     restored.close()
 
 
+def test_runtime_checkpoint_rolls_back_physical_and_logical_state_on_failure(
+    tmp_path: Path,
+) -> None:
+    source = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = source.env.sim.model._model
+    data = source.env.sim.data._data
+    hand_id = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_BODY, "robot0_right_hand"
+    )
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    data.qpos[apple_qpos : apple_qpos + 3] = data.xpos[hand_id]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+    source.command_gripper(engaged=True, suction=False)
+    source.attach_object(
+        "apple",
+        max_attach_distance_m=0.05,
+        max_attach_penetration_m=0.05,
+    )
+    checkpoint = tmp_path / "invalid-attachment.checkpoint.json"
+    save_runtime_checkpoint(checkpoint, source)
+    source.close()
+
+    payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+    payload["logical_state"]["attachment"]["position_in_reference_m"] = [
+        1.0,
+        1.0,
+        1.0,
+    ]
+    checkpoint.write_text(json.dumps(payload), encoding="utf-8")
+
+    restored = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    restored_model = restored.env.sim.model._model
+    restored_data = restored.env.sim.data._data
+    shoulder = mujoco.mj_name2id(
+        restored_model, mujoco.mjtObj.mjOBJ_JOINT, ARM_JOINTS[0]
+    )
+    restored_data.qpos[int(restored_model.jnt_qposadr[shoulder])] = 0.6
+    mujoco.mj_forward(restored_model, restored_data)
+    before_qpos = restored_data.qpos.copy()
+
+    with pytest.raises(RuntimeCheckpointError, match="rolled back"):
+        restore_runtime_checkpoint(checkpoint, restored)
+
+    assert restored_data.qpos == pytest.approx(before_qpos)
+    assert restored.attached_object_id is None
+    assert restored.held_tool_id is None
+    assert restored.grasp_engaged is False
+    restored.close()
+
+
+def test_runtime_checkpoint_rejects_contact_hold_without_bilateral_contact(
+    tmp_path: Path,
+) -> None:
+    source = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    source.command_gripper(engaged=True, suction=False)
+    source.mark_contact_friction_object_as_tool("apple")
+    checkpoint = tmp_path / "unsupported-contact-hold.checkpoint.json"
+    save_runtime_checkpoint(checkpoint, source)
+    source.close()
+
+    restored = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    before_qpos = restored.env.sim.data._data.qpos.copy()
+
+    with pytest.raises(RuntimeCheckpointError, match="bilateral finger contact"):
+        restore_runtime_checkpoint(checkpoint, restored)
+
+    assert restored.env.sim.data._data.qpos == pytest.approx(before_qpos)
+    assert restored.held_tool_id is None
+    assert restored.grasp_engaged is False
+    restored.close()
+
+
 def test_runtime_contact_friction_hold_has_no_synthetic_attachment() -> None:
     runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
 
