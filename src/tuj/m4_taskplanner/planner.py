@@ -344,6 +344,7 @@ def plan(
         search_outcome.best_cost[search_outcome.goal_state],
         task_graph.constraints,
         normalized_edges(task_graph.order_constraints),
+        request.resource_catalog,
     )
     return PlanningResult(
         status=PlanStatus.SUCCESS,
@@ -477,6 +478,7 @@ def _build_selected_plan(
     total_cost,
     contract,
     hard_edges: list[tuple[str, str]],
+    resource_catalog,
 ) -> SelectedPlan:
     steps: list[PlanStep] = []
     subgoal_order: list[str] = []
@@ -559,6 +561,11 @@ def _build_selected_plan(
                         candidate_id=edge.candidate.candidate_id,
                         group_id=subgoals[edge.subgoal_id].group_id,
                         ee=edge.candidate.ee,
+                        ee_capabilities=list(
+                            resource_catalog.end_effectors[
+                                edge.candidate.ee
+                            ].capabilities
+                        ),
                         tool=edge.candidate.tool,
                         action_type=edge.candidate.action_type,
                         mode=subgoals[edge.subgoal_id].mode,

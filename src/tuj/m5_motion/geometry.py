@@ -139,7 +139,7 @@ def _dimensions(record: Mapping[str, Any]) -> np.ndarray | None:
 
 def _anchor_local(record: Any, anchor: str) -> np.ndarray:
     normalized = anchor.strip().lower()
-    if normalized in {"origin", "center", "dock", "dock_center"}:
+    if normalized in {"origin", "dock", "dock_center"}:
         return np.zeros(3)
     if isinstance(record, Mapping):
         anchors = record.get("anchors")
@@ -148,6 +148,11 @@ def _anchor_local(record: Any, anchor: str) -> np.ndarray:
             if position is None:
                 raise GeometryResolutionError(f"anchor {anchor!r} has no position")
             return position
+        if normalized == "center":
+            # A simulator body origin need not be the geometric center.  Use
+            # the explicit geometry anchor when present and preserve the
+            # historical origin fallback for records without one.
+            return np.zeros(3)
         dimensions = _dimensions(record)
         if dimensions is not None:
             if normalized in {"top", "top_center"}:
@@ -230,7 +235,17 @@ class RelativePoseResolver:
             if keyframe.tool_axis_to_align == "+z"
             else -axis_world
         )
-        rotation = _tool_rotation_from_axis(aligned_axis, keyframe.roll_rad)
+        packing_orientation = keyframe.metadata.get("packing_orientation_xyzw")
+        if packing_orientation is not None:
+            if not isinstance(packing_orientation, Sequence) or isinstance(
+                packing_orientation, (str, bytes)
+            ):
+                raise GeometryResolutionError(
+                    "packing_orientation_xyzw must contain four quaternion values"
+                )
+            rotation = _quaternion_matrix_xyzw(packing_orientation)
+        else:
+            rotation = _tool_rotation_from_axis(aligned_axis, keyframe.roll_rad)
         return Pose(
             frame_id="world",
             position_m=tuple(float(value) for value in position),

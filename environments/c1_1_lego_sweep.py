@@ -36,6 +36,7 @@ from robosuite.utils.placement_samplers import (
 )
 
 from environments.ee_rack import add_ee_rack
+from environments.task_camera import add_standard_task_camera
 from environments.objects import (
     BottleObject,
     ForkObject,
@@ -132,6 +133,12 @@ TOOL_PHYSICAL_METADATA = {
 
     "ladle": {
         "object_type": "sweep_tool",
+        "mass_kg": 0.026018410896111836,
+        "friction": [
+            0.95,
+            0.3,
+            0.1,
+        ],
         "full_size_mm": [
             63.5,
             208.1,
@@ -247,7 +254,7 @@ EE_RACK_LAYOUT = {
 # -0.60처럼 테이블 가장자리에 너무 붙지 않도록 -0.45 사용.
 # ============================================================
 
-TOOL_X = -0.4
+TOOL_X = -0.3
 
 
 # ------------------------------------------------------------
@@ -336,7 +343,7 @@ class C1_1_LegoSweep(ManipulationEnv):
         placement_initializer=None,
         has_renderer=False,
         has_offscreen_renderer=True,
-        render_camera="ee_rack_sideview",
+        render_camera="agentview",
         render_collision_mesh=False,
         render_visual_mesh=True,
         render_gpu_device_id=-1,
@@ -653,6 +660,13 @@ class C1_1_LegoSweep(ManipulationEnv):
             ],
 
             mujoco_objects=all_objects,
+        )
+
+        self._standard_camera = add_standard_task_camera(
+            self.model,
+            robot_base_xy=(ROBOT_BASE_X, 0.0),
+            robot_base_yaw_rad=0.0,
+            surface_z=float(self.table_offset[2]),
         )
 
     # ========================================================

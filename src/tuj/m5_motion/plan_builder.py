@@ -26,6 +26,7 @@ from tuj.m5_motion.schema import (
     TrajectoryWaypoint,
 )
 from tuj.m5_motion.strategy import ConnectedStrategy
+from tuj.m5_motion.task_semantics import is_release_task, task_operation
 from tuj.m5_motion.trajectory_processing import (
     QuinticTimeParameterizer,
     clamp_joint_limit_roundoff,
@@ -466,12 +467,23 @@ class MotionPlanBuilder:
             request.world.robot_state.attached_object_id
         )
         current_held_tool_id = request.world.robot_state.held_tool_id
-        if request.task.action_type == "PICK_TOOL":
-            current_held_tool_id = request.task.goal.target_object_id
-        elif request.task.action_type in {
+        operation = task_operation(request.task)
+        target_object_id = (
+            request.task.goal.target_object_id
+            or request.task.tool
+            or next(iter(request.task.target_ids), None)
+        )
+        from tuj.m5_motion.physical_grasp import uses_contact_friction
+
+        if operation == "PICK_TOOL" or uses_contact_friction(request):
+            current_held_tool_id = target_object_id
+        elif operation in {
             "RETURN_TOOL",
             "TERMINAL_RETURN_TOOL",
-        }:
+        } or (
+            is_release_task(request.task)
+            and current_held_tool_id == target_object_id
+        ):
             current_held_tool_id = None
         current_gripper = (
             request.world.robot_state.gripper.model_copy(deep=True)
@@ -703,6 +715,22 @@ class MotionPlanBuilder:
                 event_offsets[name] = float(raw_offset)
 
             segment_end = movement_end + hold_duration
+            # Runtime events must coincide with an executable waypoint.  A
+            # post-motion event may occur inside the hold interval (for
+            # example, release after 0.1 s and then let the object settle), so
+            # materialize a stationary waypoint at every such event offset.
+            for event_offset in sorted(
+                {
+                    value
+                    for value in event_offsets.values()
+                    if 0.0 < value < hold_duration
+                }
+            ):
+                held = timed_waypoints[-1].model_copy(deep=True)
+                held.time_from_start_s = movement_end + event_offset
+                held.joint_velocities_rad_s = [0.0] * len(joint_names)
+                held.joint_accelerations_rad_s2 = [0.0] * len(joint_names)
+                timed_waypoints = (*timed_waypoints, held)
             if hold_duration > 0.0:
                 held = timed_waypoints[-1].model_copy(deep=True)
                 held.time_from_start_s = segment_end
@@ -847,6 +875,14 @@ class MotionPlanBuilder:
             ),
             held_tool_id=current_held_tool_id,
         )
+        planned_contact_friction_transform = next(
+            (
+                node.keyframe.metadata["planned_contact_friction_transform"]
+                for node in connected.nodes
+                if "planned_contact_friction_transform" in node.keyframe.metadata
+            ),
+            None,
+        )
         return MotionPlan(
             plan_id=plan_id,
             request_id=request.request_id,
@@ -863,5 +899,15 @@ class MotionPlanBuilder:
                 "strategy_id": connected.strategy_id,
                 "ik_branch_ids": [node.solution.branch_id for node in connected.nodes],
                 "edge_evaluations": connected.edge_evaluations,
+                **(
+                    {
+                        "grasp_execution_mode": "CONTACT_FRICTION",
+                        "planned_contact_friction_transform": (
+                            planned_contact_friction_transform
+                        ),
+                    }
+                    if planned_contact_friction_transform is not None
+                    else {}
+                ),
             },
         )

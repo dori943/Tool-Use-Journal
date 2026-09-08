@@ -8,14 +8,23 @@ from typing import Mapping, Protocol
 
 from tuj.m5_motion.compiler import (
     FirstFeasibleStrategyCompiler,
+    StrategyAttempt,
     StrategyCompilationResult,
 )
 from tuj.m5_motion.kinematics import UR5eKinematics
-from tuj.m5_motion.plan_builder import FinalSegmentValidator, MotionPlanBuilder
+from tuj.m5_motion.plan_builder import (
+    FinalSegmentValidator,
+    MotionPlanBuildError,
+    MotionPlanBuilder,
+)
 from tuj.m5_motion.path_planning import (
     CartesianEdgePlanner,
     PlannerDispatchEdgePlanner,
     RRTConnectEdgePlanner,
+)
+from tuj.m5_motion.phase_contract import (
+    KeyframePhaseContractError,
+    validate_keyframe_phase_contract,
 )
 from tuj.m5_motion.safety import KinematicSafetyValidator
 from tuj.m5_motion.schema import (
@@ -32,6 +41,7 @@ from tuj.m5_motion.strategy import (
     InterpolatingEdgePlanner,
     StateValidator,
 )
+from tuj.m5_motion.trajectory_processing import TrajectoryProcessingError
 
 
 class KeyframeStrategyProvider(Protocol):
@@ -116,6 +126,12 @@ class MotionPlanningPipeline:
             raise MotionPlanningPipelineError(
                 "keyframe artifact subgoal_id does not match the request"
             )
+        try:
+            validate_keyframe_phase_contract(request, artifact)
+        except KeyframePhaseContractError as error:
+            raise MotionPlanningPipelineError(
+                f"keyframe artifact violates the task phase contract: {error}"
+            ) from error
 
     @staticmethod
     def _plan_identity(
@@ -290,92 +306,137 @@ class MotionPlanningPipeline:
                 wrap_joints=False,
             ),
         )
-        compilation = compiler.compile(
-            request.world,
-            artifact.candidates,
-            start_joint_config=request.world.robot_state.joint_positions_rad,
-            state_validator=effective_state_validator,
-            edge_planner=selected_edge_planner,
-        )
-        if compilation.connected is None:
-            failures = "; ".join(
-                (
-                    f"{attempt.strategy_id}="
-                    f"{attempt.failure_code or 'UNKNOWN'}"
-                    + (f" ({attempt.detail})" if attempt.detail else "")
-                )
-                for attempt in compilation.attempts
-            )
-            raise MotionPlanningPipelineError(
-                f"no generated keyframe strategy produced a connected path: {failures}",
-                compilation=compilation,
-            )
-
         plan_id, provenance = self._plan_identity(request, artifact)
-        try:
-            def final_validator(
-                waypoints: tuple,
-                context: CollisionContext,
-            ) -> bool:
-                if not final_segment_validator(waypoints, context):
-                    source_owner = getattr(
-                        final_segment_validator, "__self__", None
+
+        def final_validator(
+            waypoints: tuple,
+            context: CollisionContext,
+        ) -> bool:
+            if not final_segment_validator(waypoints, context):
+                source_owner = getattr(
+                    final_segment_validator, "__self__", None
+                )
+                setattr(
+                    final_validator,
+                    "last_path_collision_check",
+                    getattr(
+                        source_owner,
+                        "last_path_collision_check",
+                        None,
+                    ),
+                )
+                return False
+            if not isinstance(
+                effective_state_validator, KinematicSafetyValidator
+            ):
+                return True
+            for waypoint_index, waypoint in enumerate(waypoints):
+                safety_report = effective_state_validator.check(
+                    waypoint.joint_positions_rad,
+                    context=context,
+                )
+                if not safety_report.valid:
+                    safety_report = replace(
+                        safety_report,
+                        detail=(
+                            f"waypoint {waypoint_index}: "
+                            f"{safety_report.detail}"
+                        ),
                     )
                     setattr(
                         final_validator,
                         "last_path_collision_check",
-                        getattr(
-                            source_owner,
-                            "last_path_collision_check",
-                            None,
-                        ),
+                        safety_report,
                     )
                     return False
-                if not isinstance(
-                    effective_state_validator, KinematicSafetyValidator
-                ):
-                    return True
-                for waypoint_index, waypoint in enumerate(waypoints):
-                    safety_report = effective_state_validator.check(
-                        waypoint.joint_positions_rad,
-                        context=context,
-                    )
-                    if not safety_report.valid:
-                        safety_report = replace(
-                            safety_report,
-                            detail=(
-                                f"waypoint {waypoint_index}: "
-                                f"{safety_report.detail}"
-                            ),
-                        )
-                        setattr(
-                            final_validator,
-                            "last_path_collision_check",
-                            safety_report,
-                        )
-                        return False
-                return True
+            return True
 
-            plan = self._builder.build(
-                request,
-                compilation.connected,
-                plan_id=plan_id,
-                provenance=provenance,
-                collision_contexts=collision_contexts,
-                initial_collision_context_id=initial_collision_context_id,
-                final_segment_validator=final_validator,
-                joint_position_limits_rad=joint_limits,
+        remaining_candidates = list(artifact.candidates)
+        attempts: list[StrategyAttempt] = []
+        last_build_error: Exception | None = None
+        while remaining_candidates:
+            current = compiler.compile(
+                request.world,
+                remaining_candidates,
+                start_joint_config=request.world.robot_state.joint_positions_rad,
+                state_validator=effective_state_validator,
+                edge_planner=selected_edge_planner,
             )
-        except Exception as error:
-            raise MotionPlanningPipelineError(
-                f"connected path could not be finalized ({type(error).__name__})",
+            attempts.extend(current.attempts)
+            compilation = StrategyCompilationResult(
+                connected=current.connected,
+                attempts=tuple(attempts),
+            )
+            if current.connected is None:
+                break
+            try:
+                setattr(final_validator, "last_path_collision_check", None)
+                plan = self._builder.build(
+                    request,
+                    current.connected,
+                    plan_id=plan_id,
+                    provenance=provenance,
+                    collision_contexts=collision_contexts,
+                    initial_collision_context_id=initial_collision_context_id,
+                    final_segment_validator=final_validator,
+                    joint_position_limits_rad=joint_limits,
+                )
+            except (
+                MotionPlanBuildError,
+                TrajectoryProcessingError,
+                ValueError,
+            ) as error:
+                last_build_error = error
+                connected_attempt = attempts.pop()
+                attempts.append(
+                    StrategyAttempt(
+                        strategy_id=connected_attempt.strategy_id,
+                        resolved_keyframes=connected_attempt.resolved_keyframes,
+                        selection=connected_attempt.selection,
+                        failure_code="FINAL_VALIDATION_FAILED",
+                        detail=f"{type(error).__name__}: {error}",
+                        ik_diagnostics=connected_attempt.ik_diagnostics,
+                    )
+                )
+                attempted_ids = {
+                    attempt.strategy_id for attempt in current.attempts
+                }
+                remaining_candidates = [
+                    candidate
+                    for candidate in remaining_candidates
+                    if candidate.strategy_id not in attempted_ids
+                ]
+                continue
+            compilation = StrategyCompilationResult(
+                connected=current.connected,
+                attempts=tuple(attempts),
+            )
+            return MotionPlanningResult(
+                keyframe_artifact=artifact,
                 compilation=compilation,
-            ) from error
-        return MotionPlanningResult(
-            keyframe_artifact=artifact,
-            compilation=compilation,
-            plan=plan,
+                plan=plan,
+            )
+
+        compilation = StrategyCompilationResult(
+            connected=None,
+            attempts=tuple(attempts),
         )
+        failures = "; ".join(
+            (
+                f"{attempt.strategy_id}="
+                f"{attempt.failure_code or 'UNKNOWN'}"
+                + (f" ({attempt.detail})" if attempt.detail else "")
+            )
+            for attempt in compilation.attempts
+        )
+        message = "no generated keyframe strategy produced a finalizable path"
+        error = MotionPlanningPipelineError(
+            f"{message}: {failures}",
+            compilation=compilation,
+        )
+        if last_build_error is not None:
+            raise error from last_build_error
+        raise error
 
 
 __all__ = [

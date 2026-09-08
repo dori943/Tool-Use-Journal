@@ -1,4 +1,5 @@
 from __future__ import annotations
+import pytest
 
 from types import SimpleNamespace
 
@@ -330,7 +331,8 @@ def test_contact_friction_pick_keeps_target_free_after_gripper_close() -> None:
     ) in setup.collision_contexts[grasp.collision_context_id].allowed_collision_pairs
 
 
-def test_place_binds_detach_and_stationary_target_pose_for_retreat() -> None:
+@pytest.mark.parametrize("release_contact", [False, True])
+def test_place_binds_detach_and_stationary_target_pose_for_retreat(release_contact) -> None:
     attached = AttachedObjectTransform(
         object_id="bottle",
         free_joint_name="bottle_free",
@@ -369,13 +371,16 @@ def test_place_binds_detach_and_stationary_target_pose_for_retreat() -> None:
         )
     )
 
+    if release_contact:
+        source.candidates[0].keyframes[1].metadata["allow_release_contact"] = True
+        source.candidates[0].keyframes.append(_keyframe("clear", KeyframeType.RETREAT))
     setup = _factory().prepare(request, source)
-    transfer, place, retreat = setup.keyframe_artifact.candidates[0].keyframes
+    transfer, place, retreat, *clear = setup.keyframe_artifact.candidates[0].keyframes
 
     assert transfer.collision_context_id == setup.initial_collision_context_id
     assert place.collision_context_id.startswith("place-contact:bottle:")
     assert place.collision_context_after_events_id.startswith(
-        "object-detached:bottle:"
+        "object-release-contact:bottle:" if release_contact else "object-detached:bottle:"
     )
     assert retreat.collision_context_id == place.collision_context_after_events_id
     detached = setup.collision_contexts[retreat.collision_context_id]
@@ -384,8 +389,64 @@ def test_place_binds_detach_and_stationary_target_pose_for_retreat() -> None:
         item for item in detached.free_object_poses if item.object_id == "bottle"
     )
     assert bottle.pose == target_pose
+    if release_contact:
+        assert detached.allowed_collision_pairs
+        assert clear[0].collision_context_id != retreat.collision_context_id
+        assert not setup.collision_contexts[clear[0].collision_context_id].allowed_collision_pairs
     contact = setup.collision_contexts[place.collision_context_id]
     assert ("bottle", "table_collision") in contact.allowed_collision_pairs
+
+
+def test_contact_friction_place_uses_collision_proxy_then_opens_gripper() -> None:
+    target_pose = Pose(
+        frame_id="world",
+        position_m=(0.7, 0.1, 0.15),
+        orientation_xyzw=(0.0, 0.0, 0.0, 1.0),
+    )
+    request = _request(
+        MotionGoal(
+            goal_type=GoalType.POSE,
+            target_object_id="bottle",
+            target_pose=target_pose,
+            target_region_id="table_collision",
+        ),
+        action_type="PLACE",
+    )
+    request.world.robot_state.held_tool_id = "bottle"
+    request.world.metadata["contact_friction_held_objects"] = {
+        "bottle": {
+            "object_id": "bottle",
+            "free_joint_name": "bottle_free",
+            "reference_kind": "body",
+            "reference_name": "robot0_right_hand",
+            "position_in_reference_m": [0.0, 0.0, 0.1],
+            "orientation_in_reference_xyzw": [0.0, 0.0, 0.0, 1.0],
+        }
+    }
+    source = _artifact(
+        (
+            _keyframe("transfer", KeyframeType.TRANSFER),
+            _keyframe(
+                "place",
+                KeyframeType.PLACE,
+                events=(KeyframeEventType.GRIPPER_OPEN,),
+            ),
+            _keyframe("retreat", KeyframeType.RETREAT),
+        )
+    )
+
+    setup = _factory().prepare(request, source)
+    transfer, place, retreat = setup.keyframe_artifact.candidates[0].keyframes
+
+    initial = setup.collision_contexts[setup.initial_collision_context_id]
+    assert initial.metadata["attachment_proxy"] == "CONTACT_FRICTION"
+    assert initial.attached_object_ids == ["bottle"]
+    assert transfer.collision_context_id == setup.initial_collision_context_id
+    assert place.collision_context_id.startswith("place-contact:bottle:")
+    assert place.collision_context_after_events_id.startswith(
+        "object-detached:bottle:"
+    )
+    assert retreat.collision_context_id == place.collision_context_after_events_id
 
 
 def test_default_motion_gets_explicit_context_on_every_keyframe() -> None:

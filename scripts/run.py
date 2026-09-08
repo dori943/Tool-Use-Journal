@@ -148,6 +148,11 @@ def stage_m1(task, out, args):
                 (out / "m1_points.npz").write_bytes(npz.read_bytes())
             else:
                 print(f"[M1] 경고: {npz} 없음 — M3 접지가 점군을 찾지 못합니다.")
+            source_world = src.parent / "m1_world.json"
+            if source_world.exists():
+                (out / "m1_world.json").write_bytes(source_world.read_bytes())
+            else:
+                print(f"[M1] 경고: {source_world} 없음 — M5가 관측 당시 상태를 복원할 수 없습니다.")
         return
 
     seed_everything(args.seed)
@@ -279,6 +284,14 @@ def stage_m4(task, out, args, gk_paths=None):
             "--output", str(out / "m4.json")]
     if args.initial_state:
         argv += ["--initial-state", str(args.initial_state)]
+    aliases = {}
+    for node in read_json(out / "m1.json").get("nodes", []):
+        canonical_id = node.get("canonical_id")
+        if isinstance(canonical_id, str) and canonical_id:
+            aliases[node["id"]] = canonical_id
+    alias_path = out / "id_aliases.json"
+    alias_path.write_text(json.dumps(aliases, indent=2), encoding="utf-8")
+    argv += ["--id-aliases", str(alias_path)]
     call_main(module, argv, "run_m4")
 
 
@@ -356,11 +369,7 @@ def run_m5_runner(module, argv, label, m5_dir):
 
 
 def stage_m5(task, out, args):
-    """M5 모션 계획.
-
-    기본은 태스크 비의존 범용 러너(run_m5.py). --m5-physical
-    이면 같은 러너의 물리 실행 모드(--physical)를 쓴다 — 태스크 전용 물리 예제
-    러너를 subprocess 로 띄운다(현재 c1_1 만 지원).
+    """태스크 비의존 M5 모션 계획.
 
     범용 러너는 --environment 로 환경을 다시 만들어 초기 WorldSnapshot 을 뜬다.
     같은 프로세스 안에서 M1 과 같은 시드를 다시 심어 배치를 맞춘다.
@@ -378,30 +387,30 @@ def stage_m5(task, out, args):
     env_name = args.m5_environment or TASK_ENV.get(task)
 
     seed_everything(args.seed)
-    if args.m5_physical:
-        module = load_script("run_m5")
-        argv = [task, "--physical",
-                "--task-planner", str(m4), "--output-dir", str(m5_dir)]
-        if args.m5_validate_only:
-            argv.append("--validate-input-only")
-        argv += args.m5_args
-        run_m5_runner(module, argv, "run_m5(physical)", m5_dir)
-    else:
-        if not env_name:
-            sys.exit(f"[err] {task!r} 의 환경 이름을 모릅니다 — "
-                     f"--m5-environment 로 지정하거나 TASK_ENV 에 등록하십시오.")
-        module = load_script("run_m5")
-        argv = ["--task-planner", str(m4),
-                "--environment", env_name,
-                "--output-dir", str(m5_dir),
-                "--seed", str(args.seed),
-                "--provider", os.environ["TUJ_LLM_PROVIDER"]]
-        if args.m5_validate_only:
-            argv.append("--validate-input-only")
-        elif args.m5_simulate:
-            argv += ["--simulate", args.m5_simulate, "--headless"]
-        argv += args.m5_args
-        run_m5_runner(module, argv, "run_m5", m5_dir)
+    if not env_name:
+        sys.exit(f"[err] {task!r} 의 환경 이름을 모릅니다 — "
+                 f"--m5-environment 로 지정하거나 TASK_ENV 에 등록하십시오.")
+    module = load_script("run_m5")
+    argv = ["--task-planner", str(m4),
+            "--environment", env_name,
+            "--output-dir", str(m5_dir),
+            "--seed", str(args.seed),
+            "--provider", os.environ["TUJ_LLM_PROVIDER"]]
+    m1_world = out / "m1_world.json"
+    if m1_world.exists():
+        argv += ["--initial-world", str(m1_world)]
+    m1_geometry = out / "m1.json"
+    id_aliases = out / "id_aliases.json"
+    if m1_geometry.exists():
+        argv += ["--scene-geometry", str(m1_geometry)]
+    if id_aliases.exists():
+        argv += ["--id-aliases", str(id_aliases)]
+    if args.m5_validate_only:
+        argv.append("--validate-input-only")
+    elif args.m5_simulate:
+        argv += ["--simulate", args.m5_simulate, "--headless"]
+    argv += args.m5_args
+    run_m5_runner(module, argv, "run_m5", m5_dir)
 
     summary = m5_dir / "m5_summary.json"
     if summary.exists():
@@ -458,8 +467,6 @@ def build_parser():
                    help="M5 를 입력 계약 검증만 수행 (OpenAI/MuJoCo 실행 없음)")
     p.add_argument("--m5-simulate", choices=("kinematic", "controller"),
                    default=None, help="M5 계획을 MuJoCo 로 헤드리스 재생")
-    p.add_argument("--m5-physical", action="store_true",
-                   help="물리 실행 모드 (태스크 전용 물리 예제 러너, 현재 c1_1)")
     p.add_argument("--m5-args", nargs=argparse.REMAINDER, default=[],
                    help="이 뒤의 인자는 M5 러너로 그대로 전달")
     p.add_argument("--view", action="store_true", help="M1 단계에서 뷰어 표시")

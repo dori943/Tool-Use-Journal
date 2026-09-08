@@ -124,6 +124,10 @@ def test_empty_initial_mount_selects_first_ee_to_minimize_later_exchanges() -> N
     assert result.selected_plan.cost_vector.ee_switches == 0
     assert result.selected_plan.terminal_state["current_ee"] == "B"
     assert result.selected_plan.ee_blocks[0]["ee"] == "B"
+    assert all(
+        assignment.ee_capabilities == ["grip", "tool_holding", "suction"]
+        for assignment in result.selected_plan.candidate_assignments
+    )
 
 
 # --------------------------------------------------------------------------- #

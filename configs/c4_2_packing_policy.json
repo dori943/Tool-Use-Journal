@@ -1,0 +1,20 @@
+{
+  "policy": "upright_cartons_before_diagonal_long_objects",
+  "reason": "Place rigid cartons upright on the floor with their small footprints before diagonal long objects; laying cartons after the long objects enlarged their footprints and displaced the whisk across the rim.",
+  "target_order": [
+    "obj_cereal_cereal",
+    "obj_milk_milk",
+    "obj_rolling_pin_rolling_pin",
+    "obj_whisk_whisk",
+    "obj_baguette_baguette"
+  ],
+  "evidence": {
+    "source": "C4-2 collision-mesh packing diagnostics",
+    "failed_laid_carton_effect": "whisk exceeded the +y interior boundary by 23.9 mm after cereal/milk were laid above the long-object stack",
+    "long_object_lengths_m": {
+      "obj_rolling_pin_rolling_pin": 0.300,
+      "obj_whisk_whisk": 0.280,
+      "obj_baguette_baguette": 0.260
+    }
+  }
+}

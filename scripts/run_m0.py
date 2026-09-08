@@ -37,14 +37,21 @@ import robosuite.macros as macros
 macros.IMAGE_CONVENTION = "opencv"                     # 상하반전 방지 (역투영 필수)
 
 import environments  # noqa: F401  (suite.make 등록)
+from environments.task_camera import (
+    STANDARD_TASK_CAMERA_FOVY_DEG,
+    STANDARD_TASK_CAMERA_NAME,
+    STANDARD_TASK_VIDEO_HEIGHT,
+    STANDARD_TASK_VIDEO_WIDTH,
+)
 import robosuite as suite
 from robosuite.utils import camera_utils as CU
 
 from tuj.m0_scene import build_m0, points_from_frame, serialize
 
-CAM, H, W = "agentview", 512, 512
-FOVY_OVERRIDE = 60.0        # None이면 씬 기본값(45°)
-AUTO_FIT = True             # True: 추적 객체 전부 프레임에 들어가게 카메라 위치 자동 조정
+CAM = STANDARD_TASK_CAMERA_NAME
+H, W = STANDARD_TASK_VIDEO_HEIGHT, STANDARD_TASK_VIDEO_WIDTH
+FOVY_OVERRIDE = STANDARD_TASK_CAMERA_FOVY_DEG
+AUTO_FIT = False            # 공통 robot-relative agentview 위치를 task마다 이동하지 않는다.
 AUTO_FIT_MARGIN = 0.85      # 프레임 여백 (85% 안에 맞춤)
 
 

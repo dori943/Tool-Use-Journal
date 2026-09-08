@@ -10,7 +10,6 @@
 | 실험 연결: 함수는 호출하지만 성공 미검증 | plate(2F): 현재 runtime에서 lift 전 접촉 안정성 실패 |
 | 이식·등록 제외 | tongs, ladle |
 
-접시에는 별도 **vacuum 대안**도 추가했다. C1_1에서 `ee=vac`을 명시하면 `grasp_plate_vacuum(context)`를 호출한다. 기본 배치에서 파지·5초 유지·2cm 후속 이동·놓기를, 다른 위치에서 30° 기울이기·유지·놓기까지 통과했다. 접촉 확인 후 KINEMATIC attach를 사용하는 검증이며 실제 흡착력이나 전체 쓸기 성공을 의미하지 않는다. 기본 `plate+2F`는 기존 실험 상태를 유지한다. 상세 비교는 `artifacts/plate-comparison-20260905/report.md`, 근거 해시는 [PLATE_VACUUM_VALIDATION.json](PLATE_VACUUM_VALIDATION.json)에 있다.
 
 자동 분기는 plate를 포함한 14개 객체에 연결되어 있다. 검증 완료는 13개이고 plate는 `EXPERIMENTAL`로 manifest에 기록된다. 2026-09-04의 8개 후속 통과 기록에 09-05 보정으로 bottle, spatula, bread, mug, lid가 추가됐다. 후속 검사는 일반 M5 계획기를 통한 2cm 이동·2초 유지 및 실제 release이며, 전체 task PLACE나 모든 배치의 성공률을 뜻하지 않는다. plate 파지가 실패하면 해당 단계에서 중단하며 일반 LLM 파지로 바꾸지 않는다.
 
