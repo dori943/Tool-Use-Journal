@@ -5,8 +5,27 @@ that have completed controller replay and the applicable lock/release model
 transition validation.
 
 Shared rack trajectories live outside task folders. The registry first checks
-an optional environment-specific override, then checks `ee_rack/`. It never
-scans another task's directory. Shared files must declare
+an optional environment-specific override, then checks the shared portable
+directory for that environment family:
+
+- `ee_rack/` — table / C1-1-relative workcells (robot→rack relative Z ≈ 0.123 m)
+- `ee_rack_kitchen/` — RoboCasa kitchen pedestal workcells
+  (robot→rack relative Z ≈ 0.355 m; commissioned on `C1_2_DoughFlatten`)
+
+Environment → shared cache directory:
+
+| environment | cache |
+|-------------|--------|
+| `C1_1_LegoSweep` | `ee_rack` |
+| `C2_1_ObjectSorting` | `ee_rack` |
+| `C3_1_ObjectSorting` | `ee_rack` |
+| `C4_2_DiagonalFitPacking` | `ee_rack` |
+| `C1_2_DoughFlatten` | `ee_rack_kitchen` |
+| `C2_2_SandwichAssembly` | `ee_rack_kitchen` |
+| `C3_2_BreakfastTrayPreparation` | `ee_rack_kitchen` |
+| `C4_1_IntervalFitExtraction` | `ee_rack_kitchen` |
+
+It never scans another task's directory. Shared files must declare
 `portable_across_environments` and a matching `rack-relative-v1` signature.
 Their `environment_name` remains the commissioning provenance, not the lookup
 or usage scope.
@@ -16,6 +35,13 @@ Expected layout:
 ```text
 configs/precomputed_ee_paths/
   ee_rack/
+    bare_to_2F.json
+    bare_to_3F.json
+    bare_to_vac.json
+    2F_to_bare.json
+    3F_to_bare.json
+    vac_to_bare.json
+  ee_rack_kitchen/
     bare_to_2F.json
     bare_to_3F.json
     bare_to_vac.json
@@ -39,17 +65,25 @@ Cross-environment playback keeps the joint trajectory but rebases every stored
 EEF pose through the rack reference frame. It verifies the canonical start
 joint state and robot-to-rack pose, then densely collision-checks the complete
 trajectory against the current environment's collision models and dynamic
-objects. A path without explicit portable metadata is never loaded from the
-shared `ee_rack/` directory.
+objects. A path without explicit portable metadata is never loaded from a
+shared portable directory.
 
 The commissioning command performs dynamic generation once, controller
 execution, fresh-runtime precomputed replay (three times by default), and only
-then publishes the template:
+then publishes the template.  Default output directory follows the environment
+family (`ee_rack` vs `ee_rack_kitchen`):
 
 ```text
 python scripts/generate_precomputed_ee_attach.py 2F
 python scripts/generate_precomputed_ee_attach.py 3F
 python scripts/generate_precomputed_ee_attach.py vac
+
+python scripts/generate_precomputed_ee_attach.py 2F \
+  --environment C1_2_DoughFlatten
+python scripts/generate_precomputed_ee_attach.py 3F \
+  --environment C1_2_DoughFlatten
+python scripts/generate_precomputed_ee_attach.py vac \
+  --environment C1_2_DoughFlatten
 ```
 
 After the attach trajectories exist, commission the three return trajectories.
@@ -61,6 +95,13 @@ possible composed exchanges before publishing it:
 python scripts/generate_precomputed_ee_return.py 2F
 python scripts/generate_precomputed_ee_return.py 3F
 python scripts/generate_precomputed_ee_return.py vac
+
+python scripts/generate_precomputed_ee_return.py 2F \
+  --environment C1_2_DoughFlatten
+python scripts/generate_precomputed_ee_return.py 3F \
+  --environment C1_2_DoughFlatten
+python scripts/generate_precomputed_ee_return.py vac \
+  --environment C1_2_DoughFlatten
 ```
 
 Revalidate a published trajectory from fresh bare runtimes without regenerating

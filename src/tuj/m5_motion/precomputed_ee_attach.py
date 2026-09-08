@@ -42,9 +42,28 @@ EE_ATTACH_TEMPLATE_SCHEMA_VERSION = "1.0"
 SUPPORTED_EE_IDS = ("2F", "3F", "vac")
 PORTABLE_EE_PATH_SCOPE = "rack-relative-v1"
 PORTABLE_EE_PATH_DIRECTORY = "ee_rack"
+PORTABLE_EE_PATH_DIRECTORY_KITCHEN = "ee_rack_kitchen"
+# RoboCasa kitchen envs that share the pedestal-top-z=0.8 / island-surface rack
+# relative pose. C4_2 keeps the table-family relative pose and stays on ee_rack/.
+KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS = frozenset(
+    {
+        "C1_2_DoughFlatten",
+        "C2_2_SandwichAssembly",
+        "C3_2_BreakfastTrayPreparation",
+        "C4_1_IntervalFitExtraction",
+    }
+)
 PORTABLE_REFERENCE_EE = "3F"
 PORTABLE_START_POSITION_TOLERANCE_M = 0.015
 PORTABLE_START_ORIENTATION_TOLERANCE_RAD = 0.03
+
+
+def portable_ee_path_directory_for(environment_name: str) -> str:
+    """Return the shared portable cache directory for an environment family."""
+
+    if environment_name in KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS:
+        return PORTABLE_EE_PATH_DIRECTORY_KITCHEN
+    return PORTABLE_EE_PATH_DIRECTORY
 
 
 def normalize_ee_id(value: object) -> str:
@@ -646,6 +665,7 @@ class PrecomputedEEAttachRegistry:
         self.root = Path(root)
         self._overrides: dict[tuple[str, str], Path] = {}
         self._portable_overrides: dict[str, Path] = {}
+        self._last_resolution: dict[str, str] | None = None
         for raw_path in trajectory_paths:
             path = Path(raw_path)
             template = self._load_file(path)
@@ -691,15 +711,24 @@ class PrecomputedEEAttachRegistry:
             exact_path = self.root / environment_name / f"bare_to_{target}.json"
         use_shared_path = not exact_path.is_file()
         if use_shared_path:
+            portable_directory = portable_ee_path_directory_for(environment_name)
             path = self._portable_overrides.get(target)
             if path is None:
-                path = (
-                    self.root
-                    / PORTABLE_EE_PATH_DIRECTORY
-                    / f"bare_to_{target}.json"
-                )
+                path = self.root / portable_directory / f"bare_to_{target}.json"
+            self._last_resolution = {
+                "mode": "portable",
+                "directory": portable_directory,
+                "path": str(path),
+            }
         else:
             path = exact_path
+            portable_directory = portable_ee_path_directory_for(environment_name)
+            self._last_resolution = {
+                "mode": "exact",
+                "directory": environment_name,
+                "portable_directory": portable_directory,
+                "path": str(path),
+            }
         template = self._load_file(path)
         if template.target_active_ee != target or (
             use_shared_path and not is_portable_ee_path(template)
@@ -712,6 +741,12 @@ class PrecomputedEEAttachRegistry:
                 trajectory_id=template.trajectory_id,
             )
         return template
+
+    @property
+    def last_resolution(self) -> Mapping[str, str] | None:
+        """Metadata from the most recent ``load`` (exact vs portable directory)."""
+
+        return getattr(self, "_last_resolution", None)
 
 
 class CollisionChecker(Protocol):
@@ -1071,7 +1106,17 @@ class PrecomputedEEAttachPlanner:
                 "request has no environment_name",
             )
         raw_target = request.task.metadata.get("to_ee") or request.task.ee
-        return self.registry.load(environment_name, raw_target)
+        template = self.registry.load(environment_name, raw_target)
+        self._log_cache_resolution()
+        return template
+
+    def _log_cache_resolution(self) -> None:
+        resolution = self.registry.last_resolution
+        if not resolution:
+            return
+        mode = resolution.get("mode", "unknown")
+        directory = resolution.get("directory", "?")
+        self._log(f"[M5][EE_PATH] cache_dir={directory} mode={mode}")
 
     def plan(
         self,
@@ -1265,7 +1310,9 @@ __all__ = [
     "EEAttachTrajectoryEventTemplate",
     "EEAttachTrajectorySegmentTemplate",
     "EEAttachTrajectoryTemplate",
+    "KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS",
     "PORTABLE_EE_PATH_DIRECTORY",
+    "PORTABLE_EE_PATH_DIRECTORY_KITCHEN",
     "PORTABLE_EE_PATH_SCOPE",
     "PrecomputedEEAttachPlanner",
     "PrecomputedEEAttachRegistry",
@@ -1278,6 +1325,7 @@ __all__ = [
     "is_initial_ee_attach",
     "is_portable_ee_path",
     "normalize_ee_id",
+    "portable_ee_path_directory_for",
     "portable_ee_path_metadata",
     "rebase_portable_pose",
     "save_ee_attach_template",

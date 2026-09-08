@@ -37,6 +37,7 @@ from tuj.m5_motion.mujoco_collision import (
     MuJoCoCollisionModelRegistry,
     MuJoCoCollisionValidator,
 )
+from tuj.m5_motion.precomputed_ee_attach import KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS
 from tuj.m5_motion.schema import (
     AttachedObjectTransform,
     CollisionContext,
@@ -740,7 +741,14 @@ class ToolUseJournalEnvironmentAdapter:
                 # Rack display quaternion flips local +Z to world -Z.  A
                 # negative template offset therefore stages above the rack.
                 "approach_axis_xyz": [0.0, 0.0, 1.0],
-                "staging_distance_m": 0.15,
+                # Kitchen pedestal-top-z=0.8 workcells raise the rack relative
+                # to the arm (~+0.232 m vs C1-1).  The default 0.15 m staging
+                # lift then exceeds UR5e reach; keep a reachable approach.
+                "staging_distance_m": (
+                    0.10
+                    if self.environment_name in KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS
+                    else 0.15
+                ),
                 "pre_dock_distance_m": 0.04,
                 "rack_body": str(raw.get("rack_body", "")),
                 "rack_slot": str(raw.get("rack_slot", "")),

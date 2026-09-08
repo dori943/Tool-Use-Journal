@@ -752,7 +752,8 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
         type=Path,
         help=(
             "Root containing optional <environment>/ overrides and shared "
-            "ee_rack/bare_to_<EE>.json plus <EE>_to_bare.json trajectories"
+            "ee_rack/ or ee_rack_kitchen/ bare_to_<EE>.json plus "
+            "<EE>_to_bare.json trajectories (selected by environment family)"
         ),
     )
     parser.add_argument(
