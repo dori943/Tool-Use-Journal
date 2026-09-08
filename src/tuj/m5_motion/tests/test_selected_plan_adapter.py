@@ -222,6 +222,27 @@ def test_promotes_physical_grasp_metadata_for_two_finger_acquire() -> None:
     assert metadata["attach_target"] is True
 
 
+def test_acquire_execution_metadata_changes_request_identity() -> None:
+    selected = _selected_plan()
+    selected.candidate_assignments[1].ee = "2F"
+    worlds = {
+        "sg-place": _world("scene:place", [0.0, 0.1]),
+        "sg-pick": _world("scene:pick", [0.2, 0.3]),
+    }
+    kinematic = SelectedPlanMotionRequestAdapter(
+        acquire_task_metadata={"grasp_execution_mode": "KINEMATIC"}
+    ).convert(selected, worlds=worlds, constraints=MotionConstraints())[1]
+    physical = SelectedPlanMotionRequestAdapter(
+        acquire_task_metadata={
+            "grasp_execution_mode": "CONTACT_FRICTION",
+            "grasp_profile": {"minimum_lift_m": 0.07},
+        }
+    ).convert(selected, worlds=worlds, constraints=MotionConstraints())[1]
+
+    assert kinematic.request_id != physical.request_id
+    assert kinematic.provenance.artifact_id != physical.provenance.artifact_id
+
+
 def test_adapter_preserves_object_independent_clearance_requirements() -> None:
     selected = _selected_plan()
     requirements = {

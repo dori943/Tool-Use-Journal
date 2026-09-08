@@ -590,6 +590,7 @@ class SelectedPlanMotionRequestAdapter:
                     "world": world.model_dump(mode="json"),
                     "constraints": selected_constraints.model_dump(mode="json"),
                     "options": selected_options.model_dump(mode="json"),
+                    "execution_metadata": execution_metadata,
                 }
             )
             request_id = f"motion-request:{index}:{request_digest[:20]}"
