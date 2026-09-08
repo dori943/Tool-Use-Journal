@@ -51,7 +51,7 @@ SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-STAGES = ("m1", "m2", "m3", "m4", "m5")
+STAGES = ("m1", "m2", "m4", "m5")
 
 # 태스크 id <-> 환경 이름은 단일 출처(task_registry)에서 가져온다.
 # (M5 가 환경을 다시 만들 때 등 robosuite import 없이 이름만 필요할 때 쓴다.)
@@ -158,13 +158,13 @@ def stage_m1(task, out, args):
     call_main(module, argv, "run_m1")
 
 
-def stage_m2(task, out, args, pass_no):
+def stage_m2(task, out, args):
     """scripts/run_m2.py — 서브골 분해(LLM).
 
     1차: m3.json 이 없어야 순수 분해가 된다. 2차: m3.json 을 읽어 측정 반영 + 분할.
     """
     m3 = out / "m3.json"
-    if pass_no == 1 and m3.exists():
+    if False and m3.exists():
         # 이전 실행의 응답이 남아 있으면 run_m2 가 그것을 이번 분해에 섞거나
         # 안전장치에 걸려 멈춘다. 1차는 항상 깨끗한 분해여야 한다.
         backup = out / "m3.prev.json"
@@ -183,6 +183,7 @@ def _gk_files(out):
 
 
 def stage_m3(task, out, args, label="M3"):
+    return stage_gk(task, out)
     """scripts/run_m3.py — 물리/기하 접지, m3.json + gk_<SG>.json 생성.
 
     반환: 이번 호출에서 새로 쓰인 gk 파일 목록 (이전 실행의 잔여 파일 배제용).
@@ -202,6 +203,13 @@ def stage_m3(task, out, args, label="M3"):
     if stale:
         print(f"[{label}] 이번 실행에서 갱신되지 않은 gk 파일: {stale}")
     return fresh
+
+
+def stage_gk(task, out):
+    """Assemble per-subgoal graphs from M1's integrated grounding and M2 output."""
+    module = load_script("assemble_gk")
+    call_main(module, [task], "assemble_gk")
+    return _gk_files(out)
 
 
 def _m2_plan_complete(out):
@@ -484,6 +492,38 @@ def _resolve_llm(args):
     print(f"[run] LLM provider={provider} model={args.model}")
 
 
+def _run_integrated(task, out, args, start, stop):
+    """M1 owns geometry and physical grounding; no M3 round-trip remains."""
+    gk_paths = None
+    if start <= 0:
+        banner("M1  Scene + Physical Grounding")
+        stage_m1(task, out, args)
+    if stop < 1:
+        return
+    if start <= 1:
+        banner("M2  Subgoal Decomposition")
+        stage_m2(task, out, args)
+    if stop < 2:
+        return
+    if start <= 2:
+        banner("G_k  Subgoal Graph Assembly")
+        gk_paths = stage_gk(task, out)
+    if stop < 2:
+        return
+    if args.skip_m4 or start > 2:
+        print("\n[M4] " + ("skipped" if args.skip_m4 else "using existing m4.json"))
+    else:
+        banner("M4  Task Planner")
+        stage_m4(task, out, args, gk_paths)
+    if stop < 3:
+        return
+    if args.skip_m5:
+        print("\n[M5] skipped")
+        return
+    banner("M5  Motion Planner")
+    stage_m5(task, out, args)
+
+
 def main():
     args = build_parser().parse_args()
     _resolve_llm(args)
@@ -497,6 +537,7 @@ def main():
     gk_paths = None
 
     print(f"[run] task={task} seed={args.seed} out={out}")
+    return _run_integrated(task, out, args, start, stop)
     print(f"[run] 단계: {' -> '.join(STAGES[start:stop + 1])}"
           + ("" if not args.no_roundtrip else "  (M2<->M3 왕복 생략)")
           + ("" if start == 0 else f"  (m1~{STAGES[start - 1]} 는 기존 산출물 재사용)"))

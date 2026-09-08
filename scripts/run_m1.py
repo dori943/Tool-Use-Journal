@@ -41,7 +41,8 @@ from task_registry import TASK_ENVS, TASKS
 import robosuite as suite
 from robosuite.utils import camera_utils as CU
 
-from tuj.m1_scene import build_m1, points_from_frame, serialize
+from tuj.m1_scene import (MockBackend, PropertyMemory, SiPhyBackend, build_m1,
+                          ground_scene, points_from_frame, serialize)
 
 _DEFAULT_CAM = "agentview"
 _ROBOCASA_CAM_PREFERENCES = ("robot0_robotview", "robot0_eye_in_hand")
@@ -639,9 +640,34 @@ def _render_second_view(env, spec, cam, name_of_id, cam_ov, lookat_default):
     return rgb, depth_m, seg, K, T
 
 
+def _argument(name, default=None):
+    if name not in sys.argv:
+        return default
+    index = sys.argv.index(name) + 1
+    if index >= len(sys.argv):
+        sys.exit(f"[err] {name} requires a value")
+    return sys.argv[index]
+
+
+def _ee_pool():
+    spec = json.loads((ROOT / "configs" / "robot_spec.json").read_text(encoding="utf-8"))
+    pool = []
+    for entry in spec["ee_pool"]:
+        entry = dict(entry)
+        if "flatness_tol_rms_mm" in entry:
+            entry["seal_rms_tol_mm"] = entry["flatness_tol_rms_mm"]
+        pool.append(entry)
+    return pool, spec.get("reach_mm")
+
+
 def main():
     name = sys.argv[1] if len(sys.argv) > 1 and not sys.argv[1].startswith("-") else "c1_1"
     view = "--view" in sys.argv
+    backend_name = _argument("--backend", "siphy")
+    model = _argument("--model", "gpt-4o-mini")
+    memory_path = _argument("--memory", str(ROOT / "output" / "memory.json"))
+    if backend_name not in ("siphy", "mock"):
+        sys.exit(f"[err] unsupported backend {backend_name!r}; use siphy or mock")
     if name not in TASK_ENVS:
         sys.exit(f"[err] unknown task {name!r}. 등록된 태스크: {list(TASK_ENVS)}")
     spec = task_spec(name)
@@ -830,11 +856,6 @@ def main():
     m1 = build_m1(objects)
 
     OUT.mkdir(parents=True, exist_ok=True)
-    (OUT / "m1.json").write_text(
-        json.dumps(serialize(m1), ensure_ascii=False, indent=2), encoding="utf-8")
-    np.savez_compressed(OUT / "m1_points.npz",
-                        **{n["id"]: n["_points"] for n in m1["nodes"]})
-
     if rgb is None:
         rgb = np.asarray(obs[f"{cam}_image"])
     from PIL import Image
@@ -846,6 +867,32 @@ def main():
     # 크롭 파일명 = 노드 id. inst 이름을 그대로 키로 (multi-underscore 이름도 안전)
     node_ids = {o["name"]: f"obj_{o['cls']}_{o['name']}" for o in objects}
     save_crops(crop_rgb, crop_seg, name_of_id, node_ids, OUT / "crops")   # 2차 뷰 있으면 그 프레임
+    ee_pool, reach_mm = _ee_pool()
+    ee_pool, reach_mm = _ee_pool()
+    backend = (SiPhyBackend(model=model, repo_root=ROOT, verbose=True)
+               if backend_name == "siphy" else MockBackend())
+    memory = None if memory_path == "none" else PropertyMemory(memory_path, task_id=name)
+    stats = ground_scene(
+        m1,
+        backend=backend,
+        memory=memory,
+        ee_pool=ee_pool,
+        reach_mm=reach_mm,
+        crops_dir=OUT / "crops",
+        logger=lambda **event: print("  [M1]", event),
+        source=backend_name,
+    )
+    (OUT / "m1.json").write_text(
+        json.dumps(serialize(m1), ensure_ascii=False, indent=2), encoding="utf-8")
+    np.savez_compressed(OUT / "m1_points.npz",
+                        **{n["id"]: n["_points"] for n in m1["nodes"]})
+    print("[M1] grounding: "
+          f"nodes={stats['n_nodes']} grounded={stats['grounded']} "
+          f"memory_hits={stats['memory_hits']} refreshed={stats['geom_refreshed']}")
+    if memory is not None:
+        update = stats["memory_update"]
+        print(f"[M1] memory update: new={update['new']} upgraded={update['upgraded']} "
+              f"kept={update['kept']} -> {memory_path}")
     print(f"[M1] nodes={len(m1['nodes'])} edges={len(m1['edges'])} "
           f"crops={len(list((OUT / 'crops').glob('*.png')))}")
     for e in m1["edges"]:

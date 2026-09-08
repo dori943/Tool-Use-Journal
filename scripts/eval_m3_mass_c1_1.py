@@ -78,7 +78,7 @@ def gt_from_sim() -> dict[str, dict]:
 
 def evaluate(est_cache: dict, gt: dict, ee_pool: list[dict]) -> list[dict]:
     """노드별 지표 계산 (순수 함수 — 테스트 가능). gt: {inst: mass float | {mass_kg, mu, size_mm}}"""
-    from tuj.m3_grounding import evaluate_ee
+    from tuj.m1_scene.ee_rules import evaluate_ee
     rows = []
     for nid, est in est_cache.items():
         inst = nid.split("_", 2)[-1]                   # obj_plate_light_plate → light_plate

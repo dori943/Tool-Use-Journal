@@ -361,6 +361,15 @@ def main():
     for gk in gks:
         (OUT / f"gk_{gk['subgoal_id']}.json").write_text(
             json.dumps(strip(gk), ensure_ascii=False, indent=2), encoding="utf-8")
+    # 이전 실행(다른 분할 구성)의 stale gk 정리 — 이번 실행이 만든 것만 남긴다.
+    # (gk_bundle.json은 M4 산출물이라 제외)
+    keep = {f"gk_{gk['subgoal_id']}.json" for gk in gks}
+    stale = [q for q in OUT.glob("gk_*.json")
+             if q.name not in keep and q.name != "gk_bundle.json"]
+    for q in stale:
+        q.unlink()
+    if stale:
+        print(f"[M3] stale gk 정리 {len(stale)}건: {sorted(q.name for q in stale)}")
     (OUT / "m3.json").write_text(
         json.dumps({"responses": strip(responses)}, ensure_ascii=False, indent=2),
         encoding="utf-8")

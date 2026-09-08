@@ -14,7 +14,8 @@ from __future__ import annotations
 
 from . import relational
 from .ee_conditioned import evaluate_ee, grip_slip_margin_fn, reach_check
-from .intrinsic import FrictionHead, MockBackend, ground_intrinsic
+from .intrinsic import (FrictionHead, MockBackend, geometry_from_node,
+                        geometry_is_current, ground_intrinsic)
 
 
 class Materializer:
@@ -41,11 +42,19 @@ class Materializer:
         if memory is not None and object_knowledge is None:  # legacy node-id memory only
             for nid in self.nodes:
                 hit = memory.lookup(nid)
-                if hit is not None:
-                    self._cache[nid] = hit
-                    self.log(module="m3", event="memory_hit", node=nid,
-                             stage=max(int(hit.get("mass_stage", 0)),
-                                       int(hit.get("mu", {}).get("stage", 0))))
+                if hit is None:
+                    continue
+                # 기하 스키마 갱신: 옛 엔트리(footprint/seal_patch 없음)를 그대로 쓰면
+                # EE 규칙이 구경로로 떨어져 오판한다(접시가 두께로 2F 통과, vac 탈락).
+                # 기하는 점군 산술이라 VLM 없이 재계산해 덧씌우고, 재질·질량·μ 등
+                # VLM 산출물은 그대로 재사용한다. 런 종료 memory.update로 영구 반영.
+                if not geometry_is_current(hit.get("geometry")):
+                    hit["geometry"] = geometry_from_node(node)
+                    self.log(module="m3", event="memory_geom_refresh", node=nid)
+                self._cache[nid] = hit
+                self.log(module="m3", event="memory_hit", node=nid,
+                         stage=max(int(hit.get("mass_stage", 0)),
+                                   int(hit.get("mu", {}).get("stage", 0))))
 
     # ── 질의 3종 (M2의 술어가 부름) ─────────────────────
 
