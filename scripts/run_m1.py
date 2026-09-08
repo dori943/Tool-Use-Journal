@@ -38,7 +38,6 @@ macros.IMAGE_CONVENTION = "opencv"                     # 상하반전 방지 (�
 
 import environments  # noqa: F401  (suite.make 등록)
 from task_registry import TASK_ENVS, TASKS
-import robosuite as suite
 from robosuite.utils import camera_utils as CU
 
 from tuj.m1_scene import (MockBackend, PropertyMemory, SiPhyBackend, build_m1,
@@ -678,7 +677,6 @@ def main():
     cam = _initial_camera_name(spec)
 
     make_kwargs = dict(
-        env_name=spec["env_name"], robots="UR5e",
         use_camera_obs=True, has_offscreen_renderer=True, has_renderer=False,
         camera_names=cam, camera_heights=H, camera_widths=W,
         camera_depths=True,
@@ -691,8 +689,44 @@ def main():
               "using task-object visual geom segmentation")
     else:
         make_kwargs["camera_segmentations"] = "instance"
-    env = suite.make(**make_kwargs)
+    from tuj.m5_motion.tool_use_journal import (
+        TOOL_USE_JOURNAL_BARE_HOME_QPOS,
+        ToolUseJournalEnvironmentAdapter,
+        make_tool_use_journal_env,
+    )
+
+    # M1 and M5 must observe the same bare-flange trajectory seam.  The shared
+    # factory installs the commissioned home before the environment's first
+    # reset, including for RoboCasa environments that construct the robot lazily.
+    env = make_tool_use_journal_env(
+        ROOT,
+        spec["env_name"],
+        active_ee=None,
+        **make_kwargs,
+    )
     obs = env.reset()
+    environment_adapter = ToolUseJournalEnvironmentAdapter(env)
+    observed_home = environment_adapter.world_snapshot().robot_state
+    if len(observed_home.joint_positions_rad) != len(
+        TOOL_USE_JOURNAL_BARE_HOME_QPOS
+    ):
+        raise RuntimeError(
+            "M1 bare-home initialization returned an unexpected joint count: "
+            f"{len(observed_home.joint_positions_rad)}"
+        )
+    home_error = max(
+        abs(float(observed) - float(expected))
+        for observed, expected in zip(
+            observed_home.joint_positions_rad,
+            TOOL_USE_JOURNAL_BARE_HOME_QPOS,
+            strict=True,
+        )
+    )
+    if home_error > 1e-6:
+        raise RuntimeError(
+            "M1 environment did not reach the canonical bare-home before "
+            f"capture (max joint error {home_error:.6f} rad)"
+        )
     cam = _resolve_observation_camera(env, cam, robocasa=spec["robocasa"])
 
     if spec["robocasa"]:
