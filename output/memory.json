@@ -1,117 +1,19 @@
 {
-  "schema_version": "1.0",
-  "failure_recovery_experience": {
-    "experiences": []
-  },
   "object_knowledge": {
-    "objects": {
-      "legacy::obj_plate_light_plate": {
-        "identity": {
-          "object_id": "obj_plate_light_plate",
-          "caption": null
-        },
-        "geometry": {
-          "length_mm": 178.5,
-          "diameter_mm": null,
-          "extents_mm": [
-            178.5,
-            176.2,
-            9.5
-          ],
-          "height_z_mm": 9.4,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.3
-        },
-        "physical_properties": {
-          "material": {
-            "value": "plastic",
-            "confidence": 0.85
-          },
-          "density_kgm3": {
-            "value": 950
-          },
-          "mass_kg": {
-            "value": 0.279,
-            "range": null
-          },
-          "youngs_gpa": {
-            "value": 2.0
-          },
-          "friction": {
-            "value": 0.338,
-            "stage": 0,
-            "material_basis": "plastic",
-            "surface_rms_mm": 0.3
-          }
-        },
-        "material_hypotheses": [],
-        "metadata": {
-          "source_module": "M3",
-          "source_method": "mock",
-          "source_task": null,
-          "source_episode": null,
-          "episodes_seen": 2,
-          "updated_at": "2026-08-29T09:13:02+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0,
-          "legacy_key": "obj_plate_light_plate"
-        }
-      },
-      "legacy::obj_ladle_ladle": {
-        "identity": {
-          "object_id": "obj_ladle_ladle",
-          "caption": "metallic sphere"
-        },
-        "geometry": {
-          "length_mm": 62.1,
-          "diameter_mm": null,
-          "extents_mm": [
-            62.1,
-            58.4,
-            18.6
-          ],
-          "height_z_mm": 59.4,
-          "cylinder_like": false,
-          "surface_rms_mm": 1.38
-        },
-        "physical_properties": {
-          "material": {
-            "value": "steel",
-            "confidence": 0.296
-          },
-          "density_kgm3": {
-            "value": 7151.9
-          },
-          "mass_kg": {
-            "value": 0.243,
-            "range": [
-              0.079,
-              0.407
-            ]
-          },
-          "youngs_gpa": {
-            "value": 159.07
-          },
-          "friction": {
-            "value": 0.459,
-            "stage": 0,
-            "material_basis": "steel",
-            "surface_rms_mm": 1.38
-          }
-        },
-        "material_hypotheses": [
-          {
-            "name": "steel",
-            "prob": 0.296,
-            "density_kgm3": [
-              7850.0,
-              8050.0
-            ],
-            "thickness_cm": [
-              1.0,
-              5.0
-            ]
+    "objects": {}
+  },
+  "failure_recovery_experience": {
+    "experiences": [
+      {
+        "experience_id": "VF-SPAT-007",
+        "context_signature": {
+          "task_id": null,
+          "subgoal_id": null,
+          "subgoal_description": "Move the left arm to approach and align the wooden spatula.",
+          "action_type": "acquire",
+          "target": {
+            "object_id": null,
+            "object_class": "spatula"
           },
           "violated_predicates": [],
           "selected_ee": null,
@@ -120,337 +22,32 @@
             "motion_planning_status": null,
             "controller_status": null
           }
-        ],
-        "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": null,
-          "source_episode": null,
-          "episodes_seen": 6,
-          "updated_at": "2026-09-02T20:07:10+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0,
-          "legacy_key": "obj_ladle_ladle"
-        }
-      },
-      "legacy::obj_dough_dough": {
-        "identity": {
-          "object_id": "obj_dough_dough",
-          "caption": "Round brown object"
         },
-        "geometry": {
-          "length_mm": 57.6,
-          "diameter_mm": null,
-          "extents_mm": [
-            57.6,
-            57.7,
-            26.2
-          ],
-          "height_z_mm": 33.5,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.96,
-          "seal_patch_rms_mm": 0.625,
-          "footprint_mm": [
-            52.9,
-            57.0
-          ],
-          "height_mm": 33.5
+        "diagnosis_summary": {
+          "source_failure_type": "gripper 6d-pose",
+          "failure_type": "PLANNING",
+          "failure_cause": {
+            "code": "INVALID_APPROACH",
+            "description": "The gripper pose was not properly aligned with the target object."
+          },
+          "affected_module": "M5",
+          "confidence": 0.95
         },
-        "physical_properties": {
-          "material": {
-            "value": "wood",
-            "confidence": 0.3
-          },
-          "density_kgm3": {
-            "value": 1145.0
-          },
-          "mass_kg": {
-            "value": 0.036,
-            "range": [
-              0.008,
-              0.065
-            ]
-          },
-          "youngs_gpa": {
-            "value": 14.33
-          },
-          "friction": {
-            "value": 0.506,
-            "stage": 0,
-            "material_basis": "wood",
-            "surface_rms_mm": 1.23
-          }
-        },
-        "material_hypotheses": [
-          {
-            "name": "wood",
-            "prob": 0.3,
-            "density_kgm3": [
-              300.0,
-              900.0
-            ],
-            "thickness_cm": [
-              1.0,
-              5.0
-            ]
-          },
-          "changes": [],
-          "routing": {
-            "restart_from": null,
-            "rerun_modules": [],
-            "invalidate": []
-          },
-          {
-            "name": "plastic",
-            "prob": 0.25,
-            "density_kgm3": [
-              900.0,
-              1300.0
-            ],
-            "thickness_cm": [
-              0.5,
-              3.0
-            ]
-          },
-          {
-            "name": "rubber",
-            "prob": 0.15,
-            "density_kgm3": [
-              400.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              0.5,
-              2.0
-            ]
-          }
-        ],
-        "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": null,
-          "source_episode": null,
-          "episodes_seen": 7,
-          "updated_at": "2026-09-08T15:33:03+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0,
-          "legacy_key": "obj_dough_dough"
-        }
-      },
-      "legacy::obj_apple_apple": {
-        "identity": {
-          "object_id": "obj_apple_apple",
-          "caption": "apple"
-        },
-        "geometry": {
-          "length_mm": 69.7,
-          "diameter_mm": null,
-          "extents_mm": [
-            69.7,
-            68.5,
-            28.8
-          ],
-          "height_z_mm": 50.0,
-          "cylinder_like": false,
-          "surface_rms_mm": NaN
-        },
-        "physical_properties": {
-          "material": {
-            "value": "fiber",
-            "confidence": 0.258
-          },
-          "density_kgm3": {
-            "value": 890.6
-          },
-          "mass_kg": {
-            "value": 0.002,
-            "range": [
-              0.001,
-              0.004
-            ]
-          },
-          "youngs_gpa": {
-            "value": 0.74
-          },
-          "friction": {
-            "value": 0.45,
-            "stage": 0,
-            "material_basis": "fiber",
-            "surface_rms_mm": NaN
-          }
-        },
-        "material_hypotheses": [
-          {
-            "name": "fiber",
-            "prob": 0.258,
-            "density_kgm3": [
-              150.0,
-              200.0
-            ],
-            "thickness_cm": [
-              0.2,
-              0.5
-            ]
-          },
-          "violated_predicates": [],
-          "selected_ee": null,
-          "selected_tool": null,
-          "execution_signature": {
-            "motion_planning_status": null,
-            "controller_status": null
-          }
-        ],
-        "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": null,
-          "source_episode": null,
-          "episodes_seen": 4,
-          "updated_at": "2026-09-03T04:43:57+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0,
-          "legacy_key": "obj_apple_apple"
-        }
-      },
-      "legacy::obj_spoon_spoon": {
-        "identity": {
-          "object_id": "obj_spoon_spoon",
-          "caption": "Ladle with a wooden handle"
-        },
-        "geometry": {
-          "length_mm": 109.3,
-          "diameter_mm": null,
-          "extents_mm": [
-            109.3,
-            51.5,
-            27.6
-          ],
-          "height_z_mm": 27.4,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.37,
-          "seal_patch_rms_mm": 99.9,
-          "footprint_mm": [
-            110.6,
-            51.4
-          ],
-          "height_mm": 27.4
-        },
-        "physical_properties": {
-          "material": {
-            "value": "wood",
-            "confidence": 0.333
-          },
-          "density_kgm3": {
-            "value": 2938.9
-          },
-          "mass_kg": {
-            "value": 0.029,
-            "range": [
-              0.015,
-              0.042
-            ]
-          },
-          "youngs_gpa": {
-            "value": 47.19
-          },
-          "friction": {
-            "value": 0.483,
-            "stage": 0,
-            "material_basis": "wood",
-            "surface_rms_mm": 0.34
-          }
-        },
-        "material_hypotheses": [
-          {
-            "name": "metal",
-            "prob": 0.296,
-            "density_kgm3": [
-              7000.0,
-              8000.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.0
-            ]
-          },
-          "violated_predicates": [],
-          "selected_ee": null,
-          "selected_tool": null,
-          "execution_signature": {
-            "motion_planning_status": null,
-            "controller_status": null
-          }
-        ],
-        "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": null,
-          "source_episode": null,
-          "episodes_seen": 11,
-          "updated_at": "2026-09-08T15:33:03+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0,
-          "legacy_key": "obj_spoon_spoon"
-        }
-      },
-      "legacy::obj_card_card": {
-        "identity": {
-          "object_id": "obj_card_card",
-          "caption": "Blue arrow icon"
-        },
-        "geometry": {
-          "length_mm": 49.0,
-          "diameter_mm": null,
-          "extents_mm": [
-            49.0,
-            26.4,
-            0.0
-          ],
-          "height_z_mm": 0.0,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.0
-        },
-        "physical_properties": {
-          "material": {
-            "value": "plastic",
-            "confidence": 0.4
-          },
-          "density_kgm3": {
-            "value": 1100.0
-          },
-          "mass_kg": {
-            "value": 0.001,
-            "range": [
-              0.001,
-              0.002
-            ]
-          },
-          "youngs_gpa": {
-            "value": 2.0
-          },
-          "friction": {
-            "value": 0.333,
-            "stage": 0,
-            "material_basis": "plastic",
-            "surface_rms_mm": 0.0
-          }
-        },
-        "material_hypotheses": [
-          {
-            "name": "plastic",
-            "prob": 0.4,
-            "density_kgm3": [
-              900.0,
-              1300.0
-            ],
-            "thickness_cm": [
-              0.2,
-              0.5
-            ]
+        "recovery_summary": {
+          "recovery_category": "REPLAN_MOTION",
+          "action": {
+            "action_type": "CHANGE_APPROACH",
+            "target": {
+              "subgoal_id": null,
+              "object_id": null,
+              "property": null,
+              "relation": null,
+              "ee_id": null,
+              "tool_id": null
+            },
+            "parameters": {
+              "source_correction": "Move the left gripper to the left significantly and downward significantly."
+            }
           },
           "changes": [],
           "routing": {
@@ -462,1238 +59,663 @@
             "status": "NOT_EXECUTED",
             "verification_result": null
           }
-        ],
+        },
         "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": null,
-          "source_episode": null,
-          "episodes_seen": 2,
-          "updated_at": "2026-09-02T20:03:13+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0,
-          "legacy_key": "obj_card_card"
+          "source": "offline_seed",
+          "dataset": "ViFailback",
+          "source_episode": 7,
+          "created_at": null,
+          "updated_at": null,
+          "reuse_count": 0
         }
       },
-      "legacy::obj_lid_lid": {
-        "identity": {
-          "object_id": "obj_lid_lid",
-          "caption": "Wooden plank"
-        },
-        "geometry": {
-          "length_mm": 266.4,
-          "diameter_mm": null,
-          "extents_mm": [
-            266.4,
-            206.8,
-            5.7
-          ],
-          "height_z_mm": 5.8,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.0
-        },
-        "physical_properties": {
-          "material": {
-            "value": "wood",
-            "confidence": 0.29
+      {
+        "experience_id": "VF-SPAT-015",
+        "context_signature": {
+          "task_id": null,
+          "subgoal_id": null,
+          "subgoal_description": "Release the gripper to place the wooden spatula into the blue basket.",
+          "action_type": "place",
+          "target": {
+            "object_id": null,
+            "object_class": "spatula"
           },
-          "density_kgm3": {
-            "value": 666.1
-          },
-          "mass_kg": {
-            "value": 0.094,
-            "range": [
-              0.027,
-              0.161
-            ]
-          },
-          "youngs_gpa": {
-            "value": 9.03
-          },
-          "friction": {
-            "value": 0.475,
-            "stage": 0,
-            "material_basis": "wood",
-            "surface_rms_mm": 0.0
+          "violated_predicates": [],
+          "selected_ee": null,
+          "selected_tool": null,
+          "execution_signature": {
+            "motion_planning_status": null,
+            "controller_status": null
           }
         },
-        "material_hypotheses": [
-          {
-            "name": "wood",
-            "prob": 0.29,
-            "density_kgm3": [
-              400.0,
-              900.0
-            ],
-            "thickness_cm": [
-              1.0,
-              5.0
-            ]
+        "diagnosis_summary": {
+          "source_failure_type": "gripper state",
+          "failure_type": "EXECUTION_CONTROL",
+          "failure_cause": {
+            "code": "RELEASE_FAILURE",
+            "description": "The gripper failed to properly release the target object during placement."
           },
-          {
-            "name": "plywood",
-            "prob": 0.226,
-            "density_kgm3": [
-              500.0,
-              700.0
-            ],
-            "thickness_cm": [
-              1.0,
-              3.0
-            ]
+          "affected_module": "Controller",
+          "confidence": 0.95
+        },
+        "recovery_summary": {
+          "recovery_category": "RETRY_EXECUTION",
+          "action": {
+            "action_type": "RETRY_ACTION",
+            "target": {
+              "subgoal_id": null,
+              "object_id": null,
+              "property": null,
+              "relation": null,
+              "ee_id": null,
+              "tool_id": null
+            },
+            "parameters": {
+              "source_correction": "Open the left gripper"
+            }
           },
-          {
-            "name": "mdf",
-            "prob": 0.161,
-            "density_kgm3": [
-              600.0,
-              800.0
-            ],
-            "thickness_cm": [
-              1.0,
-              2.0
-            ]
+          "changes": [],
+          "routing": {
+            "restart_from": null,
+            "rerun_modules": [],
+            "invalidate": []
           },
-          {
-            "name": "particle board",
-            "prob": 0.194,
-            "density_kgm3": [
-              600.0,
-              900.0
-            ],
-            "thickness_cm": [
-              1.0,
-              3.0
-            ]
-          },
-          {
-            "name": "bamboo",
-            "prob": 0.129,
-            "density_kgm3": [
-              500.0,
-              800.0
-            ],
-            "thickness_cm": [
-              1.0,
-              4.0
-            ]
+          "outcome": {
+            "status": "NOT_EXECUTED",
+            "verification_result": null
           }
-        ],
+        },
         "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": null,
-          "source_episode": null,
-          "episodes_seen": 2,
-          "updated_at": "2026-09-02T20:19:25+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0,
-          "legacy_key": "obj_lid_lid"
+          "source": "offline_seed",
+          "dataset": "ViFailback",
+          "source_episode": 15,
+          "created_at": null,
+          "updated_at": null,
+          "reuse_count": 0
         }
       },
-      "legacy::obj_spatula_spatula": {
-        "identity": {
-          "object_id": "obj_spatula_spatula",
-          "caption": "A rustic wooden broom or sweeping tool"
-        },
-        "geometry": {
-          "length_mm": 246.6,
-          "diameter_mm": null,
-          "extents_mm": [
-            246.6,
-            44.1,
-            1.5
-          ],
-          "height_z_mm": 1.8,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.03,
-          "seal_patch_rms_mm": 0.0,
-          "footprint_mm": [
-            246.6,
-            44.1
-          ],
-          "height_mm": 1.8
-        },
-        "physical_properties": {
-          "material": {
-            "value": "wood",
-            "confidence": 0.281
+      {
+        "experience_id": "VF-SPOON-007",
+        "context_signature": {
+          "task_id": null,
+          "subgoal_id": null,
+          "subgoal_description": "Move the left arm to approach and align the spoon.",
+          "action_type": "acquire",
+          "target": {
+            "object_id": null,
+            "object_class": "spoon"
           },
-          "density_kgm3": {
-            "value": 557.8
-          },
-          "mass_kg": {
-            "value": 0.003,
-            "range": [
-              0.001,
-              0.006
-            ]
-          },
-          "youngs_gpa": {
-            "value": 9.53
-          },
-          "friction": {
-            "value": 0.475,
-            "stage": 0,
-            "material_basis": "wood",
-            "surface_rms_mm": 0.01
+          "violated_predicates": [],
+          "selected_ee": null,
+          "selected_tool": null,
+          "execution_signature": {
+            "motion_planning_status": null,
+            "controller_status": null
           }
         },
-        "material_hypotheses": [
-          {
-            "name": "wood",
-            "prob": 0.281,
-            "density_kgm3": [
-              400.0,
-              800.0
-            ],
-            "thickness_cm": [
-              2.0,
-              5.0
-            ]
+        "diagnosis_summary": {
+          "source_failure_type": "gripper 6d-pose",
+          "failure_type": "PLANNING",
+          "failure_cause": {
+            "code": "INVALID_APPROACH",
+            "description": "The gripper pose was not properly aligned with the spoon during approach."
           },
-          {
-            "name": "straw",
-            "prob": 0.25,
-            "density_kgm3": [
-              100.0,
-              300.0
-            ],
-            "thickness_cm": [
-              5.0,
-              15.0
-            ]
+          "affected_module": "M5",
+          "confidence": 0.95
+        },
+        "recovery_summary": {
+          "recovery_category": "REPLAN_MOTION",
+          "action": {
+            "action_type": "CHANGE_APPROACH",
+            "target": {
+              "subgoal_id": null,
+              "object_id": null,
+              "property": null,
+              "relation": null,
+              "ee_id": null,
+              "tool_id": null
+            },
+            "parameters": {
+              "source_correction": "Move the left gripper to the backward significantly and downward slightly."
+            }
           },
-          {
-            "name": "bamboo",
-            "prob": 0.188,
-            "density_kgm3": [
-              500.0,
-              900.0
-            ],
-            "thickness_cm": [
-              2.0,
-              4.0
-            ]
+          "changes": [],
+          "routing": {
+            "restart_from": null,
+            "rerun_modules": [],
+            "invalidate": []
           },
-          {
-            "name": "hemp",
-            "prob": 0.125,
-            "density_kgm3": [
-              800.0,
-              1400.0
-            ],
-            "thickness_cm": [
-              0.5,
-              2.0
-            ]
-          },
-          {
-            "name": "wicker",
-            "prob": 0.156,
-            "density_kgm3": [
-              300.0,
-              600.0
-            ],
-            "thickness_cm": [
-              1.0,
-              3.0
-            ]
+          "outcome": {
+            "status": "NOT_EXECUTED",
+            "verification_result": null
           }
-        ],
+        },
         "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": null,
-          "source_episode": null,
-          "episodes_seen": 5,
-          "updated_at": "2026-09-08T15:33:03+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0,
-          "legacy_key": "obj_spatula_spatula"
+          "source": "offline_seed",
+          "dataset": "ViFailback",
+          "source_episode": 7,
+          "created_at": null,
+          "updated_at": null,
+          "reuse_count": 0
         }
       },
-      "legacy::obj_tongs_tongs": {
-        "identity": {
-          "object_id": "obj_tongs_tongs",
-          "caption": "A pair of metallic kitchen serving tongs."
-        },
-        "geometry": {
-          "length_mm": 253.0,
-          "diameter_mm": null,
-          "extents_mm": [
-            253.0,
-            29.9,
-            20.9
-          ],
-          "height_z_mm": 21.7,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.63,
-          "seal_patch_rms_mm": 0.953,
-          "footprint_mm": [
-            253.0,
-            29.0
-          ],
-          "height_mm": 21.7
-        },
-        "physical_properties": {
-          "material": {
-            "value": "stainless steel",
-            "confidence": 0.5
+      {
+        "experience_id": "RLBF-LB-092-WO",
+        "context_signature": {
+          "task_id": null,
+          "subgoal_id": null,
+          "subgoal_description": "The task plan attempts to move the grasped light bulb to the lamp before grasping the light bulb.",
+          "action_type": null,
+          "target": {
+            "object_id": null,
+            "object_class": "light bulb"
           },
-          "density_kgm3": {
-            "value": 7925.0
-          },
-          "mass_kg": {
-            "value": 0.015,
-            "range": [
-              0.01,
-              0.021
-            ]
-          },
-          "youngs_gpa": {
-            "value": 200.0
-          },
-          "friction": {
-            "value": 0.442,
-            "stage": 0,
-            "material_basis": "stainless steel",
-            "surface_rms_mm": 0.66
+          "violated_predicates": [],
+          "selected_ee": null,
+          "selected_tool": null,
+          "execution_signature": {
+            "motion_planning_status": null,
+            "controller_status": null
           }
         },
-        "material_hypotheses": [
-          {
-            "name": "stainless steel",
-            "prob": 0.5,
-            "density_kgm3": [
-              7750.0,
-              8100.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.2
-            ]
+        "diagnosis_summary": {
+          "source_failure_type": "wrong order",
+          "failure_type": "TASK_DECOMPOSITION",
+          "failure_cause": {
+            "code": "WRONG_SUBGOAL_ORDER",
+            "description": "The plan attempts to move the light bulb before grasping it, violating the causal dependency between the subtasks."
           },
-          {
-            "name": "aluminum",
-            "prob": 0.2,
-            "density_kgm3": [
-              2600.0,
-              2800.0
-            ],
-            "thickness_cm": [
-              0.2,
-              0.4
-            ]
+          "affected_module": "M2",
+          "confidence": 0.99
+        },
+        "recovery_summary": {
+          "recovery_category": "REPLAN_SUBGOAL",
+          "action": {
+            "action_type": "REORDER_SUBGOALS",
+            "target": {
+              "subgoal_id": null,
+              "object_id": null,
+              "property": null,
+              "relation": null,
+              "ee_id": null,
+              "tool_id": null
+            },
+            "parameters": {
+              "source_failed_plan": [
+                "move the grasped object to the brown lamp",
+                "grasp the rose light bulb",
+                "rotate_grasped_object",
+                "release"
+              ],
+              "source_correct_plan": [
+                "grasp the rose light bulb",
+                "move the grasped object to the brown lamp",
+                "rotate_grasped_object",
+                "release"
+              ]
+            }
           },
-          {
-            "name": "carbon steel",
-            "prob": 0.15,
-            "density_kgm3": [
-              7800.0,
-              7900.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.2
-            ]
+          "changes": [],
+          "routing": {
+            "restart_from": null,
+            "rerun_modules": [],
+            "invalidate": []
           },
-          {
-            "name": "titanium",
-            "prob": 0.1,
-            "density_kgm3": [
-              4400.0,
-              4500.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.2
-            ]
-          },
-          {
-            "name": "brass",
-            "prob": 0.05,
-            "density_kgm3": [
-              8400.0,
-              8700.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.2
-            ]
+          "outcome": {
+            "status": "NOT_EXECUTED",
+            "verification_result": null
           }
-        ],
+        },
         "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": null,
-          "source_episode": null,
-          "episodes_seen": 5,
-          "updated_at": "2026-09-08T15:33:03+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0,
-          "legacy_key": "obj_tongs_tongs"
+          "source": "offline_seed",
+          "dataset": "RLBench-Fail",
+          "source_episode": 92,
+          "created_at": null,
+          "updated_at": null,
+          "reuse_count": 0
         }
       },
-      "legacy::obj_cutting_board_cutting_board": {
-        "identity": {
-          "object_id": "obj_cutting_board_cutting_board",
-          "caption": "Rectangular wooden board with rounded corners and central hole."
-        },
-        "geometry": {
-          "length_mm": 246.8,
-          "diameter_mm": null,
-          "extents_mm": [
-            246.8,
-            149.7,
-            11.4
-          ],
-          "height_z_mm": 11.5,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.25,
-          "seal_patch_rms_mm": 0.019,
-          "footprint_mm": [
-            149.3,
-            246.8
-          ],
-          "height_mm": 11.5
-        },
-        "physical_properties": {
-          "material": {
-            "value": "hardwood",
-            "confidence": 0.27
+      {
+        "experience_id": "RLBF-RD-022-CS",
+        "context_signature": {
+          "task_id": null,
+          "subgoal_id": null,
+          "subgoal_description": "The plan releases the stick immediately after grasping it, before using the stick to push the gray cube.",
+          "action_type": null,
+          "target": {
+            "object_id": null,
+            "object_class": "stick"
           },
-          "density_kgm3": {
-            "value": 706.2
-          },
-          "mass_kg": {
-            "value": 0.132,
-            "range": [
-              0.064,
-              0.199
-            ]
-          },
-          "youngs_gpa": {
-            "value": 9.55
-          },
-          "friction": {
-            "value": 0.433,
-            "stage": 0,
-            "material_basis": "hardwood",
-            "surface_rms_mm": 0.25
+          "violated_predicates": [],
+          "selected_ee": null,
+          "selected_tool": null,
+          "execution_signature": {
+            "motion_planning_status": null,
+            "controller_status": null
           }
         },
-        "material_hypotheses": [
-          {
-            "name": "hardwood",
-            "prob": 0.27,
-            "density_kgm3": [
-              650.0,
-              800.0
-            ],
-            "thickness_cm": [
-              1.5,
-              3.5
-            ]
+        "diagnosis_summary": {
+          "source_failure_type": "contradictory subtasks",
+          "failure_type": "TASK_DECOMPOSITION",
+          "failure_cause": {
+            "code": "WRONG_ACTION_TYPE",
+            "description": "The plan introduces an inappropriate release action immediately after grasping the stick, preventing the stick from being used to push the target object."
           },
-          {
-            "name": "bamboo",
-            "prob": 0.243,
-            "density_kgm3": [
-              600.0,
-              800.0
-            ],
-            "thickness_cm": [
-              1.5,
-              3.5
-            ]
+          "affected_module": "M2",
+          "confidence": 0.95
+        },
+        "recovery_summary": {
+          "recovery_category": "REPLAN_SUBGOAL",
+          "action": {
+            "action_type": "REDECOMPOSE_SUBGOAL",
+            "target": {
+              "subgoal_id": null,
+              "object_id": null,
+              "property": null,
+              "relation": null,
+              "ee_id": null,
+              "tool_id": null
+            },
+            "parameters": {
+              "source_failed_plan": [
+                "grasp the stick",
+                "release the stick",
+                "push the gray cube forward"
+              ],
+              "source_correct_plan": [
+                "grasp the stick",
+                "push the gray cube forward"
+              ]
+            }
           },
-          {
-            "name": "softwood",
-            "prob": 0.189,
-            "density_kgm3": [
-              400.0,
-              600.0
-            ],
-            "thickness_cm": [
-              1.5,
-              3.5
-            ]
+          "changes": [],
+          "routing": {
+            "restart_from": null,
+            "rerun_modules": [],
+            "invalidate": []
           },
-          {
-            "name": "plastic",
-            "prob": 0.162,
-            "density_kgm3": [
-              900.0,
-              960.0
-            ],
-            "thickness_cm": [
-              1.0,
-              3.0
-            ]
-          },
-          {
-            "name": "wood composite",
-            "prob": 0.135,
-            "density_kgm3": [
-              600.0,
-              800.0
-            ],
-            "thickness_cm": [
-              1.5,
-              3.5
-            ]
+          "outcome": {
+            "status": "NOT_EXECUTED",
+            "verification_result": null
           }
-        ],
+        },
         "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": null,
-          "source_episode": null,
-          "episodes_seen": 1,
-          "updated_at": "2026-09-08T15:33:03+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0,
-          "legacy_key": "obj_cutting_board_cutting_board"
+          "source": "offline_seed",
+          "dataset": "RLBench-Fail",
+          "source_episode": 22,
+          "created_at": null,
+          "updated_at": null,
+          "reuse_count": 0
         }
       },
-      "c1_2::obj_bottle_bottle": {
-        "identity": {
-          "object_id": "obj_bottle_bottle",
-          "caption": "Section of cylindrical pipe, possibly with a joint."
-        },
-        "geometry": {
-          "length_mm": 102.1,
-          "diameter_mm": null,
-          "extents_mm": [
-            102.1,
-            48.0,
-            36.2
-          ],
-          "height_z_mm": 93.9,
-          "cylinder_like": false,
-          "surface_rms_mm": 1.93,
-          "seal_patch_rms_mm": 0.051,
-          "footprint_mm": [
-            48.2,
-            43.6
-          ],
-          "height_mm": 93.9
-        },
-        "physical_properties": {
-          "material": {
-            "value": "steel",
-            "confidence": 0.257
+      {
+        "experience_id": "RLBF-GROC-071-WP",
+        "context_signature": {
+          "task_id": null,
+          "subgoal_id": null,
+          "subgoal_description": "Place the crackers box in the cupboard, remove it, and then place the mustard bottle in the cupboard.",
+          "action_type": null,
+          "target": {
+            "object_id": null,
+            "object_class": "cupboard"
           },
-          "density_kgm3": {
-            "value": 4520.0
-          },
-          "mass_kg": {
-            "value": 0.121,
-            "range": [
-              0.045,
-              0.196
-            ]
-          },
-          "youngs_gpa": {
-            "value": 92.96
-          },
-          "friction": {
-            "value": 0.471,
-            "stage": 0,
-            "material_basis": "steel",
-            "surface_rms_mm": 1.93
+          "violated_predicates": [],
+          "selected_ee": null,
+          "selected_tool": null,
+          "execution_signature": {
+            "motion_planning_status": null,
+            "controller_status": null
           }
         },
-        "material_hypotheses": [
-          {
-            "name": "steel",
-            "prob": 0.257,
-            "density_kgm3": [
-              7800.0,
-              7900.0
-            ],
-            "thickness_cm": [
-              0.5,
-              2.0
-            ]
+        "diagnosis_summary": {
+          "source_failure_type": "wrong object state or placement",
+          "failure_type": "TASK_DECOMPOSITION",
+          "failure_cause": {
+            "code": "INVALID_CONDITION",
+            "description": "The plan specifies the soup can as the placement target instead of the required cupboard for both the crackers box and the mustard bottle."
           },
-          {
-            "name": "pvc",
-            "prob": 0.229,
-            "density_kgm3": [
-              1300.0,
-              1500.0
-            ],
-            "thickness_cm": [
-              0.2,
-              1.0
-            ]
+          "affected_module": "M2",
+          "confidence": 0.9
+        },
+        "recovery_summary": {
+          "recovery_category": "REPLAN_SUBGOAL",
+          "action": {
+            "action_type": "UPDATE_CONDITION",
+            "target": {
+              "subgoal_id": null,
+              "object_id": null,
+              "property": null,
+              "relation": null,
+              "ee_id": null,
+              "tool_id": null
+            },
+            "parameters": {
+              "source_failed_plan": [
+                "grasp crackers box",
+                "move grasped crackers box to soup can",
+                "release crackers box",
+                "grasp crackers box",
+                "move grasped crackers box out of soup can",
+                "release crackers box",
+                "grasp mustard bottle",
+                "move grasped mustard bottle to soup can",
+                "release mustard bottle"
+              ],
+              "source_correct_plan": [
+                "grasp crackers box",
+                "move grasped crackers box to cupboard",
+                "release crackers box",
+                "grasp crackers box",
+                "move grasped crackers box out of cupboard",
+                "release crackers box",
+                "grasp mustard bottle",
+                "move grasped mustard bottle to cupboard",
+                "release mustard bottle"
+              ]
+            }
           },
-          {
-            "name": "cast iron",
-            "prob": 0.2,
-            "density_kgm3": [
-              6800.0,
-              7800.0
-            ],
-            "thickness_cm": [
-              0.8,
-              3.0
-            ]
+          "changes": [],
+          "routing": {
+            "restart_from": null,
+            "rerun_modules": [],
+            "invalidate": []
           },
-          {
-            "name": "aluminum",
-            "prob": 0.171,
-            "density_kgm3": [
-              2700.0,
-              2800.0
-            ],
-            "thickness_cm": [
-              0.3,
-              1.5
-            ]
-          },
-          {
-            "name": "fiber-reinforced polymer",
-            "prob": 0.143,
-            "density_kgm3": [
-              1500.0,
-              2000.0
-            ],
-            "thickness_cm": [
-              0.5,
-              2.0
-            ]
+          "outcome": {
+            "status": "NOT_EXECUTED",
+            "verification_result": null
           }
-        ],
+        },
         "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": "c1_2",
-          "source_episode": null,
-          "episodes_seen": 1,
-          "updated_at": "2026-09-08T17:19:39+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0
+          "source": "offline_seed",
+          "dataset": "RLBench-Fail",
+          "source_episode": 71,
+          "created_at": null,
+          "updated_at": null,
+          "reuse_count": 0
         }
       },
-      "c1_2::obj_cutting_board_cutting_board": {
-        "identity": {
-          "object_id": "obj_cutting_board_cutting_board",
-          "caption": "Wooden cutting board with a central circular hole."
-        },
-        "geometry": {
-          "length_mm": 246.8,
-          "diameter_mm": null,
-          "extents_mm": [
-            246.8,
-            149.7,
-            11.4
-          ],
-          "height_z_mm": 11.5,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.25,
-          "seal_patch_rms_mm": 0.019,
-          "footprint_mm": [
-            149.3,
-            246.8
-          ],
-          "height_mm": 11.5
-        },
-        "physical_properties": {
-          "material": {
-            "value": "hardwood",
-            "confidence": 0.286
+      {
+        "experience_id": "RLBF-LAP-014-MS",
+        "context_signature": {
+          "task_id": null,
+          "subgoal_id": null,
+          "subgoal_description": "Shut the laptop lid, open it, close it again, and finally move it to the side.",
+          "action_type": null,
+          "target": {
+            "object_id": null,
+            "object_class": "laptop lid"
           },
-          "density_kgm3": {
-            "value": 1020.0
-          },
-          "mass_kg": {
-            "value": 0.164,
-            "range": [
-              0.087,
-              0.242
-            ]
-          },
-          "youngs_gpa": {
-            "value": 15.77
-          },
-          "friction": {
-            "value": 0.433,
-            "stage": 0,
-            "material_basis": "hardwood",
-            "surface_rms_mm": 0.25
+          "violated_predicates": [],
+          "selected_ee": null,
+          "selected_tool": null,
+          "execution_signature": {
+            "motion_planning_status": null,
+            "controller_status": null
           }
         },
-        "material_hypotheses": [
-          {
-            "name": "hardwood",
-            "prob": 0.286,
-            "density_kgm3": [
-              600.0,
-              800.0
-            ],
-            "thickness_cm": [
-              2.0,
-              4.0
-            ]
+        "diagnosis_summary": {
+          "source_failure_type": "missing subtask",
+          "failure_type": "TASK_DECOMPOSITION",
+          "failure_cause": {
+            "code": "MISSING_SUBGOAL",
+            "description": "The plan omits the required grasp actions before reopening and reclosing the laptop lid."
           },
-          {
-            "name": "bamboo",
-            "prob": 0.257,
-            "density_kgm3": [
-              650.0,
-              850.0
-            ],
-            "thickness_cm": [
-              1.5,
-              3.0
-            ]
+          "affected_module": "M2",
+          "confidence": 0.99
+        },
+        "recovery_summary": {
+          "recovery_category": "REPLAN_SUBGOAL",
+          "action": {
+            "action_type": "REDECOMPOSE_SUBGOAL",
+            "target": {
+              "subgoal_id": null,
+              "object_id": null,
+              "property": null,
+              "relation": null,
+              "ee_id": null,
+              "tool_id": null
+            },
+            "parameters": {
+              "source_failed_plan": [
+                "grasp laptop lid",
+                "move grasped laptop lid down",
+                "release laptop lid",
+                "move grasped laptop lid up",
+                "release laptop lid",
+                "move grasped laptop lid down",
+                "release laptop lid",
+                "grasp laptop lid",
+                "move grasped laptop lid to the side",
+                "release laptop lid"
+              ],
+              "source_correct_plan": [
+                "grasp laptop lid",
+                "move grasped laptop lid down",
+                "release laptop lid",
+                "grasp laptop lid",
+                "move grasped laptop lid up",
+                "release laptop lid",
+                "grasp laptop lid",
+                "move grasped laptop lid down",
+                "release laptop lid",
+                "grasp laptop lid",
+                "move grasped laptop lid to the side",
+                "release laptop lid"
+              ]
+            }
           },
-          {
-            "name": "hdpe",
-            "prob": 0.2,
-            "density_kgm3": [
-              930.0,
-              970.0
-            ],
-            "thickness_cm": [
-              1.0,
-              2.5
-            ]
+          "changes": [],
+          "routing": {
+            "restart_from": null,
+            "rerun_modules": [],
+            "invalidate": []
           },
-          {
-            "name": "paper composite",
-            "prob": 0.171,
-            "density_kgm3": [
-              1100.0,
-              1400.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.5
-            ]
-          },
-          {
-            "name": "tempered glass",
-            "prob": 0.086,
-            "density_kgm3": [
-              2400.0,
-              2800.0
-            ],
-            "thickness_cm": [
-              0.3,
-              0.8
-            ]
+          "outcome": {
+            "status": "NOT_EXECUTED",
+            "verification_result": null
           }
-        ],
+        },
         "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": "c1_2",
-          "source_episode": null,
-          "episodes_seen": 1,
-          "updated_at": "2026-09-08T17:19:39+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0
+          "source": "offline_seed",
+          "dataset": "RLBench-Fail",
+          "source_episode": 14,
+          "created_at": null,
+          "updated_at": null,
+          "reuse_count": 0
         }
       },
-      "c1_2::obj_dough_dough": {
-        "identity": {
-          "object_id": "obj_dough_dough",
-          "caption": "Round, textured, brown cookie with darker chocolate chips."
-        },
-        "geometry": {
-          "length_mm": 57.6,
-          "diameter_mm": null,
-          "extents_mm": [
-            57.6,
-            57.7,
-            26.2
-          ],
-          "height_z_mm": 33.5,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.96,
-          "seal_patch_rms_mm": 0.625,
-          "footprint_mm": [
-            52.9,
-            57.0
-          ],
-          "height_mm": 33.5
-        },
-        "physical_properties": {
-          "material": {
-            "value": "baked dough",
-            "confidence": 0.312
+      {
+        "experience_id": "RLBF-BTN-005-TR",
+        "context_signature": {
+          "task_id": null,
+          "subgoal_id": null,
+          "subgoal_description": "push the azure button down",
+          "action_type": "push_down",
+          "target": {
+            "object_id": null,
+            "object_class": "button"
           },
-          "density_kgm3": {
-            "value": 982.8
-          },
-          "mass_kg": {
-            "value": 0.04,
-            "range": [
-              0.009,
-              0.071
-            ]
-          },
-          "youngs_gpa": {
-            "value": 6.19
-          },
-          "friction": {
-            "value": 0.449,
-            "stage": 0,
-            "material_basis": "baked dough",
-            "surface_rms_mm": 0.96
+          "violated_predicates": [],
+          "selected_ee": null,
+          "selected_tool": null,
+          "execution_signature": {
+            "motion_planning_status": null,
+            "controller_status": "FAIL"
           }
         },
-        "material_hypotheses": [
-          {
-            "name": "baked dough",
-            "prob": 0.312,
-            "density_kgm3": [
-              300.0,
-              600.0
-            ],
-            "thickness_cm": [
-              3.0,
-              8.0
-            ]
+        "diagnosis_summary": {
+          "source_failure_type": "translation",
+          "failure_type": "EXECUTION_CONTROL",
+          "failure_cause": {
+            "code": "CONTROL_ERROR",
+            "description": "The button push failed because of a translation error in the end-effector positioning relative to the button."
           },
-          {
-            "name": "cooked meat",
-            "prob": 0.219,
-            "density_kgm3": [
-              800.0,
-              1100.0
-            ],
-            "thickness_cm": [
-              3.0,
-              8.0
-            ]
+          "affected_module": "Controller",
+          "confidence": 0.95
+        },
+        "recovery_summary": {
+          "recovery_category": "RETRY_EXECUTION",
+          "action": {
+            "action_type": "APPLY_OFFSET",
+            "target": {
+              "subgoal_id": null,
+              "object_id": null,
+              "property": null,
+              "relation": null,
+              "ee_id": null,
+              "tool_id": null
+            },
+            "parameters": {}
           },
-          {
-            "name": "plastic",
-            "prob": 0.188,
-            "density_kgm3": [
-              1000.0,
-              1400.0
-            ],
-            "thickness_cm": [
-              0.2,
-              8.0
-            ]
+          "changes": [],
+          "routing": {
+            "restart_from": null,
+            "rerun_modules": [],
+            "invalidate": []
           },
-          {
-            "name": "ceramic",
-            "prob": 0.156,
-            "density_kgm3": [
-              1800.0,
-              2400.0
-            ],
-            "thickness_cm": [
-              0.5,
-              8.0
-            ]
-          },
-          {
-            "name": "wood",
-            "prob": 0.125,
-            "density_kgm3": [
-              400.0,
-              900.0
-            ],
-            "thickness_cm": [
-              3.0,
-              8.0
-            ]
+          "outcome": {
+            "status": "NOT_EXECUTED",
+            "verification_result": null
           }
-        ],
+        },
         "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": "c1_2",
-          "source_episode": null,
-          "episodes_seen": 1,
-          "updated_at": "2026-09-08T17:19:39+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0
+          "source": "offline_seed",
+          "dataset": "RLBench-Fail",
+          "source_episode": 5,
+          "created_at": null,
+          "updated_at": null,
+          "reuse_count": 0
         }
       },
-      "c1_2::obj_spatula_spatula": {
-        "identity": {
-          "object_id": "obj_spatula_spatula",
-          "caption": "Leopard print high-back chair or throne with a blocky design."
-        },
-        "geometry": {
-          "length_mm": 246.6,
-          "diameter_mm": null,
-          "extents_mm": [
-            246.6,
-            44.1,
-            1.5
-          ],
-          "height_z_mm": 1.8,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.03,
-          "seal_patch_rms_mm": 0.0,
-          "footprint_mm": [
-            246.6,
-            44.1
-          ],
-          "height_mm": 1.8
-        },
-        "physical_properties": {
-          "material": {
-            "value": "wood",
-            "confidence": 0.225
+      {
+        "experience_id": "RLBF-DOOR-032-TR",
+        "context_signature": {
+          "task_id": null,
+          "subgoal_id": null,
+          "subgoal_description": "grasp the door handle",
+          "action_type": "acquire",
+          "target": {
+            "object_id": null,
+            "object_class": "door handle"
           },
-          "density_kgm3": {
-            "value": 1522.2
-          },
-          "mass_kg": {
-            "value": 0.004,
-            "range": [
-              0.002,
-              0.007
-            ]
-          },
-          "youngs_gpa": {
-            "value": 33.41
-          },
-          "friction": {
-            "value": 0.476,
-            "stage": 0,
-            "material_basis": "wood",
-            "surface_rms_mm": 0.03
+          "violated_predicates": [],
+          "selected_ee": null,
+          "selected_tool": null,
+          "execution_signature": {
+            "motion_planning_status": null,
+            "controller_status": "FAIL"
           }
         },
-        "material_hypotheses": [
-          {
-            "name": "wood",
-            "prob": 0.225,
-            "density_kgm3": [
-              500.0,
-              800.0
-            ],
-            "thickness_cm": [
-              2.0,
-              5.0
-            ]
+        "diagnosis_summary": {
+          "source_failure_type": "translation",
+          "failure_type": "EXECUTION_CONTROL",
+          "failure_cause": {
+            "code": "GRASP_FAILURE",
+            "description": "The gripper missed the door handle because of a translation error in its positioning."
           },
-          {
-            "name": "medium-density fiberboard",
-            "prob": 0.2,
-            "density_kgm3": [
-              600.0,
-              850.0
-            ],
-            "thickness_cm": [
-              1.5,
-              3.0
-            ]
+          "affected_module": "Controller",
+          "confidence": 0.97
+        },
+        "recovery_summary": {
+          "recovery_category": "RETRY_EXECUTION",
+          "action": {
+            "action_type": "APPLY_OFFSET",
+            "target": {
+              "subgoal_id": null,
+              "object_id": null,
+              "property": null,
+              "relation": null,
+              "ee_id": null,
+              "tool_id": null
+            },
+            "parameters": {}
           },
-          {
-            "name": "polyurethane foam",
-            "prob": 0.2,
-            "density_kgm3": [
-              25.0,
-              60.0
-            ],
-            "thickness_cm": [
-              5.0,
-              15.0
-            ]
+          "changes": [],
+          "routing": {
+            "restart_from": null,
+            "rerun_modules": [],
+            "invalidate": []
           },
-          {
-            "name": "polyester fabric",
-            "prob": 0.225,
-            "density_kgm3": [
-              100.0,
-              300.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.3
-            ]
-          },
-          {
-            "name": "steel",
-            "prob": 0.15,
-            "density_kgm3": [
-              7800.0,
-              7900.0
-            ],
-            "thickness_cm": [
-              0.2,
-              1.0
-            ]
+          "outcome": {
+            "status": "NOT_EXECUTED",
+            "verification_result": null
           }
-        ],
+        },
         "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": "c1_2",
-          "source_episode": null,
-          "episodes_seen": 1,
-          "updated_at": "2026-09-08T17:19:39+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0
+          "source": "offline_seed",
+          "dataset": "RLBench-Fail",
+          "source_episode": 32,
+          "created_at": null,
+          "updated_at": null,
+          "reuse_count": 0
         }
       },
-      "c1_2::obj_spoon_spoon": {
-        "identity": {
-          "object_id": "obj_spoon_spoon",
-          "caption": "Stylized mallet or mace with round head and handle."
-        },
-        "geometry": {
-          "length_mm": 109.3,
-          "diameter_mm": null,
-          "extents_mm": [
-            109.3,
-            51.5,
-            27.6
-          ],
-          "height_z_mm": 27.4,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.37,
-          "seal_patch_rms_mm": 99.9,
-          "footprint_mm": [
-            110.6,
-            51.4
-          ],
-          "height_mm": 27.4
-        },
-        "physical_properties": {
-          "material": {
-            "value": "hardwood",
-            "confidence": 0.25
+      {
+        "experience_id": "RLBF-LIFT-036-SL",
+        "context_signature": {
+          "task_id": null,
+          "subgoal_id": null,
+          "subgoal_description": "move the grasped object to the red ball",
+          "action_type": "transport",
+          "target": {
+            "object_id": null,
+            "object_class": "red cube"
           },
-          "density_kgm3": {
-            "value": 1815.3
-          },
-          "mass_kg": {
-            "value": 0.112,
-            "range": [
-              0.021,
-              0.203
-            ]
-          },
-          "youngs_gpa": {
-            "value": 33.68
-          },
-          "friction": {
-            "value": 0.436,
-            "stage": 0,
-            "material_basis": "hardwood",
-            "surface_rms_mm": 0.37
+          "violated_predicates": [],
+          "selected_ee": null,
+          "selected_tool": null,
+          "execution_signature": {
+            "motion_planning_status": null,
+            "controller_status": "FAIL"
           }
         },
-        "material_hypotheses": [
-          {
-            "name": "hardwood",
-            "prob": 0.25,
-            "density_kgm3": [
-              600.0,
-              900.0
-            ],
-            "thickness_cm": [
-              2.0,
-              15.0
-            ]
+        "diagnosis_summary": {
+          "source_failure_type": "slip",
+          "failure_type": "EXECUTION_CONTROL",
+          "failure_cause": {
+            "code": "SLIP",
+            "description": "The red cube slipped from the gripper while it was being moved toward the target."
           },
-          {
-            "name": "softwood",
-            "prob": 0.222,
-            "density_kgm3": [
-              400.0,
-              700.0
-            ],
-            "thickness_cm": [
-              2.0,
-              4.0
-            ]
+          "affected_module": "Controller",
+          "confidence": 1.0
+        },
+        "recovery_summary": {
+          "recovery_category": "RETRY_EXECUTION",
+          "action": {
+            "action_type": "RETRY_ACTION",
+            "target": {
+              "subgoal_id": null,
+              "object_id": null,
+              "property": null,
+              "relation": null,
+              "ee_id": null,
+              "tool_id": null
+            },
+            "parameters": {
+              "failed_primitive": "move_grasped_object"
+            }
           },
-          {
-            "name": "abs plastic",
-            "prob": 0.222,
-            "density_kgm3": [
-              1000.0,
-              1100.0
-            ],
-            "thickness_cm": [
-              0.3,
-              15.0
-            ]
+          "changes": [],
+          "routing": {
+            "restart_from": null,
+            "rerun_modules": [],
+            "invalidate": []
           },
-          {
-            "name": "rubber",
-            "prob": 0.167,
-            "density_kgm3": [
-              900.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              8.0,
-              15.0
-            ]
-          },
-          {
-            "name": "steel",
-            "prob": 0.139,
-            "density_kgm3": [
-              7800.0,
-              8000.0
-            ],
-            "thickness_cm": [
-              1.0,
-              15.0
-            ]
+          "outcome": {
+            "status": "NOT_EXECUTED",
+            "verification_result": null
           }
-        ],
+        },
         "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": "c1_2",
-          "source_episode": null,
-          "episodes_seen": 1,
-          "updated_at": "2026-09-08T17:19:39+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0
-        }
-      },
-      "c1_2::obj_tongs_tongs": {
-        "identity": {
-          "object_id": "obj_tongs_tongs",
-          "caption": "Kitchen or serving tongs with a simple spring design."
-        },
-        "geometry": {
-          "length_mm": 253.0,
-          "diameter_mm": null,
-          "extents_mm": [
-            253.0,
-            29.9,
-            20.9
-          ],
-          "height_z_mm": 21.7,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.63,
-          "seal_patch_rms_mm": 0.953,
-          "footprint_mm": [
-            253.0,
-            29.0
-          ],
-          "height_mm": 21.7
-        },
-        "physical_properties": {
-          "material": {
-            "value": "stainless steel",
-            "confidence": 0.265
-          },
-          "density_kgm3": {
-            "value": 4600.7
-          },
-          "mass_kg": {
-            "value": 0.029,
-            "range": [
-              0.016,
-              0.042
-            ]
-          },
-          "youngs_gpa": {
-            "value": 110.3
-          },
-          "friction": {
-            "value": 0.442,
-            "stage": 0,
-            "material_basis": "stainless steel",
-            "surface_rms_mm": 0.63
-          }
-        },
-        "material_hypotheses": [
-          {
-            "name": "stainless steel",
-            "prob": 0.265,
-            "density_kgm3": [
-              7800.0,
-              8000.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.3
-            ]
-          },
-          {
-            "name": "aluminum alloy",
-            "prob": 0.206,
-            "density_kgm3": [
-              2700.0,
-              2800.0
-            ],
-            "thickness_cm": [
-              0.2,
-              0.4
-            ]
-          },
-          {
-            "name": "nylon",
-            "prob": 0.176,
-            "density_kgm3": [
-              1050.0,
-              1150.0
-            ],
-            "thickness_cm": [
-              0.3,
-              0.6
-            ]
-          },
-          {
-            "name": "spring steel",
-            "prob": 0.206,
-            "density_kgm3": [
-              7800.0,
-              7900.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.3
-            ]
-          },
-          {
-            "name": "polypropylene",
-            "prob": 0.147,
-            "density_kgm3": [
-              900.0,
-              910.0
-            ],
-            "thickness_cm": [
-              0.4,
-              0.7
-            ]
-          }
-        ],
-        "metadata": {
-          "source_module": "M3",
-          "source_method": "siphy",
-          "source_task": "c1_2",
-          "source_episode": null,
-          "episodes_seen": 1,
-          "updated_at": "2026-09-08T17:19:39+00:00",
-          "stale": false,
-          "stale_reason": null,
-          "stage": 0
+          "source": "offline_seed",
+          "dataset": "RLBench-Fail",
+          "source_episode": 36,
+          "created_at": null,
+          "updated_at": null,
+          "reuse_count": 0
         }
       }
-    }
-  }
+    ]
+  },
+  "schema_version": "1.0"
 }

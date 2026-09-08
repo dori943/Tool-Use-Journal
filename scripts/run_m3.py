@@ -30,10 +30,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-if __name__ == "__main__":
-    sys.exit("M3 has been merged into M1. Run scripts/run_m1.py or scripts/run.py instead.")
-
-from tuj.m3_grounding import Materializer, MockBackend, PropertyMemory, SiPhyBackend, new_gk
+from tuj.m0_memory import DensityOnlyBackend, DensityOnlyResult
+from tuj.m3_grounding import (Materializer, MockBackend, PropertyMemory,
+                              SiPhyBackend, new_gk)
 
 
 # ── 술어 → m3_call 컴파일 (m2_queries가 안 실은 eval_by:m3 술어 보충) ──

@@ -39,8 +39,8 @@ class Materializer:
         self.density_infer = density_infer
         self.retrieval_debug: dict[str, dict] = {}
         self._cache: dict[str, dict] = {}
-        if memory is not None:                         # 씬 노드에 해당하는 엔트리 preload
-            for nid, node in self.nodes.items():
+        if memory is not None and object_knowledge is None:  # legacy node-id memory only
+            for nid in self.nodes:
                 hit = memory.lookup(nid)
                 if hit is None:
                     continue

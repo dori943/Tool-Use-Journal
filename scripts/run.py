@@ -154,8 +154,7 @@ def stage_m1(task, out, args):
     module = load_script("run_m1")
     if task not in TASK_ENV:
         sys.exit(f"[err] 등록되지 않은 태스크 {task!r}. 등록됨: {list(TASK_ENV)}")
-    argv = [task, "--backend", args.backend, "--model", args.model,
-            "--memory", args.memory] + (["--view"] if args.view else [])
+    argv = [task, "--output-dir", str(out), "--seed", str(args.seed)] + (["--view"] if args.view else [])
     call_main(module, argv, "run_m1")
 
 
