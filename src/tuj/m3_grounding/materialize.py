@@ -20,7 +20,8 @@ from .intrinsic import FrictionHead, MockBackend, ground_intrinsic
 class Materializer:
     def __init__(self, m1: dict, backend=None, friction: FrictionHead | None = None,
                  logger=None, eps_margin: float = 0.1,
-                 remeasure_fn=None, probe_fn=None, memory=None):
+                 remeasure_fn=None, probe_fn=None, memory=None, *, task_id=None,
+                 object_knowledge=None, density_infer=None):
         """m1: m1_scene.build_m1() 결과. memory: PropertyMemory (선택) —
         지속 메모리 hit 시 VLM 콜 스킵, 신규만 접지. remeasure_fn/probe_fn: 에스컬레이션 훅."""
         self.nodes = {n["id"]: n for n in m1["nodes"]}
@@ -32,8 +33,12 @@ class Materializer:
         self.remeasure_fn = remeasure_fn
         self.probe_fn = probe_fn
         self.memory = memory
+        self.task_id = task_id
+        self.object_knowledge = object_knowledge
+        self.density_infer = density_infer
+        self.retrieval_debug: dict[str, dict] = {}
         self._cache: dict[str, dict] = {}
-        if memory is not None:                         # 씬 노드에 해당하는 엔트리 preload
+        if memory is not None and object_knowledge is None:  # legacy node-id memory only
             for nid in self.nodes:
                 hit = memory.lookup(nid)
                 if hit is not None:
@@ -48,6 +53,15 @@ class Materializer:
                         crop_rgb=None, margin_fn=None) -> dict:
         """→ {queried_by, node_id, geometry..., material, mass_kg, mu, ...} (M2 응답 스키마)"""
         if node_id not in self._cache:
+            if self.object_knowledge is not None and self.task_id is not None:
+                infer = self.density_infer or (lambda _crop: None)
+                reused, debug = self.object_knowledge.lookup_or_retrieve(
+                    self.task_id, node_id, self.nodes[node_id].get("bbox_mm"), crop_rgb, infer)
+                self.retrieval_debug[node_id] = debug
+                if reused is not None:
+                    self._cache[node_id] = reused
+                    self.log(module="m0", event="object_knowledge_hit", node=node_id,
+                             lookup_type=debug["lookup_type"])
             hooks = {}
             if margin_fn is not None:                     # 마찰 에스컬레이션 활성화
                 hooks = dict(
@@ -56,10 +70,13 @@ class Materializer:
                     # TODO(M5): probe_push 프리미티브 완성 시 주석 해제 (2단 마찰 프로브)
                     # probe_fn=(lambda: self.probe_fn(node_id)) if self.probe_fn else None,
                     probe_fn=None)
-            self._cache[node_id] = ground_intrinsic(
-                self.nodes[node_id], crop_rgb, self.backend, self.friction, **hooks)
-            self.log(module="m3", event="intrinsic", node=node_id,
-                     mu_stage=self._cache[node_id]["mu"]["stage"])
+            if node_id not in self._cache:
+                self._cache[node_id] = ground_intrinsic(
+                    self.nodes[node_id], crop_rgb, self.backend, self.friction, **hooks)
+                debug = self.retrieval_debug.setdefault(node_id, {})
+                debug.update(full_m3_called=True, full_m3_skipped=False)
+                self.log(module="m3", event="intrinsic", node=node_id,
+                         mu_stage=self._cache[node_id]["mu"]["stage"])
         entry = gk["nodes"].setdefault(node_id, {"queried_by": []})
         entry.update(self._cache[node_id])
         entry["queried_by"].append(queried_by)
@@ -138,6 +155,41 @@ class Materializer:
         self.log(module="m3", event="predicate", pred="clear", node=region_id)
         return res
 
+    # ── 0901 어휘 확장 접지 2종 (flat_face / gap_accessible — 도희) ─────────
+    def query_flat_face(self, gk: dict, node_id: str, queried_by: str,
+                        rms_tol_mm: float = 2.0, min_face_mm: float = 40.0,
+                        patch_tol_mm: float = 1.5) -> dict:
+        """flat_face(?tool)(0901): 도구에 넓고 평평한 작업면이 있는가 — flatten용.
+        상면 평면성(rms) + 접촉 패치 평면성(seal_patch) + 작업면 폭(footprint)으로 판정."""
+        intr = self.query_intrinsic(gk, node_id, queried_by)
+        g = intr["geometry"]
+        rms = g.get("surface_rms_mm", float("nan"))
+        patch = g.get("seal_patch_rms_mm", 99.9)
+        face = min(g.get("footprint_mm", [0.0, 0.0]))
+        planar = (rms == rms) and rms <= rms_tol_mm and patch <= patch_tol_mm
+        ok = bool(planar and face >= min_face_mm)
+        res = {"queried_by": queried_by, "node_id": node_id, "type": "flat_face",
+               "value": ok, "pass": ok,
+               "check": (f"rms_{rms}<={rms_tol_mm} & patch_{patch}"
+                         f"<={patch_tol_mm} & face_{round(face, 1)}>={min_face_mm}")}
+        entry = gk["nodes"].setdefault(node_id, {"queried_by": []})
+        entry.setdefault("predicates", {})["flat_face"] = {
+            "value": ok, "face_mm": round(face, 1), "queried_by": queried_by}
+        self.log(module="m3", event="predicate", pred="flat_face", node=node_id)
+        return res
+
+    def query_gap_accessible(self, gk: dict, tool_id: str, target_id: str,
+                             queried_by: str, gap_width_mm: float | None = None) -> dict:
+        """gap_accessible(?tool, ?target)(0901): 도구가 틈에 진입해 대상에 닿는가 — extract용.
+        relational.gap_access(도구 두께/접촉폭/리치 vs 틈·대상 치수). 결과는 edge로 적재."""
+        r = {"queried_by": queried_by, "from": tool_id, "to": target_id} \
+            | relational.gap_access(self.nodes[tool_id], self.nodes[target_id],
+                                    gap_width_mm=gap_width_mm)
+        gk["edges"].append(r)
+        self.log(module="m3", event="predicate", pred="gap_accessible",
+                 tool=tool_id, target=target_id)
+        return r
+
     # ── 0828 신규 질의 2종 — 프로토타입 (수빈 작성, push 전 협의) ──────────
     # batch:       한 번의 액션으로 member 집합을 동시 처리할 수 있는가.
     #              안 되면 근접도/폭 기준 파티션(그룹 구성)까지 계산해 돌려준다.
@@ -169,8 +221,20 @@ class Materializer:
         actor = call.get("actor") or {}
         res = {"queried_by": queried_by, "subgoal_id": gk["subgoal_id"],
                "kind": "batch", "actor": actor}
+        if actor.get("type") == "ee_pool" and members:
+            # relocate 직접 파지: 그리퍼는 한 번에 물체 1개만 든다(도구 스윕처럼 폭 안에
+            # 여러 개를 담는 동시 처리가 물리적으로 불가) → 물체별 1그룹 파티션.
+            # M2는 이 partition을 '물체별 1개' 폴백 대신 측정 근거로 우선 사용한다.
+            part = [[m["id"]] for m in members]
+            self.log(module="m3", event="batch", actor="ee_pool", n_groups=len(part))
+            return res | {"feasible": len(members) <= 1,
+                          "checks": [{"rule": "ee_pool_one_per_grasp", "capacity": 1,
+                                      "demand": len(members), "unit": "count",
+                                      "margin": 1 - len(members),
+                                      "pass": bool(len(members) <= 1)}],
+                          "binding_check": "ee_pool_one_per_grasp", "partition": part}
         if actor.get("type") != "object" or len(members) < 2:
-            # EE 풀 주체(relocate)의 동시 파지 계산은 스펙 협의 후 — 지금은 미측정 응답
+            # 주체 미상/단일 물체 — 묶기 판정 대상 아님
             return res | {"feasible": None, "checks": [],
                           "binding_check": None, "partition": None}
         tool = self.nodes[actor["id"]]
@@ -198,7 +262,10 @@ class Materializer:
             return res | {"clear": None, "margin_mm": None, "blockers": []}
         tool = self.nodes[actor["id"]]
         width = min(tool["bbox_mm"][0], tool["bbox_mm"][1])
-        exclude = set(call.get("member_ids", [])) | {actor["id"], call.get("to")}
+        # ignore_ids (0831, M2 협의): 형제 서브골에서 같은 목적지로 처리될 대상은
+        # 실제 방해물이 아니므로 계획 모듈이 명시한 목록을 판정에서 제외한다.
+        exclude = (set(call.get("member_ids", [])) | {actor["id"], call.get("to")}
+                   | set(call.get("ignore_ids", [])))
         others = [n for n in self.nodes.values() if n["id"] not in exclude]
         r = relational.corridor_blockers(members, to, width, others)
         self.log(module="m3", event="swept_space", actor=actor.get("id"), clear=r["clear"])

@@ -23,7 +23,10 @@ from tuj.m5_motion.precomputed_ee_attach import (
     _robot_model,
     compute_rack_signature,
     compute_workcell_signature,
+    is_cross_environment_ee_path,
     normalize_ee_id,
+    rebase_portable_pose,
+    validate_portable_rack,
 )
 from tuj.m5_motion.precomputed_ee_exchange import (
     EEReturnTrajectoryTemplate,
@@ -256,6 +259,16 @@ class EEExchangeEntryPlanner:
                 "robot model differs from the stored exchange-entry",
                 trajectory_id=template.trajectory_id,
             )
+        if is_cross_environment_ee_path(template, request.world):
+            try:
+                validate_portable_rack(request.world, template)
+            except ValueError as error:
+                raise PrecomputedEEPathError(
+                    EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH,
+                    str(error),
+                    trajectory_id=template.trajectory_id,
+                ) from error
+            return
         if template.rack_signature != compute_rack_signature(request.world):
             raise PrecomputedEEPathError(
                 EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH,
@@ -471,7 +484,9 @@ class EEExchangeEntryPlanner:
                 joint_names=list(selected.joint_names),
                 joint_positions_rad=list(target),
                 joint_velocities_rad_s=[0.0] * len(target),
-                eef_pose=selected.start_eef_pose.model_copy(deep=True),
+                eef_pose=rebase_portable_pose(
+                    selected, request.world, selected.start_eef_pose
+                ),
                 gripper=(
                     request.world.robot_state.gripper.model_copy(deep=True)
                     if request.world.robot_state.gripper is not None

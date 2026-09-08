@@ -14,7 +14,7 @@
       output/<task>/gk_<SG>.json     — 서브골별 G_k (M4 입력)
       output/<task>/m3_intrinsic.json — Tier-2 접지 캐시
 
-siphy 백엔드: OPENAI_API_KEY 환경변수 또는 레포 루트 my_api_key.py (SiPhy 관례).
+siphy 백엔드: OPENAI_API_KEY(우선) 또는 GEMINI_API_KEY/GOOGLE_API_KEY 환경변수, 혹은 레포 루트 my_api_key.py.
 """
 from __future__ import annotations
 
@@ -30,7 +30,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-from tuj.m3_grounding import Materializer, MockBackend, PropertyMemory, SiPhyBackend, new_gk
+from tuj.m0_memory import DensityOnlyBackend, DensityOnlyResult
+from tuj.m3_grounding import (Materializer, MockBackend, PropertyMemory,
+                              SiPhyBackend, new_gk)
 
 
 # ── 술어 → m3_call 컴파일 (m2_queries가 안 실은 eval_by:m3 술어 보충) ──
@@ -44,6 +46,9 @@ HEAD_MAP = {
     "gap":            ("relational", "gap"),
     "distance":       ("relational", "distance"),
     "clearance":      ("relational", "clearance"),
+    # 0901 어휘 확장(도희): flat_face(도구 평평면), gap_accessible(도구가 틈 진입 가능)
+    "flat_face":      ("flat_face", None),
+    "gap_accessible": ("gap_accessible", None),
     # 집합형(batch/swept_space): m2_queries가 직접 실어야 함, 컴파일러는 스킵
     "batch_feasible":  ("__skip__", None),
     "act_space_clear": ("__skip__", None),
@@ -64,10 +69,36 @@ def crop_of(out, node_id):
     return p if p.exists() else None
 
 
+def _split_args(expr):
+    """expr의 최상위 인자만 분리 — 중괄호 집합 {a,b,c}는 하나의 토큰으로 유지.
+    (종전: 단순 콤마 분리가 집합을 쪼개 원소가 개별 인자로 새어 나갔다 —
+     c2_1 fits(집합,트레이) → (빵,머그) 같은 엉뚱한 쌍의 원인)."""
+    inner = expr.split("(", 1)[-1].rsplit(")", 1)[0]
+    args, depth, cur = [], 0, ""
+    for ch in inner:
+        if ch == "{":
+            depth += 1; cur += ch
+        elif ch == "}":
+            depth -= 1; cur += ch
+        elif ch == "," and depth == 0:
+            args.append(cur); cur = ""
+        else:
+            cur += ch
+    if cur.strip():
+        args.append(cur)
+    return [a for a in (x.strip() for x in args) if a]
+
+
 def compile_predicates(m2, ids, aliases):
-    """details의 eval_by:m3 술어 중 미질의/미해결 → 질의 목록으로 컴파일."""
+    """details의 eval_by:m3 술어 중 미질의/미해결 → 질의 목록으로 컴파일.
+    집합 {a,b,c} 인자는 원소별로 펼쳐 질의한다 (0828 C2_1 계약)."""
     def resolve(tok, sg):
         tok = tok.strip()
+        if tok.startswith("{") and tok.endswith("}"):     # 집합 → 원소별 해석 후 합침
+            acc = []
+            for m in tok[1:-1].split(","):
+                acc += resolve(m, sg)
+            return acc
         if tok.startswith("obj_"):
             return [tok] if tok in ids else []
         if tok.startswith("?"):
@@ -88,23 +119,31 @@ def compile_predicates(m2, ids, aliases):
                 kind, relation = HEAD_MAP[head]
                 if kind == "__skip__":
                     continue
-                args = [a for a in p["expr"].split("(", 1)[-1].rstrip(")").split(",")
-                        if not a.strip().startswith("{")]
-                targets = [resolve(a, sg) for a in args] or [[]]
+                targets = [resolve(a, sg) for a in _split_args(p["expr"])] or [[]]
                 base = {"subgoal_id": sg["subgoal_id"], "queried_by": p["id"], "kind": kind}
                 if kind == "relational":
-                    a_list, b_list = (targets + [[]])[:2]
-                    for a in a_list:
+                    a_list = targets[0]
+                    b_list = targets[1] if len(targets) > 1 else []
+                    for a in a_list:                        # 집합 target → (원소, 컨테이너)
                         for b in b_list:
                             out.append(base | {"a": a, "b": b, "relation": relation})
                     if not (a_list and b_list):
                         out.append(base | {"kind": "error",
                                            "error": f"unresolved args in {p['expr']!r} "
                                                     f"(별칭/노드 미해결 — m1 추적 대상 확인)"})
-                else:
+                elif kind == "gap_accessible":              # (?tool, ?target)
+                    tools = targets[0]
+                    tgts = targets[1] if len(targets) > 1 else []
+                    for ttool in tools:
+                        for tgt in tgts:
+                            out.append(base | {"tool_id": ttool, "target_id": tgt})
+                    if not (tools and tgts):
+                        out.append(base | {"kind": "error",
+                                           "error": f"unresolved args in {p['expr']!r}"})
+                else:                                       # ee/top_exposed/clear/flat_face
                     nodes = targets[-1] if head == "ee_usable" else targets[0]
-                    for n in nodes:
-                        out.append(base | {"node_id": n})
+                    for nd in nodes:
+                        out.append(base | {"node_id": nd})
                     if not nodes:
                         out.append(base | {"kind": "error",
                                            "error": f"unresolved args in {p['expr']!r}"})
@@ -117,8 +156,15 @@ def main():
     backend_name = args[args.index("--backend") + 1] if "--backend" in args else "siphy"
     model = args[args.index("--model") + 1] if "--model" in args else "gpt-4o-mini"
     memory_path = args[args.index("--memory") + 1] if "--memory" in args else str(ROOT / "output" / "memory.json")
+    bbox_threshold = float(args[args.index("--m0-bbox-threshold") + 1]) \
+        if "--m0-bbox-threshold" in args else 0.25
+    density_threshold = float(args[args.index("--m0-density-threshold") + 1]) \
+        if "--m0-density-threshold" in args else 0.20
+    debug_label = (args[args.index("--retrieval-debug-label") + 1]
+                   if "--retrieval-debug-label" in args else "M3")
 
-    OUT = ROOT / "output" / name
+    OUT = (Path(args[args.index("--output-dir") + 1]).resolve()
+           if "--output-dir" in args else ROOT / "output" / name)
     if not (OUT / "m1.json").exists():
         sys.exit(f"[err] {OUT}/m1.json 없음 — 먼저 python scripts/run_m1.py {name}")
 
@@ -139,8 +185,18 @@ def main():
             e["seal_rms_tol_mm"] = e["flatness_tol_rms_mm"]
         ee_pool.append(e)
 
-    memory = None if memory_path == "none" else PropertyMemory(memory_path)
-    mat = Materializer(m1, backend=backend, memory=memory,
+    memory = None if memory_path == "none" else PropertyMemory(
+        memory_path, task_id=name, bbox_relative_threshold=bbox_threshold,
+        density_relative_threshold=density_threshold)
+    if backend_name == "siphy":
+        density_backend = DensityOnlyBackend(model=backend.model, client=backend.client,
+                                             repo_root=ROOT)
+        density_infer = density_backend.infer
+    else:
+        density_infer = lambda _crop: DensityOnlyResult(
+            None, False, error="density-only inference unavailable with mock backend")
+    mat = Materializer(m1, backend=backend, memory=None, task_id=name,
+                       object_knowledge=memory, density_infer=density_infer,
                        logger=lambda **kw: print("  [m3]", kw))
     preloaded = len(mat._cache)
     if preloaded:
@@ -158,12 +214,15 @@ def main():
         aliases = {"tool_rest": [i for i in ids
                                  if "rack" in i.lower() and "gripperrack" not in i.lower()]}
         compiled = compile_predicates(m2, ids, aliases)
-        key = lambda q: (q["queried_by"], q.get("node_id") or (q.get("a"), q.get("b")))
+        key = lambda q: (q["queried_by"], q["kind"],
+                         q.get("node_id") or (q.get("a"), q.get("b"))
+                         or (q.get("tool_id"), q.get("target_id")))
         already = {key(q) for q in queries}
         compiled = [q for q in compiled if key(q) not in already]
         for q in compiled:
-            print(f"  [compile] {q['queried_by']} -> {q['kind']}"
-                  f"({q.get('node_id') or (q.get('a'), q.get('b')) or q.get('error')})")
+            tgt = (q.get("node_id") or (q.get("a"), q.get("b"))
+                   or (q.get("tool_id"), q.get("target_id")) or q.get("error"))
+            print(f"  [compile] {q['queried_by']} -> {q['kind']}({tgt})")
         queries += compiled
         for sg in m2.get("m2_subgoals", []):
             sel = set(sg.get("object_ids", []))
@@ -207,10 +266,16 @@ def main():
                 r = mat.query_top_exposed(gk, q["node_id"], queried_by=qid)
             elif kind == "clear":
                 r = mat.query_clear(gk, q["node_id"], queried_by=qid)
+            elif kind == "flat_face":
+                r = mat.query_flat_face(gk, q["node_id"], queried_by=qid)
+            elif kind == "gap_accessible":
+                r = mat.query_gap_accessible(gk, q["tool_id"], q["target_id"],
+                                             queried_by=qid)
             elif kind in ("batch", "swept_space"):
                 call = {"kind": kind, "action_type": q.get("action_type"),
                         "actor": q.get("actor"), "member_ids": q.get("member_ids", []),
-                        "to": q.get("to")}
+                        "to": q.get("to"),
+                        "ignore_ids": q.get("ignore_ids", [])}
                 fn = mat.query_batch if kind == "batch" else mat.query_swept_space
                 r = fn(gk, call, queried_by=qid)
             elif kind == "error":
@@ -300,6 +365,12 @@ def main():
         encoding="utf-8")
     (OUT / "m3_intrinsic.json").write_text(
         json.dumps(strip(dict(mat._cache)), ensure_ascii=False, indent=2), encoding="utf-8")
+    retrieval_debug = strip({"round": debug_label, "objects": mat.retrieval_debug})
+    debug_text = json.dumps(retrieval_debug, ensure_ascii=False, indent=2)
+    (OUT / "m0_retrieval.json").write_text(debug_text, encoding="utf-8")
+    debug_slug = "".join(ch.lower() if ch.isalnum() else "_" for ch in debug_label).strip("_")
+    (OUT / f"m0_retrieval.{debug_slug or 'm3'}.json").write_text(
+        debug_text, encoding="utf-8")
 
     n_t2 = len(mat._cache)
     if memory is not None:

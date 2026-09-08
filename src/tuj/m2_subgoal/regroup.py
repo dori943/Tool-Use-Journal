@@ -19,7 +19,7 @@ batch 질의 응답의 partition(그룹 구성)대로, 서브골 하나를 그�
 """
 from __future__ import annotations
 
-from .core import _detail, build_queries, decompose, invariants_for, partial_order
+from .core import _detail, add_container_seal_pres, build_queries, decompose, invariants_for, partial_order
 
 
 def _cycle_check(details: list[dict], edges: list[dict]) -> list[str]:
@@ -130,6 +130,7 @@ def split_after_m3(m2_out: dict) -> list[str]:
         return logs
 
     m2_out["m2_subgoals"] = new_subs
+    logs += add_container_seal_pres(new_subs)   # 0903: 분할 자식 기준으로 담기 ≺ 덮기 재부착
     all_details = [d for s2 in new_subs for d in s2["details"]]
     edges, mutex = partial_order(all_details)
     stuck = _cycle_check(all_details, edges)
@@ -144,6 +145,25 @@ def split_after_m3(m2_out: dict) -> list[str]:
     for s2 in new_subs:
         if "split_from" in s2:
             queries += build_queries(s2, s2["details"])
+    # ignore_ids (0831): 분할 자식의 swept_space 질의에 형제 서브골의 target 목록을 싣는다.
+    # 형제 target은 어차피 같은 목적지로 처리될 물체라 실제 방해물이 아닌데, 접지가 이를
+    # 모르면 형제끼리 서로를 blocker로 판정한다 (0830 도희 보고 이슈 2). 누가 형제인지는
+    # 계획 구조를 아는 이 모듈만 알므로 질의에 명시해 보낸다. 접지 쪽 반영은 방해물
+    # 계산에서 이 목록을 제외하는 것 — 필드를 아직 읽지 않아도 기존 동작과 동일하다.
+    sib_of: dict[str, list[dict]] = {}
+    for s2 in new_subs:
+        if s2.get("split_from"):
+            sib_of.setdefault(s2["split_from"], []).append(s2)
+    for group in sib_of.values():
+        for s2 in group:
+            ignore = sorted({t for k in group if k is not s2
+                             for t in k.get("target_ids", [])})
+            if not ignore:
+                continue
+            for q in queries:
+                if (q["subgoal_id"] == s2["subgoal_id"]
+                        and q["m3_call"].get("kind") == "swept_space"):
+                    q["m3_call"]["ignore_ids"] = ignore
     m2_out["m2_queries"] = queries
     st = m2_out.setdefault("m2_stats", {})
     st.update({"n_subgoals": len(new_subs), "n_details": len(all_details),

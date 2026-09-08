@@ -40,6 +40,11 @@ from tuj.m5_motion.task_semantics import task_operation
 
 EE_ATTACH_TEMPLATE_SCHEMA_VERSION = "1.0"
 SUPPORTED_EE_IDS = ("2F", "3F", "vac")
+PORTABLE_EE_PATH_SCOPE = "rack-relative-v1"
+PORTABLE_EE_PATH_DIRECTORY = "ee_rack"
+PORTABLE_REFERENCE_EE = "3F"
+PORTABLE_START_POSITION_TOLERANCE_M = 0.015
+PORTABLE_START_ORIENTATION_TOLERANCE_RAD = 0.03
 
 
 def normalize_ee_id(value: object) -> str:
@@ -96,6 +101,257 @@ def compute_rack_signature(world: WorldSnapshot) -> str:
     """Hash only static rack and dock geometry, excluding scene objects."""
 
     return _digest(world.rack)
+
+
+def _normalize_quaternion_xyzw(values: Sequence[float]) -> tuple[float, ...]:
+    norm = math.sqrt(sum(float(value) ** 2 for value in values))
+    if not math.isfinite(norm) or norm <= 1e-12:
+        raise ValueError("pose quaternion must be finite and non-zero")
+    normalized = tuple(float(value) / norm for value in values)
+    # q and -q describe the same rotation. Pick one representation so hashes
+    # and comparisons do not depend on the source serializer's sign choice.
+    for value in (normalized[3], *normalized[:3]):
+        if abs(value) <= 1e-12:
+            continue
+        if value < 0.0:
+            normalized = tuple(-item for item in normalized)
+        break
+    return normalized
+
+
+def _quaternion_conjugate_xyzw(values: Sequence[float]) -> tuple[float, ...]:
+    x, y, z, w = _normalize_quaternion_xyzw(values)
+    return (-x, -y, -z, w)
+
+
+def _quaternion_multiply_xyzw(
+    left: Sequence[float], right: Sequence[float]
+) -> tuple[float, ...]:
+    lx, ly, lz, lw = left
+    rx, ry, rz, rw = right
+    return (
+        lw * rx + lx * rw + ly * rz - lz * ry,
+        lw * ry - lx * rz + ly * rw + lz * rx,
+        lw * rz + lx * ry - ly * rx + lz * rw,
+        lw * rw - lx * rx - ly * ry - lz * rz,
+    )
+
+
+def _rotate_vector_xyzw(
+    quaternion: Sequence[float], vector: Sequence[float]
+) -> tuple[float, float, float]:
+    q = _normalize_quaternion_xyzw(quaternion)
+    rotated = _quaternion_multiply_xyzw(
+        _quaternion_multiply_xyzw(q, (*map(float, vector), 0.0)),
+        _quaternion_conjugate_xyzw(q),
+    )
+    return (rotated[0], rotated[1], rotated[2])
+
+
+def _rack_reference_pose(
+    world: WorldSnapshot, reference_ee: str = PORTABLE_REFERENCE_EE
+) -> Pose:
+    try:
+        dock_pose = world.rack[reference_ee]["dock_pose"]
+        return Pose.model_validate(dock_pose)
+    except (KeyError, TypeError, ValueError) as error:
+        raise ValueError(
+            f"rack has no valid {reference_ee!r} reference dock pose"
+        ) from error
+
+
+def _pose_relative_to_reference(pose: Pose, reference: Pose) -> Pose:
+    inverse = _quaternion_conjugate_xyzw(reference.orientation_xyzw)
+    delta = tuple(
+        float(value) - float(origin)
+        for value, origin in zip(pose.position_m, reference.position_m)
+    )
+    relative_position = _rotate_vector_xyzw(inverse, delta)
+    relative_orientation = _normalize_quaternion_xyzw(
+        _quaternion_multiply_xyzw(inverse, pose.orientation_xyzw)
+    )
+    return Pose(
+        frame_id=f"rack:{PORTABLE_REFERENCE_EE}",
+        position_m=relative_position,
+        orientation_xyzw=relative_orientation,
+    )
+
+
+def _pose_from_reference(relative: Pose, reference: Pose) -> Pose:
+    rotated = _rotate_vector_xyzw(
+        reference.orientation_xyzw, relative.position_m
+    )
+    position = tuple(
+        float(origin) + value
+        for origin, value in zip(reference.position_m, rotated)
+    )
+    orientation = _normalize_quaternion_xyzw(
+        _quaternion_multiply_xyzw(
+            reference.orientation_xyzw, relative.orientation_xyzw
+        )
+    )
+    return Pose(
+        frame_id=reference.frame_id,
+        position_m=position,
+        orientation_xyzw=orientation,
+    )
+
+
+def compute_portable_rack_signature(world: WorldSnapshot) -> str:
+    """Hash rack geometry in a rack-local frame instead of world coordinates."""
+
+    reference = _rack_reference_pose(world)
+    rack: dict[str, Any] = {}
+    for ee, raw in sorted(world.rack.items()):
+        if not isinstance(raw, Mapping):
+            raise ValueError(f"rack entry {ee!r} is not an object")
+        try:
+            dock = Pose.model_validate(raw["dock_pose"])
+        except (KeyError, ValueError) as error:
+            raise ValueError(f"rack entry {ee!r} has no valid dock pose") from error
+        relative = _pose_relative_to_reference(dock, reference)
+        entry = {
+            key: value
+            for key, value in raw.items()
+            if key not in {"dock_pose", "rack_support_top_z", "approach_axis_xyz"}
+        }
+        entry["dock_pose_relative_to_reference"] = {
+            "position_m": [round(value, 8) for value in relative.position_m],
+            "orientation_xyzw": [
+                round(value, 8) for value in relative.orientation_xyzw
+            ],
+        }
+        if "approach_axis_xyz" in raw:
+            entry["approach_axis_in_reference"] = [
+                round(value, 8)
+                for value in _rotate_vector_xyzw(
+                    _quaternion_conjugate_xyzw(reference.orientation_xyzw),
+                    raw["approach_axis_xyz"],
+                )
+            ]
+        if "rack_support_top_z" in raw:
+            entry["rack_support_top_offset_m"] = round(
+                float(raw["rack_support_top_z"]) - float(reference.position_m[2]),
+                8,
+            )
+        rack[str(ee)] = entry
+    return _digest(
+        {
+            "scope": PORTABLE_EE_PATH_SCOPE,
+            "reference_ee": PORTABLE_REFERENCE_EE,
+            "rack": rack,
+        }
+    )
+
+
+def portable_ee_path_metadata(world: WorldSnapshot) -> dict[str, Any]:
+    """Metadata needed to safely rebase a commissioned path to another task."""
+
+    reference = _rack_reference_pose(world)
+    return {
+        "portable_across_environments": True,
+        "portable_scope": PORTABLE_EE_PATH_SCOPE,
+        "portable_rack_signature": compute_portable_rack_signature(world),
+        "portable_reference_ee": PORTABLE_REFERENCE_EE,
+        "portable_reference_rack_pose": reference.model_dump(mode="json"),
+    }
+
+
+def is_portable_ee_path(template: object) -> bool:
+    metadata = getattr(template, "metadata", {})
+    return bool(
+        isinstance(metadata, Mapping)
+        and metadata.get("portable_across_environments") is True
+        and metadata.get("portable_scope") == PORTABLE_EE_PATH_SCOPE
+        and isinstance(metadata.get("portable_rack_signature"), str)
+        and isinstance(metadata.get("portable_reference_rack_pose"), Mapping)
+    )
+
+
+def is_cross_environment_ee_path(
+    template: object, world: WorldSnapshot
+) -> bool:
+    environment = world.metadata.get("environment_name")
+    return getattr(template, "environment_name", None) != environment
+
+
+def validate_portable_rack(
+    world: WorldSnapshot, template: object
+) -> None:
+    """Validate that a cross-task path sees the same rack-local workcell."""
+
+    if not is_portable_ee_path(template):
+        raise ValueError("trajectory is not explicitly commissioned as portable")
+    metadata = getattr(template, "metadata")
+    if metadata["portable_rack_signature"] != compute_portable_rack_signature(world):
+        raise ValueError("rack-relative geometry differs from the stored trajectory")
+
+
+def validate_portable_start_pose(
+    world: WorldSnapshot,
+    template: object,
+    *,
+    position_tolerance_m: float = PORTABLE_START_POSITION_TOLERANCE_M,
+    orientation_tolerance_rad: float = PORTABLE_START_ORIENTATION_TOLERANCE_RAD,
+) -> None:
+    """Check the robot-to-rack transform at a template's canonical joint state."""
+
+    validate_portable_rack(world, template)
+    stored_eef = getattr(template, "start_eef_pose", None)
+    current_eef = world.robot_state.eef_pose
+    if stored_eef is None or current_eef is None:
+        raise ValueError("stored and current canonical EEF poses are required")
+    metadata = getattr(template, "metadata")
+    try:
+        stored_reference = Pose.model_validate(
+            metadata["portable_reference_rack_pose"]
+        )
+    except (KeyError, ValueError) as error:
+        raise ValueError("portable reference rack pose is invalid") from error
+    current_reference = _rack_reference_pose(
+        world, str(metadata.get("portable_reference_ee", PORTABLE_REFERENCE_EE))
+    )
+    stored_relative = _pose_relative_to_reference(stored_eef, stored_reference)
+    current_relative = _pose_relative_to_reference(current_eef, current_reference)
+    position_error = math.sqrt(
+        sum(
+            (float(current) - float(stored)) ** 2
+            for current, stored in zip(
+                current_relative.position_m, stored_relative.position_m
+            )
+        )
+    )
+    current_q = _normalize_quaternion_xyzw(current_relative.orientation_xyzw)
+    stored_q = _normalize_quaternion_xyzw(stored_relative.orientation_xyzw)
+    dot = min(1.0, abs(sum(a * b for a, b in zip(current_q, stored_q))))
+    orientation_error = 2.0 * math.acos(dot)
+    if position_error > position_tolerance_m:
+        raise ValueError(
+            f"robot-to-rack start position error {position_error:.6f} m exceeds "
+            f"{position_tolerance_m:.6f} m"
+        )
+    if orientation_error > orientation_tolerance_rad:
+        raise ValueError(
+            f"robot-to-rack start orientation error {orientation_error:.6f} rad "
+            f"exceeds {orientation_tolerance_rad:.6f} rad"
+        )
+
+
+def rebase_portable_pose(
+    template: object, world: WorldSnapshot, pose: Pose | None
+) -> Pose | None:
+    """Move an artifact world-frame pose into the current rack's world frame."""
+
+    if pose is None or not is_cross_environment_ee_path(template, world):
+        return pose.model_copy(deep=True) if pose is not None else None
+    validate_portable_rack(world, template)
+    metadata = getattr(template, "metadata")
+    source_reference = Pose.model_validate(metadata["portable_reference_rack_pose"])
+    current_reference = _rack_reference_pose(
+        world, str(metadata.get("portable_reference_ee", PORTABLE_REFERENCE_EE))
+    )
+    relative = _pose_relative_to_reference(pose, source_reference)
+    return _pose_from_reference(relative, current_reference)
 
 
 def compute_workcell_signature(
@@ -323,7 +579,10 @@ class EEAttachTrajectoryTemplate(_TemplateModel):
                 )
                 for event in plan.events
             ],
-            metadata={"source_plan_fingerprint": fingerprint},
+            metadata={
+                "source_plan_fingerprint": fingerprint,
+                **portable_ee_path_metadata(request.world),
+            },
         )
 
 
@@ -360,7 +619,7 @@ class EEAttachPolicy(str, enum.Enum):
 
 
 class PrecomputedEEAttachRegistry:
-    """Load environment-scoped bare -> EE templates with optional overrides."""
+    """Load environment-local paths first, then the shared EE-rack path."""
 
     def __init__(
         self,
@@ -370,6 +629,7 @@ class PrecomputedEEAttachRegistry:
     ) -> None:
         self.root = Path(root)
         self._overrides: dict[tuple[str, str], Path] = {}
+        self._portable_overrides: dict[str, Path] = {}
         for raw_path in trajectory_paths:
             path = Path(raw_path)
             template = self._load_file(path)
@@ -377,6 +637,13 @@ class PrecomputedEEAttachRegistry:
             if key in self._overrides:
                 raise ValueError(f"duplicate EE attach trajectory override for {key}")
             self._overrides[key] = path
+            if is_portable_ee_path(template):
+                target = template.target_active_ee
+                if target in self._portable_overrides:
+                    raise ValueError(
+                        f"duplicate portable EE attach trajectory override for {target}"
+                    )
+                self._portable_overrides[target] = path
 
     @staticmethod
     def _load_file(path: Path) -> EEAttachTrajectoryTemplate:
@@ -403,13 +670,25 @@ class PrecomputedEEAttachRegistry:
                 EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_NOT_FOUND,
                 str(error),
             ) from error
-        path = self._overrides.get((environment_name, target))
-        if path is None:
-            path = self.root / environment_name / f"bare_to_{target}.json"
+        exact_path = self._overrides.get((environment_name, target))
+        if exact_path is None:
+            exact_path = self.root / environment_name / f"bare_to_{target}.json"
+        use_shared_path = not exact_path.is_file()
+        if use_shared_path:
+            path = self._portable_overrides.get(target)
+            if path is None:
+                path = (
+                    self.root
+                    / PORTABLE_EE_PATH_DIRECTORY
+                    / f"bare_to_{target}.json"
+                )
+        else:
+            path = exact_path
         template = self._load_file(path)
-        if (
-            template.environment_name != environment_name
-            or template.target_active_ee != target
+        if template.target_active_ee != target or (
+            use_shared_path and not is_portable_ee_path(template)
+        ) or (
+            not use_shared_path and template.environment_name != environment_name
         ):
             raise PrecomputedEEPathError(
                 EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_STALE,
@@ -537,6 +816,27 @@ class PrecomputedEEAttachPlanner:
                 "robot model differs from the stored trajectory",
                 template,
             )
+        if is_cross_environment_ee_path(template, request.world):
+            try:
+                validate_portable_start_pose(request.world, template)
+            except ValueError as error:
+                raise self._failure(
+                    EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH,
+                    str(error),
+                    template,
+                ) from error
+            current_context_ids = set(collision_contexts)
+            stored_context_ids = set(template.collision_model_versions)
+            if current_context_ids != stored_context_ids:
+                raise self._failure(
+                    EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_STALE,
+                    "collision context ids differ from the stored trajectory",
+                    template,
+                )
+            # Absolute workcell hashes include the commissioning environment and
+            # world translation. Dense collision checking below validates the
+            # rebased path against the current environment instead.
+            return
         if template.rack_signature != compute_rack_signature(request.world):
             raise self._failure(
                 EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH,
@@ -779,6 +1079,7 @@ class PrecomputedEEAttachPlanner:
                 "trajectory_id": template.trajectory_id,
             }
         )[:24]
+        cross_environment = is_cross_environment_ee_path(template, request.world)
         segments = [
             TrajectorySegment(
                 segment_id=(
@@ -789,7 +1090,17 @@ class PrecomputedEEAttachPlanner:
                 start_time_s=segment.waypoints[0].time_from_start_s,
                 end_time_s=segment.waypoints[-1].time_from_start_s,
                 interpolation=segment.interpolation,
-                waypoints=[item.model_copy(deep=True) for item in segment.waypoints],
+                waypoints=[
+                    item.model_copy(
+                        deep=True,
+                        update={
+                            "eef_pose": rebase_portable_pose(
+                                template, request.world, item.eef_pose
+                            )
+                        },
+                    )
+                    for item in segment.waypoints
+                ],
                 collision_checked=True,
                 min_clearance_m=clearances[segment.segment_id],
                 collision_context_before=collision_contexts[
@@ -809,6 +1120,7 @@ class PrecomputedEEAttachPlanner:
                     "source": "precomputed",
                     "trajectory_id": template.trajectory_id,
                     "source_segment_id": segment.segment_id,
+                    "cross_environment_reuse": cross_environment,
                 },
             )
             for index, segment in enumerate(template.segments)
@@ -841,6 +1153,8 @@ class PrecomputedEEAttachPlanner:
                 metadata={
                     "source": "precomputed",
                     "trajectory_id": template.trajectory_id,
+                    "commissioning_environment": template.environment_name,
+                    "cross_environment_reuse": cross_environment,
                 },
             ),
             scene_signature=request.world.scene.signature,
@@ -880,6 +1194,8 @@ class PrecomputedEEAttachPlanner:
                 "workcell_signature_validation": "PASS",
                 "collision_validation": "PASS",
                 "dynamic_planner_invoked": False,
+                "commissioning_environment": template.environment_name,
+                "cross_environment_reuse": cross_environment,
             },
         )
         self._log("[M5][EE_PATH] source=precomputed")
@@ -916,13 +1232,22 @@ __all__ = [
     "EEAttachTrajectoryEventTemplate",
     "EEAttachTrajectorySegmentTemplate",
     "EEAttachTrajectoryTemplate",
+    "PORTABLE_EE_PATH_DIRECTORY",
+    "PORTABLE_EE_PATH_SCOPE",
     "PrecomputedEEAttachPlanner",
     "PrecomputedEEAttachRegistry",
     "PrecomputedEEPathError",
     "SUPPORTED_EE_IDS",
+    "compute_portable_rack_signature",
     "compute_rack_signature",
     "compute_workcell_signature",
+    "is_cross_environment_ee_path",
     "is_initial_ee_attach",
+    "is_portable_ee_path",
     "normalize_ee_id",
+    "portable_ee_path_metadata",
+    "rebase_portable_pose",
     "save_ee_attach_template",
+    "validate_portable_rack",
+    "validate_portable_start_pose",
 ]

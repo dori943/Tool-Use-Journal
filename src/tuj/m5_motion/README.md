@@ -1,5 +1,9 @@
 # Motion Planner
 
+객체별 파지 함수 분기는 `--scripted-grasps --simulate controller`로 켤 수 있다.
+현재 활성 객체, 호출 방법과 검증 결과는 [scripted_grasps/README.md](scripted_grasps/README.md)를 참고한다.
+이 모드는 파지 후 실제 상태에서 다음 M5 요청을 계획한다.
+
 ## 빠른 시작
 
 Motion Planner(M5) 모듈 위치는 `src/tuj/m5_motion/`이며, 패키지 경로는
@@ -443,10 +447,12 @@ bare flange, 새 EE 장착 형상이 같은 segment 상태로 섞이지 않는�
 
 초기 `current_ee`가 `null`이면 Task Planner는 `DETACH_EE` 없이 첫 `ATTACH_EE`만
 생성한다. 운영 Motion Planner는 이 요청을 일반 keyframe/IK/RRT pipeline 전에
-가로채고 `configs/precomputed_ee_paths/<environment>/bare_to_<EE>.json`의 검증 완료
-관절 궤적을 사용한다. 저장 궤적은 시작 관절, UR5e base, rack/dock, collision model
-version, lock/verify event, 동역학 limit, 현재 scene의 보간 전 구간 collision을 모두
-통과해야 새 요청의 `MotionPlan`으로 바인딩된다.
+가로챈다. 현재 환경 전용 파일이 있으면 먼저 사용하고, 없으면
+`configs/precomputed_ee_paths/ee_rack/`의 공용 관절 궤적을 사용한다. 다른 task 폴더를
+검색하지 않는다. 공용 파일은 `portable_across_environments` 승인, robot-rack 상대 배치,
+rack-local 형상을 검증하고 저장 EEF pose를 현재 rack 좌표로 변환한다. 이후 시작 관절,
+lock/verify event, 동역학 limit, 현재 환경 collision model과 현재 scene의 보간 전 구간
+collision을 모두 통과해야 새 요청의 `MotionPlan`으로 바인딩된다.
 
 ```text
 EE_ATTACH → registry lookup → static/start validation
@@ -1003,3 +1009,23 @@ plan/result 관계, 정적 JSON Schema 동기화, Tool-Use-Journal 상태/충돌
 goal-aware sequence 실행, recovery attribution, 실제 robosuite controller physics loop를
 검증한다. workspace 전체 `pytest`는 별도 `upstream_planner_a`의 import 설정까지
 요구하므로 위처럼 두 모듈의 test directory를 명시한다.
+
+## Gemini 실행
+
+M5 범용 실행기는 `--provider gemini`와 `--model`을 지원한다. 키는 프로세스의
+`GEMINI_API_KEY`(또는 `GOOGLE_API_KEY`)에서 읽는다. OpenAI SDK를 사용해도
+Gemini 선택 시 요청 대상은 Google의 Chat Completions 호환 API다.
+현재 Gemini 배포는 중첩 strict JSON schema 요청을 HTTP 400으로 거절하므로
+JSON 모드로 받아 동일한 Pydantic 스키마를 로컬에서 엄격히 검증한다.
+응답은 기존 상대 좌표 키프레임 스키마, IK, 충돌 검사와 경로 검증을 그대로 거친다.
+객체별 파지 함수는 `--scripted-grasps`로 별도 활성화하며 파지 중에는 모델을 호출하지 않는다.
+
+M1부터 새 결과를 별도 폴더에 만드는 실행 예:
+
+```powershell
+python scripts/run.py c1_1 --provider gemini --model gemini-3.8-flash --seed 0 --output-dir artifacts/c1_1-new --memory artifacts/c1_1-new/memory.json --m5-simulate controller --m5-args --scripted-grasps --model gemini-3.8-flash --video artifacts/c1_1-new/c1_1.mp4
+```
+
+plate는 C1_1에서 기존 2F 함수를 호출하되 `EXPERIMENTAL`로 기록하며, 실패하면 일반
+LLM 파지로 우회하지 않고 중단한다. 영상이나 실행 폴더가 생성된 것만으로 전체 작업
+성공을 뜻하지 않는다. `m5/m5_summary.json`의 상태와 live manifest를 확인한다.

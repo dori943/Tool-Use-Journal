@@ -1,0 +1,413 @@
+{
+  "gk_by_subgoal": [
+    {
+      "subgoal_id": "SG1",
+      "nodes": {
+        "obj_card_card": {
+          "queried_by": [
+            "SG1_d1_p0",
+            "SG1_d1_p1",
+            "SG1_d1_p2"
+          ],
+          "geometry": {
+            "length_mm": 49.0,
+            "diameter_mm": null,
+            "extents_mm": [
+              49.0,
+              26.4,
+              0.0
+            ],
+            "height_z_mm": 0.0,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.0
+          },
+          "material": "plastic",
+          "density_kgm3": 1100.0,
+          "mass_kg": 0.001,
+          "youngs_gpa": 2.0,
+          "mu": {
+            "mu": 0.333,
+            "stage": 0,
+            "material": "plastic",
+            "rms_mm": 0.0
+          },
+          "confidence": 0.4,
+          "mass_range_kg": [
+            0.001,
+            0.002
+          ],
+          "materials_topk": [
+            {
+              "name": "plastic",
+              "prob": 0.4,
+              "density_kgm3": [
+                900.0,
+                1300.0
+              ],
+              "thickness_cm": [
+                0.2,
+                0.5
+              ]
+            },
+            {
+              "name": "metal",
+              "prob": 0.2,
+              "density_kgm3": [
+                2700.0,
+                8000.0
+              ],
+              "thickness_cm": [
+                0.1,
+                0.3
+              ]
+            },
+            {
+              "name": "glass",
+              "prob": 0.15,
+              "density_kgm3": [
+                2400.0,
+                3000.0
+              ],
+              "thickness_cm": [
+                0.3,
+                0.6
+              ]
+            },
+            {
+              "name": "rubber",
+              "prob": 0.1,
+              "density_kgm3": [
+                600.0,
+                1200.0
+              ],
+              "thickness_cm": [
+                0.1,
+                0.4
+              ]
+            },
+            {
+              "name": "cardboard",
+              "prob": 0.15,
+              "density_kgm3": [
+                100.0,
+                800.0
+              ],
+              "thickness_cm": [
+                0.2,
+                0.5
+              ]
+            }
+          ],
+          "caption": "Blue arrow icon",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.999,
+              "margin_unit": "kg",
+              "reason": "질량 0.001 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 26.4,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.001,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.015,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.499,
+              "margin_unit": "kg",
+              "reason": "질량 0.001 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 26.4,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.001,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.015,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": false,
+              "margin": -3.6,
+              "margin_unit": "mm",
+              "reason": "접촉면 폭 26 vs seal 직경 30mm",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.0,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.001,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 26.4,
+                  "pass": false
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 907.6,
+            "reach_mm": 850,
+            "reachable": false,
+            "margin_mm": -57.6
+          }
+        }
+      },
+      "edges": [
+        {
+          "queried_by": "SG1_d3_p2",
+          "from": "obj_card_card",
+          "to": "obj_appliance_left_appliance_left",
+          "type": "fits_inside",
+          "value_mm": 163.9,
+          "check": "opening_190.3 - footprint_26.4",
+          "pass": true
+        },
+        {
+          "queried_by": "SG1_d3_p3",
+          "from": "obj_card_card",
+          "to": "obj_appliance_left_appliance_left",
+          "type": "clearance",
+          "value_mm": 25.0,
+          "check": "container_depth_25.0 - target_height_0.0",
+          "pass": true
+        }
+      ],
+      "flags": {
+        "near_threshold": []
+      },
+      "task": "가전 사이 틈에 떨어진 카드를 꺼내라",
+      "goal": "가전 사이 틈에 떨어진 카드를 꺼낸다.",
+      "subgoal_kind": "relocate",
+      "roles": {
+        "target": [
+          "obj_card_card"
+        ],
+        "container": "obj_appliance_left_appliance_left",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG1_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_card_card"
+          },
+          "pre": [
+            {
+              "id": "SG1_d1_p0",
+              "expr": "reachable(obj_card_card)",
+              "eval_by": "m3",
+              "status": "unsat",
+              "evidence": [
+                {
+                  "node": "obj_card_card",
+                  "reachable": false,
+                  "margin_mm": -57.6
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p1",
+              "expr": "top_exposed(obj_card_card)",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": [
+                {
+                  "node": "obj_card_card",
+                  "top_exposed": null
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p2",
+              "expr": "ee_usable(?EE, obj_card_card)",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_card_card",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p3",
+              "expr": "batch_feasible(?EE, obj_card_card)",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d1_p4",
+              "expr": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_card_card)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG1_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_card_card",
+            "?r": "obj_appliance_left_appliance_left"
+          },
+          "pre": [
+            {
+              "id": "SG1_d2_p0",
+              "expr": "holding(obj_card_card)",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d2_p1",
+              "expr": "act_space_clear(?EE, obj_card_card, obj_appliance_left_appliance_left)",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d2_p2",
+              "expr": "path_clear(obj_card_card, obj_appliance_left_appliance_left)",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_card_card, obj_appliance_left_appliance_left)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_card_card",
+            "?r": "obj_appliance_left_appliance_left"
+          },
+          "pre": [
+            {
+              "id": "SG1_d3_p0",
+              "expr": "holding(obj_card_card)",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p1",
+              "expr": "above(obj_card_card, obj_appliance_left_appliance_left)",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p2",
+              "expr": "fits(obj_card_card, obj_appliance_left_appliance_left)",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "check": "opening_190.3 - footprint_26.4",
+                  "value_mm": 163.9,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "id": "SG1_d3_p3",
+              "expr": "clear(obj_appliance_left_appliance_left)",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "check": "container_depth_25.0 - target_height_0.0",
+                  "value_mm": 25.0,
+                  "pass": true
+                },
+                {
+                  "check": null,
+                  "value_mm": null,
+                  "pass": true
+                }
+              ]
+            }
+          ],
+          "establish": [
+            "in(obj_card_card, obj_appliance_left_appliance_left)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_card_card)",
+            "above(obj_card_card, obj_appliance_left_appliance_left)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_d1",
+          "to": "SG1_d2",
+          "why": "causal_link: holding(obj_card_card)"
+        },
+        {
+          "from": "SG1_d1",
+          "to": "SG1_d3",
+          "why": "causal_link: holding(obj_card_card)"
+        },
+        {
+          "from": "SG1_d2",
+          "to": "SG1_d3",
+          "why": "causal_link: above(obj_card_card, obj_appliance_left_appliance_left)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG1",
+          "expr": "in(obj_card_card, obj_appliance_left_appliance_left)",
+          "check_at": "final"
+        }
+      ],
+      "batch": [],
+      "swept_space": []
+    }
+  ]
+}

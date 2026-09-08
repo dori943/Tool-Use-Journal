@@ -17,8 +17,10 @@ from tuj.m5_motion.precomputed_ee_attach import (
     PrecomputedEEAttachPlanner,
     PrecomputedEEAttachRegistry,
     PrecomputedEEPathError,
+    compute_portable_rack_signature,
     compute_rack_signature,
     compute_workcell_signature,
+    portable_ee_path_metadata,
 )
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
@@ -245,6 +247,15 @@ def _write_template(root: Path, template: EEAttachTrajectoryTemplate) -> Path:
     return destination
 
 
+def _write_shared_template(
+    root: Path, template: EEAttachTrajectoryTemplate
+) -> Path:
+    destination = root / "ee_rack" / f"bare_to_{template.target_active_ee}.json"
+    destination.parent.mkdir(parents=True, exist_ok=True)
+    destination.write_text(template.model_dump_json(indent=2), encoding="utf-8")
+    return destination
+
+
 @dataclass
 class _CollisionResult:
     valid: bool
@@ -286,6 +297,40 @@ def _planner(
     )
 
 
+def _make_portable(
+    template: EEAttachTrajectoryTemplate, world: WorldSnapshot
+) -> EEAttachTrajectoryTemplate:
+    portable = template.model_copy(deep=True)
+    portable.start_eef_pose = world.robot_state.eef_pose.model_copy(deep=True)
+    portable.metadata.update(portable_ee_path_metadata(world))
+    for segment in portable.segments:
+        for waypoint in segment.waypoints:
+            waypoint.eef_pose = world.robot_state.eef_pose.model_copy(deep=True)
+    return portable
+
+
+def _translate_world(
+    world: WorldSnapshot, delta: tuple[float, float, float]
+) -> WorldSnapshot:
+    translated = world.model_copy(deep=True)
+    translated.metadata["environment_name"] = "C4_2_DiagonalFitPacking"
+    for rack in translated.rack.values():
+        rack["dock_pose"]["position_m"] = [
+            value + offset
+            for value, offset in zip(rack["dock_pose"]["position_m"], delta)
+        ]
+        if "rack_support_top_z" in rack:
+            rack["rack_support_top_z"] += delta[2]
+    assert translated.robot_state.eef_pose is not None
+    translated.robot_state.eef_pose.position_m = tuple(
+        value + offset
+        for value, offset in zip(
+            translated.robot_state.eef_pose.position_m, delta
+        )
+    )
+    return translated
+
+
 @pytest.mark.parametrize(
     ("stored_target", "lookup_target"),
     [
@@ -319,6 +364,131 @@ def test_registry_rejects_unknown_target(tmp_path: Path) -> None:
     assert (
         captured.value.failure_code
         is EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_NOT_FOUND
+    )
+
+
+def test_registry_reuses_shared_portable_path_for_another_environment(
+    tmp_path: Path,
+) -> None:
+    source_request = _request("2F")
+    template = _make_portable(
+        _template(source_request, _contexts("2F")), source_request.world
+    )
+    _write_shared_template(tmp_path, template)
+
+    loaded = PrecomputedEEAttachRegistry(tmp_path).load(
+        "C4_2_DiagonalFitPacking", "2F"
+    )
+
+    assert loaded.trajectory_id == template.trajectory_id
+    assert loaded.environment_name == "C1_1_LegoSweep"
+
+
+def test_registry_does_not_scan_another_task_directory(tmp_path: Path) -> None:
+    source_request = _request("2F")
+    template = _make_portable(
+        _template(source_request, _contexts("2F")), source_request.world
+    )
+    _write_template(tmp_path, template)
+
+    with pytest.raises(PrecomputedEEPathError) as captured:
+        PrecomputedEEAttachRegistry(tmp_path).load(
+            "C4_2_DiagonalFitPacking", "2F"
+        )
+
+    assert (
+        captured.value.failure_code
+        is EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_NOT_FOUND
+    )
+
+
+def test_shared_directory_rejects_unmarked_path(tmp_path: Path) -> None:
+    request = _request("2F")
+    _write_shared_template(tmp_path, _template(request, _contexts("2F")))
+
+    with pytest.raises(PrecomputedEEPathError) as captured:
+        PrecomputedEEAttachRegistry(tmp_path).load(
+            "C4_2_DiagonalFitPacking", "2F"
+        )
+
+    assert (
+        captured.value.failure_code
+        is EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_STALE
+    )
+
+
+def test_portable_path_rebases_poses_and_revalidates_current_scene(
+    tmp_path: Path,
+) -> None:
+    source_request = _request("2F")
+    source_contexts = _contexts("2F")
+    template = _make_portable(
+        _template(source_request, source_contexts), source_request.world
+    )
+    _write_shared_template(tmp_path, template)
+    delta = (2.5, -3.2, 0.12)
+    request = source_request.model_copy(deep=True)
+    request.world = _translate_world(request.world, delta)
+    contexts = {
+        key: value.model_copy(
+            update={
+                "collision_model_version": (
+                    f"current-attached-{value.active_ee}-v2"
+                    if value.active_ee is not None
+                    else "current-bare-v2"
+                )
+            }
+        )
+        for key, value in source_contexts.items()
+    }
+    planner, checker = _planner(tmp_path)
+
+    plan = planner.plan(
+        request,
+        collision_contexts=contexts,
+        collision_checker=checker,
+    )
+
+    assert plan.metadata["cross_environment_reuse"] is True
+    assert checker.checked
+    assert plan.segments[0].waypoints[0].eef_pose is not None
+    assert plan.segments[0].waypoints[0].eef_pose.position_m == pytest.approx(
+        tuple(
+            value + offset
+            for value, offset in zip(
+                source_request.world.robot_state.eef_pose.position_m, delta
+            )
+        )
+    )
+    assert compute_portable_rack_signature(request.world) == (
+        template.metadata["portable_rack_signature"]
+    )
+
+
+def test_portable_path_rejects_changed_rack_relative_geometry(
+    tmp_path: Path,
+) -> None:
+    source_request = _request("2F")
+    contexts = _contexts("2F")
+    template = _make_portable(
+        _template(source_request, contexts), source_request.world
+    )
+    _write_shared_template(tmp_path, template)
+    request = source_request.model_copy(deep=True)
+    request.world = _translate_world(request.world, (2.5, -3.2, 0.12))
+    request.world.rack["2F"]["dock_pose"]["position_m"][0] += 0.001
+    planner, checker = _planner(tmp_path)
+
+    with pytest.raises(PrecomputedEEPathError) as captured:
+        planner.plan(
+            request,
+            collision_contexts=contexts,
+            collision_checker=checker,
+        )
+
+    assert (
+        captured.value.failure_code
+        is EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH
     )
 
 

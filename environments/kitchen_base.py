@@ -55,6 +55,14 @@ class KitchenBase(Kitchen):
         if update_fxtr_cfg_dict:
             decor_cfg.update(update_fxtr_cfg_dict)
 
+        # robosuite 표준 MujocoEnv kwarg 흡수. RoboCasa ``Kitchen.__init__``은 명시
+        # 시그니처(**kwargs 없음)라 ``hard_reset``을 받지 못한다. M5 env 팩토리
+        # (make_tool_use_journal_env)가 테이블 환경(c1_1 등)과 같은 옵션으로
+        # hard_reset=False를 넘기면 TypeError가 나서 Kitchen 기반 태스크
+        # (c1_2·c2_2·c4_1·c4_2) 전부가 M5 진입 전에 중단됐다. 리셋 방식은 RoboCasa가
+        # 자체 관리하므로 여기서 버린다. (다른 kwarg는 그대로 전달해 오타를 숨기지 않는다.)
+        kwargs.pop("hard_reset", None)
+
         # clutter_mode=0 → is_clutter fixture 비활성 + decor_cfg로 plant 등 추가 비활성
         kwargs.setdefault("use_distractors", False)
 

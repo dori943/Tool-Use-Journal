@@ -9,12 +9,12 @@
 모든 id는 M1 노드 id 중에서만 고른다 (새 이름 생성 금지). 호출마다 검문 + 1회 재시도.
 
 구현체
-  LLMRough       기본 경로 (OPENAI_API_KEY 필수)
+  LLMRough       기본 경로 (GEMINI_API_KEY 또는 OPENAI_API_KEY — TUJ_LLM_PROVIDER 로 선택)
   TemplateRough  결정론 폴백 — 태스크 키워드 + class→역할 규칙표. 회귀·테스트용.
 
 출력 스키마 (두 구현체 공통, 최소):
   [{"subgoal_id", "goal",                       # goal: G_k에 실리는 한 줄 (← M2)
-    "kind": "relocate" | "sweep_collect",
+    "kind": relocate | sweep_collect | flatten | stack | scoop_transfer | extract,
     "target_ids": [...], "container_id": str|None,
     "tool_candidate_ids": [...]}]               # 도구 후보만 나열 — 선택은 M4
 """
@@ -23,6 +23,8 @@ from __future__ import annotations
 import json
 import os
 import time
+
+from .core import TOOL_KINDS
 
 
 class TemplateRough:
@@ -87,7 +89,12 @@ PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 �
   정리하기)를 발명하지 않는다.
 - target_ids / container_id / tool_candidate_ids 에는 위 노드 id만 쓴다.
 - 도구를 '선택'하지 말라. 후보만 나열한다 (선택은 뒤 모듈이 한다).
-- kind는 relocate(옮기기) 또는 sweep_collect(쓸어 담기) 중 하나.
+- kind는 relocate(옮기기), sweep_collect(모아 담기), flatten(평평하게 펴기),
+  stack(쌓기 — target_ids 순서가 곧 쌓는 순서, 아래→위), scoop_transfer(일부를 떠서 옮기기),
+  extract(좁은 틈에서 빼내기) 중 하나.
+- kind는 지시문의 동사 표현이 아니라 장면 구성과 물리적 제약을 근거로 고른다.
+  직전 계획 평가가 아래에 주어진 경우, 평가에서 실행 불가로 드러난 제약을
+  해소하지 못하는 분해는 무효다.
 - kind와 무관하게, 같은 목적지로 가는 대상 전체를 서브골 하나의 target_ids에 담는다.
   대상별로 쪼개지 않는다. 몇 그룹으로 나눠 처리할지는 뒤 모듈이 측정값을 보고 정한다.
 - 도구는 여기서 다루지 않는다. 도구 선별은 다음 단계(객체 선택)가 한다.
@@ -114,10 +121,13 @@ PROMPT_SELECT = """너는 로봇 계획의 객체 선택 단계다. 각 서브�
 규칙:
 - object_ids에는 이 서브골에서 물리·기하 추론이 필요한 객체만 담는다.
   장면 노드를 전부 나열하는 것은 선택이 아니다.
-- kind가 sweep_collect면 도구로 쓸 수 있는 물체를 장면에서 골라
-  tool_candidate_ids에 1개 이상 담는다 (object_ids에도 포함).
-  후보는 복수 가능하며 어느 것을 쓸지 최종 선택은 뒤 모듈이 측정값을 보고 한다.
-- kind가 relocate면 대상과 목적지를 object_ids에 담는다 (들어가는지 판정에 필요).
+- kind가 sweep_collect, flatten, scoop_transfer, extract면 도구로 쓸 수 있는 물체를 장면에서 골라
+  tool_candidate_ids에 담는다 (object_ids에도 포함).
+  너에게는 물체의 크기·질량 정보가 없다. 이름의 의미만으로 후보를 좁히지 말고,
+  도구 가능성을 배제할 명확한 이유가 없는 물체는 전부 후보에 담아라.
+  장면에 그런 물체가 둘 이상이면 후보도 2개 이상이어야 한다.
+  어느 것을 쓸지 최종 선택은 뒤 모듈이 측정값을 보고 한다.
+- kind가 relocate나 stack이면 대상과 목적지(받침)를 object_ids에 담는다 (들어가는지·놓이는지 판정에 필요).
 - 위 장면 노드 id만 쓴다. reason에 선택 이유를 한국어 한 문장으로 쓴다.
 - confidence: 이 객체 선택이 옳다는 확신을 0.0~1.0으로 매긴다. 지금은 물체의
   질량·재질·파지 가능 여부 등 측정값이 없는 상태다. 근거 없이 후하게 주지 말 것.
@@ -142,7 +152,12 @@ PROMPT_COMBINED = """로봇 매니퓰레이션 태스크를 planning-level 서�
 - 태스크에 명시된 목표만 서브골로 만든다. 태스크에 없는 목표(예: 장애물 치우기,
   정리하기)를 발명하지 않는다.
 - target_ids / container_id / tool_candidate_ids / object_ids 에는 위 노드 id만 쓴다.
-- kind는 relocate(옮기기) 또는 sweep_collect(쓸어 담기) 중 하나.
+- kind는 relocate(옮기기), sweep_collect(모아 담기), flatten(평평하게 펴기),
+  stack(쌓기 — target_ids 순서가 곧 쌓는 순서, 아래→위), scoop_transfer(일부를 떠서 옮기기),
+  extract(좁은 틈에서 빼내기) 중 하나.
+- kind는 지시문의 동사 표현이 아니라 장면 구성과 물리적 제약을 근거로 고른다.
+  직전 계획 평가가 아래에 주어진 경우, 평가에서 실행 불가로 드러난 제약을
+  해소하지 못하는 분해는 무효다.
 - kind와 무관하게, 같은 목적지로 가는 대상 전체를 서브골 하나의 target_ids에 담는다.
   대상별로 쪼개지 않는다. 몇 그룹으로 나눠 처리할지는 뒤 모듈이 측정값을 보고 정한다.
 - goal은 한국어 한 문장으로 쓴다.
@@ -150,10 +165,13 @@ PROMPT_COMBINED = """로봇 매니퓰레이션 태스크를 planning-level 서�
 선택 규칙:
 - object_ids에는 이 서브골에서 물리·기하 추론이 필요한 객체만 담는다.
   장면 노드를 전부 나열하는 것은 선택이 아니다.
-- kind가 sweep_collect면 도구로 쓸 수 있는 물체를 장면에서 골라
-  tool_candidate_ids에 1개 이상 담는다 (object_ids에도 포함).
-  후보는 복수 가능하며 어느 것을 쓸지 최종 선택은 뒤 모듈이 측정값을 보고 한다.
-- kind가 relocate면 대상과 목적지를 object_ids에 담는다 (들어가는지 판정에 필요).
+- kind가 sweep_collect, flatten, scoop_transfer, extract면 도구로 쓸 수 있는 물체를 장면에서 골라
+  tool_candidate_ids에 담는다 (object_ids에도 포함).
+  너에게는 물체의 크기·질량 정보가 없다. 이름의 의미만으로 후보를 좁히지 말고,
+  도구 가능성을 배제할 명확한 이유가 없는 물체는 전부 후보에 담아라.
+  장면에 그런 물체가 둘 이상이면 후보도 2개 이상이어야 한다.
+  어느 것을 쓸지 최종 선택은 뒤 모듈이 측정값을 보고 한다.
+- kind가 relocate나 stack이면 대상과 목적지(받침)를 object_ids에 담는다 (들어가는지·놓이는지 판정에 필요).
 - reason에 선택 이유를 한국어 한 문장으로 쓴다.
 - confidence: 분해와 객체 선택 각각의 확신을 0.0~1.0으로 매긴다. 지금은 물체의
   질량·재질·파지 가능 여부 등 측정값이 없는 상태다. 근거 없이 후하게 주지 말 것.
@@ -221,7 +239,9 @@ def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
             t["target_ids"] += [x for x in s["target_ids"] if x not in t["target_ids"]]
             t["tool_candidate_ids"] += [x for x in s["tool_candidate_ids"]
                                         if x not in t["tool_candidate_ids"]]
-            verb = "쓸어 담는다" if s.get("kind") == "sweep_collect" else "옮긴다"
+            verb = {"sweep_collect": "쓸어 담는다", "flatten": "평평하게 편다",
+                    "stack": "쌓는다", "scoop_transfer": "떠서 옮긴다",
+                    "extract": "빼낸다"}.get(s.get("kind"), "옮긴다")
             t["goal"] = f"대상 {len(t['target_ids'])}개를 {t['container_id']}로 {verb}"
             continue
         by_dst[key] = s
@@ -253,10 +273,59 @@ def validate_selection(sel: list[dict], subgoals: list[dict], ids: list[str]) ->
         e = by_id.get(s["subgoal_id"])
         if e is None:
             raise ValueError(f"{s['subgoal_id']}의 선택 항목이 없다. 서브골마다 하나씩 출력하라")
-        if s["kind"] == "sweep_collect" and not e.get("tool_candidate_ids"):
-            raise ValueError(f"{s['subgoal_id']}(sweep_collect): 도구로 쓸 물체를 "
-                             "tool_candidate_ids에 1개 이상 골라라")
+        if s["kind"] in TOOL_KINDS:
+            cands = e.get("tool_candidate_ids", [])
+            if not cands:
+                raise ValueError(f"{s['subgoal_id']}({s['kind']}): 도구로 쓸 물체를 "
+                                 "tool_candidate_ids에 1개 이상 골라라")
+            if len(cands) == 1:
+                # 의미만으로 후보를 하나로 좁히는 것 방지 (0831 — 국자 단독 후보 사례):
+                # target/container/zone/rack을 뺀 물체가 장면에 남아 있으면 후보 확장을 요구한다.
+                # 확장된 후보의 적합성은 어차피 M3 측정(batch 그룹 수 등)이 가른다.
+                used = set(s.get("target_ids", [])) | {s.get("container_id")} | set(cands)
+                pool = sorted(i for i in known if i not in used
+                              and not i.startswith(("obj_zone_", "obj_rack_")))
+                if pool:
+                    raise ValueError(
+                        f"{s['subgoal_id']}({s['kind']}): 도구 후보가 {cands[0]} 하나뿐이다. "
+                        "너에게는 크기·질량 정보가 없으므로 이름의 의미만으로 후보를 좁히지 마라. "
+                        f"도구 가능성을 배제할 수 없는 물체를 후보에 추가하라: {pool}")
     return by_id
+
+
+# ── LLM 제공자 선택 (0903) ────────────────────────────────────────────────
+# 개발/디버그 실행은 Gemini, 논문 실험 표는 OpenAI. 두 경우 모두 OpenAI SDK의
+# chat.completions 인터페이스를 그대로 쓴다 (Gemini는 OpenAI 호환 엔드포인트 제공).
+# 호출부(rough, ingest.update_confidence, run_m2)는 client 객체만 받으므로 바꿀 것 없음.
+#   TUJ_LLM_PROVIDER = gemini (기본) | openai
+#   TUJ_M2_MODEL     = 모델 id 강제 지정 (미지정 시 제공자별 기본값)
+#   GEMINI_API_KEY / OPENAI_API_KEY
+_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+_DEFAULT_MODEL = {"gemini": "gemini-3.8-flash", "openai": "gpt-4o"}
+
+
+def llm_provider() -> str:
+    p = os.environ.get("TUJ_LLM_PROVIDER", "gemini").lower()
+    if p not in _DEFAULT_MODEL:
+        raise ValueError(f"TUJ_LLM_PROVIDER={p!r}: gemini 또는 openai 만 지원")
+    return p
+
+
+def default_model() -> str:
+    return os.environ.get("TUJ_M2_MODEL") or _DEFAULT_MODEL[llm_provider()]
+
+
+def make_llm_client():
+    """제공자에 맞는 OpenAI SDK 클라이언트. 키가 없으면 어느 변수를 넣을지 바로 알려준다."""
+    from openai import OpenAI
+    if llm_provider() == "gemini":
+        key = os.environ.get("GEMINI_API_KEY")
+        if not key:
+            raise RuntimeError("GEMINI_API_KEY 가 없습니다 (TUJ_LLM_PROVIDER=openai 로 바꾸면 OPENAI_API_KEY 사용)")
+        return OpenAI(api_key=key, base_url=_GEMINI_BASE_URL)
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY 가 없습니다")
+    return OpenAI()
 
 
 class LLMRough:
@@ -266,15 +335,17 @@ class LLMRough:
 
     def __init__(self, model: str | None = None):
         self._client = None                     # 지연 생성 (테스트에서 키 없이 로드 가능)
-        self.model = model or os.environ.get("TUJ_M2_MODEL", "gpt-4o")
+        self.model = model or default_model()
         # 단계별 토큰 집계 (0828 — 랩미팅 지적: 호출 1회 통합 A/B의 비교 근거)
         self.usage: dict[str, dict] = {}
+        # 직전 왕복의 측정 실패 요약 (0831 — 재분해 때 분해 프롬프트에 사실로 첨부.
+        # 호출 추가 없음: 어차피 불리는 2차 분해 호출의 입력만 풍부해진다)
+        self.feedback: str | None = None
 
     def _json_call(self, prompt: str, validate, stage: str):
         """호출 → JSON 파싱 → 검문. 실패 시 오류를 붙여 1회 재시도."""
         if self._client is None:
-            from openai import OpenAI
-            self._client = OpenAI()
+            self._client = make_llm_client()
         err = None
         for attempt in (1, 2):
             msg = prompt if attempt == 1 else prompt + f"\n\n이전 출력의 문제: {err}. 고쳐서 JSON 배열만 다시 출력하라."
@@ -300,10 +371,12 @@ class LLMRough:
         if os.environ.get("TUJ_M2_SINGLE_CALL") == "1":
             return self._generate_single(task, ids, node_lines)
 
-        # 1차 — 서브골 분해
+        # 1차 — 서브골 분해 (직전 측정 피드백이 있으면 사실로 첨부)
+        base = PROMPT.format(task=task, ids=", ".join(ids))
+        if self.feedback:
+            base += "\n\n" + self.feedback
         subgoals = self._json_call(
-            PROMPT.format(task=task, ids=", ".join(ids)),
-            lambda subs: validate_subgoals(subs, ids), "서브골 분해")
+            base, lambda subs: validate_subgoals(subs, ids), "서브골 분해")
 
         # 2차 — 서브골별 객체 선택 (도구로 쓸 물체 선별 포함)
         brief = [{"subgoal_id": s["subgoal_id"], "goal": s["goal"], "kind": s["kind"],
@@ -354,7 +427,8 @@ class LLMRough:
             return subs
 
         subgoals = self._json_call(
-            PROMPT_COMBINED.format(task=task, nodes=node_lines),
+            PROMPT_COMBINED.format(task=task, nodes=node_lines)
+            + ("\n\n" + self.feedback if self.feedback else ""),
             validate, "통합(분해+선택)")
         for s in subgoals:
             conf = s.pop("_conf", {})
