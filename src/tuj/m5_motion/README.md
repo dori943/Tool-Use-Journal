@@ -4,6 +4,20 @@
 현재 활성 객체, 호출 방법과 검증 결과는 [scripted_grasps/README.md](scripted_grasps/README.md)를 참고한다.
 이 모드는 파지 후 실제 상태에서 다음 M5 요청을 계획한다.
 
+### 외부 객체 함수 catalog 경로 설정
+
+`object_function_grasp.py`는 특정 형제 checkout을 자동 탐색하지 않는다. 외부
+catalog를 사용할 때는 `grasp_lab/catalog.py`가 있는 패키지 또는 그 상위
+디렉터리를 환경 변수로 지정한다.
+
+```powershell
+$env:TUJ_SCRIPTED_GRASP_LIBRARY = "C:\path\to\scripted_grasp_lab"
+```
+
+경로를 지정하지 않으면 현재 Python 환경에서 import 가능한 `grasp_lab`을
+사용한다. 호출 코드에서는 `catalog_library(..., library_root=...)`로 경로를
+직접 전달할 수도 있다.
+
 ## 빠른 시작
 
 Motion Planner(M5) 모듈 위치는 `src/tuj/m5_motion/`이며, 패키지 경로는
