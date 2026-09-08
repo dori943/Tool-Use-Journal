@@ -17,7 +17,13 @@ INSIDE_Z_TOL_MM = 30.0
 
 
 def build_m1(objects) -> dict:
-    """objects: [{name, cls, points}] → {"nodes": [...], "edges": [...]}"""
+    """objects: [{name, cls, points}] → {"nodes": [...], "edges": [...]}
+
+    id 는 `obj_<class>_<name>` 로 만드는데, class·name 자체가 언더스코어를 포함할 수 있어
+    (rolling_pin, packing_box 등) 하류에서 id 를 첫 언더스코어로 파싱하면 잘못 잘린다.
+    그래서 env 인스턴스명(WorldSnapshot/시뮬레이션 매칭에 필요한 원본 이름)과 클래스명을
+    별도 필드로 유지한다. 하류(gk_adapter._canonical_id 등)는 파싱하지 말고 이 필드를 쓴다.
+    """
     nodes = []
     for o in objects:
         pts = mad_filter(o["points"])
@@ -28,9 +34,9 @@ def build_m1(objects) -> dict:
             "id": f"obj_{o['cls']}_{o['name']}",
             "canonical_id": str(o["name"]),
             "class": o["cls"],
-            "center_mm": center,
-            "bbox_mm": bbox_size,
-            "geometry": {"center": center, "aabb_size": bbox_size},
+            "source_name": o["name"],   # env 인스턴스명 (WorldSnapshot 매칭 키)
+            "center_mm": [round(float(c), 1) for c in (lo + hi) / 2],
+            "bbox_mm": [round(float(s), 1) for s in hi - lo],
             "_points": pts,
         })
     return {"nodes": nodes, "edges": coarse_relations(nodes)}

@@ -164,7 +164,9 @@ class EEExchangeEntryPlanner:
                 EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH,
                 "exchange-entry request has no environment_name",
             )
-        return self.return_registry.load(environment, self._source(request))
+        return self.return_registry.load(
+            environment, self._source(request), world=request.world
+        )
 
     def _validate_request(
         self,

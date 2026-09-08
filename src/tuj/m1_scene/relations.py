@@ -20,33 +20,50 @@ def center_distance(node_a: dict, node_b: dict) -> dict:
     return {"type": "distance", "value_mm": round(d, 1), "check": "center_to_center", "pass": True}
 
 
-def fits_inside(target: dict, container: dict, wall_mm: float = 4.0) -> dict:
-    """개구(외곽 bbox − 벽두께) − 대상 footprint."""
-    open_w = container["bbox_mm"][0] - 2 * wall_mm
-    open_d = container["bbox_mm"][1] - 2 * wall_mm
+def _container_opening_mm(container: dict, wall_mm: float | None = None) -> tuple[float, float, str]:
+    """컨테이너 개구 (open_w, open_d, source_tag).
+
+    우선순위:
+      1) container["inner_bbox_mm"] — env 가 아는 실제 내부치수 (c4_2 packing_box 등).
+         M1 이 노드에 실었으면 그대로 사용해 외곽·벽 두께 추정 오차를 없앤다.
+      2) container["bbox_mm"] - 2 * wall — wall 은 명시 인자 > container["wall_mm"] > 4.0.
+         점군 AABB(외곽) 에서 벽 두께 두 배를 빼 근사한다.
+    """
+    inner = container.get("inner_bbox_mm")
+    if inner:
+        return float(inner[0]), float(inner[1]), "inner_bbox"
+    w = wall_mm if wall_mm is not None else float(container.get("wall_mm") or 4.0)
+    return (container["bbox_mm"][0] - 2 * w,
+            container["bbox_mm"][1] - 2 * w,
+            f"bbox-2*wall({w:.1f})")
+
+
+def fits_inside(target: dict, container: dict, wall_mm: float | None = None) -> dict:
+    """개구(내부치수 우선, 없으면 외곽 bbox − 벽두께) − 대상 footprint."""
+    open_w, open_d, src = _container_opening_mm(container, wall_mm)
     foot = min(target["bbox_mm"][0], target["bbox_mm"][1])
     v = min(open_w, open_d) - foot
     return {"type": "fits_inside", "value_mm": round(v, 1),
-            "check": f"opening_{round(min(open_w, open_d),1)} - footprint_{round(foot,1)}",
+            "check": f"opening_{round(min(open_w, open_d),1)}[{src}] - footprint_{round(foot,1)}",
             "pass": bool(v > 0)}
 
 
-def depth_clearance(target: dict, container: dict, wall_mm: float = 4.0,
+def depth_clearance(target: dict, container: dict, wall_mm: float | None = None,
                     tip_ratio: float = 3.0) -> dict:
     """컨테이너가 대상을 담아 둘 수 있는가 — '깊이>높이'가 아니라 바닥 면적 수용 +
     전도 없음으로 판정(0902). 얕은 트레이여도 물체가 바닥에 앉고 넘어지지 않으면 담기 OK.
-      · 바닥 수용: 대상 footprint(최소변) ≤ 컨테이너 개구(외곽 − 벽두께)
+      · 바닥 수용: 대상 footprint(최소변) ≤ 컨테이너 개구(내부치수 우선, 없으면 외곽 − 벽두께)
       · 전도 없음: 대상 높이 ≤ tip_ratio × 바닥 최소변 (가늘고 높은 물체만 탈락)
     value_mm = 두 여유 중 빡빡한 쪽. (종전: 깊이 25mm 트레이에서 사과/빵/머그 전부 unsat)"""
-    open_w = container["bbox_mm"][0] - 2 * wall_mm
-    open_d = container["bbox_mm"][1] - 2 * wall_mm
+    open_w, open_d, src = _container_opening_mm(container, wall_mm)
     base = min(target["bbox_mm"][0], target["bbox_mm"][1])
     h = target["bbox_mm"][2]
     floor_margin = min(open_w, open_d) - base
     tip_margin = tip_ratio * base - h
     v = min(floor_margin, tip_margin)
     return {"type": "clearance", "value_mm": round(float(v), 1),
-            "check": (f"floor_fit(open_{round(min(open_w, open_d), 1)}-base_{round(base, 1)})"
+            "check": (f"floor_fit(open_{round(min(open_w, open_d), 1)}[{src}]"
+                      f"-base_{round(base, 1)})"
                       f" & no_tip(h_{round(h, 1)}<={tip_ratio}x{round(base, 1)})"),
             "pass": bool(floor_margin > 0 and tip_margin > 0)}
 

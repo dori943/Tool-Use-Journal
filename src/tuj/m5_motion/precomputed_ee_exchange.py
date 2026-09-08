@@ -32,6 +32,8 @@ from tuj.m5_motion.precomputed_ee_attach import (
     PrecomputedEEPathError,
     _TemplateModel,
     _digest,
+    PORTABLE_EE_PATH_DIRECTORY,
+    PORTABLE_EE_PATH_DIRECTORY_KITCHEN,
     _robot_model,
     compute_rack_signature,
     compute_workcell_signature,
@@ -39,6 +41,7 @@ from tuj.m5_motion.precomputed_ee_attach import (
     is_portable_ee_path,
     normalize_ee_id,
     portable_ee_path_directory_for,
+    portable_ee_path_directory_from_world,
     rebase_portable_pose,
     validate_portable_start_pose,
 )
@@ -205,7 +208,11 @@ class PrecomputedEEReturnRegistry:
             ) from error
 
     def load(
-        self, environment_name: str, source_ee: object
+        self,
+        environment_name: str,
+        source_ee: object,
+        *,
+        world: "WorldSnapshot | None" = None,
     ) -> EEReturnTrajectoryTemplate:
         try:
             source = normalize_ee_id(source_ee)
@@ -219,10 +226,13 @@ class PrecomputedEEReturnRegistry:
             exact_path = self.root / environment_name / f"{source}_to_bare.json"
         use_shared_path = not exact_path.is_file()
         if use_shared_path:
-            portable_directory = portable_ee_path_directory_for(environment_name)
-            path = self._portable_overrides.get(source)
-            if path is None:
-                path = self.root / portable_directory / f"{source}_to_bare.json"
+            override_path = self._portable_overrides.get(source)
+            path, portable_directory = self._resolve_portable_path(
+                source,
+                environment_name=environment_name,
+                world=world,
+                override=override_path,
+            )
             self._last_resolution = {
                 "mode": "portable",
                 "directory": portable_directory,
@@ -247,6 +257,52 @@ class PrecomputedEEReturnRegistry:
                 trajectory_id=template.trajectory_id,
             )
         return template
+
+    def _resolve_portable_path(
+        self,
+        source: str,
+        *,
+        environment_name: str,
+        world: "WorldSnapshot | None",
+        override: Path | None,
+    ) -> tuple[Path, str]:
+        """Pick the portable path preferring the sig-keyed subdirectory."""
+
+        if override is not None:
+            legacy_directory = portable_ee_path_directory_for(environment_name)
+            if world is not None:
+                try:
+                    return override, portable_ee_path_directory_from_world(world)
+                except Exception:  # noqa: BLE001
+                    pass
+            return override, legacy_directory
+        candidates: list[str] = []
+        if world is not None:
+            try:
+                candidates.append(portable_ee_path_directory_from_world(world))
+            except Exception:  # noqa: BLE001
+                pass
+        legacy_directory = portable_ee_path_directory_for(environment_name)
+        if legacy_directory not in candidates:
+            candidates.append(legacy_directory)
+        for fallback in (
+            PORTABLE_EE_PATH_DIRECTORY,
+            PORTABLE_EE_PATH_DIRECTORY_KITCHEN,
+        ):
+            if fallback not in candidates:
+                candidates.append(fallback)
+        chosen_path: Path | None = None
+        chosen_directory = candidates[0]
+        for directory in candidates:
+            candidate_path = self.root / directory / f"{source}_to_bare.json"
+            if candidate_path.is_file():
+                chosen_path = candidate_path
+                chosen_directory = directory
+                break
+        if chosen_path is None:
+            chosen_path = self.root / candidates[0] / f"{source}_to_bare.json"
+            chosen_directory = candidates[0]
+        return chosen_path, chosen_directory
 
     @property
     def last_resolution(self) -> Mapping[str, str] | None:
@@ -452,8 +508,10 @@ class PrecomputedEEExchangePlanner:
             )
         source = request.task.metadata.get("from_ee")
         target = request.task.metadata.get("to_ee") or request.task.ee
-        returned = self.return_registry.load(environment, source)
-        attached = self.attach_planner.registry.load(environment, target)
+        returned = self.return_registry.load(environment, source, world=request.world)
+        attached = self.attach_planner.registry.load(
+            environment, target, world=request.world
+        )
         for registry in (self.return_registry, self.attach_planner.registry):
             resolution = registry.last_resolution
             if resolution:
@@ -785,7 +843,9 @@ class PrecomputedEEExchangePlanner:
         if selected is None:
             environment = request.world.metadata.get("environment_name")
             selected = self.return_registry.load(
-                str(environment), request.task.metadata.get("from_ee")
+                str(environment),
+                request.task.metadata.get("from_ee"),
+                world=request.world,
             )
         self._validate_return_state(request, selected)
         return_contexts = self._validate_return_workcell(

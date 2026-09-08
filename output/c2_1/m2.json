@@ -1,66 +1,2153 @@
 {
-  "task": "테이블 위 물체(사과·빵·머그·접시·숟가락)를 모두 파란 트레이로 옮겨라",
+  "task": "테이블 위 물체를 왼쪽부터 순서대로 파란 트레이로 옮겨라",
   "m2_subgoals": [
     {
-      "subgoal_id": "SG1",
-      "goal": "테이블 위의 사과, 빵, 머그, 접시, 숟가락을 파란 트레이로 옮긴다.",
+      "subgoal_id": "SG1_s1",
+      "goal": "대상 1개를 obj_tray_blue_tray로 옮긴다 (1/5)",
       "kind": "relocate",
       "target_ids": [
-        "obj_apple_apple",
-        "obj_bread_bread",
-        "obj_mug_mug",
-        "obj_plate_plate",
         "obj_spoon_spoon"
       ],
       "container_id": "obj_tray_blue_tray",
+      "ordered": true,
       "tool_candidate_ids": [],
       "object_ids": [
-        "obj_apple_apple",
-        "obj_bread_bread",
-        "obj_mug_mug",
-        "obj_plate_plate",
         "obj_spoon_spoon",
         "obj_tray_blue_tray"
       ],
-      "selection_reason": "대상 물체들을 파란 트레이로 옮기는 것이 목표이므로, 대상 물체들과 트레이를 포함해야 한다.",
+      "selection_reason": "대상 물체들을 파란 트레이로 옮기는 작업이므로, 대상 물체들과 트레이를 선택해야 한다.",
       "confidence": {
         "before": {
-          "decomposition": 0.7,
-          "object_selection": 0.8,
+          "decomposition": 0.8,
+          "object_selection": 0.7,
           "uncertain_about": [
-            "물체들이 트레이에 모두 들어갈 수 있는지"
+            "물체들이 트레이에 잘 들어갈지 여부"
           ]
         },
         "after": {
-          "decomposition": 0.3,
-          "object_selection": 0.8,
-          "uncertain_about": [
-            "물체들이 트레이에 모두 들어갈 수 있는지",
-            "트레이가 충분히 비어 있는지",
-            "물체들의 상단이 노출되어 있는지",
-            "엔드 이펙터가 모든 물체를 한 번에 잡을 수 있는지",
-            "작업 공간이 충분히 확보되어 있는지"
-          ],
-          "reason": "트레이의 깊이가 부족하여 물체를 모두 담을 수 없고, 일부 조건에 대한 근거가 제공되지 않았습니다."
+          "decomposition": 0.8,
+          "object_selection": 0.7,
+          "uncertain_about": [],
+          "reason": "모든 조건이 충족되었고, 불확실했던 물체들이 트레이에 잘 들어갈지 여부도 확인되었기 때문에 신뢰도를 유지합니다.",
+          "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
         },
         "delta": {
-          "decomposition": -0.4,
+          "decomposition": 0.0,
           "object_selection": 0.0
         }
       },
+      "target_order": {
+        "source": "vlm",
+        "reason": "이미지에서 왼쪽부터 오른쪽 순서대로 정렬했습니다."
+      },
+      "measurements": [
+        {
+          "subgoal_id": "SG1_s1",
+          "queried_by": "SG1_s1_d1_p0",
+          "node_id": "obj_spoon_spoon",
+          "geometry": {
+            "length_mm": 101.7,
+            "diameter_mm": null,
+            "extents_mm": [
+              101.7,
+              53.0,
+              28.8
+            ],
+            "height_z_mm": 28.1,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.53,
+            "seal_patch_rms_mm": 99.9,
+            "footprint_mm": [
+              103.0,
+              53.0
+            ],
+            "height_mm": 28.1
+          },
+          "material": "wood",
+          "density_kgm3": 1431.0,
+          "mass_kg": 0.008,
+          "youngs_gpa": 30.64,
+          "mu": {
+            "mu": 0.488,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.53
+          },
+          "confidence": 0.429,
+          "caption": "Wooden ladle",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.992,
+              "margin_unit": "kg",
+              "reason": "질량 0.008 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 53.0,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.008,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.08,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.492,
+              "margin_unit": "kg",
+              "reason": "질량 0.008 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 53.0,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.008,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.08,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": false,
+              "margin": -98.4,
+              "margin_unit": "mm",
+              "reason": "흡착 패치 RMS 99.9 vs 허용 1.5mm",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.53,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.008,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 53.0,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 99.9,
+                  "limit": 1.5,
+                  "pass": false
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 695.1,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 154.9
+          }
+        },
+        {
+          "subgoal_id": "SG1_s1",
+          "queried_by": "SG1_s1_d1_p1",
+          "node_id": "obj_spoon_spoon",
+          "type": "top_exposed",
+          "value": true,
+          "pass": true,
+          "blockers": []
+        },
+        {
+          "subgoal_id": "SG1_s1",
+          "queried_by": "SG1_s1_d1_p2",
+          "node_id": "obj_spoon_spoon",
+          "geometry": {
+            "length_mm": 101.7,
+            "diameter_mm": null,
+            "extents_mm": [
+              101.7,
+              53.0,
+              28.8
+            ],
+            "height_z_mm": 28.1,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.53,
+            "seal_patch_rms_mm": 99.9,
+            "footprint_mm": [
+              103.0,
+              53.0
+            ],
+            "height_mm": 28.1
+          },
+          "material": "wood",
+          "density_kgm3": 1431.0,
+          "mass_kg": 0.008,
+          "youngs_gpa": 30.64,
+          "mu": {
+            "mu": 0.488,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.53
+          },
+          "confidence": 0.429,
+          "caption": "Wooden ladle",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.992,
+              "margin_unit": "kg",
+              "reason": "질량 0.008 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 53.0,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.008,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.08,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.492,
+              "margin_unit": "kg",
+              "reason": "질량 0.008 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 53.0,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.008,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.08,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": false,
+              "margin": -98.4,
+              "margin_unit": "mm",
+              "reason": "흡착 패치 RMS 99.9 vs 허용 1.5mm",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.53,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.008,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 53.0,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 99.9,
+                  "limit": 1.5,
+                  "pass": false
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 695.1,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 154.9
+          }
+        },
+        {
+          "subgoal_id": "SG1_s1",
+          "queried_by": "SG1_s1_d1_p3",
+          "kind": "batch",
+          "actor": {
+            "type": "ee_pool"
+          },
+          "feasible": true,
+          "checks": [
+            {
+              "rule": "ee_pool_one_per_grasp",
+              "capacity": 1,
+              "demand": 1,
+              "unit": "count",
+              "margin": 0,
+              "pass": true
+            }
+          ],
+          "binding_check": "ee_pool_one_per_grasp",
+          "partition": [
+            [
+              "obj_spoon_spoon"
+            ]
+          ]
+        },
+        {
+          "subgoal_id": "SG1_s1",
+          "queried_by": "SG1_s1_d3_p2",
+          "from": "obj_spoon_spoon",
+          "to": "obj_tray_blue_tray",
+          "type": "fits_inside",
+          "value_mm": 246.7,
+          "check": "opening_299.7[bbox-2*wall(4.0)] - footprint_53.0",
+          "pass": true
+        },
+        {
+          "subgoal_id": "SG1_s1",
+          "queried_by": "SG1_s1_d3_p3",
+          "node_id": "obj_tray_blue_tray",
+          "type": "clear",
+          "value": true,
+          "pass": true,
+          "occupants": [],
+          "depth_clearance": [
+            {
+              "type": "clearance",
+              "value_mm": 130.9,
+              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_53.0) & no_tip(h_28.1<=3.0x53.0)",
+              "pass": true
+            }
+          ],
+          "unfit_members": []
+        }
+      ],
+      "split_from": "SG1",
+      "split_index": 1,
       "details": [
         {
-          "detail_id": "SG1_d1",
+          "detail_id": "SG1_s1_d1",
           "action_type": "acquire",
           "binding": {
-            "?o": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}"
+            "?o": "obj_spoon_spoon"
           },
-          "group_id": "G_SG1",
-          "note": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon} 확보",
+          "group_id": "G_SG1_s1",
+          "note": "obj_spoon_spoon 확보",
           "pre": [
             {
-              "id": "SG1_d1_p0",
-              "expr": "reachable({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "id": "SG1_s1_d1_p0",
+              "expr": "reachable(obj_spoon_spoon)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_spoon_spoon",
+                  "reachable": true,
+                  "margin_mm": 154.9
+                }
+              ]
+            },
+            {
+              "id": "SG1_s1_d1_p1",
+              "expr": "top_exposed(obj_spoon_spoon)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_spoon_spoon",
+                  "top_exposed": true,
+                  "blockers": []
+                }
+              ]
+            },
+            {
+              "id": "SG1_s1_d1_p2",
+              "expr": "ee_usable(?EE, obj_spoon_spoon)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_spoon_spoon",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_s1_d1_p3",
+              "expr": "batch_feasible(?EE, obj_spoon_spoon)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "feasible": true,
+                  "binding_check": "ee_pool_one_per_grasp",
+                  "partition": [
+                    [
+                      "obj_spoon_spoon"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_s1_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s1_d1_e0",
+              "expr": "holding(obj_spoon_spoon)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s1_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_s1_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_spoon_spoon",
+            "?r": "obj_tray_blue_tray"
+          },
+          "group_id": "G_SG1_s1",
+          "note": "obj_spoon_spoon를 obj_tray_blue_tray로 운반",
+          "pre": [
+            {
+              "id": "SG1_s1_d2_p0",
+              "expr": "holding(obj_spoon_spoon)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_d2_p1",
+              "expr": "act_space_clear(?EE, obj_spoon_spoon, obj_tray_blue_tray)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s1_d2_p2",
+              "expr": "path_clear(obj_spoon_spoon, obj_tray_blue_tray)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s1_d2_e0",
+              "expr": "above(obj_spoon_spoon, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_spoon_spoon",
+            "?r": "obj_tray_blue_tray"
+          },
+          "group_id": "G_SG1_s1",
+          "note": "obj_spoon_spoon를 obj_tray_blue_tray에 배치",
+          "pre": [
+            {
+              "id": "SG1_s1_d3_p0",
+              "expr": "holding(obj_spoon_spoon)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_d3_p1",
+              "expr": "above(obj_spoon_spoon, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_d3_p2",
+              "expr": "fits(obj_spoon_spoon, obj_tray_blue_tray)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_spoon_spoon",
+                  "check": "opening_299.7[bbox-2*wall(4.0)] - footprint_53.0",
+                  "value_mm": 246.7,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "id": "SG1_s1_d3_p3",
+              "expr": "clear(obj_tray_blue_tray)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tray_blue_tray",
+                  "check": null,
+                  "value_mm": null,
+                  "pass": true
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s1_d3_e0",
+              "expr": "in(obj_spoon_spoon, obj_tray_blue_tray)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s1_d3_d0",
+              "expr": "holding(obj_spoon_spoon)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_d3_d1",
+              "expr": "above(obj_spoon_spoon, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ],
+      "ignore_ids": [
+        "obj_apple_apple",
+        "obj_bread_bread",
+        "obj_mug_mug",
+        "obj_plate_plate"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s2",
+      "goal": "대상 1개를 obj_tray_blue_tray로 옮긴다 (2/5)",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_plate_plate"
+      ],
+      "container_id": "obj_tray_blue_tray",
+      "ordered": true,
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_plate_plate",
+        "obj_tray_blue_tray"
+      ],
+      "selection_reason": "대상 물체들을 파란 트레이로 옮기는 작업이므로, 대상 물체들과 트레이를 선택해야 한다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.8,
+          "object_selection": 0.7,
+          "uncertain_about": [
+            "물체들이 트레이에 잘 들어갈지 여부"
+          ]
+        },
+        "after": {
+          "decomposition": 0.8,
+          "object_selection": 0.7,
+          "uncertain_about": [],
+          "reason": "모든 조건이 충족되었고, 불확실했던 물체들이 트레이에 잘 들어갈지 여부도 확인되었기 때문에 신뢰도를 유지합니다.",
+          "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
+        },
+        "delta": {
+          "decomposition": 0.0,
+          "object_selection": 0.0
+        }
+      },
+      "target_order": {
+        "source": "vlm",
+        "reason": "이미지에서 왼쪽부터 오른쪽 순서대로 정렬했습니다."
+      },
+      "measurements": [
+        {
+          "subgoal_id": "SG1_s2",
+          "queried_by": "SG1_s2_d1_p0",
+          "node_id": "obj_plate_plate",
+          "geometry": {
+            "length_mm": 182.4,
+            "diameter_mm": null,
+            "extents_mm": [
+              182.4,
+              181.5,
+              10.9
+            ],
+            "height_z_mm": 10.7,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.29,
+            "seal_patch_rms_mm": 0.35,
+            "footprint_mm": [
+              181.2,
+              181.2
+            ],
+            "height_mm": 10.7
+          },
+          "material": "plastic",
+          "density_kgm3": 1100.0,
+          "mass_kg": 0.156,
+          "youngs_gpa": 3.0,
+          "mu": {
+            "mu": 0.338,
+            "stage": 0,
+            "material": "plastic",
+            "rms_mm": 0.29
+          },
+          "confidence": 0.444,
+          "caption": "Round flat object",
+          "ee": {
+            "2F": {
+              "feasible": false,
+              "margin": -96.2,
+              "margin_unit": "mm",
+              "reason": "치수 181 vs 개구 85mm",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 181.2,
+                  "limit": 85.0,
+                  "pass": false
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.156,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 2.264,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": false,
+              "margin": -41.2,
+              "margin_unit": "mm",
+              "reason": "치수 181 vs 개구 140mm",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 181.2,
+                  "limit": 140.0,
+                  "pass": false
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.156,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 2.264,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.344,
+              "margin_unit": "kg",
+              "reason": "질량 0.156 vs 페이로드 0.5kg",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.29,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.156,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 181.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.35,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 639.3,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 210.7
+          }
+        },
+        {
+          "subgoal_id": "SG1_s2",
+          "queried_by": "SG1_s2_d1_p1",
+          "node_id": "obj_plate_plate",
+          "type": "top_exposed",
+          "value": true,
+          "pass": true,
+          "blockers": []
+        },
+        {
+          "subgoal_id": "SG1_s2",
+          "queried_by": "SG1_s2_d1_p2",
+          "node_id": "obj_plate_plate",
+          "geometry": {
+            "length_mm": 182.4,
+            "diameter_mm": null,
+            "extents_mm": [
+              182.4,
+              181.5,
+              10.9
+            ],
+            "height_z_mm": 10.7,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.29,
+            "seal_patch_rms_mm": 0.35,
+            "footprint_mm": [
+              181.2,
+              181.2
+            ],
+            "height_mm": 10.7
+          },
+          "material": "plastic",
+          "density_kgm3": 1100.0,
+          "mass_kg": 0.156,
+          "youngs_gpa": 3.0,
+          "mu": {
+            "mu": 0.338,
+            "stage": 0,
+            "material": "plastic",
+            "rms_mm": 0.29
+          },
+          "confidence": 0.444,
+          "caption": "Round flat object",
+          "ee": {
+            "2F": {
+              "feasible": false,
+              "margin": -96.2,
+              "margin_unit": "mm",
+              "reason": "치수 181 vs 개구 85mm",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 181.2,
+                  "limit": 85.0,
+                  "pass": false
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.156,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 2.264,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": false,
+              "margin": -41.2,
+              "margin_unit": "mm",
+              "reason": "치수 181 vs 개구 140mm",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 181.2,
+                  "limit": 140.0,
+                  "pass": false
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.156,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 2.264,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.344,
+              "margin_unit": "kg",
+              "reason": "질량 0.156 vs 페이로드 0.5kg",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.29,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.156,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 181.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.35,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 639.3,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 210.7
+          }
+        },
+        {
+          "subgoal_id": "SG1_s2",
+          "queried_by": "SG1_s2_d1_p3",
+          "kind": "batch",
+          "actor": {
+            "type": "ee_pool"
+          },
+          "feasible": true,
+          "checks": [
+            {
+              "rule": "ee_pool_one_per_grasp",
+              "capacity": 1,
+              "demand": 1,
+              "unit": "count",
+              "margin": 0,
+              "pass": true
+            }
+          ],
+          "binding_check": "ee_pool_one_per_grasp",
+          "partition": [
+            [
+              "obj_plate_plate"
+            ]
+          ]
+        },
+        {
+          "subgoal_id": "SG1_s2",
+          "queried_by": "SG1_s2_d3_p2",
+          "from": "obj_plate_plate",
+          "to": "obj_tray_blue_tray",
+          "type": "fits_inside",
+          "value_mm": 118.5,
+          "check": "opening_299.7[bbox-2*wall(4.0)] - footprint_181.2",
+          "pass": true
+        },
+        {
+          "subgoal_id": "SG1_s2",
+          "queried_by": "SG1_s2_d3_p3",
+          "node_id": "obj_tray_blue_tray",
+          "type": "clear",
+          "value": true,
+          "pass": true,
+          "occupants": [],
+          "depth_clearance": [
+            {
+              "type": "clearance",
+              "value_mm": 118.5,
+              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_181.2) & no_tip(h_10.7<=3.0x181.2)",
+              "pass": true
+            }
+          ],
+          "unfit_members": []
+        }
+      ],
+      "split_from": "SG1",
+      "split_index": 2,
+      "details": [
+        {
+          "detail_id": "SG1_s2_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_plate_plate"
+          },
+          "group_id": "G_SG1_s2",
+          "note": "obj_plate_plate 확보",
+          "pre": [
+            {
+              "id": "SG1_s2_d1_p0",
+              "expr": "reachable(obj_plate_plate)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_plate_plate",
+                  "reachable": true,
+                  "margin_mm": 210.7
+                }
+              ]
+            },
+            {
+              "id": "SG1_s2_d1_p1",
+              "expr": "top_exposed(obj_plate_plate)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_plate_plate",
+                  "top_exposed": true,
+                  "blockers": []
+                }
+              ]
+            },
+            {
+              "id": "SG1_s2_d1_p2",
+              "expr": "ee_usable(?EE, obj_plate_plate)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_plate_plate",
+                  "feasible_ees": [
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_s2_d1_p3",
+              "expr": "batch_feasible(?EE, obj_plate_plate)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "feasible": true,
+                  "binding_check": "ee_pool_one_per_grasp",
+                  "partition": [
+                    [
+                      "obj_plate_plate"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_s2_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_d1_p5",
+              "expr": "in(obj_spoon_spoon, obj_tray_blue_tray)",
+              "head": "in",
+              "eval_by": "m2",
+              "auto": "instruction_order"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s2_d1_e0",
+              "expr": "holding(obj_plate_plate)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s2_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_s2_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_plate_plate",
+            "?r": "obj_tray_blue_tray"
+          },
+          "group_id": "G_SG1_s2",
+          "note": "obj_plate_plate를 obj_tray_blue_tray로 운반",
+          "pre": [
+            {
+              "id": "SG1_s2_d2_p0",
+              "expr": "holding(obj_plate_plate)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_d2_p1",
+              "expr": "act_space_clear(?EE, obj_plate_plate, obj_tray_blue_tray)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s2_d2_p2",
+              "expr": "path_clear(obj_plate_plate, obj_tray_blue_tray)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s2_d2_e0",
+              "expr": "above(obj_plate_plate, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s2_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_plate_plate",
+            "?r": "obj_tray_blue_tray"
+          },
+          "group_id": "G_SG1_s2",
+          "note": "obj_plate_plate를 obj_tray_blue_tray에 배치",
+          "pre": [
+            {
+              "id": "SG1_s2_d3_p0",
+              "expr": "holding(obj_plate_plate)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_d3_p1",
+              "expr": "above(obj_plate_plate, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_d3_p2",
+              "expr": "fits(obj_plate_plate, obj_tray_blue_tray)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_plate_plate",
+                  "check": "opening_299.7[bbox-2*wall(4.0)] - footprint_181.2",
+                  "value_mm": 118.5,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "id": "SG1_s2_d3_p3",
+              "expr": "clear(obj_tray_blue_tray)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tray_blue_tray",
+                  "check": null,
+                  "value_mm": null,
+                  "pass": true
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s2_d3_e0",
+              "expr": "in(obj_plate_plate, obj_tray_blue_tray)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s2_d3_d0",
+              "expr": "holding(obj_plate_plate)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_d3_d1",
+              "expr": "above(obj_plate_plate, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ],
+      "ignore_ids": [
+        "obj_apple_apple",
+        "obj_bread_bread",
+        "obj_mug_mug",
+        "obj_spoon_spoon"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3",
+      "goal": "대상 1개를 obj_tray_blue_tray로 옮긴다 (3/5)",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_bread_bread"
+      ],
+      "container_id": "obj_tray_blue_tray",
+      "ordered": true,
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_bread_bread",
+        "obj_tray_blue_tray"
+      ],
+      "selection_reason": "대상 물체들을 파란 트레이로 옮기는 작업이므로, 대상 물체들과 트레이를 선택해야 한다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.8,
+          "object_selection": 0.7,
+          "uncertain_about": [
+            "물체들이 트레이에 잘 들어갈지 여부"
+          ]
+        },
+        "after": {
+          "decomposition": 0.8,
+          "object_selection": 0.7,
+          "uncertain_about": [],
+          "reason": "모든 조건이 충족되었고, 불확실했던 물체들이 트레이에 잘 들어갈지 여부도 확인되었기 때문에 신뢰도를 유지합니다.",
+          "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
+        },
+        "delta": {
+          "decomposition": 0.0,
+          "object_selection": 0.0
+        }
+      },
+      "target_order": {
+        "source": "vlm",
+        "reason": "이미지에서 왼쪽부터 오른쪽 순서대로 정렬했습니다."
+      },
+      "measurements": [
+        {
+          "subgoal_id": "SG1_s3",
+          "queried_by": "SG1_s3_d1_p0",
+          "node_id": "obj_bread_bread",
+          "geometry": {
+            "length_mm": 124.8,
+            "diameter_mm": null,
+            "extents_mm": [
+              124.8,
+              83.3,
+              45.5
+            ],
+            "height_z_mm": 43.3,
+            "cylinder_like": false,
+            "surface_rms_mm": 1.3,
+            "seal_patch_rms_mm": 0.601,
+            "footprint_mm": [
+              83.2,
+              124.7
+            ],
+            "height_mm": 43.3
+          },
+          "material": "flour",
+          "density_kgm3": 781.0,
+          "mass_kg": 0.084,
+          "youngs_gpa": 2.58,
+          "mu": {
+            "mu": 0.457,
+            "stage": 0,
+            "material": "flour",
+            "rms_mm": 1.3
+          },
+          "confidence": 0.267,
+          "caption": "loaf of bread",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 1.8,
+              "margin_unit": "mm",
+              "reason": "치수 83 vs 개구 85mm",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 83.2,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.084,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.902,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.416,
+              "margin_unit": "kg",
+              "reason": "질량 0.084 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 83.2,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.084,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.902,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.2,
+              "margin_unit": "mm",
+              "reason": "상면 RMS 1.3 vs 허용 1.5",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 1.3,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.084,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 83.3,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.601,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 666.4,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 183.6
+          }
+        },
+        {
+          "subgoal_id": "SG1_s3",
+          "queried_by": "SG1_s3_d1_p1",
+          "node_id": "obj_bread_bread",
+          "type": "top_exposed",
+          "value": true,
+          "pass": true,
+          "blockers": []
+        },
+        {
+          "subgoal_id": "SG1_s3",
+          "queried_by": "SG1_s3_d1_p2",
+          "node_id": "obj_bread_bread",
+          "geometry": {
+            "length_mm": 124.8,
+            "diameter_mm": null,
+            "extents_mm": [
+              124.8,
+              83.3,
+              45.5
+            ],
+            "height_z_mm": 43.3,
+            "cylinder_like": false,
+            "surface_rms_mm": 1.3,
+            "seal_patch_rms_mm": 0.601,
+            "footprint_mm": [
+              83.2,
+              124.7
+            ],
+            "height_mm": 43.3
+          },
+          "material": "flour",
+          "density_kgm3": 781.0,
+          "mass_kg": 0.084,
+          "youngs_gpa": 2.58,
+          "mu": {
+            "mu": 0.457,
+            "stage": 0,
+            "material": "flour",
+            "rms_mm": 1.3
+          },
+          "confidence": 0.267,
+          "caption": "loaf of bread",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 1.8,
+              "margin_unit": "mm",
+              "reason": "치수 83 vs 개구 85mm",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 83.2,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.084,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.902,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.416,
+              "margin_unit": "kg",
+              "reason": "질량 0.084 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 83.2,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.084,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.902,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.2,
+              "margin_unit": "mm",
+              "reason": "상면 RMS 1.3 vs 허용 1.5",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 1.3,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.084,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 83.3,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.601,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 666.4,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 183.6
+          }
+        },
+        {
+          "subgoal_id": "SG1_s3",
+          "queried_by": "SG1_s3_d1_p3",
+          "kind": "batch",
+          "actor": {
+            "type": "ee_pool"
+          },
+          "feasible": true,
+          "checks": [
+            {
+              "rule": "ee_pool_one_per_grasp",
+              "capacity": 1,
+              "demand": 1,
+              "unit": "count",
+              "margin": 0,
+              "pass": true
+            }
+          ],
+          "binding_check": "ee_pool_one_per_grasp",
+          "partition": [
+            [
+              "obj_bread_bread"
+            ]
+          ]
+        },
+        {
+          "subgoal_id": "SG1_s3",
+          "queried_by": "SG1_s3_d3_p2",
+          "from": "obj_bread_bread",
+          "to": "obj_tray_blue_tray",
+          "type": "fits_inside",
+          "value_mm": 216.5,
+          "check": "opening_299.7[bbox-2*wall(4.0)] - footprint_83.2",
+          "pass": true
+        },
+        {
+          "subgoal_id": "SG1_s3",
+          "queried_by": "SG1_s3_d3_p3",
+          "node_id": "obj_tray_blue_tray",
+          "type": "clear",
+          "value": true,
+          "pass": true,
+          "occupants": [],
+          "depth_clearance": [
+            {
+              "type": "clearance",
+              "value_mm": 206.3,
+              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_83.2) & no_tip(h_43.3<=3.0x83.2)",
+              "pass": true
+            }
+          ],
+          "unfit_members": []
+        }
+      ],
+      "split_from": "SG1",
+      "split_index": 3,
+      "details": [
+        {
+          "detail_id": "SG1_s3_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_bread_bread"
+          },
+          "group_id": "G_SG1_s3",
+          "note": "obj_bread_bread 확보",
+          "pre": [
+            {
+              "id": "SG1_s3_d1_p0",
+              "expr": "reachable(obj_bread_bread)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_bread_bread",
+                  "reachable": true,
+                  "margin_mm": 183.6
+                }
+              ]
+            },
+            {
+              "id": "SG1_s3_d1_p1",
+              "expr": "top_exposed(obj_bread_bread)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_bread_bread",
+                  "top_exposed": true,
+                  "blockers": []
+                }
+              ]
+            },
+            {
+              "id": "SG1_s3_d1_p2",
+              "expr": "ee_usable(?EE, obj_bread_bread)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_bread_bread",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_s3_d1_p3",
+              "expr": "batch_feasible(?EE, obj_bread_bread)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "feasible": true,
+                  "binding_check": "ee_pool_one_per_grasp",
+                  "partition": [
+                    [
+                      "obj_bread_bread"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_s3_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_d1_p5",
+              "expr": "in(obj_plate_plate, obj_tray_blue_tray)",
+              "head": "in",
+              "eval_by": "m2",
+              "auto": "instruction_order"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s3_d1_e0",
+              "expr": "holding(obj_bread_bread)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s3_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_s3_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_bread_bread",
+            "?r": "obj_tray_blue_tray"
+          },
+          "group_id": "G_SG1_s3",
+          "note": "obj_bread_bread를 obj_tray_blue_tray로 운반",
+          "pre": [
+            {
+              "id": "SG1_s3_d2_p0",
+              "expr": "holding(obj_bread_bread)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_d2_p1",
+              "expr": "act_space_clear(?EE, obj_bread_bread, obj_tray_blue_tray)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s3_d2_p2",
+              "expr": "path_clear(obj_bread_bread, obj_tray_blue_tray)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s3_d2_e0",
+              "expr": "above(obj_bread_bread, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s3_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_bread_bread",
+            "?r": "obj_tray_blue_tray"
+          },
+          "group_id": "G_SG1_s3",
+          "note": "obj_bread_bread를 obj_tray_blue_tray에 배치",
+          "pre": [
+            {
+              "id": "SG1_s3_d3_p0",
+              "expr": "holding(obj_bread_bread)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_d3_p1",
+              "expr": "above(obj_bread_bread, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_d3_p2",
+              "expr": "fits(obj_bread_bread, obj_tray_blue_tray)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_bread_bread",
+                  "check": "opening_299.7[bbox-2*wall(4.0)] - footprint_83.2",
+                  "value_mm": 216.5,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "id": "SG1_s3_d3_p3",
+              "expr": "clear(obj_tray_blue_tray)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tray_blue_tray",
+                  "check": null,
+                  "value_mm": null,
+                  "pass": true
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s3_d3_e0",
+              "expr": "in(obj_bread_bread, obj_tray_blue_tray)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s3_d3_d0",
+              "expr": "holding(obj_bread_bread)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_d3_d1",
+              "expr": "above(obj_bread_bread, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ],
+      "ignore_ids": [
+        "obj_apple_apple",
+        "obj_mug_mug",
+        "obj_plate_plate",
+        "obj_spoon_spoon"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s4",
+      "goal": "대상 1개를 obj_tray_blue_tray로 옮긴다 (4/5)",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_apple_apple"
+      ],
+      "container_id": "obj_tray_blue_tray",
+      "ordered": true,
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_apple_apple",
+        "obj_tray_blue_tray"
+      ],
+      "selection_reason": "대상 물체들을 파란 트레이로 옮기는 작업이므로, 대상 물체들과 트레이를 선택해야 한다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.8,
+          "object_selection": 0.7,
+          "uncertain_about": [
+            "물체들이 트레이에 잘 들어갈지 여부"
+          ]
+        },
+        "after": {
+          "decomposition": 0.8,
+          "object_selection": 0.7,
+          "uncertain_about": [],
+          "reason": "모든 조건이 충족되었고, 불확실했던 물체들이 트레이에 잘 들어갈지 여부도 확인되었기 때문에 신뢰도를 유지합니다.",
+          "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
+        },
+        "delta": {
+          "decomposition": 0.0,
+          "object_selection": 0.0
+        }
+      },
+      "target_order": {
+        "source": "vlm",
+        "reason": "이미지에서 왼쪽부터 오른쪽 순서대로 정렬했습니다."
+      },
+      "measurements": [
+        {
+          "subgoal_id": "SG1_s4",
+          "queried_by": "SG1_s4_d1_p0",
+          "node_id": "obj_apple_apple",
+          "geometry": {
+            "length_mm": 74.9,
+            "diameter_mm": null,
+            "extents_mm": [
+              74.9,
+              70.5,
+              40.5
+            ],
+            "height_z_mm": 41.4,
+            "cylinder_like": false,
+            "surface_rms_mm": NaN,
+            "seal_patch_rms_mm": 99.9,
+            "footprint_mm": [
+              74.8,
+              67.8
+            ],
+            "height_mm": 41.4
+          },
+          "material": "fiber",
+          "density_kgm3": 908.1,
+          "mass_kg": 0.01,
+          "youngs_gpa": 1.05,
+          "mu": {
+            "mu": 0.45,
+            "stage": 0,
+            "material": "fiber",
+            "rms_mm": NaN
+          },
+          "confidence": 0.25,
+          "caption": "apple",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.99,
+              "margin_unit": "kg",
+              "reason": "질량 0.01 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 67.8,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.01,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.109,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.49,
+              "margin_unit": "kg",
+              "reason": "질량 0.01 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 67.8,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.01,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.109,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": false,
+              "margin": NaN,
+              "margin_unit": "mm",
+              "reason": "상면 RMS nan vs 허용 1.5; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": NaN,
+                  "limit": 1.5,
+                  "pass": false
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.01,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 70.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 99.9,
+                  "limit": 1.5,
+                  "pass": false
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 722.0,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 128.0
+          }
+        },
+        {
+          "subgoal_id": "SG1_s4",
+          "queried_by": "SG1_s4_d1_p1",
+          "node_id": "obj_apple_apple",
+          "type": "top_exposed",
+          "value": true,
+          "pass": true,
+          "blockers": []
+        },
+        {
+          "subgoal_id": "SG1_s4",
+          "queried_by": "SG1_s4_d1_p2",
+          "node_id": "obj_apple_apple",
+          "geometry": {
+            "length_mm": 74.9,
+            "diameter_mm": null,
+            "extents_mm": [
+              74.9,
+              70.5,
+              40.5
+            ],
+            "height_z_mm": 41.4,
+            "cylinder_like": false,
+            "surface_rms_mm": NaN,
+            "seal_patch_rms_mm": 99.9,
+            "footprint_mm": [
+              74.8,
+              67.8
+            ],
+            "height_mm": 41.4
+          },
+          "material": "fiber",
+          "density_kgm3": 908.1,
+          "mass_kg": 0.01,
+          "youngs_gpa": 1.05,
+          "mu": {
+            "mu": 0.45,
+            "stage": 0,
+            "material": "fiber",
+            "rms_mm": NaN
+          },
+          "confidence": 0.25,
+          "caption": "apple",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.99,
+              "margin_unit": "kg",
+              "reason": "질량 0.01 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 67.8,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.01,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.109,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.49,
+              "margin_unit": "kg",
+              "reason": "질량 0.01 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 67.8,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.01,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.109,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": false,
+              "margin": NaN,
+              "margin_unit": "mm",
+              "reason": "상면 RMS nan vs 허용 1.5; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": NaN,
+                  "limit": 1.5,
+                  "pass": false
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.01,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 70.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 99.9,
+                  "limit": 1.5,
+                  "pass": false
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 722.0,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 128.0
+          }
+        },
+        {
+          "subgoal_id": "SG1_s4",
+          "queried_by": "SG1_s4_d1_p3",
+          "kind": "batch",
+          "actor": {
+            "type": "ee_pool"
+          },
+          "feasible": true,
+          "checks": [
+            {
+              "rule": "ee_pool_one_per_grasp",
+              "capacity": 1,
+              "demand": 1,
+              "unit": "count",
+              "margin": 0,
+              "pass": true
+            }
+          ],
+          "binding_check": "ee_pool_one_per_grasp",
+          "partition": [
+            [
+              "obj_apple_apple"
+            ]
+          ]
+        },
+        {
+          "subgoal_id": "SG1_s4",
+          "queried_by": "SG1_s4_d3_p2",
+          "from": "obj_apple_apple",
+          "to": "obj_tray_blue_tray",
+          "type": "fits_inside",
+          "value_mm": 231.9,
+          "check": "opening_299.7[bbox-2*wall(4.0)] - footprint_67.8",
+          "pass": true
+        },
+        {
+          "subgoal_id": "SG1_s4",
+          "queried_by": "SG1_s4_d3_p3",
+          "node_id": "obj_tray_blue_tray",
+          "type": "clear",
+          "value": true,
+          "pass": true,
+          "occupants": [],
+          "depth_clearance": [
+            {
+              "type": "clearance",
+              "value_mm": 162.0,
+              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_67.8) & no_tip(h_41.4<=3.0x67.8)",
+              "pass": true
+            }
+          ],
+          "unfit_members": []
+        }
+      ],
+      "split_from": "SG1",
+      "split_index": 4,
+      "details": [
+        {
+          "detail_id": "SG1_s4_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_apple_apple"
+          },
+          "group_id": "G_SG1_s4",
+          "note": "obj_apple_apple 확보",
+          "pre": [
+            {
+              "id": "SG1_s4_d1_p0",
+              "expr": "reachable(obj_apple_apple)",
               "head": "reachable",
               "eval_by": "m3",
               "status": "sat",
@@ -68,62 +2155,27 @@
                 {
                   "node": "obj_apple_apple",
                   "reachable": true,
-                  "margin_mm": 121.3
-                },
-                {
-                  "node": "obj_bread_bread",
-                  "reachable": true,
-                  "margin_mm": 175.8
-                },
-                {
-                  "node": "obj_mug_mug",
-                  "reachable": true,
-                  "margin_mm": 54.9
-                },
-                {
-                  "node": "obj_plate_plate",
-                  "reachable": true,
-                  "margin_mm": 210.6
-                },
-                {
-                  "node": "obj_spoon_spoon",
-                  "reachable": true,
-                  "margin_mm": 149.8
+                  "margin_mm": 128.0
                 }
               ]
             },
             {
-              "id": "SG1_d1_p1",
-              "expr": "top_exposed({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "id": "SG1_s4_d1_p1",
+              "expr": "top_exposed(obj_apple_apple)",
               "head": "top_exposed",
               "eval_by": "m3",
-              "status": "unknown",
+              "status": "sat",
               "evidence": [
                 {
                   "node": "obj_apple_apple",
-                  "top_exposed": null
-                },
-                {
-                  "node": "obj_bread_bread",
-                  "top_exposed": null
-                },
-                {
-                  "node": "obj_mug_mug",
-                  "top_exposed": null
-                },
-                {
-                  "node": "obj_plate_plate",
-                  "top_exposed": null
-                },
-                {
-                  "node": "obj_spoon_spoon",
-                  "top_exposed": null
+                  "top_exposed": true,
+                  "blockers": []
                 }
               ]
             },
             {
-              "id": "SG1_d1_p2",
-              "expr": "ee_usable(?EE, {obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "id": "SG1_s4_d1_p2",
+              "expr": "ee_usable(?EE, obj_apple_apple)",
               "head": "ee_usable",
               "eval_by": "m3",
               "status": "sat",
@@ -134,74 +2186,55 @@
                     "2F",
                     "3F"
                   ]
-                },
-                {
-                  "node": "obj_bread_bread",
-                  "feasible_ees": [
-                    "2F",
-                    "3F"
-                  ]
-                },
-                {
-                  "node": "obj_mug_mug",
-                  "feasible_ees": [
-                    "2F",
-                    "3F"
-                  ]
-                },
-                {
-                  "node": "obj_plate_plate",
-                  "feasible_ees": [
-                    "2F",
-                    "3F",
-                    "vac"
-                  ]
-                },
-                {
-                  "node": "obj_spoon_spoon",
-                  "feasible_ees": [
-                    "2F",
-                    "3F",
-                    "vac"
-                  ]
                 }
               ]
             },
             {
-              "id": "SG1_d1_p3",
-              "expr": "batch_feasible(?EE, {obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "id": "SG1_s4_d1_p3",
+              "expr": "batch_feasible(?EE, obj_apple_apple)",
               "head": "batch_feasible",
               "eval_by": "m3",
-              "status": "unknown",
+              "status": "sat",
               "evidence": [
                 {
                   "actor": {
                     "type": "ee_pool"
                   },
-                  "feasible": null,
-                  "binding_check": null,
-                  "partition": null
+                  "feasible": true,
+                  "binding_check": "ee_pool_one_per_grasp",
+                  "partition": [
+                    [
+                      "obj_apple_apple"
+                    ]
+                  ]
                 }
               ]
             },
             {
-              "id": "SG1_d1_p4",
+              "id": "SG1_s4_d1_p4",
               "expr": "hand_empty",
               "head": "hand_empty",
               "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s4_d1_p5",
+              "expr": "in(obj_bread_bread, obj_tray_blue_tray)",
+              "head": "in",
+              "eval_by": "m2",
+              "auto": "instruction_order"
             }
           ],
           "establish": [
             {
-              "id": "SG1_d1_e0",
-              "expr": "holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "id": "SG1_s4_d1_e0",
+              "expr": "holding(obj_apple_apple)",
               "head": "holding",
               "eval_by": "m2"
             }
           ],
           "destroy": [
             {
-              "id": "SG1_d1_d0",
+              "id": "SG1_s4_d1_d0",
               "expr": "hand_empty",
               "head": "hand_empty",
               "eval_by": "m2"
@@ -209,49 +2242,38 @@
           ]
         },
         {
-          "detail_id": "SG1_d2",
+          "detail_id": "SG1_s4_d2",
           "action_type": "transport",
           "binding": {
-            "?o": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}",
+            "?o": "obj_apple_apple",
             "?r": "obj_tray_blue_tray"
           },
-          "group_id": "G_SG1",
-          "note": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}를 obj_tray_blue_tray로 운반",
+          "group_id": "G_SG1_s4",
+          "note": "obj_apple_apple를 obj_tray_blue_tray로 운반",
           "pre": [
             {
-              "id": "SG1_d2_p0",
-              "expr": "holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "id": "SG1_s4_d2_p0",
+              "expr": "holding(obj_apple_apple)",
               "head": "holding",
               "eval_by": "m2"
             },
             {
-              "id": "SG1_d2_p1",
-              "expr": "act_space_clear(?EE, {obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "id": "SG1_s4_d2_p1",
+              "expr": "act_space_clear(?EE, obj_apple_apple, obj_tray_blue_tray)",
               "head": "act_space_clear",
-              "eval_by": "m3",
-              "status": "unknown",
-              "evidence": [
-                {
-                  "actor": {
-                    "type": "ee_pool"
-                  },
-                  "clear": null,
-                  "margin_mm": null,
-                  "blockers": []
-                }
-              ]
+              "eval_by": "motion"
             },
             {
-              "id": "SG1_d2_p2",
-              "expr": "path_clear({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "id": "SG1_s4_d2_p2",
+              "expr": "path_clear(obj_apple_apple, obj_tray_blue_tray)",
               "head": "path_clear",
               "eval_by": "motion"
             }
           ],
           "establish": [
             {
-              "id": "SG1_d2_e0",
-              "expr": "above({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "id": "SG1_s4_d2_e0",
+              "expr": "above(obj_apple_apple, obj_tray_blue_tray)",
               "head": "above",
               "eval_by": "m2"
             }
@@ -259,99 +2281,51 @@
           "destroy": []
         },
         {
-          "detail_id": "SG1_d3",
+          "detail_id": "SG1_s4_d3",
           "action_type": "place",
           "binding": {
-            "?o": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}",
+            "?o": "obj_apple_apple",
             "?r": "obj_tray_blue_tray"
           },
-          "group_id": "G_SG1",
-          "note": "{obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}를 obj_tray_blue_tray에 배치",
+          "group_id": "G_SG1_s4",
+          "note": "obj_apple_apple를 obj_tray_blue_tray에 배치",
           "pre": [
             {
-              "id": "SG1_d3_p0",
-              "expr": "holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "id": "SG1_s4_d3_p0",
+              "expr": "holding(obj_apple_apple)",
               "head": "holding",
               "eval_by": "m2"
             },
             {
-              "id": "SG1_d3_p1",
-              "expr": "above({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "id": "SG1_s4_d3_p1",
+              "expr": "above(obj_apple_apple, obj_tray_blue_tray)",
               "head": "above",
               "eval_by": "m2"
             },
             {
-              "id": "SG1_d3_p2",
-              "expr": "fits({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "id": "SG1_s4_d3_p2",
+              "expr": "fits(obj_apple_apple, obj_tray_blue_tray)",
               "head": "fits",
               "eval_by": "m3",
-              "status": "unsat",
+              "status": "sat",
               "evidence": [
                 {
-                  "check": "opening_295.6 - footprint_60.0",
-                  "value_mm": 235.6,
+                  "node": "obj_apple_apple",
+                  "check": "opening_299.7[bbox-2*wall(4.0)] - footprint_67.8",
+                  "value_mm": 231.9,
                   "pass": true
-                },
-                {
-                  "check": "opening_295.6 - footprint_66.5",
-                  "value_mm": 229.1,
-                  "pass": true
-                },
-                {
-                  "check": "opening_295.6 - footprint_68.3",
-                  "value_mm": 227.3,
-                  "pass": true
-                },
-                {
-                  "check": "opening_295.6 - footprint_179.1",
-                  "value_mm": 116.5,
-                  "pass": true
-                },
-                {
-                  "check": "opening_295.6 - footprint_51.1",
-                  "value_mm": 244.5,
-                  "pass": true
-                },
-                {
-                  "check": "opening_60.3 - footprint_66.5",
-                  "value_mm": -6.2,
-                  "pass": false
                 }
               ]
             },
             {
-              "id": "SG1_d3_p3",
+              "id": "SG1_s4_d3_p3",
               "expr": "clear(obj_tray_blue_tray)",
               "head": "clear",
               "eval_by": "m3",
-              "status": "unsat",
+              "status": "sat",
               "evidence": [
                 {
-                  "check": "container_depth_25.1 - target_height_45.1",
-                  "value_mm": -20.0,
-                  "pass": false
-                },
-                {
-                  "check": "container_depth_25.1 - target_height_51.7",
-                  "value_mm": -26.6,
-                  "pass": false
-                },
-                {
-                  "check": "container_depth_25.1 - target_height_78.1",
-                  "value_mm": -53.0,
-                  "pass": false
-                },
-                {
-                  "check": "container_depth_25.1 - target_height_9.8",
-                  "value_mm": 15.3,
-                  "pass": true
-                },
-                {
-                  "check": "container_depth_25.1 - target_height_26.8",
-                  "value_mm": -1.7,
-                  "pass": false
-                },
-                {
+                  "node": "obj_tray_blue_tray",
                   "check": null,
                   "value_mm": null,
                   "pass": true
@@ -361,13 +2335,13 @@
           ],
           "establish": [
             {
-              "id": "SG1_d3_e0",
-              "expr": "in({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "id": "SG1_s4_d3_e0",
+              "expr": "in(obj_apple_apple, obj_tray_blue_tray)",
               "head": "in",
               "eval_by": "m2"
             },
             {
-              "id": "SG1_d3_e1",
+              "id": "SG1_s4_d3_e1",
               "expr": "hand_empty",
               "head": "hand_empty",
               "eval_by": "m2"
@@ -375,341 +2349,870 @@
           ],
           "destroy": [
             {
-              "id": "SG1_d3_d0",
-              "expr": "holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})",
+              "id": "SG1_s4_d3_d0",
+              "expr": "holding(obj_apple_apple)",
               "head": "holding",
               "eval_by": "m2"
             },
             {
-              "id": "SG1_d3_d1",
-              "expr": "above({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+              "id": "SG1_s4_d3_d1",
+              "expr": "above(obj_apple_apple, obj_tray_blue_tray)",
               "head": "above",
               "eval_by": "m2"
             }
           ]
         }
+      ],
+      "ignore_ids": [
+        "obj_bread_bread",
+        "obj_mug_mug",
+        "obj_plate_plate",
+        "obj_spoon_spoon"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s5",
+      "goal": "대상 1개를 obj_tray_blue_tray로 옮긴다 (5/5)",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_mug_mug"
+      ],
+      "container_id": "obj_tray_blue_tray",
+      "ordered": true,
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_mug_mug",
+        "obj_tray_blue_tray"
+      ],
+      "selection_reason": "대상 물체들을 파란 트레이로 옮기는 작업이므로, 대상 물체들과 트레이를 선택해야 한다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.8,
+          "object_selection": 0.7,
+          "uncertain_about": [
+            "물체들이 트레이에 잘 들어갈지 여부"
+          ]
+        },
+        "after": {
+          "decomposition": 0.8,
+          "object_selection": 0.7,
+          "uncertain_about": [],
+          "reason": "모든 조건이 충족되었고, 불확실했던 물체들이 트레이에 잘 들어갈지 여부도 확인되었기 때문에 신뢰도를 유지합니다.",
+          "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
+        },
+        "delta": {
+          "decomposition": 0.0,
+          "object_selection": 0.0
+        }
+      },
+      "target_order": {
+        "source": "vlm",
+        "reason": "이미지에서 왼쪽부터 오른쪽 순서대로 정렬했습니다."
+      },
+      "measurements": [
+        {
+          "subgoal_id": "SG1_s5",
+          "queried_by": "SG1_s5_d1_p0",
+          "node_id": "obj_mug_mug",
+          "geometry": {
+            "length_mm": 102.0,
+            "diameter_mm": 82.4,
+            "extents_mm": [
+              102.0,
+              86.5,
+              78.3
+            ],
+            "height_z_mm": 78.4,
+            "cylinder_like": true,
+            "surface_rms_mm": 2.84,
+            "seal_patch_rms_mm": 1.218,
+            "footprint_mm": [
+              72.8,
+              100.0
+            ],
+            "height_mm": 78.4
+          },
+          "material": "ceramic",
+          "density_kgm3": 2000.0,
+          "mass_kg": 0.242,
+          "youngs_gpa": 35.0,
+          "mu": {
+            "mu": 0.492,
+            "stage": 0,
+            "material": "ceramic",
+            "rms_mm": 2.84
+          },
+          "confidence": 0.533,
+          "caption": "Ceramic coffee mug",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.758,
+              "margin_unit": "kg",
+              "reason": "질량 0.242 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 72.8,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.242,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 2.413,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.258,
+              "margin_unit": "kg",
+              "reason": "질량 0.242 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 72.8,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.242,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 2.413,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": false,
+              "margin": -1.34,
+              "margin_unit": "mm",
+              "reason": "상면 RMS 2.84 vs 허용 1.5",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 2.84,
+                  "limit": 1.5,
+                  "pass": false
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.242,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 82.4,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 1.218,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 793.5,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 56.5
+          }
+        },
+        {
+          "subgoal_id": "SG1_s5",
+          "queried_by": "SG1_s5_d1_p1",
+          "node_id": "obj_mug_mug",
+          "type": "top_exposed",
+          "value": true,
+          "pass": true,
+          "blockers": []
+        },
+        {
+          "subgoal_id": "SG1_s5",
+          "queried_by": "SG1_s5_d1_p2",
+          "node_id": "obj_mug_mug",
+          "geometry": {
+            "length_mm": 102.0,
+            "diameter_mm": 82.4,
+            "extents_mm": [
+              102.0,
+              86.5,
+              78.3
+            ],
+            "height_z_mm": 78.4,
+            "cylinder_like": true,
+            "surface_rms_mm": 2.84,
+            "seal_patch_rms_mm": 1.218,
+            "footprint_mm": [
+              72.8,
+              100.0
+            ],
+            "height_mm": 78.4
+          },
+          "material": "ceramic",
+          "density_kgm3": 2000.0,
+          "mass_kg": 0.242,
+          "youngs_gpa": 35.0,
+          "mu": {
+            "mu": 0.492,
+            "stage": 0,
+            "material": "ceramic",
+            "rms_mm": 2.84
+          },
+          "confidence": 0.533,
+          "caption": "Ceramic coffee mug",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.758,
+              "margin_unit": "kg",
+              "reason": "질량 0.242 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 72.8,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.242,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 2.413,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.258,
+              "margin_unit": "kg",
+              "reason": "질량 0.242 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 72.8,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.242,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 2.413,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": false,
+              "margin": -1.34,
+              "margin_unit": "mm",
+              "reason": "상면 RMS 2.84 vs 허용 1.5",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 2.84,
+                  "limit": 1.5,
+                  "pass": false
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.242,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 82.4,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 1.218,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 793.5,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 56.5
+          }
+        },
+        {
+          "subgoal_id": "SG1_s5",
+          "queried_by": "SG1_s5_d1_p3",
+          "kind": "batch",
+          "actor": {
+            "type": "ee_pool"
+          },
+          "feasible": true,
+          "checks": [
+            {
+              "rule": "ee_pool_one_per_grasp",
+              "capacity": 1,
+              "demand": 1,
+              "unit": "count",
+              "margin": 0,
+              "pass": true
+            }
+          ],
+          "binding_check": "ee_pool_one_per_grasp",
+          "partition": [
+            [
+              "obj_mug_mug"
+            ]
+          ]
+        },
+        {
+          "subgoal_id": "SG1_s5",
+          "queried_by": "SG1_s5_d3_p2",
+          "from": "obj_mug_mug",
+          "to": "obj_tray_blue_tray",
+          "type": "fits_inside",
+          "value_mm": 226.9,
+          "check": "opening_299.7[bbox-2*wall(4.0)] - footprint_72.8",
+          "pass": true
+        },
+        {
+          "subgoal_id": "SG1_s5",
+          "queried_by": "SG1_s5_d3_p3",
+          "node_id": "obj_tray_blue_tray",
+          "type": "clear",
+          "value": true,
+          "pass": true,
+          "occupants": [],
+          "depth_clearance": [
+            {
+              "type": "clearance",
+              "value_mm": 140.0,
+              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_72.8) & no_tip(h_78.4<=3.0x72.8)",
+              "pass": true
+            }
+          ],
+          "unfit_members": []
+        }
+      ],
+      "split_from": "SG1",
+      "split_index": 5,
+      "details": [
+        {
+          "detail_id": "SG1_s5_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_mug_mug"
+          },
+          "group_id": "G_SG1_s5",
+          "note": "obj_mug_mug 확보",
+          "pre": [
+            {
+              "id": "SG1_s5_d1_p0",
+              "expr": "reachable(obj_mug_mug)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_mug_mug",
+                  "reachable": true,
+                  "margin_mm": 56.5
+                }
+              ]
+            },
+            {
+              "id": "SG1_s5_d1_p1",
+              "expr": "top_exposed(obj_mug_mug)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_mug_mug",
+                  "top_exposed": true,
+                  "blockers": []
+                }
+              ]
+            },
+            {
+              "id": "SG1_s5_d1_p2",
+              "expr": "ee_usable(?EE, obj_mug_mug)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_mug_mug",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_s5_d1_p3",
+              "expr": "batch_feasible(?EE, obj_mug_mug)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "feasible": true,
+                  "binding_check": "ee_pool_one_per_grasp",
+                  "partition": [
+                    [
+                      "obj_mug_mug"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_s5_d1_p4",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_d1_p5",
+              "expr": "in(obj_apple_apple, obj_tray_blue_tray)",
+              "head": "in",
+              "eval_by": "m2",
+              "auto": "instruction_order"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s5_d1_e0",
+              "expr": "holding(obj_mug_mug)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s5_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_s5_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_mug_mug",
+            "?r": "obj_tray_blue_tray"
+          },
+          "group_id": "G_SG1_s5",
+          "note": "obj_mug_mug를 obj_tray_blue_tray로 운반",
+          "pre": [
+            {
+              "id": "SG1_s5_d2_p0",
+              "expr": "holding(obj_mug_mug)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_d2_p1",
+              "expr": "act_space_clear(?EE, obj_mug_mug, obj_tray_blue_tray)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s5_d2_p2",
+              "expr": "path_clear(obj_mug_mug, obj_tray_blue_tray)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s5_d2_e0",
+              "expr": "above(obj_mug_mug, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s5_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_mug_mug",
+            "?r": "obj_tray_blue_tray"
+          },
+          "group_id": "G_SG1_s5",
+          "note": "obj_mug_mug를 obj_tray_blue_tray에 배치",
+          "pre": [
+            {
+              "id": "SG1_s5_d3_p0",
+              "expr": "holding(obj_mug_mug)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_d3_p1",
+              "expr": "above(obj_mug_mug, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_d3_p2",
+              "expr": "fits(obj_mug_mug, obj_tray_blue_tray)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_mug_mug",
+                  "check": "opening_299.7[bbox-2*wall(4.0)] - footprint_72.8",
+                  "value_mm": 226.9,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "id": "SG1_s5_d3_p3",
+              "expr": "clear(obj_tray_blue_tray)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tray_blue_tray",
+                  "check": null,
+                  "value_mm": null,
+                  "pass": true
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s5_d3_e0",
+              "expr": "in(obj_mug_mug, obj_tray_blue_tray)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s5_d3_d0",
+              "expr": "holding(obj_mug_mug)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_d3_d1",
+              "expr": "above(obj_mug_mug, obj_tray_blue_tray)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ],
+      "ignore_ids": [
+        "obj_apple_apple",
+        "obj_bread_bread",
+        "obj_plate_plate",
+        "obj_spoon_spoon"
       ]
     }
   ],
   "m2_partial_order": [
     {
-      "from": "SG1_d1",
-      "to": "SG1_d2",
-      "why": "causal_link: holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})"
+      "from": "SG1_s1_d1",
+      "to": "SG1_s1_d2",
+      "why": "causal_link: holding(obj_spoon_spoon)"
     },
     {
-      "from": "SG1_d1",
-      "to": "SG1_d3",
-      "why": "causal_link: holding({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon})"
+      "from": "SG1_s1_d1",
+      "to": "SG1_s1_d3",
+      "why": "causal_link: holding(obj_spoon_spoon)"
     },
     {
-      "from": "SG1_d2",
-      "to": "SG1_d3",
-      "why": "causal_link: above({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)"
+      "from": "SG1_s1_d2",
+      "to": "SG1_s1_d3",
+      "why": "causal_link: above(obj_spoon_spoon, obj_tray_blue_tray)"
+    },
+    {
+      "from": "SG1_s1_d3",
+      "to": "SG1_s2_d1",
+      "why": "causal_link: in(obj_spoon_spoon, obj_tray_blue_tray)"
+    },
+    {
+      "from": "SG1_s2_d1",
+      "to": "SG1_s2_d2",
+      "why": "causal_link: holding(obj_plate_plate)"
+    },
+    {
+      "from": "SG1_s2_d1",
+      "to": "SG1_s2_d3",
+      "why": "causal_link: holding(obj_plate_plate)"
+    },
+    {
+      "from": "SG1_s2_d2",
+      "to": "SG1_s2_d3",
+      "why": "causal_link: above(obj_plate_plate, obj_tray_blue_tray)"
+    },
+    {
+      "from": "SG1_s2_d3",
+      "to": "SG1_s3_d1",
+      "why": "causal_link: in(obj_plate_plate, obj_tray_blue_tray)"
+    },
+    {
+      "from": "SG1_s3_d1",
+      "to": "SG1_s3_d2",
+      "why": "causal_link: holding(obj_bread_bread)"
+    },
+    {
+      "from": "SG1_s3_d1",
+      "to": "SG1_s3_d3",
+      "why": "causal_link: holding(obj_bread_bread)"
+    },
+    {
+      "from": "SG1_s3_d2",
+      "to": "SG1_s3_d3",
+      "why": "causal_link: above(obj_bread_bread, obj_tray_blue_tray)"
+    },
+    {
+      "from": "SG1_s3_d3",
+      "to": "SG1_s4_d1",
+      "why": "causal_link: in(obj_bread_bread, obj_tray_blue_tray)"
+    },
+    {
+      "from": "SG1_s4_d1",
+      "to": "SG1_s4_d2",
+      "why": "causal_link: holding(obj_apple_apple)"
+    },
+    {
+      "from": "SG1_s4_d1",
+      "to": "SG1_s4_d3",
+      "why": "causal_link: holding(obj_apple_apple)"
+    },
+    {
+      "from": "SG1_s4_d2",
+      "to": "SG1_s4_d3",
+      "why": "causal_link: above(obj_apple_apple, obj_tray_blue_tray)"
+    },
+    {
+      "from": "SG1_s4_d3",
+      "to": "SG1_s5_d1",
+      "why": "causal_link: in(obj_apple_apple, obj_tray_blue_tray)"
+    },
+    {
+      "from": "SG1_s5_d1",
+      "to": "SG1_s5_d2",
+      "why": "causal_link: holding(obj_mug_mug)"
+    },
+    {
+      "from": "SG1_s5_d1",
+      "to": "SG1_s5_d3",
+      "why": "causal_link: holding(obj_mug_mug)"
+    },
+    {
+      "from": "SG1_s5_d2",
+      "to": "SG1_s5_d3",
+      "why": "causal_link: above(obj_mug_mug, obj_tray_blue_tray)"
     }
   ],
-  "m2_mutex": [],
-  "m2_queries": [
+  "m2_mutex": [
     {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p0",
-      "m3_call": {
-        "kind": "intrinsic",
-        "node_id": "obj_apple_apple"
-      }
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s1",
+        "G_SG1_s2"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
     },
     {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p0",
-      "m3_call": {
-        "kind": "intrinsic",
-        "node_id": "obj_bread_bread"
-      }
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s1",
+        "G_SG1_s3"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
     },
     {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p0",
-      "m3_call": {
-        "kind": "intrinsic",
-        "node_id": "obj_mug_mug"
-      }
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s1",
+        "G_SG1_s4"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
     },
     {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p0",
-      "m3_call": {
-        "kind": "intrinsic",
-        "node_id": "obj_plate_plate"
-      }
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s1",
+        "G_SG1_s5"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
     },
     {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p0",
-      "m3_call": {
-        "kind": "intrinsic",
-        "node_id": "obj_spoon_spoon"
-      }
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s2",
+        "G_SG1_s3"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
     },
     {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p1",
-      "m3_call": {
-        "kind": "intrinsic",
-        "node_id": "obj_apple_apple"
-      }
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s2",
+        "G_SG1_s4"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
     },
     {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p1",
-      "m3_call": {
-        "kind": "intrinsic",
-        "node_id": "obj_bread_bread"
-      }
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s2",
+        "G_SG1_s5"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
     },
     {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p1",
-      "m3_call": {
-        "kind": "intrinsic",
-        "node_id": "obj_mug_mug"
-      }
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s3",
+        "G_SG1_s4"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
     },
     {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p1",
-      "m3_call": {
-        "kind": "intrinsic",
-        "node_id": "obj_plate_plate"
-      }
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s3",
+        "G_SG1_s5"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
     },
     {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p1",
-      "m3_call": {
-        "kind": "intrinsic",
-        "node_id": "obj_spoon_spoon"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p2",
-      "m3_call": {
-        "kind": "ee",
-        "node_id": "obj_apple_apple"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p2",
-      "m3_call": {
-        "kind": "ee",
-        "node_id": "obj_bread_bread"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p2",
-      "m3_call": {
-        "kind": "ee",
-        "node_id": "obj_mug_mug"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p2",
-      "m3_call": {
-        "kind": "ee",
-        "node_id": "obj_plate_plate"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p2",
-      "m3_call": {
-        "kind": "ee",
-        "node_id": "obj_spoon_spoon"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d1_p3",
-      "m3_call": {
-        "kind": "batch",
-        "action_type": "relocate",
-        "member_ids": [
-          "obj_apple_apple",
-          "obj_bread_bread",
-          "obj_mug_mug",
-          "obj_plate_plate",
-          "obj_spoon_spoon"
-        ],
-        "actor": {
-          "type": "ee_pool"
-        }
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d2_p1",
-      "m3_call": {
-        "kind": "swept_space",
-        "action_type": "relocate",
-        "member_ids": [
-          "obj_apple_apple",
-          "obj_bread_bread",
-          "obj_mug_mug",
-          "obj_plate_plate",
-          "obj_spoon_spoon"
-        ],
-        "to": "obj_tray_blue_tray",
-        "actor": {
-          "type": "ee_pool"
-        }
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d3_p2",
-      "m3_call": {
-        "kind": "relational",
-        "a": "obj_apple_apple",
-        "b": "obj_tray_blue_tray",
-        "relation": "fits_inside"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d3_p2",
-      "m3_call": {
-        "kind": "relational",
-        "a": "obj_bread_bread",
-        "b": "obj_tray_blue_tray",
-        "relation": "fits_inside"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d3_p2",
-      "m3_call": {
-        "kind": "relational",
-        "a": "obj_mug_mug",
-        "b": "obj_tray_blue_tray",
-        "relation": "fits_inside"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d3_p2",
-      "m3_call": {
-        "kind": "relational",
-        "a": "obj_plate_plate",
-        "b": "obj_tray_blue_tray",
-        "relation": "fits_inside"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d3_p2",
-      "m3_call": {
-        "kind": "relational",
-        "a": "obj_spoon_spoon",
-        "b": "obj_tray_blue_tray",
-        "relation": "fits_inside"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d3_p3",
-      "m3_call": {
-        "kind": "relational",
-        "a": "obj_apple_apple",
-        "b": "obj_tray_blue_tray",
-        "relation": "clearance"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d3_p3",
-      "m3_call": {
-        "kind": "relational",
-        "a": "obj_bread_bread",
-        "b": "obj_tray_blue_tray",
-        "relation": "clearance"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d3_p3",
-      "m3_call": {
-        "kind": "relational",
-        "a": "obj_mug_mug",
-        "b": "obj_tray_blue_tray",
-        "relation": "clearance"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d3_p3",
-      "m3_call": {
-        "kind": "relational",
-        "a": "obj_plate_plate",
-        "b": "obj_tray_blue_tray",
-        "relation": "clearance"
-      }
-    },
-    {
-      "subgoal_id": "SG1",
-      "queried_by": "SG1_d3_p3",
-      "m3_call": {
-        "kind": "relational",
-        "a": "obj_spoon_spoon",
-        "b": "obj_tray_blue_tray",
-        "relation": "clearance"
-      }
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s4",
+        "G_SG1_s5"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
     }
   ],
   "m2_invariants": [
     {
-      "id": "INV_SG1",
-      "expr": "all_in({obj_apple_apple,obj_bread_bread,obj_mug_mug,obj_plate_plate,obj_spoon_spoon}, obj_tray_blue_tray)",
+      "id": "INV_SG1_s1",
+      "expr": "in(obj_spoon_spoon, obj_tray_blue_tray)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG1_s2",
+      "expr": "in(obj_plate_plate, obj_tray_blue_tray)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG1_s3",
+      "expr": "in(obj_bread_bread, obj_tray_blue_tray)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG1_s4",
+      "expr": "in(obj_apple_apple, obj_tray_blue_tray)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG1_s5",
+      "expr": "in(obj_mug_mug, obj_tray_blue_tray)",
       "check_at": "final"
     }
   ],
   "m2_stats": {
-    "n_subgoals": 1,
-    "n_details": 3,
-    "n_edges": 3,
-    "n_mutex": 0,
-    "n_m3_queries": 27,
+    "n_subgoals": 5,
+    "n_details": 15,
+    "n_edges": 19,
+    "n_mutex": 10,
     "llm_usage": {
       "서브골 분해": {
         "calls": 1,
-        "prompt_tokens": 520,
-        "completion_tokens": 132,
-        "tokens": 652,
-        "seconds": 1.61
+        "prompt_tokens": 979,
+        "completion_tokens": 122,
+        "tokens": 1101,
+        "seconds": 2.69
       },
       "객체 선택": {
         "calls": 1,
-        "prompt_tokens": 635,
-        "completion_tokens": 112,
-        "tokens": 747,
-        "seconds": 1.64
+        "prompt_tokens": 715,
+        "completion_tokens": 110,
+        "tokens": 825,
+        "seconds": 1.83
+      },
+      "순서(VLM)": {
+        "calls": 1,
+        "prompt_tokens": 475,
+        "completion_tokens": 61,
+        "tokens": 536,
+        "seconds": 1.59
       },
       "confidence_update": {
         "calls": 1,
-        "prompt_tokens": 873,
-        "completion_tokens": 132,
-        "tokens": 1005,
-        "seconds": 1.83
+        "prompt_tokens": 817,
+        "completion_tokens": 70,
+        "tokens": 887,
+        "seconds": 1.11
       }
     },
+    "n_evaluations": 30,
     "m3_predicates": {
-      "sat": 2,
-      "unsat": 2,
-      "unknown": 3,
-      "unanswered": 0,
+      "sat": 30,
+      "unsat": 0,
+      "unknown": 0,
       "not_queried": 0
-    }
+    },
+    "n_split_subgoals": 5
   }
 }
