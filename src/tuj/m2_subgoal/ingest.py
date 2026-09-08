@@ -17,7 +17,7 @@
   flat_face        node.predicates.flat_face.value
   gap_accessible   relations.gap_access(tool, target)
   batch_feasible   relations.batch_partition(members, tool) — partition을 분할에 사용
-  act_space_clear  relations.swept_space(members, to, others, tool)
+(act_space_clear는 0908에 motion 유보로 옮겼다 — 통로 점유는 궤적이 정해져야 안다)
 """
 from __future__ import annotations
 
@@ -357,6 +357,13 @@ def measurement_feedback(m2_out: dict) -> str | None:
     # sweep_collect("병으로 반죽을 도마에 쓸어 담기")를 내놓았다. 펴기를 쓸기로 바꾸는 건
     # 어떤 상황에서도 답이 아니므로 kind는 유지하고 도구 후보 확장만 요구한다.
     kind_lines, tool_lines, adjust_lines = [], [], []
+    # 0908: 계획 자신이 옮길 물체는 blocker로 세지 않는다. 초기 상태에서 A 위에 B가
+    # 있어도 B가 이 태스크의 대상이면 실행 순서가 그것을 해소한다 (c2_2: 빵 두 개가
+    # 겹쳐 있는데 아래 빵이 5층, 위 빵이 1층이라 1층을 놓는 순간 노출된다).
+    # 이런 위반을 재분해 사유로 넘기면 초기 상태는 그대로라 순서를 바꿔도 풀리지 않고,
+    # LLM이 상한까지 같은 분해를 반복한다. 판정 결과(evidence)에는 남겨 M4가 본다.
+    planned = {t for s in m2_out.get("m2_subgoals", [])
+               for t in (s.get("target_ids") or [])}
     for s in m2_out.get("m2_subgoals", []):
         for d in s.get("details", []):
             for p in d.get("pre", []):
@@ -385,6 +392,8 @@ def measurement_feedback(m2_out: dict) -> str | None:
                     blk = {n for e in ev if e.get("top_exposed") is False
                            for n in (e.get("blockers") or [])}
                     who = [e.get("node") for e in ev if e.get("top_exposed") is False]
+                    if blk and blk <= planned:
+                        continue            # 계획이 먼저 치울 물체 — 재분해로는 못 푼다
                     adjust_lines.append(
                         f"- {p['expr']} -> 불충족: {', '.join(who)} 위에 다른 물체가 있음"
                         + (f" ({', '.join(sorted(blk))})" if blk else "")
