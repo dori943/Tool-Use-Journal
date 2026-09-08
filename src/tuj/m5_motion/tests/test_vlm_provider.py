@@ -380,6 +380,27 @@ def test_pick_keyframe_gets_deterministic_grasp_and_attach_events() -> None:
     assert grasp.metadata["event_target_id"] == "bottle"
 
 
+def test_pick_event_uses_selected_ee_suction_capability() -> None:
+    request = _request()
+    request.task.metadata["ee_capabilities"] = ["suction"]
+    request.task.goal = MotionGoal(
+        goal_type=GoalType.POSE,
+        target_object_id="bottle",
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_batch()),
+    )
+
+    artifact = provider.generate(request)
+
+    grasp = artifact.candidates[0].keyframes[1]
+    assert grasp.events_after == [
+        KeyframeEventType.SUCTION_ON,
+        KeyframeEventType.ATTACH_OBJECT,
+    ]
+
+
 def test_pick_tool_marks_attachment_as_a_tool_resource() -> None:
     request = _request()
     request.task.action_type = "PICK_TOOL"

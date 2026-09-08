@@ -5,6 +5,10 @@ from __future__ import annotations
 from dataclasses import dataclass
 from typing import Sequence
 
+from tuj.m5_motion.attachment_retarget import (
+    AttachmentRetargetError,
+    retarget_resolved_pose,
+)
 from tuj.m5_motion.geometry import GeometryResolutionError, RelativePoseResolver
 from tuj.m5_motion.kinematics import IKSolutionSet, UR5eKinematics
 from tuj.m5_motion.schema import KeyframePlanCandidate, Pose, WorldSnapshot
@@ -26,12 +30,27 @@ class ResolvedKeyframe:
 
 
 @dataclass(frozen=True, slots=True)
+class KeyframeIKDiagnostic:
+    keyframe_id: str
+    raw_ik_count: int
+    valid_ik_count: int
+    attempted_seeds: int
+    best_position_error_m: float
+    best_orientation_error_rad: float
+    solver_id: str
+    solver_failure_code: str | None
+    solver_detail: str
+    validity_detail: str
+
+
+@dataclass(frozen=True, slots=True)
 class StrategyAttempt:
     strategy_id: str
     resolved_keyframes: tuple[ResolvedKeyframe, ...] = ()
     selection: BranchSelectionResult | None = None
     failure_code: str | None = None
     detail: str = ""
+    ik_diagnostics: tuple[KeyframeIKDiagnostic, ...] = ()
 
 
 @dataclass(frozen=True, slots=True)
@@ -74,13 +93,22 @@ class FirstFeasibleStrategyCompiler:
         for strategy in candidates:
             resolved: list[ResolvedKeyframe] = []
             solution_sets: list[IKSolutionSet] = []
+            diagnostics: list[KeyframeIKDiagnostic] = []
             failure_code: str | None = None
             failure_detail = ""
             for keyframe in strategy.keyframes:
                 try:
-                    pose = resolver.resolve(keyframe)
-                except GeometryResolutionError as error:
-                    failure_code = "KEYFRAME_GEOMETRY_INVALID"
+                    pose = retarget_resolved_pose(
+                        world,
+                        keyframe,
+                        resolver.resolve(keyframe),
+                    )
+                except (GeometryResolutionError, AttachmentRetargetError) as error:
+                    failure_code = (
+                        "ATTACHMENT_RETARGET_INVALID"
+                        if isinstance(error, AttachmentRetargetError)
+                        else "KEYFRAME_GEOMETRY_INVALID"
+                    )
                     failure_detail = f"{keyframe.keyframe_id}: {error}"
                     break
                 ik_options = {
@@ -103,6 +131,20 @@ class FirstFeasibleStrategyCompiler:
                 valid_solutions = filter_ik_solutions(
                     solutions, keyframe, state_validator
                 )
+                diagnostics.append(
+                    KeyframeIKDiagnostic(
+                        keyframe_id=keyframe.keyframe_id,
+                        raw_ik_count=len(solutions.solutions),
+                        valid_ik_count=len(valid_solutions.solutions),
+                        attempted_seeds=solutions.attempted_seeds,
+                        best_position_error_m=solutions.best_position_error_m,
+                        best_orientation_error_rad=solutions.best_orientation_error_rad,
+                        solver_id=solutions.solver_id,
+                        solver_failure_code=solutions.failure_code,
+                        solver_detail=solutions.detail,
+                        validity_detail=valid_solutions.detail,
+                    )
+                )
                 resolved.append(
                     ResolvedKeyframe(
                         keyframe_id=keyframe.keyframe_id,
@@ -112,11 +154,23 @@ class FirstFeasibleStrategyCompiler:
                 )
                 solution_sets.append(valid_solutions)
                 if not valid_solutions.solved:
-                    failure_code = (
-                        "NO_VALID_IK_BRANCH"
-                        if valid_solutions.enumeration_complete
-                        else "IK_SEARCH_EXHAUSTED"
-                    )
+                    if not solutions.solved:
+                        failure_code = (
+                            "TARGET_OUTSIDE_REACH_ENVELOPE"
+                            if solutions.failure_code
+                            == "TARGET_OUTSIDE_CONSERVATIVE_REACH"
+                            else "NO_VALID_IK_BRANCH"
+                            if solutions.enumeration_complete
+                            else "IK_SEARCH_EXHAUSTED"
+                        )
+                    elif "COLLISION_" in valid_solutions.detail.upper():
+                        failure_code = "COLLISION_FILTERED_ALL"
+                    else:
+                        failure_code = (
+                            "NO_VALID_IK_BRANCH"
+                            if valid_solutions.enumeration_complete
+                            else "IK_SEARCH_EXHAUSTED"
+                        )
                     failure_detail = (
                         f"{keyframe.keyframe_id}: {valid_solutions.detail}"
                     )
@@ -129,6 +183,7 @@ class FirstFeasibleStrategyCompiler:
                         resolved_keyframes=tuple(resolved),
                         failure_code=failure_code,
                         detail=failure_detail,
+                        ik_diagnostics=tuple(diagnostics),
                     )
                 )
                 continue
@@ -146,6 +201,7 @@ class FirstFeasibleStrategyCompiler:
                     selection=selection,
                     failure_code=selection.failure_code,
                     detail=selection.detail,
+                    ik_diagnostics=tuple(diagnostics),
                 )
             )
             if selection.connected is not None:

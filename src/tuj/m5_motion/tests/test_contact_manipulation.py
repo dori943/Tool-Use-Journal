@@ -287,6 +287,117 @@ def test_task_aware_goal_routes_physical_regions_and_conceptual_tool_rest() -> N
     assert rest_result.status is GoalEvaluationStatus.SATISFIED
 
 
+def test_rotated_target_footprint_uses_oriented_region_geometry() -> None:
+    world = _world(target_x_m=0.0)
+    world.objects["block"]["dimensions_m"] = [0.18, 0.04, 0.02]
+    world.objects["region"]["dimensions_m"] = [0.12, 0.20, 0.01]
+    half_sqrt = 2.0 ** -0.5
+    world.objects["block"]["pose"]["orientation_xyzw"] = [
+        0.0,
+        0.0,
+        half_sqrt,
+        half_sqrt,
+    ]
+
+    assert target_fully_inside_region(
+        world,
+        target_id="block",
+        region_id="region",
+    )
+
+    world.objects["block"]["pose"]["orientation_xyzw"] = [0.0, 0.0, 0.0, 1.0]
+    assert not target_fully_inside_region(
+        world,
+        target_id="block",
+        region_id="region",
+    )
+
+
+def test_transport_to_physical_region_evaluates_above_not_containment() -> None:
+    request = _request(target_x_m=0.04)
+    request.task.action_type = "transport"
+    request.world.objects["block"]["pose"]["position_m"][2] = 0.02
+
+    result = TaskAwareGoalEvaluator().evaluate(
+        request,
+        _report(),
+        request.world,
+    )
+
+    assert result.status is GoalEvaluationStatus.SATISFIED
+    assert result.observed["above_target_ids"] == ["block"]
+
+
+def test_transport_of_held_target_requires_retention_and_above_region() -> None:
+    request = _request(target_x_m=0.04)
+    request.task.action_type = "transport"
+    request.world.robot_state.held_tool_id = "block"
+    request.world.objects["block"]["pose"]["position_m"][2] = 0.02
+    report = _report()
+    report.final_robot_state.held_tool_id = None
+
+    lost = TaskAwareGoalEvaluator().evaluate(
+        request,
+        report,
+        request.world,
+    )
+    assert lost.status is GoalEvaluationStatus.FAILED
+
+    report.final_robot_state.held_tool_id = "block"
+    retained = TaskAwareGoalEvaluator().evaluate(
+        request,
+        report,
+        request.world,
+    )
+    assert retained.status is GoalEvaluationStatus.SATISFIED
+
+
+def test_place_into_region_requires_detachment_and_containment() -> None:
+    request = _request(target_x_m=0.04)
+    request.task.action_type = "place"
+    request.task.contact = None
+    report = _report()
+
+    result = TaskAwareGoalEvaluator().evaluate(request, report, request.world)
+
+    assert result.status is GoalEvaluationStatus.SATISFIED
+    assert result.observed["inside_target_ids"] == ["block"]
+
+    report.final_robot_state.attached_object_id = "block"
+    attached = TaskAwareGoalEvaluator().evaluate(request, report, request.world)
+    assert attached.status is GoalEvaluationStatus.FAILED
+    assert "still attached" in attached.detail
+
+
+def test_place_into_container_requires_vertical_containment() -> None:
+    request = _request(target_x_m=0.04)
+    request.task.action_type = "place"
+    request.task.contact = None
+    request.world.objects["region"]["packing_metadata"] = {
+        "kind": "CONTAINER",
+        "interior_dimensions_m": [0.20, 0.20, 0.10],
+        "interior_center_m": [0.0, 0.0, 0.05],
+    }
+    request.world.objects["block"]["pose"]["position_m"][2] = 0.12
+
+    result = TaskAwareGoalEvaluator().evaluate(request, _report(), request.world)
+
+    assert result.status is GoalEvaluationStatus.FAILED
+    assert result.observed["include_vertical"] is True
+
+
+def test_place_into_container_without_interior_geometry_is_unknown() -> None:
+    request = _request(target_x_m=0.04)
+    request.task.action_type = "place"
+    request.task.contact = None
+    request.world.objects["region"]["packing_metadata"] = {"kind": "CONTAINER"}
+
+    result = TaskAwareGoalEvaluator().evaluate(request, _report(), request.world)
+
+    assert result.status is GoalEvaluationStatus.UNKNOWN
+    assert "interior geometry" in result.detail
+
+
 def test_profiles_reject_nonphysical_retry_configuration() -> None:
     with pytest.raises(ValueError, match="cannot exceed"):
         PushPlanningProfile(

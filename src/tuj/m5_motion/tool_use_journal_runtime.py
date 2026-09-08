@@ -490,8 +490,10 @@ class ToolUseJournalEERuntime:
         self._transitions: list[EERuntimeTransition] = []
         self._gripper_command = -1.0
         self._grasp_engaged = False
+        self._captured_gripper_action: np.ndarray | None = None
         self._attachment: AttachedObjectState | None = None
         self._held_tool_id: str | None = None
+        self._contact_friction_retention: Any | None = None
         self._breakable_runtime: _BreakableAttachmentRuntime | None = None
         self._last_attachment_break: AttachmentBreakObservation | None = None
         self._render_callback: Callable[[object], None] | None = None
@@ -592,6 +594,10 @@ class ToolUseJournalEERuntime:
         return self._active_ee
 
     @property
+    def environment_name(self) -> str:
+        return self._environment_name
+
+    @property
     def transitions(self) -> tuple[EERuntimeTransition, ...]:
         return tuple(self._transitions)
 
@@ -614,6 +620,14 @@ class ToolUseJournalEERuntime:
         return self._attachment.object_id if self._attachment is not None else None
 
     @property
+    def captured_gripper_action(self) -> tuple[float, ...] | None:
+        return (
+            tuple(float(value) for value in self._captured_gripper_action)
+            if self._captured_gripper_action is not None
+            else None
+        )
+
+    @property
     def held_tool_id(self) -> str | None:
         """Task-level tool resource currently attached to the active EE."""
 
@@ -630,11 +644,22 @@ class ToolUseJournalEERuntime:
         self._held_tool_id = object_id
 
     def mark_contact_friction_object_as_tool(self, object_id: str) -> None:
-        """Record a validated free-body grasp without attaching or projecting it."""
-        if self._attachment is not None or not self.grasp_engaged:
-            raise ToolUseJournalRuntimeError("contact grasp requires an engaged, unattached gripper")
-        if object_id not in self.env.obj_body_id:
-            raise ToolUseJournalRuntimeError(f"unknown grasp object {object_id!r}")
+        """Record a validated free-body friction grasp without creating a weld."""
+
+        if self._attachment is not None:
+            raise ToolUseJournalRuntimeError(
+                "contact-friction tool state cannot coexist with an attachment"
+            )
+        if not self._grasp_engaged:
+            raise ToolUseJournalRuntimeError(
+                "contact-friction tool state requires an engaged gripper"
+            )
+        try:
+            self.env.obj_body_id[object_id]  # type: ignore[attr-defined]
+        except (AttributeError, KeyError, TypeError) as error:
+            raise ToolUseJournalRuntimeError(
+                f"contact-friction tool {object_id!r} is absent"
+            ) from error
         self._held_tool_id = object_id
 
     @property
@@ -1158,13 +1183,25 @@ class ToolUseJournalEERuntime:
             )
         self._gripper_command = normalized
         self._grasp_engaged = engaged
+        self._captured_gripper_action = None
         if not engaged:
             self._held_tool_id = None
             retention = getattr(self, "scripted_grasp_retention", None)
             if retention is not None and hasattr(retention, "close"):
                 retention.close()
             self.scripted_grasp_retention = None
+            self._contact_friction_retention = None
         return self._gripper_command
+
+    def capture_gripper_hold(self) -> None:
+        """Retain the object function's integrated finger targets for transport."""
+        if self._active_ee not in {"2F", "3F"} or not self._grasp_engaged:
+            raise ToolUseJournalRuntimeError("capture hold requires engaged fingers")
+        gripper = self.env.robots[0].gripper["right"]
+        action = np.asarray(gripper.current_action, dtype=float).copy()
+        if not np.isfinite(action).all():
+            raise ToolUseJournalRuntimeError("non-finite finger hold target")
+        self._captured_gripper_action = action
 
     def hold_gripper_position(self) -> None:
         """Keep commanding closure so a finger gripper retains its clamp."""
@@ -1428,6 +1465,7 @@ class ToolUseJournalEERuntime:
         )
         self._clear_attachment_wrench()
         self._attachment = None
+        self._captured_gripper_action = None
         if self._held_tool_id == attachment.object_id:
             self._held_tool_id = None
         self._breakable_runtime = None
@@ -1671,6 +1709,11 @@ class ToolUseJournalEERuntime:
             raise ToolUseJournalRuntimeError(
                 f"object {self._attachment.object_id!r} is already attached"
             )
+        if self._held_tool_id is not None:
+            raise ToolUseJournalRuntimeError(
+                f"cannot attach while contact-friction tool "
+                f"{self._held_tool_id!r} is held"
+            )
         if require_grasp_command and not self._grasp_engaged:
             raise ToolUseJournalRuntimeError(
                 "ATTACH_OBJECT requires GRIPPER_CLOSE or SUCTION_ON first"
@@ -1771,6 +1814,144 @@ class ToolUseJournalEERuntime:
             self.synchronize_attached_object()
         return attachment
 
+    def restore_logical_state(
+        self,
+        *,
+        gripper_command: float,
+        grasp_engaged: bool,
+        captured_gripper_action: Sequence[float] | None,
+        attachment: AttachedObjectState | None,
+        held_tool_id: str | None,
+        attachment_position_tolerance_m: float = 5e-3,
+        attachment_orientation_tolerance_rad: float = 5e-2,
+    ) -> None:
+        """Restore checkpoint-only state without reclassifying it as a grasp.
+
+        A checkpoint attachment already passed the grasp contract when it was
+        created.  Restoration verifies that the restored free body still has
+        the recorded relative pose, then reinstates that exact transform.  It
+        deliberately does not apply the new-grasp penetration threshold.
+        """
+
+        if self._attachment is not None:
+            raise ToolUseJournalRuntimeError(
+                "cannot restore logical state while an object is attached"
+            )
+        command = self._normalized_command(gripper_command, engaged=grasp_engaged)
+        if grasp_engaged != (command >= 0.0):
+            raise ToolUseJournalRuntimeError(
+                "checkpoint gripper command disagrees with grasp state"
+            )
+        captured = (
+            np.asarray(captured_gripper_action, dtype=float)
+            if captured_gripper_action is not None
+            else None
+        )
+        if captured is not None and (
+            self._active_ee not in {"2F", "3F"}
+            or not grasp_engaged
+            or captured.ndim != 1
+            or not np.all(np.isfinite(captured))
+        ):
+            raise ToolUseJournalRuntimeError(
+                "checkpoint captured gripper action is incompatible"
+            )
+        if attachment is not None:
+            if self._active_ee is None or not grasp_engaged:
+                raise ToolUseJournalRuntimeError(
+                    "checkpoint attachment requires an engaged mounted EE"
+                )
+            model, data = _raw_model_data(self.env)
+            body_id, _, free_joint_name = self._object_free_joint(
+                self.env, attachment.object_id
+            )
+            if free_joint_name != attachment.free_joint_name:
+                raise ToolUseJournalRuntimeError(
+                    "checkpoint attachment free joint does not match the model"
+                )
+            reference_position, reference_rotation = self._reference_pose(
+                self.env,
+                attachment.reference_kind,
+                attachment.reference_name,
+            )
+            mujoco.mj_forward(model, data)
+            object_position = np.asarray(data.xpos[body_id], dtype=float)
+            object_rotation = np.asarray(data.xmat[body_id], dtype=float).reshape(3, 3)
+            observed_position = reference_rotation.T @ (
+                object_position - reference_position
+            )
+            observed_rotation = reference_rotation.T @ object_rotation
+            expected_position = np.asarray(
+                attachment.position_in_reference_m, dtype=float
+            )
+            expected_rotation = np.asarray(
+                attachment.rotation_in_reference, dtype=float
+            )
+            position_error = float(
+                np.linalg.norm(observed_position - expected_position)
+            )
+            rotation_delta = observed_rotation @ expected_rotation.T
+            orientation_error = math.acos(
+                float(np.clip((np.trace(rotation_delta) - 1.0) * 0.5, -1.0, 1.0))
+            )
+            if position_error > attachment_position_tolerance_m or (
+                orientation_error > attachment_orientation_tolerance_rad
+            ):
+                raise ToolUseJournalRuntimeError(
+                    "checkpoint attachment pose mismatch: "
+                    f"position_error={position_error:.6f} m, "
+                    f"orientation_error={orientation_error:.6f} rad"
+                )
+        if held_tool_id is not None and attachment is not None and (
+            held_tool_id != attachment.object_id
+        ):
+            raise ToolUseJournalRuntimeError(
+                "checkpoint held tool disagrees with attached object"
+            )
+        if held_tool_id is not None and attachment is None:
+            if self._active_ee != "2F" or not grasp_engaged:
+                raise ToolUseJournalRuntimeError(
+                    "checkpoint contact-friction hold requires an engaged 2F gripper"
+                )
+            contact = self.object_contact_metrics(held_tool_id)
+            groups = set(contact.contact_groups)
+            left_contact = any(group.startswith("left_finger") for group in groups)
+            right_contact = any(group.startswith("right_finger") for group in groups)
+            if contact.contact_count < 2 or not (left_contact and right_contact):
+                raise ToolUseJournalRuntimeError(
+                    "checkpoint contact-friction hold lacks bilateral finger contact: "
+                    f"count={contact.contact_count}, groups={sorted(groups)}"
+                )
+
+        self._gripper_command = command
+        self._grasp_engaged = bool(grasp_engaged)
+        self._captured_gripper_action = captured.copy() if captured is not None else None
+        self._attachment = attachment
+        self._held_tool_id = held_tool_id
+        self._contact_friction_retention = None
+        self._last_attachment_break = None
+        self._breakable_runtime = (
+            _BreakableAttachmentRuntime()
+            if attachment is not None
+            and attachment.mode is AttachmentMode.BREAKABLE_WELD
+            else None
+        )
+        if attachment is not None and attachment.mode is AttachmentMode.KINEMATIC:
+            self.synchronize_attached_object()
+        elif held_tool_id is not None:
+            from tuj.m5_motion.physical_grasp import (
+                ContactFrictionRetentionMonitor,
+            )
+            from tuj.m5_motion.profiles import PhysicalGraspProfile
+
+            self._contact_friction_retention = (
+                ContactFrictionRetentionMonitor.from_runtime(
+                    self,
+                    held_tool_id,
+                    PhysicalGraspProfile(),
+                )
+            )
+
     def synchronize_attached_object(self) -> None:
         """Project the attached object's free joint onto the grasp transform."""
 
@@ -1841,6 +2022,7 @@ class ToolUseJournalEERuntime:
             qvel_start = int(model.jnt_dofadr[joint_id])
             data.qvel[qvel_start : qvel_start + 6] = 0.0
         self._attachment = None
+        self._captured_gripper_action = None
         if self._held_tool_id == attachment.object_id:
             self._held_tool_id = None
         self._breakable_runtime = None
@@ -1870,6 +2052,11 @@ class ToolUseJournalEERuntime:
             raise ToolUseJournalRuntimeError(
                 f"cannot exchange EE while object "
                 f"{self._attachment.object_id!r} is attached"
+            )
+        if self._held_tool_id is not None:
+            raise ToolUseJournalRuntimeError(
+                f"cannot exchange EE while tool {self._held_tool_id!r} is "
+                "held by contact friction"
             )
 
         if self._held_tool_id is not None:
@@ -1934,6 +2121,7 @@ class ToolUseJournalEERuntime:
         self._active_ee = to_ee
         self._gripper_command = -1.0
         self._grasp_engaged = False
+        self._captured_gripper_action = None
         self._hidden_rack_ee = hidden
         transition = EERuntimeTransition(
             from_ee=previous,
@@ -2421,9 +2609,23 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             else set()
         )
         if context.metadata.get("attachment_proxy") == "CONTACT_FRICTION":
-            retention = getattr(self.runtime, "scripted_grasp_retention", None)
-            if retention is not None and self.runtime.held_tool_id == retention.entry.object_id:
-                actual_objects = {retention.entry.object_id}
+            held_object_id = self.runtime.held_tool_id
+            scripted_retention = getattr(
+                self.runtime, "scripted_grasp_retention", None
+            )
+            scripted_object_id = getattr(
+                getattr(scripted_retention, "entry", None), "object_id", None
+            )
+            contact_retention = getattr(
+                self.runtime, "_contact_friction_retention", None
+            )
+            contact_object_id = getattr(contact_retention, "object_id", None)
+            if (
+                not actual_objects
+                and held_object_id is not None
+                and held_object_id in {scripted_object_id, contact_object_id}
+            ):
+                actual_objects = {held_object_id}
         if expected_objects != actual_objects:
             raise ToolUseJournalRuntimeError(
                 f"{label} expects attached objects {sorted(expected_objects)}, "
@@ -2862,6 +3064,10 @@ class ToolUseJournalControllerTrajectoryPlayer(
         gripper_slice = split_indexes.get("right_gripper")
         if gripper_slice is not None:
             gripper_start, gripper_end = gripper_slice
+            if self.runtime._captured_gripper_action is not None:
+                robot.gripper["right"].current_action = self.runtime._captured_gripper_action.copy()
+                action[gripper_start:gripper_end] = 0.0
+                return action
             command = float(self.runtime.gripper_command)
             if command == 0.0:
                 self._gripper_rate_credit = 0.0
@@ -2940,7 +3146,13 @@ class ToolUseJournalControllerTrajectoryPlayer(
         final_settle_ticks: int = 25,
         allow_wider_discrete_state: bool = False,
     ) -> float:
-        """Pre-shape 2F to a metric aperture independent of actuator gain."""
+        """Pre-shape 2F to a metric aperture independent of actuator gain.
+
+        The public Robotiq policy input can expose coarse adjacent aperture
+        states.  When the requested metric value lies between them, select the
+        immediately wider state instead of the narrower one.  A wider pre-shape
+        preserves object clearance; the later close event still forms contact.
+        """
 
         if (
             not math.isfinite(target_aperture_m)
@@ -3018,7 +3230,11 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     self._advance_controller(action)
                 aperture_m = self.runtime.fingerpad_separation_m()
                 if aperture_m < target_aperture_m - tolerance_m:
-                    raise ToolUseJournalRuntimeError("2F safe wider aperture quantization failed")
+                    raise ToolUseJournalRuntimeError(
+                        "2F safe wider aperture quantization failed: "
+                        f"target={target_aperture_m:.6f}, actual={aperture_m:.6f}, "
+                        f"tolerance={tolerance_m:.6f}"
+                    )
                 break
             # Exercise the public GRIP input for exactly one policy tick. This
             # preserves the Robotiq85 underactuated joint path instead of
@@ -3050,6 +3266,9 @@ class ToolUseJournalControllerTrajectoryPlayer(
         if retention is not None:
             action = retention.before_tick(action)
         env = self.runtime.env
+        contact_retention = getattr(
+            self.runtime, "_contact_friction_retention", None
+        )
         model, data = _raw_model_data(env)
         try:
             control_timestep = float(env.control_timestep)  # type: ignore[attr-defined]
@@ -3098,6 +3317,8 @@ class ToolUseJournalControllerTrajectoryPlayer(
         # Use MuJoCo time as the source of truth across EE topology swaps.
         if retention is not None:
             retention.after_tick(float(data.time))
+        if contact_retention is not None:
+            contact_retention.after_tick(float(data.time))
         if getattr(self.runtime, "scripted_render", False):
             self.runtime.render()
         factor = getattr(self.runtime, "scripted_realtime_factor", 0.)

@@ -281,15 +281,30 @@ class _CollisionChecker:
         return _CollisionResult(valid=True)
 
 
+class _ForwardKinematics:
+    def __init__(self, pose: Pose) -> None:
+        self.pose = pose
+
+    def forward_pose_world(self, joint_positions_rad):
+        assert len(joint_positions_rad) == 6
+        return self.pose.position_m, self.pose.orientation_xyzw
+
+
 def _planner(
     root: Path,
     *,
     checker: _CollisionChecker | None = None,
+    forward_pose: Pose | None = None,
 ) -> tuple[PrecomputedEEAttachPlanner, _CollisionChecker]:
     selected_checker = checker or _CollisionChecker()
     return (
         PrecomputedEEAttachPlanner(
             PrecomputedEEAttachRegistry(root),
+            forward_kinematics=(
+                _ForwardKinematics(forward_pose)
+                if forward_pose is not None
+                else None
+            ),
             joint_position_limits_rad=[(-6.3, 6.3)] * 6,
             log=lambda _: None,
         ),
@@ -483,7 +498,9 @@ def test_portable_path_rebases_poses_and_revalidates_current_scene(
         )
         for key, value in source_contexts.items()
     }
-    planner, checker = _planner(tmp_path)
+    planner, checker = _planner(
+        tmp_path, forward_pose=request.world.robot_state.eef_pose
+    )
 
     plan = planner.plan(
         request,
@@ -519,7 +536,9 @@ def test_portable_path_rejects_changed_rack_relative_geometry(
     request = source_request.model_copy(deep=True)
     request.world = _translate_world(request.world, (2.5, -3.2, 0.12))
     request.world.rack["2F"]["dock_pose"]["position_m"][0] += 0.001
-    planner, checker = _planner(tmp_path)
+    planner, checker = _planner(
+        tmp_path, forward_pose=request.world.robot_state.eef_pose
+    )
 
     with pytest.raises(PrecomputedEEPathError) as captured:
         planner.plan(
@@ -532,6 +551,36 @@ def test_portable_path_rejects_changed_rack_relative_geometry(
         captured.value.failure_code
         is EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH
     )
+
+
+def test_portable_path_rejects_rack_motion_without_matching_robot_fk(
+    tmp_path: Path,
+) -> None:
+    source_request = _request("2F")
+    contexts = _contexts("2F")
+    template = _make_portable(
+        _template(source_request, contexts), source_request.world
+    )
+    _write_shared_template(tmp_path, template)
+    request = source_request.model_copy(deep=True)
+    request.world = _translate_world(request.world, (2.5, -3.2, 0.12))
+    planner, checker = _planner(
+        tmp_path,
+        forward_pose=source_request.world.robot_state.eef_pose,
+    )
+
+    with pytest.raises(PrecomputedEEPathError) as captured:
+        planner.plan(
+            request,
+            collision_contexts=contexts,
+            collision_checker=checker,
+        )
+
+    assert (
+        captured.value.failure_code
+        is EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH
+    )
+    assert "robot-to-rack start position error" in captured.value.detail
 
 
 def test_start_joint_mismatch_is_fail_closed(tmp_path: Path) -> None:

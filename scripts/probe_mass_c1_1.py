@@ -83,7 +83,7 @@ def main():
         os.environ["MUJOCO_GL"] = "wgl"
     import environments  # noqa: F401
     import robosuite as suite
-    from tuj.m3_grounding import evaluate_ee
+    from tuj.m1_scene.ee_rules import evaluate_ee
 
     cache_p = OUT / "m3_intrinsic.json"
     est_cache = json.loads(cache_p.read_text(encoding="utf-8")) if cache_p.exists() else {}

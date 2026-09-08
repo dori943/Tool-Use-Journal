@@ -38,6 +38,7 @@ from tuj.m5_motion.closed_loop_contact import (
     ContactStepRunner,
 )
 from tuj.m5_motion.contact_evaluation import (
+    AboveRegionEvaluator,
     CompositeGoalEvaluator,
     GraspRetentionEvaluator,
     RegionContainmentEvaluator,
@@ -46,6 +47,17 @@ from tuj.m5_motion.contact_evaluation import (
     ToolClearanceEvaluator,
 )
 from tuj.m5_motion.geometry import RelativePoseResolver
+from tuj.m5_motion.grasp_geometry import (
+    GraspGeometryBinder,
+    OpposedContactSpec,
+    TWO_FINGER_OPPOSED_CONTACT,
+    SupportClearanceContext,
+    TwoFingerOpposedContactBinder,
+    annotate_support_clearance,
+    bind_grasp_geometry,
+    opposed_contact_spec,
+    support_clearance_context,
+)
 from tuj.m5_motion.kinematics import (
     IKResult,
     IKSolutionSet,
@@ -99,10 +111,24 @@ from tuj.m5_motion.path_planning import (
 from tuj.m5_motion.profiles import (
     ContactExecutionProfile,
     GraspExecutionProfile,
+    GraspForceProfile,
+    GraspStabilizationProfile,
+    GraspValidationProfile,
+    GripperPreshapeProfile,
+    PhysicalGraspProfile,
     PushPlanningProfile,
     RobotControlProfile,
     TaskRecoveryProfile,
     ToolAffordanceProfile,
+)
+from tuj.m5_motion.physical_grasp import (
+    ContactFrictionKeyframeProvider,
+    GraspExecutionMode,
+    PhysicalGraspControllerTrajectoryPlayer,
+    PhysicalGraspMonitor,
+    RetargetedAcquireKeyframeProvider,
+    uses_contact_friction,
+    with_contact_friction_grasp,
 )
 from tuj.m5_motion.push_to_region import (
     ContactPoseResolver,
@@ -115,6 +141,7 @@ from tuj.m5_motion.push_to_region import (
     push_to_region_geometry,
     reduced_contact_step_distance,
     target_fully_inside_region,
+    target_above_region,
 )
 from tuj.m5_motion.safety import KinematicSafetyValidator
 from tuj.m5_motion.selected_plan_adapter import (
@@ -137,6 +164,13 @@ from tuj.m5_motion.recovery import (
     RecoveryExecutionResult,
     RecoveryOrchestrator,
 )
+from tuj.m5_motion.runtime_checkpoint import (
+    RuntimeCheckpointError,
+    RuntimeCheckpointRestore,
+    capture_runtime_checkpoint,
+    restore_runtime_checkpoint,
+    save_runtime_checkpoint,
+)
 from tuj.m5_motion.strategy import (
     FirstFeasibleBranchSelector,
     InterpolatingEdgePlanner,
@@ -152,6 +186,7 @@ from tuj.m5_motion.tool_use_journal import (
     ToolUseJournalEnvironmentAdapter,
     make_tool_use_journal_env,
     registered_tool_use_journal_environments,
+    settle_tool_use_journal_free_objects,
 )
 from tuj.m5_motion.tool_affordance import (
     CircularPlateAffordanceProvider,
@@ -198,6 +233,7 @@ from tuj.m5_motion.vlm_provider import (
 )
 
 __all__ = [
+    "AboveRegionEvaluator",
     "AttachmentBreakObservation",
     "AttachmentContactMetrics",
     "AttachmentMode",
@@ -244,13 +280,24 @@ __all__ = [
     "GoalEvaluationStatus",
     "GroundedMotionGoalEvaluator",
     "GraspExecutionProfile",
+    "GraspExecutionMode",
+    "GraspForceProfile",
+    "GraspGeometryBinder",
+    "OpposedContactSpec",
     "GraspRetentionEvaluator",
+    "GraspStabilizationProfile",
+    "GraspValidationProfile",
+    "GripperPreshapeProfile",
     "MissingOpenAIAPIKeyError",
     "MotionPlanBuilder",
     "MotionPlanStore",
     "MotionPlanningPipeline",
     "MotionPlanningPipelineError",
     "MotionPlanningResult",
+    "PhysicalGraspControllerTrajectoryPlayer",
+    "PhysicalGraspMonitor",
+    "RetargetedAcquireKeyframeProvider",
+    "PhysicalGraspProfile",
     "PrecomputedEEAttachPlanner",
     "PrecomputedEEAttachRegistry",
     "PrecomputedEEPathError",
@@ -269,6 +316,8 @@ __all__ = [
     "RecoveryExecutionError",
     "RecoveryExecutionResult",
     "RecoveryOrchestrator",
+    "RuntimeCheckpointError",
+    "RuntimeCheckpointRestore",
     "RoutedKeyframeStrategyProvider",
     "RobotControlProfile",
     "CartesianEdgePlanner",
@@ -290,6 +339,8 @@ __all__ = [
     "SupportStabilityEvaluator",
     "TaskAwareGoalEvaluator",
     "TaskRecoveryProfile",
+    "TWO_FINGER_OPPOSED_CONTACT",
+    "SupportClearanceContext",
     "selected_plan_to_motion_requests",
     "ToolUseJournalCollisionModelCompiler",
     "ToolUseJournalCollisionBindingError",
@@ -303,23 +354,36 @@ __all__ = [
     "ToolUseJournalMotionRequestPlanner",
     "ToolUseJournalRuntimeError",
     "ToolUseJournalAttachmentBroken",
+    "TwoFingerOpposedContactBinder",
     "ToolAffordanceError",
     "ToolAffordanceProvider",
     "ToolAffordanceProfile",
     "ToolClearanceEvaluator",
+    "ContactFrictionKeyframeProvider",
     "UR5eKinematics",
     "WorkcellModelCompilationError",
     "WorkcellMotionRequestRouter",
     "attached_object_transform_from_state",
+    "annotate_support_clearance",
+    "bind_grasp_geometry",
+    "capture_runtime_checkpoint",
     "cleanup_target_ids",
     "default_model_path",
     "deterministic_shortcut",
     "make_tool_use_journal_env",
     "registered_tool_use_journal_environments",
+    "settle_tool_use_journal_free_objects",
     "order_targets_around_region",
     "push_to_region_geometry",
     "reduced_contact_step_distance",
+    "restore_runtime_checkpoint",
+    "save_runtime_checkpoint",
     "select_contact_patch",
+    "target_above_region",
     "target_fully_inside_region",
+    "opposed_contact_spec",
+    "support_clearance_context",
     "tool_use_journal_joint_position_controller_config",
+    "uses_contact_friction",
+    "with_contact_friction_grasp",
 ]

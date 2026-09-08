@@ -310,6 +310,7 @@ def validate_portable_start_pose(
     world: WorldSnapshot,
     template: object,
     *,
+    forward_kinematics: "ForwardKinematics",
     position_tolerance_m: float = PORTABLE_START_POSITION_TOLERANCE_M,
     orientation_tolerance_rad: float = PORTABLE_START_ORIENTATION_TOLERANCE_RAD,
 ) -> None:
@@ -317,9 +318,24 @@ def validate_portable_start_pose(
 
     validate_portable_rack(world, template)
     stored_eef = getattr(template, "start_eef_pose", None)
-    current_eef = world.robot_state.eef_pose
-    if stored_eef is None or current_eef is None:
-        raise ValueError("stored and current canonical EEF poses are required")
+    if stored_eef is None:
+        raise ValueError("stored canonical EEF pose is required")
+    start_joints = getattr(template, "start_joint_positions_rad", None)
+    if not isinstance(start_joints, Sequence):
+        raise ValueError("stored canonical joint state is required")
+    try:
+        current_position, current_orientation = (
+            forward_kinematics.forward_pose_world(start_joints)
+        )
+        current_eef = Pose(
+            frame_id="world",
+            position_m=tuple(float(value) for value in current_position),
+            orientation_xyzw=tuple(float(value) for value in current_orientation),
+        )
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "current model could not evaluate the stored canonical joint state"
+        ) from error
     metadata = getattr(template, "metadata")
     try:
         stored_reference = Pose.model_validate(
@@ -744,6 +760,12 @@ class CollisionChecker(Protocol):
     ) -> Any: ...
 
 
+class ForwardKinematics(Protocol):
+    def forward_pose_world(
+        self, joint_positions_rad: Sequence[float]
+    ) -> tuple[Sequence[float], Sequence[float]]: ...
+
+
 def _dense_joint_path(
     waypoints: Sequence[TrajectoryWaypoint],
     max_joint_step_rad: float,
@@ -773,6 +795,7 @@ class PrecomputedEEAttachPlanner:
         self,
         registry: PrecomputedEEAttachRegistry,
         *,
+        forward_kinematics: ForwardKinematics | None = None,
         start_tolerance_rad: float = 0.01,
         joint_position_limits_rad: Sequence[tuple[float, float]] | None = None,
         log: LogSink = print,
@@ -780,6 +803,7 @@ class PrecomputedEEAttachPlanner:
         if not math.isfinite(start_tolerance_rad) or start_tolerance_rad < 0:
             raise ValueError("start_tolerance_rad must be finite and non-negative")
         self.registry = registry
+        self.forward_kinematics = forward_kinematics
         self.start_tolerance_rad = start_tolerance_rad
         self.joint_position_limits_rad = (
             tuple(joint_position_limits_rad)
@@ -853,7 +877,16 @@ class PrecomputedEEAttachPlanner:
             )
         if is_cross_environment_ee_path(template, request.world):
             try:
-                validate_portable_start_pose(request.world, template)
+                if self.forward_kinematics is None:
+                    raise ValueError(
+                        "cross-environment trajectory validation requires "
+                        "current-model forward kinematics"
+                    )
+                validate_portable_start_pose(
+                    request.world,
+                    template,
+                    forward_kinematics=self.forward_kinematics,
+                )
             except ValueError as error:
                 raise self._failure(
                     EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH,

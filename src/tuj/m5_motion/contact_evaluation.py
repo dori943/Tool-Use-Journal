@@ -13,12 +13,16 @@ from tuj.m5_motion.execution import (
     GoalEvaluator,
     GroundedMotionGoalEvaluator,
 )
-from tuj.m5_motion.push_to_region import target_fully_inside_region
+from tuj.m5_motion.push_to_region import (
+    target_above_region,
+    target_fully_inside_region,
+)
 from tuj.m5_motion.schema import ExecutionReport, MotionPlanRequest, WorldSnapshot
 from tuj.m5_motion.task_semantics import (
     is_acquire_task,
     is_ee_exchange_task,
     is_release_task,
+    task_operation,
 )
 
 
@@ -41,10 +45,18 @@ def _result(
 class RegionContainmentEvaluator:
     """Require every grounded target footprint to fit inside its region."""
 
-    def __init__(self, *, inset_margin_m: float = 0.0) -> None:
+    def __init__(
+        self,
+        *,
+        inset_margin_m: float = 0.0,
+        include_vertical: bool = False,
+        require_interior_geometry: bool = False,
+    ) -> None:
         if inset_margin_m < 0.0:
             raise ValueError("inset margin must be non-negative")
         self._inset = inset_margin_m
+        self._include_vertical = include_vertical
+        self._require_interior_geometry = require_interior_geometry
 
     def evaluate(
         self,
@@ -67,8 +79,41 @@ class RegionContainmentEvaluator:
                 GoalEvaluationStatus.UNKNOWN,
                 "observed world is unavailable",
             )
+        if self._require_interior_geometry:
+            region_record = observed_world.objects.get(region_id)
+            packing_metadata = (
+                region_record.get("packing_metadata")
+                if isinstance(region_record, Mapping)
+                else None
+            )
+            interior_dimensions = np.asarray(
+                packing_metadata.get("interior_dimensions_m")
+                if isinstance(packing_metadata, Mapping)
+                else None,
+                dtype=float,
+            )
+            interior_center = np.asarray(
+                packing_metadata.get("interior_center_m")
+                if isinstance(packing_metadata, Mapping)
+                else None,
+                dtype=float,
+            )
+            if not (
+                interior_dimensions.shape == (3,)
+                and interior_center.shape == (3,)
+                and np.all(np.isfinite(interior_dimensions))
+                and np.all(interior_dimensions > 0.0)
+                and np.all(np.isfinite(interior_center))
+            ):
+                return _result(
+                    request,
+                    GoalEvaluationStatus.UNKNOWN,
+                    "container interior geometry is unavailable",
+                    observed={"region_id": region_id, "include_vertical": True},
+                )
         inside: list[str] = []
         errors: dict[str, str] = {}
+        outside: list[str] = []
         for target_id in targets:
             try:
                 if target_fully_inside_region(
@@ -76,25 +121,92 @@ class RegionContainmentEvaluator:
                     target_id=target_id,
                     region_id=region_id,
                     inset_margin_m=self._inset,
+                    include_vertical=self._include_vertical,
                 ):
                     inside.append(target_id)
+                else:
+                    outside.append(target_id)
             except ValueError as error:
                 errors[target_id] = str(error)
-        satisfied = len(inside) == len(targets) and not errors
+        if outside:
+            status = GoalEvaluationStatus.FAILED
+            detail = "one or more target footprints are outside the goal region"
+        elif errors:
+            status = GoalEvaluationStatus.UNKNOWN
+            detail = "region containment geometry is unavailable"
+        else:
+            status = GoalEvaluationStatus.SATISFIED
+            detail = "all target footprints are inside the goal region"
         return _result(
             request,
-            GoalEvaluationStatus.SATISFIED if satisfied else GoalEvaluationStatus.FAILED,
-            (
-                "all target footprints are inside the goal region"
-                if satisfied
-                else "one or more target footprints are outside the goal region"
-            ),
+            status,
+            detail,
             observed={
                 "region_id": region_id,
                 "inside_target_ids": inside,
-                "outside_target_ids": [target for target in targets if target not in inside],
+                "outside_target_ids": outside,
                 "geometry_errors": errors,
                 "inset_margin_m": self._inset,
+                "include_vertical": self._include_vertical,
+            },
+        )
+
+
+class AboveRegionEvaluator:
+    """Require each transported target to be horizontally over a region."""
+
+    def __init__(
+        self,
+        *,
+        horizontal_tolerance_m: float = 0.0,
+        vertical_tolerance_m: float = 0.01,
+    ) -> None:
+        if horizontal_tolerance_m < 0.0 or vertical_tolerance_m < 0.0:
+            raise ValueError("above-region tolerances must be non-negative")
+        self._horizontal = horizontal_tolerance_m
+        self._vertical = vertical_tolerance_m
+
+    def evaluate(
+        self,
+        request: MotionPlanRequest,
+        report: ExecutionReport,
+        observed_world: WorldSnapshot | None,
+    ) -> GoalEvaluation:
+        del report
+        region_id = request.task.goal.target_region_id
+        targets = list(request.task.target_ids)
+        if not region_id or not targets or observed_world is None:
+            return _result(
+                request,
+                GoalEvaluationStatus.UNKNOWN,
+                "above-region evaluation requires observed targets and region",
+            )
+        above: list[str] = []
+        errors: dict[str, str] = {}
+        for target_id in targets:
+            try:
+                if target_above_region(
+                    observed_world,
+                    target_id=target_id,
+                    region_id=region_id,
+                    horizontal_tolerance_m=self._horizontal,
+                    vertical_tolerance_m=self._vertical,
+                ):
+                    above.append(target_id)
+            except ValueError as error:
+                errors[target_id] = str(error)
+        satisfied = len(above) == len(targets) and not errors
+        return _result(
+            request,
+            GoalEvaluationStatus.SATISFIED if satisfied else GoalEvaluationStatus.FAILED,
+            "all targets are above the goal region"
+            if satisfied
+            else "one or more targets are not above the goal region",
+            observed={
+                "region_id": region_id,
+                "above_target_ids": above,
+                "not_above_target_ids": [item for item in targets if item not in above],
+                "geometry_errors": errors,
             },
         )
 
@@ -189,7 +301,11 @@ class GraspRetentionEvaluator:
                 observed=dict(validation),
             )
         state = report.final_robot_state
-        expected = request.task.tool
+        expected = (
+            request.task.goal.target_object_id
+            or next(iter(request.task.target_ids), None)
+            or request.task.tool
+        )
         if state is None or expected is None:
             return _result(
                 request,
@@ -301,6 +417,12 @@ class TaskAwareGoalEvaluator:
             joint_tolerance_rad=joint_tolerance_rad
         )
         self._region = RegionContainmentEvaluator()
+        self._container_region = RegionContainmentEvaluator(
+            include_vertical=True,
+            require_interior_geometry=True,
+        )
+        self._above_region = AboveRegionEvaluator()
+        self._grasp = GraspRetentionEvaluator()
 
     def evaluate(
         self,
@@ -309,22 +431,87 @@ class TaskAwareGoalEvaluator:
         observed_world: WorldSnapshot | None,
     ) -> GoalEvaluation:
         task = request.task
+        if is_acquire_task(task):
+            from tuj.m5_motion.physical_grasp import uses_contact_friction
+
+            if uses_contact_friction(request):
+                return self._grasp.evaluate(request, report, observed_world)
         is_resource_transition = (
             is_acquire_task(task)
             or is_release_task(task)
             or is_ee_exchange_task(task)
         )
+        operation = task_operation(task)
+        region_record = request.world.objects.get(task.goal.target_region_id or "")
+        packing_metadata = (
+            region_record.get("packing_metadata")
+            if isinstance(region_record, Mapping)
+            else None
+        )
+        region_evaluator = (
+            self._container_region
+            if isinstance(packing_metadata, Mapping)
+            and str(packing_metadata.get("kind", "")).upper() == "CONTAINER"
+            else self._region
+        )
+        if (
+            operation == "TRANSPORT"
+            and task.goal.target_region_id is not None
+            and task.goal.target_region_id in request.world.objects
+            and bool(task.target_ids)
+        ):
+            held_target = request.world.robot_state.held_tool_id
+            if held_target is not None and held_target in task.target_ids:
+                return CompositeGoalEvaluator(
+                    (self._above_region, self._grasp)
+                ).evaluate(request, report, observed_world)
+            return self._above_region.evaluate(request, report, observed_world)
+        if (
+            is_release_task(task)
+            and task.goal.target_region_id is not None
+            and task.goal.target_region_id in request.world.objects
+            and bool(task.target_ids)
+        ):
+            target = task.goal.target_object_id or task.target_ids[0]
+            state = report.final_robot_state
+            if state is None:
+                return _result(
+                    request,
+                    GoalEvaluationStatus.UNKNOWN,
+                    "release execution did not produce a final robot state",
+                )
+            if state.attached_object_id == target:
+                return _result(
+                    request,
+                    GoalEvaluationStatus.FAILED,
+                    f"placed object {target!r} is still attached",
+                    observed={"attached_object_id": state.attached_object_id},
+                )
+            return region_evaluator.evaluate(request, report, observed_world)
         if (
             not is_resource_transition
             and task.goal.target_region_id is not None
             and task.goal.target_region_id in request.world.objects
             and bool(task.target_ids)
+            and (
+                task.contact is not None
+                or operation
+                in {
+                    "PUSH",
+                    "PUSH_TO_REGION",
+                    "SWEEP",
+                    "REGROUP",
+                    "CLEANUP",
+                    "TOOL_ACT",
+                }
+            )
         ):
-            return self._region.evaluate(request, report, observed_world)
+            return region_evaluator.evaluate(request, report, observed_world)
         return self._state.evaluate(request, report, observed_world)
 
 
 __all__ = [
+    "AboveRegionEvaluator",
     "CompositeGoalEvaluator",
     "GraspRetentionEvaluator",
     "RegionContainmentEvaluator",

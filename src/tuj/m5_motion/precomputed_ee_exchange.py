@@ -592,7 +592,18 @@ class PrecomputedEEExchangePlanner:
             )
         if is_cross_environment_ee_path(template, request.world):
             try:
-                validate_portable_start_pose(request.world, template)
+                if self.attach_planner.forward_kinematics is None:
+                    raise ValueError(
+                        "cross-environment trajectory validation requires "
+                        "current-model forward kinematics"
+                    )
+                validate_portable_start_pose(
+                    request.world,
+                    template,
+                    forward_kinematics=(
+                        self.attach_planner.forward_kinematics
+                    ),
+                )
             except ValueError as error:
                 raise self._failure(
                     EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH,

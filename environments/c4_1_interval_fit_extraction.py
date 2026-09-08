@@ -24,6 +24,7 @@ from environments.ee_rack import add_ee_rack
 from environments.kitchen_base import KitchenBase
 from environments.objects import CuttingBoardObject, KnifeObject, SpatulaObject
 from environments.robot_pedestal import add_robot_pedestal, remove_robot_pedestal
+from environments.task_camera import add_standard_task_camera
 
 
 ROBOT_SPEC_PATH = Path(__file__).resolve().parents[1] / "configs" / "robot_spec.json"
@@ -324,6 +325,13 @@ class C4_1_IntervalFitExtraction(KitchenBase):
         self._bind_procedural_material_gt()
 
         self._apply_island_layout()
+
+        self._standard_camera = add_standard_task_camera(
+            self.model,
+            robot_base_xy=self._robot_base_xy,
+            robot_base_yaw_rad=self._robot_base_yaw,
+            surface_z=self._island_surface_z,
+        )
 
     def _bind_procedural_material_gt(self):
         """Bind all procedural BoxObject GT values to final MJCF <custom>."""

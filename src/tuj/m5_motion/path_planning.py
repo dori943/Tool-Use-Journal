@@ -14,6 +14,7 @@ from typing import Any, Protocol, Sequence
 
 import numpy as np
 
+from tuj.m5_motion.attachment_retarget import retarget_resolved_pose
 from tuj.m5_motion.geometry import RelativePoseResolver
 from tuj.m5_motion.schema import (
     KeyframePlannerType,
@@ -174,7 +175,11 @@ class CartesianEdgePlanner:
             start_position, start_orientation = (
                 self.kinematics.forward_pose_world(source)
             )
-            target_pose = RelativePoseResolver(self.world).resolve(target_keyframe)
+            target_pose = retarget_resolved_pose(
+                self.world,
+                target_keyframe,
+                RelativePoseResolver(self.world).resolve(target_keyframe),
+            )
         except Exception as error:  # noqa: BLE001 - kinematics backends vary
             return EdgePlanResult(
                 valid=False,
@@ -211,18 +216,57 @@ class CartesianEdgePlanner:
                     seed_qpos=previous,
                 )
                 valid_solutions = []
+                rejected: list[str] = []
                 for solution in solutions.solutions:
                     candidate = tuple(float(value) for value in solution.qpos)
-                    valid, _, _, _ = _state_report(
+                    valid, failure_code, detail, clearance = _state_report(
                         self.state_validator, candidate, target_keyframe
                     )
                     if valid:
                         valid_solutions.append(candidate)
+                    elif len(rejected) < 3:
+                        rejected.append(
+                            f"{solution.branch_id}: "
+                            f"{failure_code or 'STATE_INVALID'}: {detail}"
+                        )
+                    if clearance is not None:
+                        minimum = (
+                            clearance
+                            if minimum is None
+                            else min(minimum, clearance)
+                        )
                 if not valid_solutions:
+                    position_text = ", ".join(f"{value:.6f}" for value in position)
+                    if not solutions.solutions:
+                        failure_code = (
+                            "CARTESIAN_INTERMEDIATE_TARGET_OUTSIDE_REACH"
+                            if solutions.failure_code
+                            == "TARGET_OUTSIDE_CONSERVATIVE_REACH"
+                            else "CARTESIAN_INTERMEDIATE_IK_NON_CONVERGENCE"
+                        )
+                        reason = (
+                            f"solver={solutions.failure_code or 'UNKNOWN'}; "
+                            f"attempted_seeds={solutions.attempted_seeds}; "
+                            f"best_position_error_m="
+                            f"{solutions.best_position_error_m:.6g}; "
+                            f"best_orientation_error_rad="
+                            f"{solutions.best_orientation_error_rad:.6g}; "
+                            f"detail={solutions.detail}"
+                        )
+                    else:
+                        failure_code = "CARTESIAN_INTERMEDIATE_STATE_INVALID"
+                        reason = (
+                            f"raw_ik_count={len(solutions.solutions)}; "
+                            f"rejected={' | '.join(rejected)}"
+                        )
                     return EdgePlanResult(
                         valid=False,
-                        failure_code="CARTESIAN_INTERMEDIATE_IK_FAILED",
-                        detail=f"no valid IK at Cartesian sample {index}/{steps}",
+                        failure_code=failure_code,
+                        detail=(
+                            f"no valid continuation at Cartesian sample "
+                            f"{index}/{steps}; position_m=[{position_text}]; "
+                            f"{reason}"
+                        ),
                         min_clearance_m=minimum,
                     )
                 selected = min(

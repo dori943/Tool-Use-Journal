@@ -51,7 +51,7 @@ SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-STAGES = ("m1", "m2", "m3", "m4", "m5")
+STAGES = ("m1", "m2", "m4", "m5")
 
 # 태스크 id <-> 환경 이름은 단일 출처(task_registry)에서 가져온다.
 # (M5 가 환경을 다시 만들 때 등 robosuite import 없이 이름만 필요할 때 쓴다.)
@@ -148,6 +148,11 @@ def stage_m1(task, out, args):
                 (out / "m1_points.npz").write_bytes(npz.read_bytes())
             else:
                 print(f"[M1] 경고: {npz} 없음 — M3 접지가 점군을 찾지 못합니다.")
+            source_world = src.parent / "m1_world.json"
+            if source_world.exists():
+                (out / "m1_world.json").write_bytes(source_world.read_bytes())
+            else:
+                print(f"[M1] 경고: {source_world} 없음 — M5가 관측 당시 상태를 복원할 수 없습니다.")
         return
 
     seed_everything(args.seed)
@@ -158,13 +163,13 @@ def stage_m1(task, out, args):
     call_main(module, argv, "run_m1")
 
 
-def stage_m2(task, out, args, pass_no):
+def stage_m2(task, out, args):
     """scripts/run_m2.py — 서브골 분해(LLM).
 
     1차: m3.json 이 없어야 순수 분해가 된다. 2차: m3.json 을 읽어 측정 반영 + 분할.
     """
     m3 = out / "m3.json"
-    if pass_no == 1 and m3.exists():
+    if False and m3.exists():
         # 이전 실행의 응답이 남아 있으면 run_m2 가 그것을 이번 분해에 섞거나
         # 안전장치에 걸려 멈춘다. 1차는 항상 깨끗한 분해여야 한다.
         backup = out / "m3.prev.json"
@@ -183,6 +188,7 @@ def _gk_files(out):
 
 
 def stage_m3(task, out, args, label="M3"):
+    return stage_gk(task, out)
     """scripts/run_m3.py — 물리/기하 접지, m3.json + gk_<SG>.json 생성.
 
     반환: 이번 호출에서 새로 쓰인 gk 파일 목록 (이전 실행의 잔여 파일 배제용).
@@ -202,6 +208,13 @@ def stage_m3(task, out, args, label="M3"):
     if stale:
         print(f"[{label}] 이번 실행에서 갱신되지 않은 gk 파일: {stale}")
     return fresh
+
+
+def stage_gk(task, out):
+    """Assemble per-subgoal graphs from M1's integrated grounding and M2 output."""
+    module = load_script("assemble_gk")
+    call_main(module, [task], "assemble_gk")
+    return _gk_files(out)
 
 
 def _m2_plan_complete(out):
@@ -271,6 +284,14 @@ def stage_m4(task, out, args, gk_paths=None):
             "--output", str(out / "m4.json")]
     if args.initial_state:
         argv += ["--initial-state", str(args.initial_state)]
+    aliases = {}
+    for node in read_json(out / "m1.json").get("nodes", []):
+        canonical_id = node.get("canonical_id")
+        if isinstance(canonical_id, str) and canonical_id:
+            aliases[node["id"]] = canonical_id
+    alias_path = out / "id_aliases.json"
+    alias_path.write_text(json.dumps(aliases, indent=2), encoding="utf-8")
+    argv += ["--id-aliases", str(alias_path)]
     call_main(module, argv, "run_m4")
 
 
@@ -348,11 +369,7 @@ def run_m5_runner(module, argv, label, m5_dir):
 
 
 def stage_m5(task, out, args):
-    """M5 모션 계획.
-
-    기본은 태스크 비의존 범용 러너(run_m5.py). --m5-physical
-    이면 같은 러너의 물리 실행 모드(--physical)를 쓴다 — 태스크 전용 물리 예제
-    러너를 subprocess 로 띄운다(현재 c1_1 만 지원).
+    """태스크 비의존 M5 모션 계획.
 
     범용 러너는 --environment 로 환경을 다시 만들어 초기 WorldSnapshot 을 뜬다.
     같은 프로세스 안에서 M1 과 같은 시드를 다시 심어 배치를 맞춘다.
@@ -370,30 +387,30 @@ def stage_m5(task, out, args):
     env_name = args.m5_environment or TASK_ENV.get(task)
 
     seed_everything(args.seed)
-    if args.m5_physical:
-        module = load_script("run_m5")
-        argv = [task, "--physical",
-                "--task-planner", str(m4), "--output-dir", str(m5_dir)]
-        if args.m5_validate_only:
-            argv.append("--validate-input-only")
-        argv += args.m5_args
-        run_m5_runner(module, argv, "run_m5(physical)", m5_dir)
-    else:
-        if not env_name:
-            sys.exit(f"[err] {task!r} 의 환경 이름을 모릅니다 — "
-                     f"--m5-environment 로 지정하거나 TASK_ENV 에 등록하십시오.")
-        module = load_script("run_m5")
-        argv = ["--task-planner", str(m4),
-                "--environment", env_name,
-                "--output-dir", str(m5_dir),
-                "--seed", str(args.seed),
-                "--provider", os.environ["TUJ_LLM_PROVIDER"]]
-        if args.m5_validate_only:
-            argv.append("--validate-input-only")
-        elif args.m5_simulate:
-            argv += ["--simulate", args.m5_simulate, "--headless"]
-        argv += args.m5_args
-        run_m5_runner(module, argv, "run_m5", m5_dir)
+    if not env_name:
+        sys.exit(f"[err] {task!r} 의 환경 이름을 모릅니다 — "
+                 f"--m5-environment 로 지정하거나 TASK_ENV 에 등록하십시오.")
+    module = load_script("run_m5")
+    argv = ["--task-planner", str(m4),
+            "--environment", env_name,
+            "--output-dir", str(m5_dir),
+            "--seed", str(args.seed),
+            "--provider", os.environ["TUJ_LLM_PROVIDER"]]
+    m1_world = out / "m1_world.json"
+    if m1_world.exists():
+        argv += ["--initial-world", str(m1_world)]
+    m1_geometry = out / "m1.json"
+    id_aliases = out / "id_aliases.json"
+    if m1_geometry.exists():
+        argv += ["--scene-geometry", str(m1_geometry)]
+    if id_aliases.exists():
+        argv += ["--id-aliases", str(id_aliases)]
+    if args.m5_validate_only:
+        argv.append("--validate-input-only")
+    elif args.m5_simulate:
+        argv += ["--simulate", args.m5_simulate, "--headless"]
+    argv += args.m5_args
+    run_m5_runner(module, argv, "run_m5", m5_dir)
 
     summary = m5_dir / "m5_summary.json"
     if summary.exists():
@@ -450,8 +467,6 @@ def build_parser():
                    help="M5 를 입력 계약 검증만 수행 (OpenAI/MuJoCo 실행 없음)")
     p.add_argument("--m5-simulate", choices=("kinematic", "controller"),
                    default=None, help="M5 계획을 MuJoCo 로 헤드리스 재생")
-    p.add_argument("--m5-physical", action="store_true",
-                   help="물리 실행 모드 (태스크 전용 물리 예제 러너, 현재 c1_1)")
     p.add_argument("--m5-args", nargs=argparse.REMAINDER, default=[],
                    help="이 뒤의 인자는 M5 러너로 그대로 전달")
     p.add_argument("--view", action="store_true", help="M1 단계에서 뷰어 표시")
@@ -484,6 +499,38 @@ def _resolve_llm(args):
     print(f"[run] LLM provider={provider} model={args.model}")
 
 
+def _run_integrated(task, out, args, start, stop):
+    """M1 owns geometry and physical grounding; no M3 round-trip remains."""
+    gk_paths = None
+    if start <= 0:
+        banner("M1  Scene + Physical Grounding")
+        stage_m1(task, out, args)
+    if stop < 1:
+        return
+    if start <= 1:
+        banner("M2  Subgoal Decomposition")
+        stage_m2(task, out, args)
+    if stop < 2:
+        return
+    if start <= 2:
+        banner("G_k  Subgoal Graph Assembly")
+        gk_paths = stage_gk(task, out)
+    if stop < 2:
+        return
+    if args.skip_m4 or start > 2:
+        print("\n[M4] " + ("skipped" if args.skip_m4 else "using existing m4.json"))
+    else:
+        banner("M4  Task Planner")
+        stage_m4(task, out, args, gk_paths)
+    if stop < 3:
+        return
+    if args.skip_m5:
+        print("\n[M5] skipped")
+        return
+    banner("M5  Motion Planner")
+    stage_m5(task, out, args)
+
+
 def main():
     args = build_parser().parse_args()
     _resolve_llm(args)
@@ -497,6 +544,7 @@ def main():
     gk_paths = None
 
     print(f"[run] task={task} seed={args.seed} out={out}")
+    return _run_integrated(task, out, args, start, stop)
     print(f"[run] 단계: {' -> '.join(STAGES[start:stop + 1])}"
           + ("" if not args.no_roundtrip else "  (M2<->M3 왕복 생략)")
           + ("" if start == 0 else f"  (m1~{STAGES[start - 1]} 는 기존 산출물 재사용)"))
