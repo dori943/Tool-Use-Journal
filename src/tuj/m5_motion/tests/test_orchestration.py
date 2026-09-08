@@ -156,7 +156,7 @@ def _fake_planner(request):
     )
 
 
-def test_live_executor_state_replaces_prediction_before_function():
+def test_live_executor_state_replaces_prediction_before_function(tmp_path):
     observed = []
     def execute(request, plan):
         world = request.world.model_copy(deep=True)
@@ -174,14 +174,58 @@ def test_live_executor_state_replaces_prediction_before_function():
         world.robot_state.joint_positions_rad = [4.0]
         world.robot_state.attached_object_id = "part"
         return world
-    result = SelectedPlanMotionOrchestrator(_fake_planner,
-        request_handler=handler, plan_executor=execute).plan(_selected(),
+    result = SelectedPlanMotionOrchestrator(
+        _fake_planner,
+        store=MotionPlanStore(tmp_path),
+        request_handler=handler,
+        plan_executor=execute,
+    ).plan(_selected(),
         initial_world=_world(), constraints=MotionConstraints(joint_limits={
             "j1": JointDynamicLimit(max_velocity_rad_s=1., max_acceleration_rad_s2=2.)}))
     assert len(result.plans) == 2
+    assert len(result.handled_requests) == 1
+    assert result.handled_requests[0].task.subgoal_id == "pick-part"
+    assert result.handled_worlds[0].scene.signature.startswith("observed:")
+    assert len(result.step_request_ids) == 3
+    assert all(path.is_file() for path in result.handled_request_paths)
+    assert all(path.is_file() for path in result.handled_world_paths)
     assert result.final_world.robot_state.joint_positions_rad == [4.0]
     assert result.final_world.robot_state.attached_object_id == "part"
     assert result.final_world.scene.completed_subgoals == ["pick-part"]
+    restored = MotionPlanStore(tmp_path).load_manifest()
+    assert restored.handled_requests == result.handled_requests
+    assert restored.handled_worlds == result.handled_worlds
+    assert restored.step_request_ids == result.step_request_ids
+
+
+def test_stale_executor_signature_is_replaced_before_next_request() -> None:
+    seen_signatures: list[str] = []
+
+    def stale_executor(request, plan):
+        del plan
+        seen_signatures.append(request.world.scene.signature)
+        return request.world.model_copy(deep=True)
+
+    result = SelectedPlanMotionOrchestrator(
+        _fake_planner,
+        plan_executor=stale_executor,
+    ).plan(
+        _selected(),
+        initial_world=_world(),
+        constraints=MotionConstraints(
+            joint_limits={
+                "j1": JointDynamicLimit(
+                    max_velocity_rad_s=1.0,
+                    max_acceleration_rad_s2=2.0,
+                )
+            }
+        ),
+    )
+
+    assert len(seen_signatures) == 3
+    assert seen_signatures[1].startswith("observed:")
+    assert len(set(seen_signatures)) == len(seen_signatures)
+    assert result.final_world.scene.signature.startswith("observed:")
 
 
 def test_orchestrator_plans_transition_then_subgoal_and_persists(tmp_path) -> None:
