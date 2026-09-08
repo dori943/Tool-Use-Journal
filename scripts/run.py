@@ -190,7 +190,11 @@ def stage_m3(task, out, args, label="M3"):
     before = {p: p.stat().st_mtime for p in _gk_files(out)}
     module = load_script("run_m3")
     argv = [task, "--backend", args.backend, "--model", args.model,
-            "--memory", args.memory, "--output-dir", str(out)]
+        "--memory", args.memory,
+        "--output-dir", str(out),
+        "--m0-bbox-threshold", str(args.m0_bbox_threshold),
+        "--m0-density-threshold", str(args.m0_density_threshold),
+        "--retrieval-debug-label", label]
     call_main(module, argv, "run_m3")
     fresh = [p for p in _gk_files(out)
              if p not in before or p.stat().st_mtime > before[p]]
@@ -424,6 +428,10 @@ def build_parser():
                    help="LLM 제공자 (미지정 시 --model 접두어로 추론, 그래도 없으면 gemini)")
     p.add_argument("--memory", default=str(ROOT / "output" / "memory.json"),
                    help="M3 물성 메모리 경로 ('none' 이면 사용 안 함)")
+    p.add_argument("--m0-bbox-threshold", type=float, default=0.25,
+                   help="provisional bbox 최대 축 상대차 threshold")
+    p.add_argument("--m0-density-threshold", type=float, default=0.20,
+                   help="provisional density 상대차 threshold")
     p.add_argument("--robot-spec", default=str(ROOT / "configs" / "robot_spec.json"),
                    help="M4 로봇/EE 스펙")
     p.add_argument("--initial-state", default=None,

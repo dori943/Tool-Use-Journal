@@ -1,19 +1,7 @@
-"""M3 물성 메모리 — 객체별 intrinsic 추론을 에피소드 간 지속·재사용.
-
-원리: 물성(재질·질량·μ·치수)은 pose 불변 → 한 번 접지하면 재사용 가능.
-  · 조회는 노드 id 키 lookup (우리 스케일에선 이것이 곧 retrieval — 벡터 RAG 불요.
-    novel object 유사도 전이가 필요해지면 그때 시그니처 검색으로 확장)
-  · 병합 규칙: stage 높은 쪽 우선 (probe 2 > 재관측 1 > 시각 0), 같으면 최신
-  · 효과: 에피소드 반복 시 VLM 콜 → 0 수렴, M2/M4 컨텍스트에 컴팩트 요약만
-
-무효화 주의: 내용물이 변할 수 있는 객체(컨테이너류)는 관련 이벤트(붓기/담기)
-후 해당 엔트리를 invalidate() 할 것 — M6/실행 루프의 책임.
-"""
+"""Backward-compatible M3 facade over the unified M0 memory store."""
 from __future__ import annotations
 
-import json
-from datetime import datetime, timezone
-from pathlib import Path
+from tuj.m0_memory.object_knowledge import ObjectKnowledgeManager, entry_to_props
 
 
 def _stage(props: dict) -> int:
@@ -22,46 +10,54 @@ def _stage(props: dict) -> int:
                int(props.get("mu", {}).get("stage", 0)))
 
 
-class PropertyMemory:
-    """{node_id: {"props": intrinsic dict, "stage", "episodes_seen", "updated_at"}}"""
+class PropertyMemory(ObjectKnowledgeManager):
+    """Retain the production API while persisting unified Object Knowledge."""
 
-    def __init__(self, path):
-        self.path = Path(path)
-        self.data: dict = {}
-        if self.path.exists():
-            self.data = json.loads(self.path.read_text(encoding="utf-8")).get("objects", {})
+    def __init__(self, path, *, task_id=None, source_episode=None,
+                 bbox_relative_threshold=0.25, density_relative_threshold=0.20):
+        super().__init__(path, bbox_relative_threshold=bbox_relative_threshold,
+                         density_relative_threshold=density_relative_threshold)
+        self.task_id = task_id
+        self.source_episode = source_episode
 
-    def lookup(self, node_id: str) -> dict | None:
-        e = self.data.get(node_id)
-        return dict(e["props"]) if e and not e.get("stale") else None
+    def lookup(self, node_id: str, task_id=None) -> dict | None:
+        query_task = self.task_id if task_id is None else task_id
+        if query_task is not None:
+            entry, _, _ = self.lookup_exact(query_task, node_id)
+            return entry_to_props(entry) if entry is not None else None
+        matches = [entry for entry in self.objects.values()
+                   if entry.get("identity", {}).get("object_id") == node_id
+                   and not entry.get("metadata", {}).get("stale")]
+        return entry_to_props(matches[0]) if len(matches) == 1 else None
 
-    def update(self, cache: dict, source: str = "m3") -> dict:
+    def update(self, cache: dict, source: str = "m3", *, task_id=None,
+               source_episode=None) -> dict:
         """런 종료 시 캐시 병합. → {"hits": 재사용됐던 수, "new": 신규, "upgraded": 승격}"""
         stats = {"new": 0, "upgraded": 0, "kept": 0}
-        now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-        for nid, props in cache.items():
-            props = {k: v for k, v in props.items() if not k.startswith("_")}
-            old = self.data.get(nid)
+        query_task = self.task_id if task_id is None else task_id
+        if query_task is None:
+            raise ValueError("task_id is required to update unified Object Knowledge")
+        episode = self.source_episode if source_episode is None else source_episode
+        for nid, raw_props in cache.items():
+            props = {k: v for k, v in raw_props.items() if not k.startswith("_")}
+            old, _, _ = self.lookup_exact(query_task, nid)
+            old_stage = int((old or {}).get("metadata", {}).get("stage", 0))
+            new_stage = _stage(props)
+            self.update_entry(query_task, nid, props, episode=episode,
+                              source_method=source, stage=new_stage)
             if old is None:
-                self.data[nid] = {"props": props, "stage": _stage(props),
-                                  "source": source, "episodes_seen": 1, "updated_at": now}
                 stats["new"] += 1
-            elif _stage(props) >= old["stage"]:
-                self.data[nid] = {"props": props, "stage": _stage(props), "source": source,
-                                  "episodes_seen": old["episodes_seen"] + 1, "updated_at": now}
-                stats["upgraded" if _stage(props) > old["stage"] else "kept"] += 1
-            else:                                      # 낮은 단계 측정으론 강등 금지
-                old["episodes_seen"] += 1
+            elif new_stage > old_stage:
+                stats["upgraded"] += 1
+            else:
                 stats["kept"] += 1
         return stats
 
-    def invalidate(self, node_id: str, reason: str = ""):
-        if node_id in self.data:
-            self.data[node_id]["stale"] = True
-            self.data[node_id]["stale_reason"] = reason
-
-    def save(self):
-        self.path.parent.mkdir(parents=True, exist_ok=True)
-        self.path.write_text(
-            json.dumps({"objects": self.data}, ensure_ascii=False, indent=2),
-            encoding="utf-8")
+    def invalidate(self, node_id: str, reason: str = "", *, task_id=None):
+        query_task = self.task_id if task_id is None else task_id
+        matches = [entry for entry in self.objects.values()
+                   if entry.get("identity", {}).get("object_id") == node_id
+                   and (query_task is None
+                        or entry.get("metadata", {}).get("source_task") == query_task)]
+        if len(matches) == 1:
+            matches[0]["metadata"].update(stale=True, stale_reason=reason)

@@ -20,7 +20,8 @@ from .intrinsic import FrictionHead, MockBackend, ground_intrinsic
 class Materializer:
     def __init__(self, m1: dict, backend=None, friction: FrictionHead | None = None,
                  logger=None, eps_margin: float = 0.1,
-                 remeasure_fn=None, probe_fn=None, memory=None):
+                 remeasure_fn=None, probe_fn=None, memory=None, *, task_id=None,
+                 object_knowledge=None, density_infer=None):
         """m1: m1_scene.build_m1() 결과. memory: PropertyMemory (선택) —
         지속 메모리 hit 시 VLM 콜 스킵, 신규만 접지. remeasure_fn/probe_fn: 에스컬레이션 훅."""
         self.nodes = {n["id"]: n for n in m1["nodes"]}
@@ -32,8 +33,12 @@ class Materializer:
         self.remeasure_fn = remeasure_fn
         self.probe_fn = probe_fn
         self.memory = memory
+        self.task_id = task_id
+        self.object_knowledge = object_knowledge
+        self.density_infer = density_infer
+        self.retrieval_debug: dict[str, dict] = {}
         self._cache: dict[str, dict] = {}
-        if memory is not None:                         # 씬 노드에 해당하는 엔트리 preload
+        if memory is not None and object_knowledge is None:  # legacy node-id memory only
             for nid in self.nodes:
                 hit = memory.lookup(nid)
                 if hit is not None:
@@ -48,6 +53,15 @@ class Materializer:
                         crop_rgb=None, margin_fn=None) -> dict:
         """→ {queried_by, node_id, geometry..., material, mass_kg, mu, ...} (M2 응답 스키마)"""
         if node_id not in self._cache:
+            if self.object_knowledge is not None and self.task_id is not None:
+                infer = self.density_infer or (lambda _crop: None)
+                reused, debug = self.object_knowledge.lookup_or_retrieve(
+                    self.task_id, node_id, self.nodes[node_id].get("bbox_mm"), crop_rgb, infer)
+                self.retrieval_debug[node_id] = debug
+                if reused is not None:
+                    self._cache[node_id] = reused
+                    self.log(module="m0", event="object_knowledge_hit", node=node_id,
+                             lookup_type=debug["lookup_type"])
             hooks = {}
             if margin_fn is not None:                     # 마찰 에스컬레이션 활성화
                 hooks = dict(
@@ -56,10 +70,13 @@ class Materializer:
                     # TODO(M5): probe_push 프리미티브 완성 시 주석 해제 (2단 마찰 프로브)
                     # probe_fn=(lambda: self.probe_fn(node_id)) if self.probe_fn else None,
                     probe_fn=None)
-            self._cache[node_id] = ground_intrinsic(
-                self.nodes[node_id], crop_rgb, self.backend, self.friction, **hooks)
-            self.log(module="m3", event="intrinsic", node=node_id,
-                     mu_stage=self._cache[node_id]["mu"]["stage"])
+            if node_id not in self._cache:
+                self._cache[node_id] = ground_intrinsic(
+                    self.nodes[node_id], crop_rgb, self.backend, self.friction, **hooks)
+                debug = self.retrieval_debug.setdefault(node_id, {})
+                debug.update(full_m3_called=True, full_m3_skipped=False)
+                self.log(module="m3", event="intrinsic", node=node_id,
+                         mu_stage=self._cache[node_id]["mu"]["stage"])
         entry = gk["nodes"].setdefault(node_id, {"queried_by": []})
         entry.update(self._cache[node_id])
         entry["queried_by"].append(queried_by)
