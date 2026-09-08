@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import hashlib
 import json
 from pathlib import Path
 import sys
@@ -48,9 +49,12 @@ def _save_state(path: Path, runtime) -> None:
     from tuj.m5_motion.tool_use_journal import _raw_model_data
 
     path.parent.mkdir(parents=True, exist_ok=True)
-    _model, data = _raw_model_data(runtime.env)
+    model, data = _raw_model_data(runtime.env)
     np.savez_compressed(
         path,
+        state_format_version=np.asarray(2, dtype=np.int64),
+        active_ee=np.asarray(runtime.active_ee or ""),
+        model_signature=np.asarray(_model_signature(model)),
         qpos=np.asarray(data.qpos, dtype=float),
         qvel=np.asarray(data.qvel, dtype=float),
         ctrl=np.asarray(data.ctrl, dtype=float),
@@ -61,18 +65,146 @@ def _save_state(path: Path, runtime) -> None:
 def _restore_state(path: Path, runtime) -> None:
     from tuj.m5_motion.tool_use_journal import _raw_model_data
 
-    saved = np.load(path)
     model, data = _raw_model_data(runtime.env)
-    for name in ("qpos", "qvel", "ctrl"):
-        destination = getattr(data, name)
-        source = saved[name]
-        if destination.shape != source.shape:
+    with np.load(path, allow_pickle=False) as saved:
+        required = {
+            "state_format_version",
+            "active_ee",
+            "model_signature",
+            "qpos",
+            "qvel",
+            "ctrl",
+            "time",
+        }
+        missing = sorted(required - set(saved.files))
+        if missing:
             raise ValueError(
-                f"saved {name} shape {source.shape} != runtime {destination.shape}"
+                "legacy --state files are unsafe to restore; use a versioned "
+                "checkpoint or a state saved by this script (missing: "
+                + ", ".join(missing)
+                + ")"
             )
-        destination[:] = source
-    data.time = float(saved["time"])
+        version = int(np.asarray(saved["state_format_version"]).item())
+        if version != 2:
+            raise ValueError(f"unsupported raw state format version {version}")
+        saved_active_ee = str(np.asarray(saved["active_ee"]).item()) or None
+        if saved_active_ee != runtime.active_ee:
+            raise ValueError(
+                "saved active EE does not match runtime: "
+                f"{saved_active_ee!r} != {runtime.active_ee!r}"
+            )
+        saved_model_signature = str(
+            np.asarray(saved["model_signature"]).item()
+        )
+        runtime_model_signature = _model_signature(model)
+        if saved_model_signature != runtime_model_signature:
+            raise ValueError(
+                "saved MuJoCo model signature does not match the runtime model"
+            )
+        restored: dict[str, np.ndarray] = {}
+        for name in ("qpos", "qvel", "ctrl"):
+            destination = getattr(data, name)
+            source = np.asarray(saved[name], dtype=float)
+            if destination.shape != source.shape:
+                raise ValueError(
+                    f"saved {name} shape {source.shape} != runtime {destination.shape}"
+                )
+            if not np.all(np.isfinite(source)):
+                raise ValueError(f"saved {name} contains non-finite values")
+            restored[name] = source.copy()
+        restored_time = float(np.asarray(saved["time"]).item())
+        if not np.isfinite(restored_time):
+            raise ValueError("saved time is not finite")
+    for name, source in restored.items():
+        getattr(data, name)[:] = source
+    data.time = restored_time
     mujoco.mj_forward(model, data)
+
+
+def _model_signature(model) -> str:
+    raw_names = getattr(model, "names", b"")
+    if isinstance(raw_names, str):
+        name_bytes = raw_names.encode("utf-8")
+    elif isinstance(raw_names, (bytes, bytearray, memoryview)):
+        name_bytes = bytes(raw_names)
+    else:
+        name_bytes = np.asarray(raw_names).tobytes()
+    payload = {
+        name: int(getattr(model, name))
+        for name in ("nq", "nv", "nu", "nbody", "njnt", "ngeom", "nsite")
+    }
+    payload["names_sha256"] = hashlib.sha256(name_bytes).hexdigest()
+    return hashlib.sha256(
+        json.dumps(payload, sort_keys=True, separators=(",", ":")).encode("utf-8")
+    ).hexdigest()
+
+
+def _pose_components(record) -> tuple[np.ndarray, np.ndarray] | None:
+    if not isinstance(record, dict):
+        return None
+    pose = record.get("pose")
+    if not isinstance(pose, dict):
+        return None
+    try:
+        position = np.asarray(pose["position_m"], dtype=float)
+        orientation = np.asarray(pose["orientation_xyzw"], dtype=float)
+    except (KeyError, TypeError, ValueError):
+        return None
+    if position.shape != (3,) or orientation.shape != (4,):
+        return None
+    norm = float(np.linalg.norm(orientation))
+    if not np.all(np.isfinite(position)) or not np.isfinite(norm) or norm < 1e-12:
+        return None
+    return position, orientation / norm
+
+
+def _validate_preplanned_world(plan, world) -> dict[str, float | int | str]:
+    """Prove that a rebased plan's initial collision scene is still current."""
+
+    context = plan.segments[0].collision_context_before
+    if context is None:
+        raise ValueError("preplanned plan has no initial collision context")
+    checked = 0
+    maximum_position_error = 0.0
+    maximum_orientation_error = 0.0
+    for free_pose in context.free_object_poses:
+        current = _pose_components(world.objects.get(free_pose.object_id))
+        if current is None:
+            raise ValueError(
+                f"current world has no usable pose for {free_pose.object_id!r}"
+            )
+        current_position, current_orientation = current
+        planned_position = np.asarray(free_pose.pose.position_m, dtype=float)
+        planned_orientation = np.asarray(
+            free_pose.pose.orientation_xyzw, dtype=float
+        )
+        planned_orientation /= np.linalg.norm(planned_orientation)
+        position_error = float(np.linalg.norm(current_position - planned_position))
+        quaternion_dot = float(
+            np.clip(abs(np.dot(current_orientation, planned_orientation)), 0.0, 1.0)
+        )
+        orientation_error = 2.0 * float(np.arccos(quaternion_dot))
+        maximum_position_error = max(maximum_position_error, position_error)
+        maximum_orientation_error = max(
+            maximum_orientation_error, orientation_error
+        )
+        if position_error > 1e-5 or orientation_error > 1e-4:
+            raise ValueError(
+                "preplanned collision scene is stale for "
+                f"{free_pose.object_id!r}: position_error_m={position_error:.6g}, "
+                f"orientation_error_rad={orientation_error:.6g}"
+            )
+        checked += 1
+    if checked == 0:
+        raise ValueError(
+            "preplanned plan has no initial free-object poses to validate"
+        )
+    return {
+        "source_scene_signature": plan.scene_signature,
+        "validated_free_object_count": checked,
+        "max_position_error_m": maximum_position_error,
+        "max_orientation_error_rad": maximum_orientation_error,
+    }
 
 
 def _slice_selected(selected, start: str, through: str | None):
@@ -248,6 +380,7 @@ def main() -> int:
     records = []
     summary = {"status": "FAILED", "steps": records}
     packed_targets: set[str] = set()
+    used_kinematic_playback = False
 
     def save_checkpoint(path: Path) -> None:
         save_runtime_checkpoint(
@@ -388,11 +521,18 @@ def main() -> int:
                     raise ValueError(
                         "preplanned plan does not start at the restored checkpoint"
                     )
+                scene_validation = _validate_preplanned_world(
+                    preplanned_plan, request.world
+                )
                 return preplanned_plan.model_copy(
                     deep=True,
                     update={
                         "request_id": request.request_id,
                         "scene_signature": request.world.scene.signature,
+                        "metadata": {
+                            **preplanned_plan.metadata,
+                            "preplanned_scene_rebase": scene_validation,
+                        },
                     },
                 )
             bound = ToolUseJournalMotionRequestPlanner.from_environment(
@@ -430,6 +570,7 @@ def main() -> int:
                 raise
 
         def execute_plan(request, plan):
+            nonlocal used_kinematic_playback
             index = len(records)
             compiler = ToolUseJournalCollisionModelCompiler.from_repository(
                 runtime.env,
@@ -439,16 +580,19 @@ def main() -> int:
                     env, ee, REPOSITORY
                 ),
             )
+            controller_enabled = (
+                not args.kinematic_playback
+                or task_operation(request.task) in {"PLACE", "PLACE_ON"}
+            )
+            if not controller_enabled:
+                used_kinematic_playback = True
             execution = ToolUseJournalExecutionAdapter(
                 runtime,
                 compiler=compiler,
                 # Direct waypoint replay is safe for already collision-checked
                 # transport, but release tasks need live physics so gravity and
                 # contact settling actually advance during the hold window.
-                controller=(
-                    not args.kinematic_playback
-                    or task_operation(request.task) in {"PLACE", "PLACE_ON"}
-                ),
+                controller=controller_enabled,
                 realtime_factor=0.0,
                 render=False,
             ).execute(
@@ -464,6 +608,11 @@ def main() -> int:
                     "subgoal_id": request.task.subgoal_id,
                     "kind": "motion_plan",
                     "status": execution.status.value,
+                    "execution_mode": (
+                        "CONTROLLER_VERIFIED"
+                        if controller_enabled
+                        else "KINEMATIC_PLAYBACK_UNVERIFIED"
+                    ),
                     "artifact": str(execution.manifest_path),
                 }
             )
@@ -538,7 +687,12 @@ def main() -> int:
         _save_state(args.output_dir / "final_state.npz", runtime)
         save_checkpoint(args.output_dir / "final.checkpoint.json")
         summary.update(
-            status="SUCCESS",
+            status=(
+                "SUCCESS_UNVERIFIED"
+                if used_kinematic_playback
+                else "SUCCESS"
+            ),
+            kinematic_playback_used=used_kinematic_playback,
             final_active_ee=runtime.active_ee,
             attached_object_id=runtime.attached_object_id,
         )
