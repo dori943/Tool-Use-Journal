@@ -43,10 +43,9 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     ("lid", "C4_2_DiagonalFitPacking", "vac", "catalog"),
 ))
 
-# Explicitly selected EE alternatives; never retry a failed 2F grasp with vac.
-ALTERNATIVE_ENTRIES = (
-    GraspEntry("plate", "C1_1_LegoSweep", "vac", "catalog", "plate_vacuum"),
-)
+# Optional alternatives remain an explicit extension point. The repository does
+# not select object- or scene-specific alternatives in the generic M5 path.
+ALTERNATIVE_ENTRIES: tuple[GraspEntry, ...] = ()
 
 # Exact M1 identifiers only; no substring or fuzzy matching of object names.
 ALIASES = {f"obj_{e.object_id}_{e.object_id}": e.object_id for e in ENTRIES}

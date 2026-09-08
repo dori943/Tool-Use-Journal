@@ -33,7 +33,12 @@ from tuj.m5_motion.selected_plan_adapter import (
     SelectedPlanAdapterError,
     SelectedPlanMotionRequestAdapter,
 )
-from tuj.m5_motion.task_semantics import is_ee_exchange_task, is_release_task
+from tuj.m5_motion.task_semantics import (
+    is_acquire_task,
+    is_ee_exchange_task,
+    is_release_task,
+    task_operation,
+)
 
 
 def _world_target_pose(
@@ -103,6 +108,19 @@ class MotionPlanStore:
         self._atomic_json(path, request.model_dump_json(indent=2))
         return path.resolve()
 
+    def save_observed_world(
+        self,
+        world: WorldSnapshot,
+        *,
+        request_id: str,
+        index: int,
+    ) -> Path:
+        path = self.root / "observed_worlds" / (
+            f"{index:04d}-{_safe_name(request_id)}.json"
+        )
+        self._atomic_json(path, world.model_dump_json(indent=2))
+        return path.resolve()
+
     def save_manifest(
         self,
         *,
@@ -112,14 +130,27 @@ class MotionPlanStore:
         request_paths: Sequence[Path],
         plan_paths: Sequence[Path],
         final_world: WorldSnapshot,
+        handled_requests: Sequence[MotionPlanRequest] = (),
+        handled_worlds: Sequence[WorldSnapshot] = (),
+        handled_request_paths: Sequence[Path] = (),
+        handled_world_paths: Sequence[Path] = (),
+        step_request_ids: Sequence[str] = (),
     ) -> Path:
         manifest = {
-            "manifest_version": "1.0.0",
+            "manifest_version": "1.1.0",
             "selected_plan_hash": selected_plan_hash,
             "request_ids": [request.request_id for request in requests],
             "request_files": [str(path) for path in request_paths],
             "plan_ids": [plan.plan_id for plan in plans],
             "plan_files": [str(path) for path in plan_paths],
+            "handled_request_ids": [
+                request.request_id for request in handled_requests
+            ],
+            "handled_request_files": [
+                str(path) for path in handled_request_paths
+            ],
+            "handled_world_files": [str(path) for path in handled_world_paths],
+            "step_request_ids": list(step_request_ids),
             "final_scene_signature": final_world.scene.signature,
             "final_robot_state": final_world.robot_state.model_dump(mode="json"),
             "final_world": final_world.model_dump(mode="json"),
@@ -135,7 +166,7 @@ class MotionPlanStore:
             Path(path) if path is not None else self.root / "motion-plan-manifest.json"
         ).resolve()
         payload = json.loads(manifest_path.read_text(encoding="utf-8"))
-        if payload.get("manifest_version") != "1.0.0":
+        if payload.get("manifest_version") not in {"1.0.0", "1.1.0"}:
             raise ValueError("unsupported motion plan manifest version")
         request_files = [Path(value).resolve() for value in payload.get("request_files", [])]
         plan_files = [Path(value).resolve() for value in payload.get("plan_files", [])]
@@ -156,6 +187,30 @@ class MotionPlanStore:
         for request, plan in zip(requests, plans):
             if plan.request_id != request.request_id:
                 raise ValueError("manifest contains a plan for a different request")
+        handled_request_files = [
+            Path(value).resolve()
+            for value in payload.get("handled_request_files", [])
+        ]
+        handled_world_files = [
+            Path(value).resolve()
+            for value in payload.get("handled_world_files", [])
+        ]
+        if len(handled_request_files) != len(handled_world_files):
+            raise ValueError("manifest handled request/world files are misaligned")
+        handled_requests = tuple(
+            MotionPlanRequest.model_validate_json(file.read_text(encoding="utf-8"))
+            for file in handled_request_files
+        )
+        handled_worlds = tuple(
+            WorldSnapshot.model_validate_json(file.read_text(encoding="utf-8"))
+            for file in handled_world_files
+        )
+        if [request.request_id for request in handled_requests] != payload.get(
+            "handled_request_ids", []
+        ):
+            raise ValueError(
+                "manifest handled request identities do not match request files"
+            )
         final_world_payload = payload.get("final_world")
         if final_world_payload is None:
             raise ValueError("manifest does not contain the final WorldSnapshot")
@@ -166,6 +221,16 @@ class MotionPlanStore:
             final_world=final_world,
             request_paths=tuple(request_files),
             plan_paths=tuple(plan_files),
+            handled_requests=handled_requests,
+            handled_worlds=handled_worlds,
+            handled_request_paths=tuple(handled_request_files),
+            handled_world_paths=tuple(handled_world_files),
+            step_request_ids=tuple(
+                payload.get(
+                    "step_request_ids",
+                    [request.request_id for request in requests],
+                )
+            ),
             manifest_path=manifest_path,
         )
 
@@ -177,6 +242,11 @@ class SelectedPlanPlanningResult:
     final_world: WorldSnapshot
     request_paths: tuple[Path, ...] = ()
     plan_paths: tuple[Path, ...] = ()
+    handled_requests: tuple[MotionPlanRequest, ...] = ()
+    handled_worlds: tuple[WorldSnapshot, ...] = ()
+    handled_request_paths: tuple[Path, ...] = ()
+    handled_world_paths: tuple[Path, ...] = ()
+    step_request_ids: tuple[str, ...] = ()
     manifest_path: Path | None = None
 
 
@@ -481,11 +551,50 @@ def _predicted_world(
         )
         result.metadata["physical_active_ee"] = final_active_ee
         result.metadata["declared_active_ee"] = final_active_ee
-    operation = request.task.metadata.get("operation")
-    if operation in {"PICK_TOOL"}:
-        result.metadata["held_tool"] = request.task.metadata.get("tool_id")
-    elif operation in {"RETURN_TOOL", "TERMINAL_RETURN_TOOL"}:
-        result.metadata["held_tool"] = None
+    operation = task_operation(request.task)
+    target_object = (
+        request.task.goal.target_object_id
+        or request.task.tool
+        or next(iter(request.task.target_ids), None)
+    )
+    if is_acquire_task(request.task):
+        if operation == "PICK_TOOL":
+            result.metadata["held_tool"] = target_object
+        physical_transform = plan.metadata.get(
+            "planned_contact_friction_transform"
+        )
+        if (
+            target_object is not None
+            and result.robot_state.held_tool_id == target_object
+            and isinstance(physical_transform, Mapping)
+        ):
+            result.metadata["contact_friction_held_objects"] = {
+                str(target_object): dict(physical_transform)
+            }
+    elif is_release_task(request.task):
+        raw_contact_holds = result.metadata.get(
+            "contact_friction_held_objects", {}
+        )
+        released_contact_object = (
+            target_object is not None
+            and (
+                request.world.robot_state.held_tool_id == target_object
+                or (
+                    isinstance(raw_contact_holds, Mapping)
+                    and target_object in raw_contact_holds
+                )
+            )
+        )
+        if released_contact_object or operation in {
+            "RETURN_TOOL",
+            "TERMINAL_RETURN_TOOL",
+        }:
+            result.metadata["contact_friction_held_objects"] = {}
+        if operation in {"RETURN_TOOL", "TERMINAL_RETURN_TOOL"} or (
+            target_object is not None
+            and result.metadata.get("held_tool") == target_object
+        ):
+            result.metadata["held_tool"] = None
     signature = _digest(
         {
             "previous": world.scene.signature,
@@ -512,10 +621,14 @@ class SelectedPlanMotionOrchestrator:
         *,
         store: MotionPlanStore | None = None,
         adapter: SelectedPlanMotionRequestAdapter | None = None,
+        request_handler: Callable[[MotionPlanRequest], WorldSnapshot | None] | None = None,
+        plan_executor: Callable[[MotionPlanRequest, MotionPlan], WorldSnapshot] | None = None,
     ) -> None:
         self._request_planner = request_planner
         self._store = store
         self._adapter = adapter or SelectedPlanMotionRequestAdapter()
+        self._request_handler = request_handler
+        self._plan_executor = plan_executor
 
     def plan(
         self,
@@ -533,9 +646,33 @@ class SelectedPlanMotionOrchestrator:
         current_world = initial_world.model_copy(deep=True)
         requests: list[MotionPlanRequest] = []
         plans: list[MotionPlan] = []
+        handled_requests: list[MotionPlanRequest] = []
+        handled_worlds: list[WorldSnapshot] = []
+        step_request_ids: list[str] = []
         request_paths: list[Path] = []
         paths: list[Path] = []
+        handled_request_paths: list[Path] = []
+        handled_world_paths: list[Path] = []
         selected_options: OptionSource = options or PlannerOptions()
+
+        def observed_completion(
+            world: WorldSnapshot,
+            completed: str | None,
+            *,
+            input_signature: str,
+        ) -> WorldSnapshot:
+            result = world.model_copy(deep=True)
+            if completed and completed not in result.scene.completed_subgoals:
+                result.scene.completed_subgoals.append(completed)
+            if result.scene.signature == input_signature:
+                result.scene.signature = "observed:" + _digest({
+                    "previous": input_signature,
+                    "robot_state": result.robot_state.model_dump(mode="json"),
+                    "objects": result.objects,
+                    "metadata": result.metadata,
+                    "completed_subgoals": result.scene.completed_subgoals,
+                })
+            return result
 
         def execute(request: MotionPlanRequest, completed: str | None) -> None:
             nonlocal current_world
@@ -565,17 +702,51 @@ class SelectedPlanMotionOrchestrator:
                         },
                     }
                 )
+            handled_world = (
+                self._request_handler(request) if self._request_handler else None
+            )
+            if handled_world is not None:
+                current_world = observed_completion(
+                    handled_world,
+                    completed,
+                    input_signature=request.world.scene.signature,
+                )
+                handled_requests.append(request)
+                handled_worlds.append(current_world.model_copy(deep=True))
+                step_request_ids.append(request.request_id)
+                if self._store is not None:
+                    step_index = len(step_request_ids) - 1
+                    handled_request_paths.append(
+                        self._store.save_request(request, index=step_index)
+                    )
+                    handled_world_paths.append(
+                        self._store.save_observed_world(
+                            current_world,
+                            request_id=request.request_id,
+                            index=step_index,
+                        )
+                    )
+                return
             plan = _unwrap_plan(self._request_planner(request), request)
             requests.append(request)
             plans.append(plan)
+            step_request_ids.append(request.request_id)
             if self._store is not None:
+                step_index = len(step_request_ids) - 1
                 request_paths.append(
-                    self._store.save_request(request, index=len(plans) - 1)
+                    self._store.save_request(request, index=step_index)
                 )
-                paths.append(self._store.save_plan(plan, index=len(plans) - 1))
-            current_world = _predicted_world(
-                current_world, request, plan, completed_subgoal=completed
-            )
+                paths.append(self._store.save_plan(plan, index=step_index))
+            if self._plan_executor is not None:
+                current_world = observed_completion(
+                    self._plan_executor(request, plan),
+                    completed,
+                    input_signature=request.world.scene.signature,
+                )
+            else:
+                current_world = _predicted_world(
+                    current_world, request, plan, completed_subgoal=completed
+                )
 
         for index, subgoal_id in enumerate(selected.subgoal_order):
             selected_constraints = _source_value(
@@ -654,6 +825,11 @@ class SelectedPlanMotionOrchestrator:
                 request_paths=request_paths,
                 plan_paths=paths,
                 final_world=current_world,
+                handled_requests=handled_requests,
+                handled_worlds=handled_worlds,
+                handled_request_paths=handled_request_paths,
+                handled_world_paths=handled_world_paths,
+                step_request_ids=step_request_ids,
             )
         return SelectedPlanPlanningResult(
             requests=tuple(requests),
@@ -661,6 +837,11 @@ class SelectedPlanMotionOrchestrator:
             final_world=current_world,
             request_paths=tuple(request_paths),
             plan_paths=tuple(paths),
+            handled_requests=tuple(handled_requests),
+            handled_worlds=tuple(handled_worlds),
+            handled_request_paths=tuple(handled_request_paths),
+            handled_world_paths=tuple(handled_world_paths),
+            step_request_ids=tuple(step_request_ids),
             manifest_path=manifest,
         )
 

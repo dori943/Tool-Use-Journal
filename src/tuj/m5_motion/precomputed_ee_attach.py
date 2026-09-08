@@ -42,9 +42,28 @@ EE_ATTACH_TEMPLATE_SCHEMA_VERSION = "1.0"
 SUPPORTED_EE_IDS = ("2F", "3F", "vac")
 PORTABLE_EE_PATH_SCOPE = "rack-relative-v1"
 PORTABLE_EE_PATH_DIRECTORY = "ee_rack"
+PORTABLE_EE_PATH_DIRECTORY_KITCHEN = "ee_rack_kitchen"
+# RoboCasa kitchen envs that share the pedestal-top-z=0.8 / island-surface rack
+# relative pose. C4_2 keeps the table-family relative pose and stays on ee_rack/.
+KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS = frozenset(
+    {
+        "C1_2_DoughFlatten",
+        "C2_2_SandwichAssembly",
+        "C3_2_BreakfastTrayPreparation",
+        "C4_1_IntervalFitExtraction",
+    }
+)
 PORTABLE_REFERENCE_EE = "3F"
 PORTABLE_START_POSITION_TOLERANCE_M = 0.015
 PORTABLE_START_ORIENTATION_TOLERANCE_RAD = 0.03
+
+
+def portable_ee_path_directory_for(environment_name: str) -> str:
+    """Return the shared portable cache directory for an environment family."""
+
+    if environment_name in KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS:
+        return PORTABLE_EE_PATH_DIRECTORY_KITCHEN
+    return PORTABLE_EE_PATH_DIRECTORY
 
 
 def normalize_ee_id(value: object) -> str:
@@ -291,6 +310,7 @@ def validate_portable_start_pose(
     world: WorldSnapshot,
     template: object,
     *,
+    forward_kinematics: "ForwardKinematics",
     position_tolerance_m: float = PORTABLE_START_POSITION_TOLERANCE_M,
     orientation_tolerance_rad: float = PORTABLE_START_ORIENTATION_TOLERANCE_RAD,
 ) -> None:
@@ -298,9 +318,24 @@ def validate_portable_start_pose(
 
     validate_portable_rack(world, template)
     stored_eef = getattr(template, "start_eef_pose", None)
-    current_eef = world.robot_state.eef_pose
-    if stored_eef is None or current_eef is None:
-        raise ValueError("stored and current canonical EEF poses are required")
+    if stored_eef is None:
+        raise ValueError("stored canonical EEF pose is required")
+    start_joints = getattr(template, "start_joint_positions_rad", None)
+    if not isinstance(start_joints, Sequence):
+        raise ValueError("stored canonical joint state is required")
+    try:
+        current_position, current_orientation = (
+            forward_kinematics.forward_pose_world(start_joints)
+        )
+        current_eef = Pose(
+            frame_id="world",
+            position_m=tuple(float(value) for value in current_position),
+            orientation_xyzw=tuple(float(value) for value in current_orientation),
+        )
+    except (TypeError, ValueError) as error:
+        raise ValueError(
+            "current model could not evaluate the stored canonical joint state"
+        ) from error
     metadata = getattr(template, "metadata")
     try:
         stored_reference = Pose.model_validate(
@@ -630,6 +665,7 @@ class PrecomputedEEAttachRegistry:
         self.root = Path(root)
         self._overrides: dict[tuple[str, str], Path] = {}
         self._portable_overrides: dict[str, Path] = {}
+        self._last_resolution: dict[str, str] | None = None
         for raw_path in trajectory_paths:
             path = Path(raw_path)
             template = self._load_file(path)
@@ -675,15 +711,24 @@ class PrecomputedEEAttachRegistry:
             exact_path = self.root / environment_name / f"bare_to_{target}.json"
         use_shared_path = not exact_path.is_file()
         if use_shared_path:
+            portable_directory = portable_ee_path_directory_for(environment_name)
             path = self._portable_overrides.get(target)
             if path is None:
-                path = (
-                    self.root
-                    / PORTABLE_EE_PATH_DIRECTORY
-                    / f"bare_to_{target}.json"
-                )
+                path = self.root / portable_directory / f"bare_to_{target}.json"
+            self._last_resolution = {
+                "mode": "portable",
+                "directory": portable_directory,
+                "path": str(path),
+            }
         else:
             path = exact_path
+            portable_directory = portable_ee_path_directory_for(environment_name)
+            self._last_resolution = {
+                "mode": "exact",
+                "directory": environment_name,
+                "portable_directory": portable_directory,
+                "path": str(path),
+            }
         template = self._load_file(path)
         if template.target_active_ee != target or (
             use_shared_path and not is_portable_ee_path(template)
@@ -697,6 +742,12 @@ class PrecomputedEEAttachRegistry:
             )
         return template
 
+    @property
+    def last_resolution(self) -> Mapping[str, str] | None:
+        """Metadata from the most recent ``load`` (exact vs portable directory)."""
+
+        return getattr(self, "_last_resolution", None)
+
 
 class CollisionChecker(Protocol):
     def check(
@@ -707,6 +758,12 @@ class CollisionChecker(Protocol):
         context: CollisionContext | None = None,
         context_id: str | None = None,
     ) -> Any: ...
+
+
+class ForwardKinematics(Protocol):
+    def forward_pose_world(
+        self, joint_positions_rad: Sequence[float]
+    ) -> tuple[Sequence[float], Sequence[float]]: ...
 
 
 def _dense_joint_path(
@@ -738,6 +795,7 @@ class PrecomputedEEAttachPlanner:
         self,
         registry: PrecomputedEEAttachRegistry,
         *,
+        forward_kinematics: ForwardKinematics | None = None,
         start_tolerance_rad: float = 0.01,
         joint_position_limits_rad: Sequence[tuple[float, float]] | None = None,
         log: LogSink = print,
@@ -745,6 +803,7 @@ class PrecomputedEEAttachPlanner:
         if not math.isfinite(start_tolerance_rad) or start_tolerance_rad < 0:
             raise ValueError("start_tolerance_rad must be finite and non-negative")
         self.registry = registry
+        self.forward_kinematics = forward_kinematics
         self.start_tolerance_rad = start_tolerance_rad
         self.joint_position_limits_rad = (
             tuple(joint_position_limits_rad)
@@ -818,7 +877,16 @@ class PrecomputedEEAttachPlanner:
             )
         if is_cross_environment_ee_path(template, request.world):
             try:
-                validate_portable_start_pose(request.world, template)
+                if self.forward_kinematics is None:
+                    raise ValueError(
+                        "cross-environment trajectory validation requires "
+                        "current-model forward kinematics"
+                    )
+                validate_portable_start_pose(
+                    request.world,
+                    template,
+                    forward_kinematics=self.forward_kinematics,
+                )
             except ValueError as error:
                 raise self._failure(
                     EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH,
@@ -1038,7 +1106,17 @@ class PrecomputedEEAttachPlanner:
                 "request has no environment_name",
             )
         raw_target = request.task.metadata.get("to_ee") or request.task.ee
-        return self.registry.load(environment_name, raw_target)
+        template = self.registry.load(environment_name, raw_target)
+        self._log_cache_resolution()
+        return template
+
+    def _log_cache_resolution(self) -> None:
+        resolution = self.registry.last_resolution
+        if not resolution:
+            return
+        mode = resolution.get("mode", "unknown")
+        directory = resolution.get("directory", "?")
+        self._log(f"[M5][EE_PATH] cache_dir={directory} mode={mode}")
 
     def plan(
         self,
@@ -1232,7 +1310,9 @@ __all__ = [
     "EEAttachTrajectoryEventTemplate",
     "EEAttachTrajectorySegmentTemplate",
     "EEAttachTrajectoryTemplate",
+    "KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS",
     "PORTABLE_EE_PATH_DIRECTORY",
+    "PORTABLE_EE_PATH_DIRECTORY_KITCHEN",
     "PORTABLE_EE_PATH_SCOPE",
     "PrecomputedEEAttachPlanner",
     "PrecomputedEEAttachRegistry",
@@ -1245,6 +1325,7 @@ __all__ = [
     "is_initial_ee_attach",
     "is_portable_ee_path",
     "normalize_ee_id",
+    "portable_ee_path_directory_for",
     "portable_ee_path_metadata",
     "rebase_portable_pose",
     "save_ee_attach_template",

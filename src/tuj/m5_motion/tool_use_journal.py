@@ -37,6 +37,7 @@ from tuj.m5_motion.mujoco_collision import (
     MuJoCoCollisionModelRegistry,
     MuJoCoCollisionValidator,
 )
+from tuj.m5_motion.precomputed_ee_attach import KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS
 from tuj.m5_motion.schema import (
     AttachedObjectTransform,
     CollisionContext,
@@ -89,6 +90,52 @@ def _raw_model_data(env: object) -> tuple[mujoco.MjModel, mujoco.MjData]:
         raise ToolUseJournalCompatibilityError(
             "env must be a reset robosuite environment"
         ) from error
+
+
+def settle_tool_use_journal_free_objects(
+    env: object,
+    *,
+    duration_s: float = 5.0,
+) -> int:
+    """Advance free bodies to a deterministic resting pose with the robot fixed.
+
+    Object placement initializers write poses and call ``mj_forward`` but do not
+    integrate gravity. Planning directly from that transient state is unsafe
+    for non-flat tools, which can rotate before the robot reaches them. During
+    settling, every non-free joint is restored after each MuJoCo step so only
+    object free joints evolve.
+    """
+
+    if not math.isfinite(duration_s) or duration_s < 0.0:
+        raise ValueError("duration_s must be finite and non-negative")
+    model, data = _raw_model_data(env)
+    if duration_s == 0.0:
+        return 0
+    timestep_s = float(model.opt.timestep)
+    steps = max(1, int(math.ceil(duration_s / timestep_s)))
+    free_qpos = np.zeros(int(model.nq), dtype=bool)
+    free_dofs = np.zeros(int(model.nv), dtype=bool)
+    for joint_id in range(int(model.njnt)):
+        if int(model.jnt_type[joint_id]) != int(mujoco.mjtJoint.mjJNT_FREE):
+            continue
+        qpos_address = int(model.jnt_qposadr[joint_id])
+        dof_address = int(model.jnt_dofadr[joint_id])
+        free_qpos[qpos_address : qpos_address + 7] = True
+        free_dofs[dof_address : dof_address + 6] = True
+    fixed_qpos = ~free_qpos
+    fixed_dofs = ~free_dofs
+    fixed_positions = np.asarray(data.qpos[fixed_qpos], dtype=float).copy()
+    previous_ctrl = np.asarray(data.ctrl, dtype=float).copy()
+    data.ctrl[:] = 0.0
+    try:
+        for _ in range(steps):
+            mujoco.mj_step(model, data)
+            data.qpos[fixed_qpos] = fixed_positions
+            data.qvel[fixed_dofs] = 0.0
+        mujoco.mj_forward(model, data)
+    finally:
+        data.ctrl[:] = previous_ctrl
+    return steps
 
 
 def _name(model: mujoco.MjModel, kind: mujoco.mjtObj, object_id: int) -> str:
@@ -232,13 +279,13 @@ def _geom_local_points(model: mujoco.MjModel, geom_id: int) -> np.ndarray | None
     return None
 
 
-def _body_local_bounds(
+def _body_local_points(
     model: mujoco.MjModel,
     data: mujoco.MjData,
     root_body_id: int,
     *,
     collision_only: bool,
-) -> tuple[np.ndarray, np.ndarray] | None:
+) -> np.ndarray | None:
     root_position = np.asarray(data.xpos[root_body_id], dtype=float)
     root_rotation = np.asarray(data.xmat[root_body_id], dtype=float).reshape(3, 3)
     points: list[np.ndarray] = []
@@ -259,7 +306,28 @@ def _body_local_bounds(
     if not points:
         return None
     combined = np.concatenate(points, axis=0)
-    return np.min(combined, axis=0), np.max(combined, axis=0)
+    # Geometry meshes often repeat shared vertices.  A compact unique point
+    # set preserves exact extrema under arbitrary object rotations without
+    # bloating every M5 world snapshot.
+    return np.unique(np.round(combined, decimals=9), axis=0)
+
+
+def _body_local_bounds(
+    model: mujoco.MjModel,
+    data: mujoco.MjData,
+    root_body_id: int,
+    *,
+    collision_only: bool,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    points = _body_local_points(
+        model,
+        data,
+        root_body_id,
+        collision_only=collision_only,
+    )
+    if points is None:
+        return None
+    return np.min(points, axis=0), np.max(points, axis=0)
 
 
 def _pose_record(
@@ -286,6 +354,11 @@ def _object_record(
     ]
     bounds = _body_local_bounds(
         model, data, body_id, collision_only=bool(collision_ids)
+    )
+    collision_points = (
+        _body_local_points(model, data, body_id, collision_only=True)
+        if collision_ids
+        else None
     )
     record: dict[str, Any] = {
         "body_name": _name(model, mujoco.mjtObj.mjOBJ_BODY, body_id),
@@ -315,6 +388,8 @@ def _object_record(
                 float(lower[2]),
             ],
         }
+    if collision_points is not None:
+        record["collision_points_m"] = collision_points.tolist()
     free_joints = [
         _name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
         for joint_id in range(model.njnt)
@@ -443,6 +518,13 @@ def make_tool_use_journal_env(
         "hard_reset": False,
     }
     options.update(suite_make_kwargs)
+    from robosuite.environments.base import REGISTERED_ENVS
+    is_kitchen = any(cls.__module__.startswith("robocasa.")
+        for cls in REGISTERED_ENVS[env_name].__mro__)
+    if is_kitchen:
+        # RoboCasa controls reset itself. Every registered task installs the
+        # same fixed, robot-relative agentview camera in its compiled model.
+        options.pop("hard_reset", None)
     options["gripper_types"] = (
         TOOL_USE_JOURNAL_EE_GRIPPER_TYPES[active_ee]
         if active_ee is not None
@@ -659,7 +741,14 @@ class ToolUseJournalEnvironmentAdapter:
                 # Rack display quaternion flips local +Z to world -Z.  A
                 # negative template offset therefore stages above the rack.
                 "approach_axis_xyz": [0.0, 0.0, 1.0],
-                "staging_distance_m": 0.15,
+                # Kitchen pedestal-top-z=0.8 workcells raise the rack relative
+                # to the arm (~+0.232 m vs C1-1).  The default 0.15 m staging
+                # lift then exceeds UR5e reach; keep a reachable approach.
+                "staging_distance_m": (
+                    0.10
+                    if self.environment_name in KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS
+                    else 0.15
+                ),
                 "pre_dock_distance_m": 0.04,
                 "rack_body": str(raw.get("rack_body", "")),
                 "rack_slot": str(raw.get("rack_slot", "")),
@@ -673,12 +762,26 @@ class ToolUseJournalEnvironmentAdapter:
 
     def _obstacles(self) -> list[Any]:
         result: list[Any] = []
+        robot_root_body_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_BODY,
+            str(self.robot.robot_model.root_body),
+        )
+        robot_body_ids = (
+            _descendant_body_ids(self.model, robot_root_body_id)
+            if robot_root_body_id >= 0
+            else set()
+        )
         for geom_id in range(self.model.ngeom):
             geom_name = _name(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
-            if not (
-                geom_name.startswith("table_collision")
-                or geom_name == "ee_rack_base"
-                or geom_name.startswith("ee_rack_support_")
+            # Include all stationary collision geometry (islands, box fixtures,
+            # shelves, etc.), not just a few table/rack names. Moving objects
+            # are represented separately by the current object records.
+            body_id = int(self.model.geom_bodyid[geom_id])
+            if (
+                int(self.model.body_weldid[body_id]) != 0
+                or body_id in robot_body_ids
+                or not (int(self.model.geom_contype[geom_id]) or int(self.model.geom_conaffinity[geom_id]))
             ):
                 continue
             local = _geom_local_points(self.model, geom_id)
@@ -729,6 +832,42 @@ class ToolUseJournalEnvironmentAdapter:
             )
             for object_id, body_id in sorted(self.object_body_ids.items())
         }
+        anchor_provider = getattr(self.env, "get_motion_anchor_offsets", None)
+        if callable(anchor_provider):
+            for object_id, record in objects.items():
+                center = np.asarray(record.get("anchors", {}).get("center", [0, 0, 0]))
+                for anchor, offset in anchor_provider(object_id).items():
+                    record.setdefault("anchors", {})[anchor] = (center + np.asarray(offset)).tolist()
+                if "handle_grasp" in record.get("anchors", {}):
+                    record["grasp_hint"] = "Use handle_grasp for finger acquisition; center is a wire head, not a graspable handle."
+        metadata_provider = getattr(
+            self.env, "get_tool_physical_metadata", None
+        )
+        if callable(metadata_provider):
+            for object_id, record in objects.items():
+                try:
+                    physical_metadata = metadata_provider(object_id)
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if isinstance(physical_metadata, Mapping):
+                    # Keep environment-owned object / grasp facts explicit in
+                    # the snapshot. Geometry binders then remain independent
+                    # of task ids and concrete object names.
+                    record["physical_metadata"] = dict(physical_metadata)
+        packing_metadata_provider = getattr(
+            self.env, "get_motion_packing_metadata", None
+        )
+        if callable(packing_metadata_provider):
+            for object_id, record in objects.items():
+                try:
+                    packing_metadata = packing_metadata_provider(object_id)
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if isinstance(packing_metadata, Mapping) and packing_metadata:
+                    # Clear container volume and feasible object orientations
+                    # belong to the environment geometry contract.  The generic
+                    # provider consumes this compact data without task-name checks.
+                    record["packing_metadata"] = dict(packing_metadata)
         xml_hash = hashlib.sha256(self.source_mjcf.encode("utf-8")).hexdigest()
         signature_payload = {
             "adapter": "tool-use-journal-v1",
@@ -750,6 +889,16 @@ class ToolUseJournalEnvironmentAdapter:
             separators=(",", ":"),
         ).encode("utf-8")
         signature = "tool-use-journal:" + hashlib.sha256(encoded).hexdigest()
+        base_body_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_BODY,
+            str(self.robot.robot_model.root_body),
+        )
+        robot_base_world_m = (
+            [float(value) for value in self.data.xpos[base_body_id]]
+            if base_body_id >= 0
+            else None
+        )
         return WorldSnapshot(
             scene=SceneRef(
                 signature=signature,
@@ -769,6 +918,7 @@ class ToolUseJournalEnvironmentAdapter:
                 "declared_active_ee": self.declared_active_ee,
                 "ee_metadata_matches_physics": self.ee_metadata_matches_physics,
                 "rack_collision_policy": "PROMOTE_IN_PLANNER_COPY",
+                "robot_base_world_m": robot_base_world_m,
                 "attached_object_transforms": (
                     {
                         attached_object_transform.object_id: (
@@ -780,6 +930,68 @@ class ToolUseJournalEnvironmentAdapter:
                 ),
             },
         )
+
+
+def apply_world_snapshot_state(env: object, world: WorldSnapshot) -> None:
+    """Restore named robot and free-object poses from a planning snapshot.
+
+    Environment recreation is still required to obtain the compiled MuJoCo
+    model.  Seed equality alone does not guarantee that randomized object ids
+    receive the same poses, so M5 restores the M1-captured state by stable joint
+    names before planning or replay.
+    """
+
+    model, data = _raw_model_data(env)
+    for name, value in zip(
+        world.robot_state.joint_names,
+        world.robot_state.joint_positions_rad,
+        strict=True,
+    ):
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)
+        if joint_id < 0:
+            raise ToolUseJournalCompatibilityError(
+                f"WorldSnapshot robot joint {name!r} is absent from the runtime"
+            )
+        data.qpos[int(model.jnt_qposadr[joint_id])] = float(value)
+
+    for object_id, raw_record in world.objects.items():
+        if not isinstance(raw_record, Mapping):
+            continue
+        free_joint_name = raw_record.get("free_joint_name")
+        pose = raw_record.get("pose")
+        if not isinstance(free_joint_name, str) or not isinstance(pose, Mapping):
+            continue
+        joint_id = mujoco.mj_name2id(
+            model, mujoco.mjtObj.mjOBJ_JOINT, free_joint_name
+        )
+        if joint_id < 0:
+            raise ToolUseJournalCompatibilityError(
+                f"WorldSnapshot object {object_id!r} free joint "
+                f"{free_joint_name!r} is absent from the runtime"
+            )
+        position = np.asarray(pose.get("position_m"), dtype=float)
+        quaternion_xyzw = np.asarray(pose.get("orientation_xyzw"), dtype=float)
+        if (
+            position.shape != (3,)
+            or quaternion_xyzw.shape != (4,)
+            or not np.all(np.isfinite(position))
+            or not np.all(np.isfinite(quaternion_xyzw))
+        ):
+            raise ToolUseJournalCompatibilityError(
+                f"WorldSnapshot object {object_id!r} has an invalid world pose"
+            )
+        norm = float(np.linalg.norm(quaternion_xyzw))
+        if norm <= 1e-12:
+            raise ToolUseJournalCompatibilityError(
+                f"WorldSnapshot object {object_id!r} has a zero quaternion"
+            )
+        quaternion_xyzw /= norm
+        address = int(model.jnt_qposadr[joint_id])
+        data.qpos[address : address + 3] = position
+        data.qpos[address + 3 : address + 7] = quaternion_xyzw[[3, 0, 1, 2]]
+
+    data.qvel[:] = 0.0
+    mujoco.mj_forward(model, data)
 
 
 def _joint_qpos_width(joint_type: int) -> int:
@@ -1083,6 +1295,7 @@ class ToolUseJournalCollisionModelCompiler:
         *,
         seed: int = 0,
         source_revision: str = TOOL_USE_JOURNAL_TESTED_REVISION,
+        environment_preparer: Callable[[object, str | None], object] | None = None,
         **suite_make_kwargs: Any,
     ) -> "ToolUseJournalCollisionModelCompiler":
         env_name = _environment_name(reference_env)
@@ -1090,13 +1303,20 @@ class ToolUseJournalCollisionModelCompiler:
             suite_make_kwargs.setdefault("scripted_grasps", True)
 
         def factory(active_ee: str | None) -> object:
-            return make_tool_use_journal_env(
+            env = make_tool_use_journal_env(
                 repository_root,
                 env_name,
                 active_ee=active_ee,
                 seed=seed,
                 **suite_make_kwargs,
             )
+            if environment_preparer is not None:
+                try:
+                    return environment_preparer(env, active_ee)
+                except Exception:
+                    env.close()
+                    raise
+            return env
 
         return cls.from_environment_factory(
             reference_env,

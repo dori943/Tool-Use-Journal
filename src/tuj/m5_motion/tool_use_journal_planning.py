@@ -16,6 +16,11 @@ from typing import Any, Protocol
 
 import numpy as np
 
+from tuj.m5_motion.attachment_retarget import (
+    ATTACHED_OBJECT_POSE_SUBJECT,
+    POSE_SUBJECT_KEY,
+    POSE_SUBJECT_OBJECT_ID_KEY,
+)
 from tuj.m5_motion.ee_exchange import RoutedKeyframeStrategyProvider
 from tuj.m5_motion.ee_exchange_entry import (
     EEExchangeEntryPlanner,
@@ -71,6 +76,7 @@ from tuj.m5_motion.vlm_provider import OpenAIKeyframeProvider
 
 
 _ATTACHMENT_METADATA_KEY = "attached_object_transforms"
+_CONTACT_FRICTION_HELD_METADATA_KEY = "contact_friction_held_objects"
 
 
 class ToolUseJournalCollisionBindingError(RuntimeError):
@@ -446,6 +452,40 @@ class ToolUseJournalCollisionContextFactory:
                 metadata={"attachment_proxy": "CONTACT_FRICTION"},
             )
         if attached_id is None:
+            held_tool_id = request.world.robot_state.held_tool_id
+            raw_contact_transforms = request.world.metadata.get(
+                _CONTACT_FRICTION_HELD_METADATA_KEY, {}
+            )
+            if held_tool_id is not None and isinstance(
+                raw_contact_transforms, Mapping
+            ) and held_tool_id in raw_contact_transforms:
+                try:
+                    transform = AttachedObjectTransform.model_validate(
+                        raw_contact_transforms[held_tool_id]
+                    )
+                except (TypeError, ValueError) as error:
+                    raise ToolUseJournalCollisionBindingError(
+                        "world contains an invalid contact-friction transform"
+                    ) from error
+                context_id = f"contact-friction-held:{held_tool_id}:initial"
+                return CollisionContext(
+                    context_id=context_id,
+                    scene_state_id=(
+                        f"{request.world.scene.signature}:ee:{active_ee}:"
+                        f"contact-held:{held_tool_id}"
+                    ),
+                    active_ee=active_ee,
+                    attached_object_ids=[held_tool_id],
+                    attached_object_transforms=[transform],
+                    free_object_poses=_free_object_poses(
+                        request.world, exclude=(held_tool_id,)
+                    ),
+                    touch_links=[active_ee],
+                    collision_model_version=self.compiler.model_version_for(
+                        active_ee
+                    ),
+                    metadata={"attachment_proxy": "CONTACT_FRICTION"},
+                )
             context_id = f"ee-attached:{active_ee}"
             return CollisionContext(
                 context_id=context_id,
@@ -710,6 +750,19 @@ class ToolUseJournalCollisionContextFactory:
                     f"contact-friction strategy {candidate.strategy_id!r} "
                     "must not contain ATTACH_OBJECT"
                 )
+            planning_transform = _relative_attachment(
+                request,
+                grasp,
+                object_id=target,
+                reference_kind=self.attachment_reference_kind,
+                reference_name=self.attachment_reference_name,
+            )
+            grasp.metadata = {
+                **grasp.metadata,
+                "planned_contact_friction_transform": (
+                    planning_transform.model_dump(mode="json")
+                ),
+            }
             token = _short_digest((candidate.strategy_id, grasp.keyframe_id))
             contact_id = f"physical-grasp-contact:{target}:{token}"
             contact = base.model_copy(
@@ -741,11 +794,13 @@ class ToolUseJournalCollisionContextFactory:
         target = request.task.goal.target_object_id
         if not target:
             raise ToolUseJournalCollisionBindingError("PLACE has no target object")
-        contact_held = (
-            base.metadata.get("attachment_proxy") == "CONTACT_FRICTION"
-            and request.world.robot_state.held_tool_id == target
-        )
-        if request.world.robot_state.attached_object_id != target and not contact_held:
+        from tuj.m5_motion.physical_grasp import releases_contact_friction
+
+        physical_release = releases_contact_friction(request)
+        if (
+            request.world.robot_state.attached_object_id != target
+            and not physical_release
+        ):
             raise ToolUseJournalCollisionBindingError(
                 f"PLACE target {target!r} is not the currently attached object"
             )
@@ -763,10 +818,27 @@ class ToolUseJournalCollisionContextFactory:
         for candidate in bound.candidates:
             place = self._event_keyframe(
                 candidate,
-                KeyframeEventType.DETACH_OBJECT,
+                (
+                    KeyframeEventType.GRIPPER_OPEN
+                    if physical_release
+                    else KeyframeEventType.DETACH_OBJECT
+                ),
                 KeyframeType.PLACE,
             )
             token = _short_digest((candidate.strategy_id, place.keyframe_id))
+            detached_target_pose = target_pose
+            if (
+                str(place.metadata.get(POSE_SUBJECT_KEY, "")).upper()
+                == ATTACHED_OBJECT_POSE_SUBJECT
+                and place.metadata.get(POSE_SUBJECT_OBJECT_ID_KEY) == target
+            ):
+                # The symbolic PLACE keyframe describes the held object's
+                # desired pose.  Freeze the newly detached collision body at
+                # that candidate-specific pose, not at the stale task goal
+                # pose captured before keyframe generation.
+                detached_target_pose = RelativePoseResolver(
+                    request.world
+                ).resolve(place)
             contact_id = f"place-contact:{target}:{token}"
             detached_id = f"object-detached:{target}:{token}"
             contact = base.model_copy(
@@ -783,21 +855,36 @@ class ToolUseJournalCollisionContextFactory:
                 active_ee=active_ee,
                 free_object_poses=_free_object_poses(
                     request.world,
-                    overrides={target: target_pose},
+                    overrides={target: detached_target_pose},
                 ),
                 collision_model_version=self.compiler.model_version_for(active_ee),
             )
             contexts[contact_id] = contact
             contexts[detached_id] = detached
+            # Fingers still touch the now-free object while opening. Allow
+            # only that target contact through the first withdrawal edge;
+            # subsequent motion uses the ordinary detached context.
+            release_id = detached_id
+            if place.metadata.get("allow_release_contact") is True:
+                release_id = f"object-release-contact:{target}:{token}"
+                contexts[release_id] = detached.model_copy(update={
+                    "context_id": release_id,
+                    "allowed_collision_pairs": self._contact_pairs(active_ee, [target]),
+                })
             current_id = base.context_id
+            withdrawal_pending = False
             for keyframe in candidate.keyframes:
                 keyframe.collision_context_after_events_id = None
                 if keyframe is place:
                     keyframe.collision_context_id = contact_id
-                    keyframe.collision_context_after_events_id = detached_id
-                    current_id = detached_id
+                    keyframe.collision_context_after_events_id = release_id
+                    current_id = release_id
+                    withdrawal_pending = release_id != detached_id
                 else:
                     keyframe.collision_context_id = current_id
+                    if withdrawal_pending:
+                        current_id = detached_id
+                        withdrawal_pending = False
         return _stamp_bound_artifact(request, source, bound), contexts
 
     def _bind_ee_exchange(
@@ -1120,6 +1207,12 @@ class ToolUseJournalMotionRequestPlanner:
             if isinstance(selected_provider, RoutedKeyframeStrategyProvider)
             else RoutedKeyframeStrategyProvider(selected_provider)
         )
+        # The routed provider still owns geometry generation.  This decorator
+        # changes only explicitly selected physical PICK requests from a
+        # synthetic ATTACH_OBJECT event to persistent contact friction.
+        from tuj.m5_motion.physical_grasp import ContactFrictionKeyframeProvider
+
+        execution_provider = ContactFrictionKeyframeProvider(routed_provider)
         kinematics = adapter.make_kinematics()
         if getattr(env, "scripted_grasp_profile", None) is not None:
             # Continue from the physical grasp pose. Tight IK tolerances leave
@@ -1128,7 +1221,7 @@ class ToolUseJournalMotionRequestPlanner:
             kinematics = ContinuousIK(
                 kinematics, adapter.data.qpos[adapter.robot._ref_joint_pos_indexes]
             )
-        pipeline = MotionPlanningPipeline(routed_provider, kinematics)
+        pipeline = MotionPlanningPipeline(execution_provider, kinematics)
         factory = ToolUseJournalCollisionContextFactory(
             compiler,
             attachment_reference_name=(
@@ -1162,6 +1255,7 @@ class ToolUseJournalMotionRequestPlanner:
                 registry_root,
                 trajectory_paths=ee_attach_trajectory_paths,
             ),
+            forward_kinematics=kinematics,
             start_tolerance_rad=ee_attach_start_tolerance_rad,
             joint_position_limits_rad=getattr(
                 kinematics, "joint_limits_rad", None

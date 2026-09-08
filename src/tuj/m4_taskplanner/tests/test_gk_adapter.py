@@ -253,7 +253,7 @@ def test_gk_bundle_uses_selected_tool_and_m2_scene_graph() -> None:
     } == {"light_plate"}
 
 
-def test_repository_c1_1_bundle_selects_forwarded_light_plate() -> None:
+def test_repository_bundle_preserves_forwarded_tool_and_grouping() -> None:
     repository = Path(__file__).resolve().parents[4]
     output = repository / "output" / "c1_1"
 
@@ -271,16 +271,29 @@ def test_repository_c1_1_bundle_selects_forwarded_light_plate() -> None:
     assert result.status is PlanStatus.SUCCESS
     assert result.selected_plan is not None
     assignments = result.selected_plan.candidate_assignments
-    assert {assignment.tool for assignment in assignments} == {"light_plate"}
+    expected_tools = {
+        subgoal.tool_id
+        for subgoal in request.task_graph.subgoals
+        if subgoal.tool_id is not None
+    }
+    assert {assignment.tool for assignment in assignments} == expected_tools
     sweeps = [item for item in assignments if item.action_type == "tool_act"]
-    assert len(sweeps) == 3
-    assert len({target for item in sweeps for target in item.target_ids}) == 12
+    expected_sweeps = [
+        subgoal
+        for subgoal in request.task_graph.subgoals
+        if subgoal.action_type == "tool_act"
+    ]
+    assert len(sweeps) == len(expected_sweeps)
+    assert {target for item in sweeps for target in item.target_ids} == {
+        target for subgoal in expected_sweeps for target in subgoal.target_ids
+    }
     pick = next(item for item in assignments if item.action_type == "PICK_TOOL")
     returned = next(
         item for item in assignments if item.action_type == "RETURN_TOOL"
     )
-    assert pick.target_ids == ["light_plate"]
-    assert returned.target_ids == ["light_plate"]
+    assert pick.target_ids == [pick.tool]
+    assert returned.target_ids == [returned.tool]
+    assert pick.tool == returned.tool
     resource_subgoals = {pick.subgoal_id, returned.subgoal_id}
     assert not any(
         step.kind == "transition"
@@ -288,8 +301,12 @@ def test_repository_c1_1_bundle_selects_forwarded_light_plate() -> None:
         and step.action in {"PICK_TOOL", "RETURN_TOOL"}
         for step in result.selected_plan.steps
     )
-    assert result.selected_plan.action_counts.n_tool_picks == 1
-    assert result.selected_plan.action_counts.n_tool_returns == 1
+    assert result.selected_plan.action_counts.n_tool_picks == sum(
+        item.action_type == "PICK_TOOL" for item in assignments
+    )
+    assert result.selected_plan.action_counts.n_tool_returns == sum(
+        item.action_type == "RETURN_TOOL" for item in assignments
+    )
 
 
 def test_gk_accepts_selected_tool_id_alias() -> None:

@@ -27,7 +27,6 @@ from tuj.m5_motion.precomputed_ee_attach import (
     EEAttachTrajectoryEventTemplate,
     EEAttachTrajectorySegmentTemplate,
     EEAttachTrajectoryTemplate,
-    PORTABLE_EE_PATH_DIRECTORY,
     PrecomputedEEAttachPlanner,
     PrecomputedEEAttachRegistry,
     PrecomputedEEPathError,
@@ -39,6 +38,7 @@ from tuj.m5_motion.precomputed_ee_attach import (
     is_cross_environment_ee_path,
     is_portable_ee_path,
     normalize_ee_id,
+    portable_ee_path_directory_for,
     rebase_portable_pose,
     validate_portable_start_pose,
 )
@@ -171,6 +171,7 @@ class PrecomputedEEReturnRegistry:
         self.root = Path(root)
         self._overrides: dict[tuple[str, str], Path] = {}
         self._portable_overrides: dict[str, Path] = {}
+        self._last_resolution: dict[str, str] | None = None
         for raw_path in trajectory_paths:
             path = Path(raw_path)
             template = self._load_file(path)
@@ -218,15 +219,22 @@ class PrecomputedEEReturnRegistry:
             exact_path = self.root / environment_name / f"{source}_to_bare.json"
         use_shared_path = not exact_path.is_file()
         if use_shared_path:
+            portable_directory = portable_ee_path_directory_for(environment_name)
             path = self._portable_overrides.get(source)
             if path is None:
-                path = (
-                    self.root
-                    / PORTABLE_EE_PATH_DIRECTORY
-                    / f"{source}_to_bare.json"
-                )
+                path = self.root / portable_directory / f"{source}_to_bare.json"
+            self._last_resolution = {
+                "mode": "portable",
+                "directory": portable_directory,
+                "path": str(path),
+            }
         else:
             path = exact_path
+            self._last_resolution = {
+                "mode": "exact",
+                "directory": environment_name,
+                "path": str(path),
+            }
         template = self._load_file(path)
         if template.source_active_ee != source or (
             use_shared_path and not is_portable_ee_path(template)
@@ -239,6 +247,12 @@ class PrecomputedEEReturnRegistry:
                 trajectory_id=template.trajectory_id,
             )
         return template
+
+    @property
+    def last_resolution(self) -> Mapping[str, str] | None:
+        """Metadata from the most recent ``load`` (exact vs portable directory)."""
+
+        return getattr(self, "_last_resolution", None)
 
 
 def _reverse_waypoint(
@@ -438,10 +452,16 @@ class PrecomputedEEExchangePlanner:
             )
         source = request.task.metadata.get("from_ee")
         target = request.task.metadata.get("to_ee") or request.task.ee
-        return (
-            self.return_registry.load(environment, source),
-            self.attach_planner.registry.load(environment, target),
-        )
+        returned = self.return_registry.load(environment, source)
+        attached = self.attach_planner.registry.load(environment, target)
+        for registry in (self.return_registry, self.attach_planner.registry):
+            resolution = registry.last_resolution
+            if resolution:
+                self._log(
+                    f"[M5][EE_PATH] cache_dir={resolution.get('directory', '?')} "
+                    f"mode={resolution.get('mode', 'unknown')}"
+                )
+        return returned, attached
 
     def _validate_return_state(
         self,
@@ -572,7 +592,18 @@ class PrecomputedEEExchangePlanner:
             )
         if is_cross_environment_ee_path(template, request.world):
             try:
-                validate_portable_start_pose(request.world, template)
+                if self.attach_planner.forward_kinematics is None:
+                    raise ValueError(
+                        "cross-environment trajectory validation requires "
+                        "current-model forward kinematics"
+                    )
+                validate_portable_start_pose(
+                    request.world,
+                    template,
+                    forward_kinematics=(
+                        self.attach_planner.forward_kinematics
+                    ),
+                )
             except ValueError as error:
                 raise self._failure(
                     EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH,

@@ -39,6 +39,7 @@ from environments.robot_pedestal import (
     add_robot_pedestal,
     remove_robot_pedestal,
 )
+from environments.task_camera import add_standard_task_camera
 
 from environments.objects.c4_2_packing_objects import (
     BaguetteObject,
@@ -123,6 +124,72 @@ _LONG_AXIS = {
     "milk": 2,
 }
 
+
+# Box-local rotations whose collision-mesh bounds fit inside the clear box
+# interior with a 2 mm inset.  These are environment geometry facts rather
+# than planner-owned task poses; M5 may reflect and offset them while searching.
+_PACKING_ORIENTATION_CANDIDATES = {
+    "whisk": (
+        {
+            "orientation_xyzw": (
+                0.01277933,
+                0.71879474,
+                -0.38785331,
+                0.57683674,
+            ),
+            "dimensions_m": (
+                0.1561408461056378,
+                0.20858173505294422,
+                0.1730204263696026,
+            ),
+            "center_offset_m": (
+                0.004222016922341032,
+                -0.0004316735969427665,
+                -0.0023108170035207876,
+            ),
+        },
+    ),
+    "rolling_pin": (
+        {
+            "orientation_xyzw": (
+                -0.38898768,
+                -0.36902991,
+                -0.12626111,
+                0.83460388,
+            ),
+            "dimensions_m": (
+                0.1534137567058214,
+                0.20237045356608135,
+                0.17042643023503182,
+            ),
+            "center_offset_m": (
+                4.728539351739336e-08,
+                -8.03399554445694e-07,
+                6.839213763376595e-07,
+            ),
+        },
+    ),
+    "baguette": (
+        {
+            "orientation_xyzw": (
+                -0.19812896,
+                -0.28660541,
+                0.33754624,
+                0.87445114,
+            ),
+            "dimensions_m": (
+                0.13353051490198753,
+                0.1815723954789698,
+                0.14941986261342083,
+            ),
+            "center_offset_m": (
+                0.004180776363140848,
+                -0.0004543973816845681,
+                0.0017794226505309652,
+            ),
+        },
+    ),
+}
 
 _BOX_BODY_NAME = "packing_box"
 
@@ -622,6 +689,13 @@ class C4_2_DiagonalFitPacking(KitchenBase):
         self._add_fixed_packing_box(
             box_center,
             surface_z,
+        )
+
+        self._standard_camera = add_standard_task_camera(
+            self.model,
+            robot_base_xy=self._robot_base_xy,
+            robot_base_yaw_rad=self._robot_base_yaw,
+            surface_z=surface_z,
         )
 
     def _bind_procedural_material_gt(self):
@@ -1333,9 +1407,13 @@ class C4_2_DiagonalFitPacking(KitchenBase):
     ):
         """Install pedestal, robot base, and EE rack."""
 
-        # Preserve the commissioned C1-1 robot/rack Z transform while moving
-        # the complete EE-rack workcell to this island.
-        robot_base_root_z = float(surface_z + ROBOT_BASE_SURFACE_OFFSET_Z)
+        # C1_1's commissioned rack path is expressed in joint space. Preserve
+        # its robot/rack Z transform while translating the complete workcell to
+        # this island. RoboCasa later resets the robot root body directly, so
+        # retain the shared root Z separately below.
+        robot_base_root_z = float(
+            surface_z + ROBOT_BASE_SURFACE_OFFSET_Z
+        )
 
         remove_robot_pedestal(
             self.model
@@ -1423,6 +1501,8 @@ class C4_2_DiagonalFitPacking(KitchenBase):
 
     def _setup_references(self):
         super()._setup_references()
+        # Fixed task destinations must be visible to the motion world adapter.
+        self.obj_body_id[_BOX_BODY_NAME] = self.sim.model.body_name2id(_BOX_BODY_NAME)
 
         if self.ee_rack_info:
             self.ee_rack_body_id = (
@@ -1430,6 +1510,44 @@ class C4_2_DiagonalFitPacking(KitchenBase):
                     "ee_rack"
                 )
             )
+
+    def get_motion_anchor_offsets(self, object_id):
+        """Object-local grasp region validated by the independent grasp lab."""
+        if object_id == "whisk":
+            return {"handle_grasp": [0.0, -0.28 * OBJECT_LENGTHS["whisk"], 0.006]}
+        return {}
+
+    def get_motion_packing_metadata(self, object_id):
+        """Expose compact, environment-owned clearances to generic M5 binders."""
+
+        if object_id == _BOX_BODY_NAME:
+            return {
+                "kind": "CONTAINER",
+                # The fixed box body uses x=depth, y=width, z=height.
+                "interior_dimensions_m": (
+                    BOX_INNER_D,
+                    BOX_INNER_W,
+                    BOX_INNER_H,
+                ),
+                "interior_center_m": (
+                    0.0,
+                    0.0,
+                    BOX_FLOOR_THICKNESS + 0.5 * BOX_INNER_H,
+                ),
+                "opening_top_z_m": BOX_FLOOR_THICKNESS + BOX_INNER_H,
+            }
+        candidates = _PACKING_ORIENTATION_CANDIDATES.get(object_id)
+        if candidates is None:
+            metadata = {}
+        else:
+            metadata = {
+                "kind": "PACKABLE_OBJECT",
+                "orientation_candidates": candidates,
+                "orientation_frame": "TARGET_REGION",
+                "bounds_source": "COLLISION_MESH",
+            }
+
+        return metadata
 
     # =================================================================
     # Reset

@@ -1,6 +1,14 @@
 from __future__ import annotations
 
+import pytest
+
+from tuj.m5_motion.attachment_retarget import (
+    ATTACHED_OBJECT_POSE_SUBJECT,
+    POSE_SUBJECT_KEY,
+    POSE_SUBJECT_OBJECT_ID_KEY,
+)
 from tuj.m5_motion.kinematics import IKResult, IKSolutionSet
+from tuj.m5_motion.mujoco_collision import CollisionCheckResult
 from tuj.m5_motion.path_planning import (
     CartesianEdgePlanner,
     PlannerDispatchEdgePlanner,
@@ -156,6 +164,161 @@ def test_cartesian_planner_seeds_each_intermediate_ik_from_previous_state() -> N
     assert result.joint_path[0] == (0.0,)
     assert result.joint_path[-1] == (1.0,)
     assert max(q[0] for q in result.joint_path) <= 1.0
+
+
+def test_cartesian_samples_retarget_attached_object_pose_to_eef_pose() -> None:
+    world = WorldSnapshot(
+        scene=SceneRef(signature="scene"),
+        robot_state=RobotState(
+            robot_id="planar",
+            joint_names=["x", "y"],
+            joint_positions_rad=[0.0, 0.0],
+            attached_object_id="target",
+        ),
+        objects={
+            "target": {
+                "pose": {
+                    "position_m": [1.0, 0.0, 0.0],
+                    "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                }
+            }
+        },
+        metadata={
+            "attached_object_transforms": {
+                "target": {
+                    "object_id": "target",
+                    "free_joint_name": "target_free",
+                    "reference_kind": "site",
+                    "reference_name": "grip_site",
+                    "position_in_reference_m": [0.1, 0.0, 0.0],
+                    "orientation_in_reference_xyzw": [0.0, 0.0, 0.0, 1.0],
+                }
+            }
+        },
+    )
+    keyframe = _keyframe(KeyframePlannerType.CARTESIAN)
+    keyframe.metadata = {
+        POSE_SUBJECT_KEY: ATTACHED_OBJECT_POSE_SUBJECT,
+        POSE_SUBJECT_OBJECT_ID_KEY: "target",
+    }
+    planner = CartesianEdgePlanner(
+        _PlanarKinematics(),
+        world,
+        lambda q, supplied: True,
+        translation_step_m=0.25,
+        max_joint_step_rad=0.1,
+    )
+
+    result = planner.plan((0.0, 0.0), (0.9, 0.0), None, keyframe)
+
+    assert result.valid
+    eef_x = [q[0] for q in result.joint_path]
+    assert eef_x[-1] == pytest.approx(0.9)
+    assert max(eef_x) <= 0.9
+    assert any(value == pytest.approx(0.225) for value in eef_x)
+
+
+class _NonConvergingKinematics:
+    def forward_pose_world(self, qpos):
+        return (qpos[0], 0.0, 0.0), (0.0, 0.0, 0.0, 1.0)
+
+    def solve_all_ik(self, world_pos, orientation_xyzw, **kwargs):
+        del world_pos, orientation_xyzw, kwargs
+        return IKSolutionSet(
+            attempted_seeds=13,
+            best_position_error_m=0.031,
+            best_orientation_error_rad=0.22,
+            failure_code="IK_NUMERICAL_NON_CONVERGENCE",
+            detail="iteration budget exhausted",
+            enumeration_complete=True,
+        )
+
+
+def test_cartesian_failure_reports_numerical_ik_diagnostics() -> None:
+    world = WorldSnapshot(
+        scene=SceneRef(signature="scene"),
+        robot_state=RobotState(
+            robot_id="non-converging",
+            joint_names=["x"],
+            joint_positions_rad=[0.0],
+        ),
+        objects={
+            "target": {
+                "pose": {
+                    "position_m": [1.0, 0.0, 0.0],
+                    "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                }
+            }
+        },
+    )
+    planner = CartesianEdgePlanner(
+        _NonConvergingKinematics(),
+        world,
+        lambda q, keyframe: True,
+        translation_step_m=0.25,
+    )
+
+    result = planner.plan(
+        (0.0,),
+        (1.0,),
+        None,
+        _keyframe(KeyframePlannerType.CARTESIAN),
+    )
+
+    assert not result.valid
+    assert result.failure_code == "CARTESIAN_INTERMEDIATE_IK_NON_CONVERGENCE"
+    assert "sample 1/4" in result.detail
+    assert "attempted_seeds=13" in result.detail
+    assert "iteration budget exhausted" in result.detail
+
+
+class _CollisionRejectingValidator:
+    def check(self, config, keyframe):
+        del config, keyframe
+        return CollisionCheckResult(
+            valid=False,
+            failure_code="COLLISION_MARGIN_VIOLATION",
+            detail="forearm <-> island",
+            min_clearance_m=-0.01,
+        )
+
+
+def test_cartesian_failure_distinguishes_valid_ik_from_invalid_state() -> None:
+    world = WorldSnapshot(
+        scene=SceneRef(signature="scene"),
+        robot_state=RobotState(
+            robot_id="planar",
+            joint_names=["x", "y"],
+            joint_positions_rad=[0.0, 0.0],
+        ),
+        objects={
+            "target": {
+                "pose": {
+                    "position_m": [1.0, 0.0, 0.0],
+                    "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                }
+            }
+        },
+    )
+    planner = CartesianEdgePlanner(
+        _PlanarKinematics(),
+        world,
+        _CollisionRejectingValidator(),
+        translation_step_m=0.25,
+    )
+
+    result = planner.plan(
+        (0.0, 0.0),
+        (1.0, 0.0),
+        None,
+        _keyframe(KeyframePlannerType.CARTESIAN),
+    )
+
+    assert not result.valid
+    assert result.failure_code == "CARTESIAN_INTERMEDIATE_STATE_INVALID"
+    assert "COLLISION_MARGIN_VIOLATION" in result.detail
+    assert "forearm <-> island" in result.detail
+    assert result.min_clearance_m == -0.01
 
 
 def test_rrt_connect_routes_around_invalid_joint_region() -> None:

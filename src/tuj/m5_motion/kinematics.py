@@ -67,6 +67,7 @@ class IKSolutionSet:
     attempted_seeds: int = 0
     solver_id: str = "MUJOCO_DLS_MULTI_START"
     enumeration_complete: bool = False
+    failure_code: str | None = None
     detail: str = ""
 
     @property
@@ -296,20 +297,34 @@ class UR5eKinematics:
         return self._envelope()[1]
 
     def _envelope(self) -> tuple[float, float]:
-        """(min, max) EEF distance from the base over the seed ladder + extremes.
+        """Conservative radial bound used only for impossible-target rejection.
 
-        A cheap pre-IK filter: a target outside this shell can never be reached,
-        so IK is not even attempted.
+        The former bound used the largest FK distance from a small seed set.
+        That was an observed lower bound on maximum reach, so it could reject a
+        reachable pose before IK ran.  The sum below is a triangle-inequality
+        upper bound over the complete base-to-EEF body chain, including
+        off-origin joint anchors and the configured TCP offset.
         """
         if getattr(self, "_cached_envelope", None) is None:
-            distances = []
-            for q in (*_SEED_LADDER, tuple(self._lower), tuple(self._upper)):
-                pos = self._forward(np.asarray(q, dtype=float))
-                distances.append(float(np.linalg.norm(pos)))
-            # Fully extended arm: sum of the planar link contributions.
-            stretched = self._forward(np.array([0.0, 0.0, 0.0, 0.0, 0.0, 0.0]))
-            distances.append(float(np.linalg.norm(stretched)))
-            self._cached_envelope = (0.0, max(distances))
+            chain: set[int] = set()
+            body_id = self._eef_id
+            while body_id > 0:
+                chain.add(body_id)
+                body_id = int(self._model.body_parentid[body_id])
+            upper = float(np.linalg.norm(self._target_position_in_eef))
+            upper += sum(
+                float(np.linalg.norm(self._model.body_pos[item]))
+                for item in chain
+            )
+            for joint_id in range(self._model.njnt):
+                if int(self._model.jnt_bodyid[joint_id]) not in chain:
+                    continue
+                joint_type = int(self._model.jnt_type[joint_id])
+                upper += 2.0 * float(np.linalg.norm(self._model.jnt_pos[joint_id]))
+                if joint_type == int(mujoco.mjtJoint.mjJNT_SLIDE):
+                    lower, higher = self._model.jnt_range[joint_id]
+                    upper += max(abs(float(lower)), abs(float(higher)))
+            self._cached_envelope = (0.0, upper + 1e-6)
         return self._cached_envelope
 
     def _forward(self, qpos: np.ndarray) -> np.ndarray:
@@ -483,9 +498,10 @@ class UR5eKinematics:
             return IKSolutionSet(
                 best_position_error_m=distance - reach,
                 attempted_seeds=0,
+                failure_code="TARGET_OUTSIDE_CONSERVATIVE_REACH",
                 detail=(
                     f"target is {distance:.3f} m from the base, beyond the "
-                    f"{reach:.3f} m envelope"
+                    f"conservative {reach:.3f} m reach bound"
                 ),
             )
 
@@ -603,6 +619,9 @@ class UR5eKinematics:
             best_position_error_m=best_position,
             best_orientation_error_rad=best_orientation,
             attempted_seeds=len(seeds),
+            failure_code=(
+                None if solutions else "IK_NUMERICAL_NON_CONVERGENCE"
+            ),
             detail=(
                 f"found {len(solutions)} distinct IK branches"
                 if solutions

@@ -7,7 +7,12 @@ from types import SimpleNamespace
 import pytest
 
 from tuj.m5_motion.kinematics import IKResult, IKSolutionSet
-from tuj.m5_motion.pipeline import CollisionPlanningSetup, MotionPlanningPipeline
+from tuj.m5_motion.pipeline import (
+    CollisionPlanningSetup,
+    MotionPlanningPipeline,
+    MotionPlanningPipelineError,
+)
+from tuj.m5_motion.plan_builder import MotionPlanBuilder
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
     CollisionContext,
@@ -30,6 +35,7 @@ from tuj.m5_motion.vlm_provider import (
     OpenAIKeyframeProvider,
     OpenAIKeyframeProviderConfig,
 )
+from tuj.m5_motion.trajectory_processing import TrajectoryProcessingError
 
 
 def _request() -> MotionPlanRequest:
@@ -157,6 +163,32 @@ class _FakeKinematics:
         )
 
 
+class _OutsideReachKinematics:
+    def solve_all_ik(self, position, orientation, **kwargs):
+        del position, orientation, kwargs
+        return IKSolutionSet(
+            best_position_error_m=0.25,
+            best_orientation_error_rad=0.0,
+            attempted_seeds=0,
+            failure_code="TARGET_OUTSIDE_CONSERVATIVE_REACH",
+            detail="target is 0.25 m beyond the conservative reach envelope",
+        )
+
+
+class _CollisionRejectingValidator:
+    def __call__(self, qpos, keyframe):
+        del qpos, keyframe
+        return False
+
+    def check(self, qpos, keyframe):
+        del qpos, keyframe
+        return SimpleNamespace(
+            valid=False,
+            failure_code="COLLISION_MARGIN_VIOLATION",
+            detail="held object intersects packing-box wall",
+        )
+
+
 def test_openai_candidates_are_robot_filtered_and_finalized() -> None:
     provider = OpenAIKeyframeProvider(
         OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
@@ -192,6 +224,149 @@ def test_openai_candidates_are_robot_filtered_and_finalized() -> None:
     ]
     assert kinematics.endpoint_seeds
     assert all(seed is None for seed in kinematics.endpoint_seeds)
+
+
+def test_pipeline_preserves_raw_ik_diagnostics_and_reach_failure_code() -> None:
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(),
+    )
+    pipeline = MotionPlanningPipeline(provider, _OutsideReachKinematics())
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    with pytest.raises(MotionPlanningPipelineError) as caught:
+        pipeline.plan(
+            _request(),
+            state_validator=lambda q, keyframe: True,
+            collision_contexts={context.context_id: context},
+            initial_collision_context_id=context.context_id,
+            final_segment_validator=lambda waypoints, selected_context: True,
+        )
+
+    attempt = caught.value.compilation.attempts[0]
+    diagnostic = attempt.ik_diagnostics[0]
+    assert attempt.failure_code == "TARGET_OUTSIDE_REACH_ENVELOPE"
+    assert diagnostic.raw_ik_count == 0
+    assert diagnostic.valid_ik_count == 0
+    assert diagnostic.attempted_seeds == 0
+    assert diagnostic.solver_failure_code == "TARGET_OUTSIDE_CONSERVATIVE_REACH"
+    assert diagnostic.best_position_error_m == pytest.approx(0.25)
+    assert "conservative reach envelope" in diagnostic.solver_detail
+    assert "conservative reach envelope" in diagnostic.validity_detail
+
+
+def test_pipeline_distinguishes_collision_filtered_ik_branches() -> None:
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(),
+    )
+    pipeline = MotionPlanningPipeline(provider, _FakeKinematics())
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    with pytest.raises(MotionPlanningPipelineError) as caught:
+        pipeline.plan(
+            _request(),
+            state_validator=_CollisionRejectingValidator(),
+            collision_contexts={context.context_id: context},
+            initial_collision_context_id=context.context_id,
+            final_segment_validator=lambda waypoints, selected_context: True,
+        )
+
+    attempt = caught.value.compilation.attempts[0]
+    assert attempt.failure_code == "COLLISION_FILTERED_ALL"
+    assert attempt.ik_diagnostics[0].raw_ik_count == 1
+    assert attempt.ik_diagnostics[0].valid_ik_count == 0
+
+
+def test_pipeline_retries_after_connected_strategy_fails_final_validation() -> None:
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(),
+    )
+    pipeline = MotionPlanningPipeline(provider, _FakeKinematics())
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    result = pipeline.plan(
+        _request(),
+        state_validator=lambda q, keyframe: True,
+        collision_contexts={context.context_id: context},
+        initial_collision_context_id=context.context_id,
+        final_segment_validator=lambda waypoints, selected_context: (
+            bool(waypoints)
+            and selected_context.context_id == context.context_id
+            and waypoints[-1].joint_positions_rad[0] > 0.42
+        ),
+    )
+
+    assert result.compilation.connected is not None
+    assert result.compilation.connected.strategy_id.endswith(":connected")
+    assert [attempt.failure_code for attempt in result.compilation.attempts] == [
+        "FINAL_VALIDATION_FAILED",
+        None,
+    ]
+    assert result.compilation.attempts[0].strategy_id.endswith(":blocked")
+
+
+@pytest.mark.parametrize(
+    "build_error",
+    [
+        TrajectoryProcessingError("invalid time parameterization"),
+        ValueError("invalid motion plan payload"),
+    ],
+)
+def test_pipeline_retries_after_non_build_validation_error(build_error) -> None:
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(),
+    )
+    delegate = MotionPlanBuilder()
+
+    class FailFirstBuilder:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def build(self, *args, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                raise build_error
+            return delegate.build(*args, **kwargs)
+
+    pipeline = MotionPlanningPipeline(
+        provider,
+        _FakeKinematics(),
+        plan_builder=FailFirstBuilder(),
+    )
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    result = pipeline.plan(
+        _request(),
+        state_validator=lambda q, keyframe: True,
+        collision_contexts={context.context_id: context},
+        initial_collision_context_id=context.context_id,
+        final_segment_validator=lambda waypoints, selected_context: True,
+    )
+
+    assert [attempt.failure_code for attempt in result.compilation.attempts] == [
+        "FINAL_VALIDATION_FAILED",
+        None,
+    ]
+    assert type(build_error).__name__ in result.compilation.attempts[0].detail
 
 
 def test_pipeline_accepts_one_artifact_aware_collision_factory() -> None:

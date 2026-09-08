@@ -317,6 +317,8 @@ def _replay_template(
 
 def main() -> int:
     _install_source_roots()
+    from tuj.m5_motion.precomputed_ee_attach import portable_ee_path_directory_for
+
     args = _parse_args()
     repository = args.repository.expanduser().resolve()
     output = (
@@ -325,7 +327,7 @@ def main() -> int:
         else repository
         / "configs"
         / "precomputed_ee_paths"
-        / "ee_rack"
+        / portable_ee_path_directory_for(args.environment)
         / f"bare_to_{args.target_ee}.json"
     )
     if args.replay_existing and not output.is_file():

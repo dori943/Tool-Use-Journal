@@ -335,6 +335,63 @@ def add_container_seal_pres(subgoals: list[dict]) -> list[str]:
     return logs
 
 
+def add_container_packing_sequence_pres(
+    subgoals: list[dict], target_order: list[str]
+) -> list[str]:
+    """Encode a task-owned packing sequence as cross-group causal links."""
+    for subgoal in subgoals:
+        for detail in subgoal.get("details", []):
+            detail["pre"] = [
+                condition
+                for condition in detail.get("pre", [])
+                if condition.get("auto") != "container_packing_sequence"
+            ]
+
+    by_target: dict[str, dict] = {}
+    for subgoal in subgoals:
+        targets = subgoal.get("target_ids") or []
+        if subgoal.get("kind") == "relocate" and len(targets) == 1:
+            by_target[targets[0]] = subgoal
+
+    ordered = [target for target in target_order if target in by_target]
+    logs: list[str] = []
+    for rank, (previous_id, current_id) in enumerate(
+        zip(ordered, ordered[1:]), start=1
+    ):
+        previous = by_target[previous_id]
+        current = by_target[current_id]
+        container = previous.get("container_id")
+        if not container or current.get("container_id") != container:
+            continue
+
+        established_expr = f"in({previous_id}, {container})"
+        if not any(
+            effect.get("expr") == established_expr
+            for detail in previous.get("details", [])
+            for effect in detail.get("establish", [])
+        ):
+            continue
+        if not current.get("details"):
+            continue
+
+        first = current["details"][0]
+        first.setdefault("pre", []).append(
+            {
+                "id": f"{first['detail_id']}_p{len(first.get('pre', []))}",
+                "expr": established_expr,
+                "head": "in",
+                "eval_by": "m2",
+                "auto": "container_packing_sequence",
+                "packing_rank": rank,
+            }
+        )
+        logs.append(
+            f"  [적재 순서] {previous_id} -> {current_id}: "
+            f"{previous_id}를 {container}에 넣은 뒤 다음 물체 확보"
+        )
+    return logs
+
+
 def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
     """causal link / threat → DAG 엣지 + mutex.
 
@@ -362,7 +419,8 @@ def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
             # 예외(0908): 받침 도착(auto=base_arrival, 접시가 트레이에 담긴 뒤에야 그 위에 쌓기)도 동일.
             for a in producers:
                 if a["group_id"] == b["group_id"] or p.get("auto") in (
-                        "container_seal", "instruction_order", "base_arrival"):
+                        "container_seal", "container_packing_sequence",
+                        "instruction_order", "base_arrival"):
                     edges.append({"from": a["detail_id"], "to": b["detail_id"],
                                   "why": f"causal_link: {p['expr']}"})
             # 그룹 밖 생산자만 있으면(예: hand_empty) 배타 자원 — mutex

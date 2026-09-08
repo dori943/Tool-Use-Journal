@@ -430,10 +430,12 @@ def _parse_args() -> argparse.Namespace:
 
 def main() -> int:
     _install_source_roots()
+    from tuj.m5_motion.precomputed_ee_attach import portable_ee_path_directory_for
+
     args = _parse_args()
     repository = args.repository.expanduser().resolve()
     registry_root = repository / "configs" / "precomputed_ee_paths"
-    shared_rack_root = registry_root / "ee_rack"
+    shared_rack_root = registry_root / portable_ee_path_directory_for(args.environment)
     attach_path = shared_rack_root / f"bare_to_{args.source_ee}.json"
     output = (
         args.output.expanduser().resolve()

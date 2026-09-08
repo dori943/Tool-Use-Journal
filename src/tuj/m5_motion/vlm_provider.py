@@ -193,13 +193,15 @@ def _frame_catalog(request: MotionPlanRequest) -> list[dict[str, Any]]:
 
 
 def _prompt_payload(request: MotionPlanRequest, candidate_count: int) -> dict[str, Any]:
+    from tuj.m5_motion.scene_context import spatial_record
+
     task = request.task.model_dump(mode="json", exclude={"metadata"})
     world = {
         "scene": request.world.scene.model_dump(mode="json"),
         "robot_state": request.world.robot_state.model_dump(mode="json"),
-        "objects": request.world.objects,
+        "objects": {key: spatial_record(value) for key, value in request.world.objects.items()},
         "obstacles": request.world.obstacles,
-        "rack": request.world.rack,
+        "rack": {key: spatial_record(value, rack=True) for key, value in request.world.rack.items()},
     }
     return _without_sensitive_values(
         {
@@ -351,18 +353,19 @@ class OpenAIKeyframeProvider:
                 try:
                     events: list[KeyframeEventType] = []
                     event_target_id: str | None = None
-                    is_vacuum = request.task.ee.strip().lower() in {
-                        "vac",
-                        "vacuum",
-                        "suction",
+                    ee_capabilities = {
+                        str(value).strip().lower()
+                        for value in request.task.metadata.get("ee_capabilities", [])
+                        if isinstance(value, str)
                     }
+                    uses_suction = "suction" in ee_capabilities
                     picks_resource = is_acquire_task(request.task)
                     releases_resource = is_release_task(request.task)
                     if picks_resource and item.keyframe_type is KeyframeType.GRASP:
                         events = [
                             (
                                 KeyframeEventType.SUCTION_ON
-                                if is_vacuum
+                                if uses_suction
                                 else KeyframeEventType.GRIPPER_CLOSE
                             )
                         ]
@@ -375,7 +378,7 @@ class OpenAIKeyframeProvider:
                             events.append(KeyframeEventType.DETACH_OBJECT)
                         events.append(
                             KeyframeEventType.SUCTION_OFF
-                            if is_vacuum
+                            if uses_suction
                             else KeyframeEventType.GRIPPER_OPEN
                         )
                         event_target_id = request.task.goal.target_object_id

@@ -329,6 +329,7 @@ def filter_ik_solutions(
         if rejection_summaries
         else ""
     )
+    solver_detail = f"; solver: {solutions.detail}" if solutions.detail else ""
     return IKSolutionSet(
         solutions=valid,
         best_position_error_m=solutions.best_position_error_m,
@@ -336,8 +337,9 @@ def filter_ik_solutions(
         attempted_seeds=solutions.attempted_seeds,
         solver_id=solutions.solver_id,
         enumeration_complete=solutions.enumeration_complete,
+        failure_code=solutions.failure_code,
         detail=(
             f"{len(valid)}/{len(solutions.solutions)} IK branches passed state validity"
-            f"{rejection_detail}"
+            f"{rejection_detail}{solver_detail}"
         ),
     )

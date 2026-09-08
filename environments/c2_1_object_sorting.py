@@ -29,6 +29,7 @@ from robosuite.utils.placement_samplers import (
 )
 
 from environments.ee_rack import add_ee_rack
+from environments.task_camera import add_standard_task_camera
 from environments.objects import (
     AppleObject,
     BreadObject,
@@ -175,7 +176,7 @@ class C2_1_ObjectSorting(ManipulationEnv):
         placement_initializer=None,
         has_renderer=False,
         has_offscreen_renderer=True,
-        render_camera="frontview",
+        render_camera="agentview",
         render_collision_mesh=False,
         render_visual_mesh=True,
         render_gpu_device_id=-1,
@@ -443,6 +444,13 @@ class C2_1_ObjectSorting(ManipulationEnv):
             mujoco_objects=(
                 all_objects
             ),
+        )
+
+        self._standard_camera = add_standard_task_camera(
+            self.model,
+            robot_base_xy=(ROBOT_BASE_X, 0.0),
+            robot_base_yaw_rad=0.0,
+            surface_z=float(self.table_offset[2]),
         )
 
 

@@ -51,3 +51,26 @@ def test_full_pose_ik_prefers_a_supplied_local_seed(kinematics) -> None:
         abs(actual - expected)
         for actual, expected in zip(result.solutions[0].qpos, seed_q)
     ) <= 1e-9
+
+
+@pytest.mark.parametrize(
+    "joint_config",
+    (
+        (0.0, -1.57, 1.57, -1.57, -1.57, 0.0),
+        (0.7, -2.1, 1.2, -0.8, 1.0, -0.4),
+        (-1.4, -0.6, 0.4, -2.2, -1.1, 1.8),
+    ),
+)
+def test_conservative_reach_bound_never_rejects_forward_kinematics_pose(
+    kinematics, joint_config
+) -> None:
+    position, orientation = kinematics.forward_pose_world(joint_config)
+
+    result = kinematics.solve_all_ik(
+        position,
+        orientation,
+        seed_qpos=joint_config,
+    )
+
+    assert result.failure_code != "TARGET_OUTSIDE_CONSERVATIVE_REACH"
+    assert result.solved

@@ -1,6 +1,7 @@
 """M1 — Scene Abstraction: bbox 노드 + coarse 관계. 태스크 무관, 에피소드당 1회.
 
-출력 노드: {id, class, center_mm, bbox_mm} (+ 내부용 _points — M3 질의에서 사용)
+출력 노드: {id, canonical_id, class, center_mm, bbox_mm, geometry}
+(+ 내부용 _points — M3 질의에서 사용)
 출력 엣지: on / inside / overlaps / near (bbox 산술만)
 common/schemas.py 의 scene 스키마와 정합 필요 시 serialize() 결과를 검증에 통과시킬 것.
 """
@@ -21,11 +22,15 @@ def build_m1(objects) -> dict:
     for o in objects:
         pts = mad_filter(o["points"])
         lo, hi = pts.min(axis=0), pts.max(axis=0)
+        center = [round(float(c), 1) for c in (lo + hi) / 2]
+        bbox_size = [round(float(s), 1) for s in hi - lo]
         nodes.append({
             "id": f"obj_{o['cls']}_{o['name']}",
+            "canonical_id": str(o["name"]),
             "class": o["cls"],
-            "center_mm": [round(float(c), 1) for c in (lo + hi) / 2],
-            "bbox_mm": [round(float(s), 1) for s in hi - lo],
+            "center_mm": center,
+            "bbox_mm": bbox_size,
+            "geometry": {"center": center, "aabb_size": bbox_size},
             "_points": pts,
         })
     return {"nodes": nodes, "edges": coarse_relations(nodes)}
@@ -65,8 +70,16 @@ def coarse_clearance(passer_bbox_mm, opening_mm) -> dict:
 
 def serialize(m1: dict) -> dict:
     """점군 제외 JSON-직렬화 형태 (M2 전달용 · schemas.py 검증 대상)."""
-    return {"nodes": [{k: v for k, v in n.items() if k != "_points"} for n in m1["nodes"]],
-            "edges": m1["edges"]}
+    result = {
+        "nodes": [
+            {k: v for k, v in n.items() if k != "_points"}
+            for n in m1["nodes"]
+        ],
+        "edges": m1["edges"],
+    }
+    if "geometry_metadata" in m1:
+        result["geometry_metadata"] = m1["geometry_metadata"]
+    return result
 
 
 # ── bbox 산술 ──

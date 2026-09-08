@@ -281,15 +281,30 @@ class _CollisionChecker:
         return _CollisionResult(valid=True)
 
 
+class _ForwardKinematics:
+    def __init__(self, pose: Pose) -> None:
+        self.pose = pose
+
+    def forward_pose_world(self, joint_positions_rad):
+        assert len(joint_positions_rad) == 6
+        return self.pose.position_m, self.pose.orientation_xyzw
+
+
 def _planner(
     root: Path,
     *,
     checker: _CollisionChecker | None = None,
+    forward_pose: Pose | None = None,
 ) -> tuple[PrecomputedEEAttachPlanner, _CollisionChecker]:
     selected_checker = checker or _CollisionChecker()
     return (
         PrecomputedEEAttachPlanner(
             PrecomputedEEAttachRegistry(root),
+            forward_kinematics=(
+                _ForwardKinematics(forward_pose)
+                if forward_pose is not None
+                else None
+            ),
             joint_position_limits_rad=[(-6.3, 6.3)] * 6,
             log=lambda _: None,
         ),
@@ -376,12 +391,54 @@ def test_registry_reuses_shared_portable_path_for_another_environment(
     )
     _write_shared_template(tmp_path, template)
 
-    loaded = PrecomputedEEAttachRegistry(tmp_path).load(
-        "C4_2_DiagonalFitPacking", "2F"
-    )
+    registry = PrecomputedEEAttachRegistry(tmp_path)
+    loaded = registry.load("C4_2_DiagonalFitPacking", "2F")
 
     assert loaded.trajectory_id == template.trajectory_id
     assert loaded.environment_name == "C1_1_LegoSweep"
+    assert registry.last_resolution == {
+        "mode": "portable",
+        "directory": "ee_rack",
+        "path": str(tmp_path / "ee_rack" / "bare_to_2F.json"),
+    }
+
+
+def test_registry_selects_kitchen_portable_directory(tmp_path: Path) -> None:
+    from tuj.m5_motion.precomputed_ee_attach import (
+        portable_ee_path_directory_for,
+    )
+
+    assert portable_ee_path_directory_for("C1_2_DoughFlatten") == "ee_rack_kitchen"
+    assert portable_ee_path_directory_for("C2_2_SandwichAssembly") == "ee_rack_kitchen"
+    assert portable_ee_path_directory_for("C3_2_BreakfastTrayPreparation") == (
+        "ee_rack_kitchen"
+    )
+    assert portable_ee_path_directory_for("C4_1_IntervalFitExtraction") == (
+        "ee_rack_kitchen"
+    )
+    assert portable_ee_path_directory_for("C4_2_DiagonalFitPacking") == "ee_rack"
+    assert portable_ee_path_directory_for("C1_1_LegoSweep") == "ee_rack"
+    assert portable_ee_path_directory_for("C2_1_ObjectSorting") == "ee_rack"
+    assert portable_ee_path_directory_for("C3_1_ObjectSorting") == "ee_rack"
+
+    source_request = _request("2F")
+    template = _make_portable(
+        _template(source_request, _contexts("2F")), source_request.world
+    )
+    kitchen = tmp_path / "ee_rack_kitchen" / "bare_to_2F.json"
+    kitchen.parent.mkdir(parents=True, exist_ok=True)
+    kitchen.write_text(template.model_dump_json(indent=2), encoding="utf-8")
+    # Table-family shared cache must not be selected for kitchen envs.
+    _write_shared_template(tmp_path, template.model_copy(deep=True))
+
+    registry = PrecomputedEEAttachRegistry(tmp_path)
+    loaded = registry.load("C1_2_DoughFlatten", "2F")
+    assert loaded.trajectory_id == template.trajectory_id
+    assert registry.last_resolution == {
+        "mode": "portable",
+        "directory": "ee_rack_kitchen",
+        "path": str(kitchen),
+    }
 
 
 def test_registry_does_not_scan_another_task_directory(tmp_path: Path) -> None:
@@ -441,7 +498,9 @@ def test_portable_path_rebases_poses_and_revalidates_current_scene(
         )
         for key, value in source_contexts.items()
     }
-    planner, checker = _planner(tmp_path)
+    planner, checker = _planner(
+        tmp_path, forward_pose=request.world.robot_state.eef_pose
+    )
 
     plan = planner.plan(
         request,
@@ -477,7 +536,9 @@ def test_portable_path_rejects_changed_rack_relative_geometry(
     request = source_request.model_copy(deep=True)
     request.world = _translate_world(request.world, (2.5, -3.2, 0.12))
     request.world.rack["2F"]["dock_pose"]["position_m"][0] += 0.001
-    planner, checker = _planner(tmp_path)
+    planner, checker = _planner(
+        tmp_path, forward_pose=request.world.robot_state.eef_pose
+    )
 
     with pytest.raises(PrecomputedEEPathError) as captured:
         planner.plan(
@@ -490,6 +551,36 @@ def test_portable_path_rejects_changed_rack_relative_geometry(
         captured.value.failure_code
         is EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH
     )
+
+
+def test_portable_path_rejects_rack_motion_without_matching_robot_fk(
+    tmp_path: Path,
+) -> None:
+    source_request = _request("2F")
+    contexts = _contexts("2F")
+    template = _make_portable(
+        _template(source_request, contexts), source_request.world
+    )
+    _write_shared_template(tmp_path, template)
+    request = source_request.model_copy(deep=True)
+    request.world = _translate_world(request.world, (2.5, -3.2, 0.12))
+    planner, checker = _planner(
+        tmp_path,
+        forward_pose=source_request.world.robot_state.eef_pose,
+    )
+
+    with pytest.raises(PrecomputedEEPathError) as captured:
+        planner.plan(
+            request,
+            collision_contexts=contexts,
+            collision_checker=checker,
+        )
+
+    assert (
+        captured.value.failure_code
+        is EEAttachPathFailureCode.WORKCELL_SIGNATURE_MISMATCH
+    )
+    assert "robot-to-rack start position error" in captured.value.detail
 
 
 def test_start_joint_mismatch_is_fail_closed(tmp_path: Path) -> None:

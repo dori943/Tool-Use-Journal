@@ -19,6 +19,8 @@ from tuj.m5_motion.generic_runner import (
     load_selected_plan,
     load_world,
     main,
+    truncate_after_first_acquire,
+    truncate_after_subgoal,
     validate_selected_plan,
 )
 from tuj.m5_motion.schema import RobotState, SceneRef, WorldSnapshot
@@ -294,6 +296,42 @@ def test_generic_validation_accepts_current_m4_tool_resource_contract() -> None:
     assert report["resources"][2]["target_ids"] == ["light_plate"]
 
 
+def test_stop_after_pick_truncates_follow_on_work_and_terminal_steps() -> None:
+    selected = _m4_tool_contract_selected()
+    selected.steps.append(
+        PlanStep(
+            step_index=99,
+            kind="transition",
+            action="DETACH_EE",
+            subgoal_id=None,
+        )
+    )
+
+    result = truncate_after_first_acquire(selected)
+
+    assert result.subgoal_order == ["pick-tool"]
+    assert [item.subgoal_id for item in result.candidate_assignments] == [
+        "pick-tool"
+    ]
+    assert all(step.subgoal_id == "pick-tool" for step in result.steps)
+
+
+def test_stop_after_named_subgoal_keeps_prefix_only() -> None:
+    selected = _m4_tool_contract_selected()
+
+    result = truncate_after_subgoal(selected, "sweep-blocks")
+
+    assert result.subgoal_order == ["pick-tool", "sweep-blocks"]
+    assert {item.subgoal_id for item in result.candidate_assignments} == {
+        "pick-tool",
+        "sweep-blocks",
+    }
+    assert all(
+        step.subgoal_id in {"pick-tool", "sweep-blocks"}
+        for step in result.steps
+    )
+
+
 def test_generic_cli_validates_explicit_task_and_world_files(tmp_path) -> None:
     task_path = tmp_path / "another_task.json"
     task_path.write_text(
@@ -441,7 +479,6 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
             str(output_dir),
             "--video",
             str(video_path),
-            "--no-scripted-grasps",
         ]
     )
 
@@ -459,11 +496,10 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
 
 
 @pytest.mark.parametrize("mode_args", [
-    ["--simulate", "controller"],
-    ["--video", "test.mp4"],
     ["--simulate", "controller", "--scripted-grasps"],
+    ["--video", "test.mp4", "--scripted-grasps"],
 ])
-def test_controller_defaults_to_scripted_before_constructing_planner(
+def test_explicit_scripted_mode_runs_before_constructing_planner(
     tmp_path, monkeypatch, mode_args
 ):
     from tuj.m5_motion.scripted_grasps import cli

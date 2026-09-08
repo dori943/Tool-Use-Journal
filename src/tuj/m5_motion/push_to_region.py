@@ -82,6 +82,42 @@ def _record_geometry(
     return position, dimensions
 
 
+def _record_box_geometry(
+    world: WorldSnapshot,
+    object_id: str,
+) -> tuple[np.ndarray, np.ndarray, np.ndarray, np.ndarray]:
+    position, dimensions = _record_geometry(world, object_id)
+    record = world.objects[object_id]
+    pose = record["pose"]
+    raw_orientation = pose.get("orientation_xyzw", (0.0, 0.0, 0.0, 1.0))
+    try:
+        rotation = quaternion_matrix_xyzw(raw_orientation)
+    except (TypeError, ValueError) as error:
+        raise PushToRegionError(
+            f"object {object_id!r} requires a valid orientation"
+        ) from error
+    center = np.zeros(3, dtype=float)
+    anchors = record.get("anchors")
+    raw_center = anchors.get("center") if isinstance(anchors, Mapping) else None
+    if isinstance(raw_center, Mapping):
+        raw_center = next(
+            (
+                raw_center.get(key)
+                for key in ("position_m", "position", "pos", "xyz")
+                if key in raw_center
+            ),
+            None,
+        )
+    if raw_center is not None:
+        candidate = np.asarray(raw_center, dtype=float)
+        if candidate.shape != (3,) or not np.all(np.isfinite(candidate)):
+            raise PushToRegionError(
+                f"object {object_id!r} has an invalid center anchor"
+            )
+        center = candidate
+    return position, rotation, center, dimensions
+
+
 def _record_position(world: WorldSnapshot, object_id: str) -> np.ndarray:
     record = world.objects.get(object_id)
     pose = record.get("pose") if isinstance(record, Mapping) else None
@@ -168,13 +204,115 @@ def target_fully_inside_region(
     target_id: str,
     region_id: str,
     inset_margin_m: float = 0.0,
+    include_vertical: bool = False,
 ) -> bool:
-    target_position, target_size = _record_geometry(world, target_id)
-    region_position, region_size = _record_geometry(world, region_id)
-    available = region_size[:2] * 0.5 - target_size[:2] * 0.5 - inset_margin_m
+    if inset_margin_m < 0.0:
+        raise ValueError("inset margin must be non-negative")
+    target_position, target_rotation, target_center, target_size = (
+        _record_box_geometry(world, target_id)
+    )
+    region_position, region_rotation, region_center, region_size = (
+        _record_box_geometry(world, region_id)
+    )
+    target_record = world.objects[target_id]
+    raw_collision_points = target_record.get("collision_points_m")
+    collision_points = np.asarray(raw_collision_points, dtype=float)
+    if (
+        collision_points.ndim == 2
+        and collision_points.shape[1:] == (3,)
+        and collision_points.shape[0] > 0
+        and np.all(np.isfinite(collision_points))
+    ):
+        target_points_local = collision_points
+    else:
+        signs = np.asarray(
+            [
+                (x, y, z)
+                for x in (-1.0, 1.0)
+                for y in (-1.0, 1.0)
+                for z in (-1.0, 1.0)
+            ],
+            dtype=float,
+        )
+        target_points_local = target_center + signs * (target_size * 0.5)
+    target_points_world = (
+        target_position + (target_rotation @ target_points_local.T).T
+    )
+    target_points_in_region = (
+        region_rotation.T @ (target_points_world - region_position).T
+    ).T
+    region_record = world.objects[region_id]
+    region_metadata = region_record.get("packing_metadata")
+    if isinstance(region_metadata, Mapping):
+        interior_size = np.asarray(
+            region_metadata.get("interior_dimensions_m"), dtype=float
+        )
+        interior_center = np.asarray(
+            region_metadata.get("interior_center_m"), dtype=float
+        )
+        if (
+            interior_size.shape == (3,)
+            and interior_center.shape == (3,)
+            and np.all(np.isfinite(interior_size))
+            and np.all(interior_size > 0.0)
+            and np.all(np.isfinite(interior_center))
+        ):
+            region_size = interior_size
+            region_center = interior_center
+    axes = 3 if include_vertical else 2
+    lower = region_center[:axes] - region_size[:axes] * 0.5 + inset_margin_m
+    upper = region_center[:axes] + region_size[:axes] * 0.5 - inset_margin_m
+    values = target_points_in_region[:, :axes]
+    # MuJoCo's soft wall contacts can leave roughly one millimetre of apparent
+    # collision-mesh penetration when a long body is pressed between both box
+    # walls.  This still rejects genuine rim overhangs (the diagnosed failure
+    # was 16.8 mm) while avoiding contact-solver false negatives.
+    contact_tolerance_m = 1.5e-3
     return bool(
-        np.all(available >= 0.0)
-        and np.all(np.abs(target_position[:2] - region_position[:2]) <= available)
+        np.all(lower <= upper)
+        and np.all(values >= lower - contact_tolerance_m)
+        and np.all(values <= upper + contact_tolerance_m)
+    )
+
+
+def target_above_region(
+    world: WorldSnapshot,
+    *,
+    target_id: str,
+    region_id: str,
+    horizontal_tolerance_m: float = 0.0,
+    vertical_tolerance_m: float = 0.01,
+) -> bool:
+    """Check an ``above`` postcondition without requiring full containment."""
+
+    if horizontal_tolerance_m < 0.0 or vertical_tolerance_m < 0.0:
+        raise ValueError("above tolerances must be non-negative")
+    target_position, target_rotation, target_center, target_size = (
+        _record_box_geometry(world, target_id)
+    )
+    region_position, region_rotation, region_center, region_size = (
+        _record_box_geometry(world, region_id)
+    )
+    target_center_world = target_position + target_rotation @ target_center
+    target_center_in_region = region_rotation.T @ (
+        target_center_world - region_position
+    )
+    horizontal_limit = region_size[:2] * 0.5 + horizontal_tolerance_m
+    horizontally_aligned = np.all(
+        np.abs(target_center_in_region[:2] - region_center[:2])
+        <= horizontal_limit
+    )
+    target_half_extent_along_region_z = float(
+        np.dot(
+            np.abs(region_rotation[:, 2] @ target_rotation),
+            target_size * 0.5,
+        )
+    )
+    target_bottom = target_center_in_region[2] - target_half_extent_along_region_z
+    region_top = region_center[2] + region_size[2] * 0.5
+    return bool(
+        horizontally_aligned
+        and target_bottom >= region_top - vertical_tolerance_m
     )
 
 

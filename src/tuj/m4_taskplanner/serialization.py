@@ -51,6 +51,7 @@ class CandidateAssignment(BaseModel):
     candidate_id: str
     group_id: str | None = None
     ee: str
+    ee_capabilities: list[str] = Field(default_factory=list)
     tool: str | None = None
     action_type: str | None = None
     mode: str | None = None

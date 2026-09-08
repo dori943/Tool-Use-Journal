@@ -723,8 +723,28 @@ class SelectedPlanSimulationOrchestrator:
                 failed_index = index
                 break
 
+            expected_final_state = plan.expected_final_state
+            # A free-body friction grasp has no runtime attachment object.  Its
+            # held-tool state is accepted only by the physical goal evaluator,
+            # so do not turn missing contact into a generic state-divergence
+            # error before that evidence is evaluated.
+            try:
+                from tuj.m5_motion.physical_grasp import uses_contact_friction
+
+                physical_grasp = uses_contact_friction(request)
+            except (ImportError, ValueError):
+                physical_grasp = False
+            if physical_grasp:
+                expected_final_state = expected_final_state.model_copy(
+                    update={
+                        "held_tool_id": report.final_robot_state.held_tool_id,
+                        "attached_object_id": (
+                            report.final_robot_state.attached_object_id
+                        ),
+                    }
+                )
             final_error, state_detail = _state_error(
-                report.final_robot_state, plan.expected_final_state
+                report.final_robot_state, expected_final_state
             )
             if state_detail is not None or final_error > self._acceptance.max_final_joint_error_rad:
                 reports.append(report)

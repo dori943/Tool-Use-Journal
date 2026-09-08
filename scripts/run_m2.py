@@ -38,6 +38,37 @@ from task_registry import instruction as task_instruction
 MAX_REDECOMPOSE = 2                     # 피드백 재분해 상한 (왕복이 없어 M2 안에서 끝낸다)
 
 
+def apply_task_packing_policy(out, policy_path):
+    """Apply every requested adjacent packing precedence or fail atomically."""
+    from tuj.m2_subgoal.core import (
+        add_container_packing_sequence_pres,
+        partial_order,
+    )
+
+    with open(policy_path, encoding="utf-8") as f:
+        packing_policy = json.load(f)
+    target_order = packing_policy["target_order"]
+    logs = add_container_packing_sequence_pres(
+        out["m2_subgoals"], target_order
+    )
+    expected = max(0, len(target_order) - 1)
+    if len(logs) != expected:
+        raise ValueError(
+            "packing policy did not resolve every adjacent target pair: "
+            f"expected {expected}, got {len(logs)}"
+        )
+    all_details = [
+        detail
+        for subgoal in out["m2_subgoals"]
+        for detail in subgoal["details"]
+    ]
+    out["m2_partial_order"], out["m2_mutex"] = partial_order(all_details)
+    out["m2_packing_policy"] = packing_policy
+    out["m2_stats"]["n_edges"] = len(out["m2_partial_order"])
+    out["m2_stats"]["n_mutex"] = len(out["m2_mutex"])
+    return logs
+
+
 def _serialized(m1: dict) -> dict:
     """분해 LLM에 넘길 M1 뷰 — 점군만 뺀다 (접지값은 프롬프트 컨텍스트로 유용)."""
     return {"nodes": [{k: v for k, v in n.items() if k != "_points"} for n in m1["nodes"]],
@@ -125,6 +156,14 @@ def main():
     if unresolved:
         print(f"[M2] 경고: 도구 미확정 서브골 {unresolved} — assemble_gk에서 멈춥니다")
     out["m2_stats"]["llm_usage"] = rough.usage
+
+    # A task-owned packing order is a hard execution constraint. If M1/M2
+    # identifiers drift and even one adjacent pair cannot be linked, do not
+    # emit an apparently valid DAG without the policy.
+    policy_path = os.path.join(_ROOT, "configs", f"{name}_packing_policy.json")
+    if os.path.exists(policy_path):
+        for line in apply_task_packing_policy(out, policy_path):
+            print(line)
 
     with open(os.path.join(tdir, "m2.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
