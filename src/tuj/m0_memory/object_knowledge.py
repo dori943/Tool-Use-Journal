@@ -40,13 +40,13 @@ def props_to_entry(props: dict, task_id: str, object_id: str, *, episode=None,
     now = datetime.now(timezone.utc).isoformat(timespec="seconds")
     return {
         "identity": {"object_id": object_id, "caption": props.get("caption")},
+        # 0908: geometry는 통째로 보존한다. 이전엔 6개 필드만 골라 저장해 footprint_mm,
+        # seal_patch_rms_mm, height_mm이 빠졌고, memory hit 뒤 EE 판정(plate vac → 2F/3F,
+        # lid vac → 없음)과 flat_face(전부 false)가 첫 측정과 달라졌다 (0908 8태스크 실행).
+        # 기존 memory.json 항목은 필드가 없으므로 지우고 다시 쌓아야 한다.
         "geometry": {
-            "length_mm": geometry.get("length_mm"),
-            "diameter_mm": geometry.get("diameter_mm"),
-            "extents_mm": geometry.get("extents_mm"),
+            **copy.deepcopy(geometry),
             "height_z_mm": geometry.get("height_z_mm", geometry.get("height_mm")),
-            "cylinder_like": geometry.get("cylinder_like"),
-            "surface_rms_mm": geometry.get("surface_rms_mm"),
         },
         "physical_properties": {
             "material": {"value": props.get("material"), "confidence": props.get("confidence")},
@@ -159,10 +159,11 @@ class ObjectKnowledgeManager:
     def _bbox_difference(query_bbox, memory_extents):
         if not query_bbox or not memory_extents or len(query_bbox) != 3 or len(memory_extents) != 3:
             return None
-        q = sorted((_finite_positive(x) for x in query_bbox))
-        m = sorted((_finite_positive(x) for x in memory_extents))
+        q = [_finite_positive(x) for x in query_bbox]
+        m = [_finite_positive(x) for x in memory_extents]
         if any(x is None for x in q + m):
-            return None
+            return None          # 비정상 extents 항목은 후보에서 제외 (sorted 전에 걸러야 함)
+        q, m = sorted(q), sorted(m)
         axis_diffs = [abs(a - b) / max(abs(b), 1e-9) for a, b in zip(q, m)]
         return max(axis_diffs), axis_diffs
 

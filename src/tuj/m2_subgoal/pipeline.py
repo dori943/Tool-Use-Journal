@@ -27,7 +27,7 @@ def run_m2(task: str, m1_serialized: dict, rough=None) -> dict:
     add_container_seal_pres(subgoals)          # 0903: 담기 ≺ 덮기 (서브골 간)
     for s in subgoals:
         all_details += s["details"]
-        all_queries += build_queries(s, s["details"])
+        all_queries += build_queries(s, s["details"], m1=m1_serialized)   # 0908: 틈 폭 계산용 m1
     edges, mutex = partial_order(all_details)
 
     # 서브골별 객체 선택(object_ids)은 LLMRough 2차 호출이 담당한다 (0821 결정).

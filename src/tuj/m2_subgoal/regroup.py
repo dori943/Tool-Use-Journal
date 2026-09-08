@@ -99,12 +99,31 @@ def _split_sweep(s: dict, part: list[list[str]]) -> list[dict]:
 
 
 def _split_relocate(s: dict, part: list[list[str]]) -> list[dict]:
-    """relocate 분할 — 공용 확보/반환 단계가 없어 그룹마다 독립 체인. decompose를 그대로 쓴다."""
+    """relocate 분할 — 공용 확보/반환 단계가 없어 그룹마다 독립 체인. decompose를 그대로 쓴다.
+
+    0908: ordered 서브골(VLM이 target_ids를 지시문 순서로 정렬해 둠)은 그룹을 그 순서대로
+    배열하고, k+1번째 자식의 acquire에 k번째 자식의 place가 establish하는 in(...)을
+    사전조건(auto=instruction_order)으로 붙여 partial_order가 체인 엣지로 잡게 한다.
+    (container_seal과 같은 수법. M4 gk_adapter는 m2_partial_order를 그대로 DAG로 읽는다.)
+    """
     sid = s["subgoal_id"]
+    ordered = bool(s.get("ordered")) and len(s.get("target_ids", [])) > 1
+    if ordered:
+        rank = {t: i for i, t in enumerate(s["target_ids"])}
+        part = sorted((sorted(g, key=lambda t: rank.get(t, 1e9)) for g in part),
+                      key=lambda g: min(rank.get(t, 1e9) for t in g))
     children = []
     for k, members in enumerate(part, 1):
         child = _child(s, sid, k, len(part), members, "옮긴다")
         child["details"] = decompose(child)
+        if ordered and children:
+            prev = children[-1]
+            pm = prev["target_ids"]
+            po = pm[0] if len(pm) == 1 else "{" + ",".join(pm) + "}"   # decompose의 ?o 표기와 동일
+            first = child["details"][0]
+            first["pre"].append({"id": f"{first['detail_id']}_p{len(first['pre'])}",
+                                 "expr": f"in({po}, {s['container_id']})", "head": "in",
+                                 "eval_by": "m2", "auto": "instruction_order"})
         children.append(child)
     return children
 
@@ -130,6 +149,9 @@ def split_after_m3(m2_out: dict) -> list[str]:
         return logs
 
     m2_out["m2_subgoals"] = new_subs
+    chain = [s["subgoal_id"] for s in new_subs if s.get("split_from") and s.get("ordered")]
+    if len(chain) > 1:
+        logs.append(f"  [순서] 지시문 순서(VLM) 체인: {' -> '.join(chain)}")
     logs += add_container_seal_pres(new_subs)   # 0903: 분할 자식 기준으로 담기 ≺ 덮기 재부착
     all_details = [d for s2 in new_subs for d in s2["details"]]
     edges, mutex = partial_order(all_details)
