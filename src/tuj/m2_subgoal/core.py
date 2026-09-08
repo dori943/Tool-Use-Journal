@@ -357,12 +357,15 @@ def gap_width_mm(m1: dict | None, target_id: str, exclude: set[str] | None = Non
     return round(best, 1) if best is not None else None
 
 
-def build_queries(subgoal: dict, details: list[dict], m1: dict | None = None) -> list[dict]:
-    """eval_by == m3 인 술어 인스턴스 → Materializer 호출 사양.
+def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None) -> list[dict]:
+    """eval_by == m3 인 술어 인스턴스 → 판정 사양 (술어 1건이 어느 노드/쌍을 보는지).
 
-    m3_call.kind ∈ intrinsic | relational | ee | top_exposed | clear | gap_accessible | batch | swept_space
-    queried_by에 술어 id를 실어 보낸다 — M6 역추적 계약.
-    m1은 gap_accessible 질의의 틈 폭 계산용 (없으면 틈 폭 없이 발행 → M3 기본값).
+    0908 파이프라인 재구조 전에는 이것이 M3로 나가는 질의 목록(m2_queries)이었다.
+    이제 왕복이 없어 M2가 직접 판정하지만, "fits(?o,?r)의 ?o가 어느 노드인가" 같은
+    바인딩 해소는 여전히 필요하므로 같은 사양을 내부용으로 만든다 (ingest.apply_grounding).
+    call.kind ∈ intrinsic | relational | ee | top_exposed | clear | gap_accessible | batch | swept_space
+    queried_by에 술어 id를 실어 둔다 — M6 역추적 계약.
+    m1은 gap_accessible의 틈 폭 계산용.
     """
     q = []
     tool_ids = subgoal.get("tool_candidate_ids", [])
@@ -381,21 +384,28 @@ def build_queries(subgoal: dict, details: list[dict], m1: dict | None = None) ->
                 kind = "top_exposed" if head == "top_exposed" else "intrinsic"
                 for t in targets:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                              "m3_call": {"kind": kind, "node_id": t}})
+                              "call": {"kind": kind, "node_id": t}})
             elif head == "ee_usable":
                 oid = b.get("?o")
                 targets = tool_ids if oid == "?tool" else _set_members(oid)
                 for t in targets:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                              "m3_call": {"kind": "ee", "node_id": t}})
+                              "call": {"kind": "ee", "node_id": t}})
             elif head == "fits":
                 oid, rid = b.get("?o"), b.get("?r")
                 if oid in (None, "?tool") or rid in (None, "tool_rest"):
                     continue                       # 도구 거치 위치는 측정 대상 아님
                 for t in _set_members(oid):          # 집합이면 원소별 관계 질의
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                              "m3_call": {"kind": "relational", "a": t, "b": rid,
+                              "call": {"kind": "relational", "a": t, "b": rid,
                                           "relation": "fits_inside"}})
+            elif head == "flat_face":
+                # 0908: 종전에는 M2가 발행하지 않아 run_m3 컴파일 보충이 대신 질의했다.
+                # 왕복이 없어진 뒤로는 보충해 줄 곳이 없으므로 M2가 직접 낸다.
+                for t in (tool_ids if b.get("?t") in ("?tool", None) else
+                          _set_members(b.get("?t"))):
+                    q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
+                              "call": {"kind": "flat_face", "node_id": t}})
             elif head == "gap_accessible":
                 # 0908: (?tool, ?o) 쌍마다 발행 + 틈 폭 동봉. 이전엔 M2가 발행하지 않아
                 # run_m3 컴파일 보충이 틈 폭 없이 질의했고, 응답은 apply_m3 게이팅에 걸렸음.
@@ -408,7 +418,7 @@ def build_queries(subgoal: dict, details: list[dict], m1: dict | None = None) ->
                         if w is not None:
                             call["gap_width_mm"] = w
                         q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                                  "m3_call": call})
+                                  "call": call})
             elif head == "clear":
                 # clear(?r) = 목적지 영역이 비어 있는가 (점유 객체 유무, M3 query_clear).
                 # 0905: 이전엔 clearance(컨테이너 깊이 - 물체 높이)로 잘못 매핑돼
@@ -416,8 +426,11 @@ def build_queries(subgoal: dict, details: list[dict], m1: dict | None = None) ->
                 rid = b.get("?r")
                 if rid in (None, "tool_rest"):
                     continue
+                # 0908: 담는 목적지면 원소별 수용 여부(depth_clearance)로도 판정한다.
+                # members가 비어 있으면 종전대로 영역 점유(clear)만 본다.
+                members = [m for m in _set_members(b.get("?o")) if m != "?tool"]
                 q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                          "m3_call": {"kind": "clear", "node_id": rid}})
+                          "call": {"kind": "clear", "node_id": rid, "members": members}})
             elif head in ("batch_feasible", "act_space_clear"):
                 # 0828 신규 질의. 물체 1개짜리는 묶기 판정이 필요 없어 질의를 내지 않는다
                 # (not_queried — tool_rest와 같은 취급). 액션 주체(actor):
@@ -441,11 +454,11 @@ def build_queries(subgoal: dict, details: list[dict], m1: dict | None = None) ->
                     call["to"] = rid
                 for a in actors:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                              "m3_call": {**call, "actor": a}})
+                              "call": {**call, "actor": a}})
     # 동일 호출 중복 제거 (같은 노드 intrinsic 2회 등 — M3 캐시가 있지만 명세도 깨끗하게)
     seen, uniq = set(), []
     for x in q:
-        k = (x["queried_by"], json.dumps(x["m3_call"], sort_keys=True, ensure_ascii=False))
+        k = (x["queried_by"], json.dumps(x["call"], sort_keys=True, ensure_ascii=False))
         if k not in seen:
             seen.add(k)
             uniq.append(x)

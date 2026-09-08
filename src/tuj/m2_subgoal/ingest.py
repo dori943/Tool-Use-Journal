@@ -1,17 +1,23 @@
 # -*- coding: utf-8 -*-
-"""M2-5 — M3 응답 반영: 질의로 나갔던 술어에 판정 결과를 되채운다.
+"""M2-5 — 접지값으로 술어 판정 + 도구 확정.
 
-입력  M1Output + M3 응답 리스트 (합의 형식: 항목마다 queried_by, node_id 에코)
-출력  eval_by==m3 술어에 status(sat|unsat|unknown|unanswered)와 evidence 부착,
-      사람이 읽을 로그 라인 목록 반환 (도희 요청: 질의가 반영되는지 확인할 로그)
+0908 파이프라인 재구조 (M1&M3 통합): M3 질의/응답 왕복이 없어졌다.
+입력  M1Output + m1 (노드에 ee/reachability/predicates/물성이 실려 온다)
+출력  eval_by==m3 술어에 status(sat|unsat|unknown)와 evidence 부착, 서브골에
+      measurements(원본 판정 결과 — assemble_gk가 gk에 실어 M4/M6가 본다) 부착,
+      사람이 읽을 로그 라인 목록 반환
 
-판정 규칙 (EE-agnostic 유지 — 후보 중 하나라도 되면 sat, 최종 선택은 M4 몫):
-  reachable       reachability.reachable
-  top_exposed     응답에 판정 필드 없음 → unknown (M3에 필드 추가 논의 항목)
-  ee_usable       ee 판정 중 feasible=true 존재 여부
-  batch_feasible  batch 응답(0828 신규)의 feasible — 그룹 동시 처리 가능 여부
-  act_space_clear swept_space 응답(0828 신규)의 clear — 실행 공간 확보 여부
-  fits / clear    relational 응답의 pass
+판정 소스 (EE-agnostic 유지 — 후보 중 하나라도 되면 sat, 최종 선택은 M4 몫):
+  reachable        node.reachability.reachable
+  ee_usable        node.ee 중 feasible 하나 이상
+  top_exposed      node.predicates.top_exposed.value
+  clear(영역)      node.predicates.clear.value
+  clear(담기)      + 원소별 relations.depth_clearance(member, container).pass 전부
+  fits             relations.fits_inside, 집합이면 원소별 all()
+  flat_face        node.predicates.flat_face.value
+  gap_accessible   relations.gap_access(tool, target)
+  batch_feasible   relations.batch_partition(members, tool) — partition을 분할에 사용
+  act_space_clear  relations.swept_space(members, to, others, tool)
 """
 from __future__ import annotations
 
@@ -40,10 +46,12 @@ def _judge(head: str, nodes: list[str], view: dict, rels: list[dict],
     ev = []
     if head in ("fits", "clear"):
         if not rels:
-            return "unanswered", []
+            return "unknown", []
         ok = [bool(r.get("pass")) for r in rels]
         ev = [{"node": r.get("from") or r.get("node_id"), "check": r.get("check"),
-               "value_mm": r.get("value_mm"), "pass": bool(r.get("pass"))} for r in rels]
+               "value_mm": r.get("value_mm"), "pass": bool(r.get("pass"))}
+              | ({"unfit_members": r["unfit_members"]} if r.get("unfit_members") else {})
+              for r in rels]
         # 0908: 도구 후보 서브골(require_all=False)은 후보 중 하나라도 되면 sat.
         # 전원 통과를 요구하면 fits(?tool, tool_rest)가 후보 하나 때문에 unsat이 되어
         # 재분해(sweep_collect → relocate)를 잘못 트리거한다 (c1_1 0908 실행).
@@ -226,7 +234,7 @@ def _apply_llm_tool_choice(s: dict, obj: dict, logs: list[str]) -> None:
 def _summarize_for_subgoal(s: dict) -> str:
     """한 서브골의 M3 판정 결과 요약. 상태 성격을 구분해 전달한다
     (not_queried는 불확실성이 아니라 의도적 비측정)."""
-    buckets = {"sat": [], "unsat": [], "unknown": [], "not_queried": []}
+    buckets = {"sat": [], "unsat": [], "split": [], "unknown": [], "not_queried": []}
     for d in s["details"]:
         for p in d["pre"]:
             if p.get("eval_by") != "m3" or "status" not in p:
@@ -234,11 +242,22 @@ def _summarize_for_subgoal(s: dict) -> str:
             ev = "; ".join(str(e) for e in p.get("evidence", [])[:2])[:120]
             proxy = any(e.get("proxy") for e in p.get("evidence", []) if isinstance(e, dict))
             tag = " [대체 판정]" if proxy else ""
-            buckets.get(p["status"], buckets["unknown"]).append(
+            # 0908: batch_feasible 불충족은 실패가 아니라 그룹 분할의 트리거다. M2는 일부러
+            # 넓게 분해한 뒤(예: relocate({5개} → 트레이)) 이 측정으로 몇 그룹인지 정한다.
+            # 종전에는 이게 "불충족 조건"으로 들어가 신뢰도 갱신 LLM이 계획이 나빠진 신호로
+            # 읽었고, c2_1/c3_1/c3_2/c4_2의 분해 신뢰도가 전부 이 사유로 깎였다
+            # ("일괄 조작 불가로 서브골 분해 수정 필요" — 애초에 일괄 조작이 목표가 아니었다).
+            bucket = ("split" if (p["status"] == "unsat"
+                                  and p.get("head") == "batch_feasible")
+                      else p["status"])
+            buckets.get(bucket, buckets["unknown"]).append(
                 f"  - {p['expr'][:60]}: ({ev}){tag}")
     parts = [f"판정 요약: 충족 {len(buckets['sat'])} / 불충족 {len(buckets['unsat'])} / "
+             f"분할로 해소 {len(buckets['split'])} / "
              f"근거 미제공 {len(buckets['unknown'])} / 의도적 비측정 {len(buckets['not_queried'])}"]
     labels = {"sat": "충족된 조건:", "unsat": "불충족 조건:",
+              "split": ("한 번에 처리하기엔 대상이 많아 그룹 분할로 진행하는 조건 "
+                        "(계획 실패가 아니라 예정된 절차다. 이 때문에 신뢰도를 낮추지 말 것):"),
               "unknown": "측정을 요청했으나 판정 근거가 없던 조건:",
               "not_queried": "의도적으로 측정하지 않은 조건 (측정 대상 아님, 불확실성으로 취급하지 말 것):"}
     for k, label in labels.items():
@@ -348,11 +367,20 @@ def measurement_feedback(m2_out: dict) -> str | None:
                 # 해소되는 신호라 재분해 사유가 아니다 (0831 — kind 진동 방지)
                 if head in ("batch_feasible", "act_space_clear"):
                     continue
-                # 0903: 목적지 clear 불충족은 수행 방식(kind)을 바꿔도 해소되지 않는다
-                # (트레이가 막힌 건 쓸어 담아도 마찬가지). 목적지 정리는 별도 서브골 문제.
-                if head == "clear":
-                    continue
                 ev = p.get("evidence") or []
+                if head == "clear":
+                    # 0903: 목적지가 다른 물체로 막힌 것은 kind를 바꿔도 해소되지 않는다
+                    # (트레이가 막힌 건 쓸어 담아도 마찬가지). 목적지 정리는 별도 문제.
+                    # 0908: 다만 "이 물체가 목적지에 안 들어간다"(depth_clearance 불충족)는
+                    # 성격이 fits와 같다 — 그 대상만 빼거나 다른 목적지로 보내면 풀린다.
+                    unfit = sorted({m for e in ev for m in (e.get("unfit_members") or [])})
+                    if not unfit:
+                        continue
+                    adjust_lines.append(
+                        f"- {p['expr']} -> 불충족: {', '.join(unfit)}는 이 목적지에 "
+                        "안정적으로 담기지 않음 (바닥 면적 부족 또는 넘어짐). 해당 대상만 "
+                        "다른 목적지로 보내거나 대상에서 제외할 것")
+                    continue
                 if head == "top_exposed":
                     blk = {n for e in ev if e.get("top_exposed") is False
                            for n in (e.get("blockers") or [])}
@@ -415,67 +443,146 @@ _CORE_PRED = {"sweep_collect": "batch_feasible", "scoop_transfer": "batch_feasib
               "flatten": "flat_face", "extract": "gap_accessible"}
 
 
-def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
-    """M3 응답을 M2 출력의 m3 술어에 반영하고 로그 라인을 돌려준다. (m2_out은 제자리 수정)"""
+def evaluate(m2_out: dict, m1: dict) -> list[tuple[dict, dict]]:
+    """0908: 판정 사양을 M1 접지값 + 관계 함수로 직접 계산한다 (M3 왕복 없음).
+
+    반환: [(plan_item, result), ...]. result는 종전 M3 응답과 같은 스키마라
+    아래 판정 로직(_judge 계열)을 그대로 쓴다.
+    """
+    from . import ground
+    from .core import plan_evaluations
+
+    nodes = {n["id"]: n for n in m1["nodes"]}
+    out = []
+    for s in m2_out["m2_subgoals"]:
+        ignore = set(s.get("ignore_ids") or [])
+        for q in plan_evaluations(s, s.get("details", []), m1=m1):
+            c, qid = q["call"], q["queried_by"]
+            kind = c["kind"]
+            r: dict = {"queried_by": qid}
+            try:
+                if kind in ("intrinsic", "ee"):
+                    n = nodes[c["node_id"]]
+                    r["node_id"] = n["id"]
+                    r |= {k: v for k, v in n.items()
+                          if k in ("geometry", "material", "density_kgm3", "mass_kg",
+                                   "youngs_gpa", "mu", "confidence", "caption")}
+                    # reachable/ee_usable은 같은 노드 뷰에서 읽히므로 둘 다 실어 둔다
+                    if "ee" in n:
+                        r |= {"ee": n["ee"], "reachability": n.get("reachability")}
+                    elif kind == "ee":
+                        r["error"] = f"접지값 없음(ee): {n['id']}"
+                elif kind == "relational":
+                    r |= {"from": c["a"], "to": c["b"]}
+                    r |= ground.fits_inside(nodes[c["a"]], nodes[c["b"]])
+                elif kind in ("top_exposed", "clear"):
+                    n = nodes[c["node_id"]]
+                    pred = (n.get("predicates") or {}).get(kind) or {}
+                    r |= {"node_id": n["id"], "type": kind,
+                          "value": pred.get("value"), "pass": pred.get("value")}
+                    if kind == "top_exposed":
+                        r["blockers"] = pred.get("blockers", [])
+                    else:
+                        r["occupants"] = pred.get("occupants", [])
+                        # 0908 팀 스펙: 담는 목적지는 원소별 수용 여부까지 본다.
+                        # 영역이 비어 있어도 물체가 안 들어가면 계획이 성립하지 않는다.
+                        mem = [m for m in c.get("members", []) if m in nodes]
+                        holds = [ground.depth_clearance(nodes[m], n) for m in mem]
+                        if holds:
+                            unfit = [m for m, h in zip(mem, holds) if not h.get("pass")]
+                            ok = bool(r.get("value")) and not unfit
+                            r |= {"value": ok, "pass": ok, "depth_clearance": holds,
+                                  "unfit_members": unfit}
+                elif kind == "flat_face":
+                    n = nodes[c["node_id"]]
+                    pred = (n.get("predicates") or {}).get("flat_face") or {}
+                    r |= {"node_id": n["id"], "type": "flat_face",
+                          "value": pred.get("value"), "pass": pred.get("value"),
+                          "check": pred.get("check")}
+                elif kind == "gap_accessible":
+                    r |= {"from": c["tool_id"], "to": c["target_id"],
+                          "type": "gap_accessible"}
+                    r |= ground.gap_access(nodes[c["tool_id"]], nodes[c["target_id"]],
+                                           gap_width_mm=c.get("gap_width_mm"))
+                elif kind in ("batch", "swept_space"):
+                    actor = c.get("actor") or {}
+                    tool = nodes.get(actor["id"]) if actor.get("type") == "object" else None
+                    members = [nodes[i] for i in c.get("member_ids", []) if i in nodes]
+                    r |= {"subgoal_id": s["subgoal_id"], "kind": kind, "actor": actor}
+                    if not members:
+                        r |= {"feasible": None, "clear": None, "partition": None}
+                    elif kind == "batch":
+                        r |= ground.batch_partition(members, tool=tool)
+                    else:
+                        to = nodes.get(c.get("to"))
+                        exclude = ({m["id"] for m in members} | ignore | {c.get("to")}
+                                   | ({tool["id"]} if tool else set()))
+                        others = [n for n in nodes.values() if n["id"] not in exclude]
+                        r |= (ground.swept_space(members, to, others, tool=tool) if to
+                              else {"clear": None, "margin_mm": None, "blockers": []})
+                else:
+                    r["error"] = f"unsupported kind: {kind}"
+            except KeyError as e:
+                r["error"] = f"node not in m1: {e}"
+            except Exception as e:                   # 판정 실패는 미판정으로 남긴다
+                r["error"] = f"{type(e).__name__}: {e}"
+            out.append((q, {"subgoal_id": s["subgoal_id"]} | r))
+    return out
+
+
+def apply_grounding(m2_out: dict, m1: dict) -> list[str]:
+    """M1 접지값으로 m3 술어를 판정하고 도구를 확정한다. (m2_out은 제자리 수정)
+
+    0908 재구조: 종전 apply_m3(m2_out, m3_responses)를 대체한다. 측정값은 m1에 실려
+    오고, 쌍/집합 술어는 evaluate()가 관계 함수로 직접 계산한다. 원본 판정 결과는
+    서브골 measurements에 남겨 gk로 실린다 (M4/M6가 본다).
+    """
+    pairs = evaluate(m2_out, m1)
+    plan = [q for q, _ in pairs]
+    responses = [r for _, r in pairs]
+    m2_out.setdefault("m2_stats", {})["n_evaluations"] = len(responses)
+    for s in m2_out["m2_subgoals"]:
+        s["measurements"] = [r for r in responses
+                             if r.get("subgoal_id") == s["subgoal_id"]]
+    return _apply_responses(m2_out, plan, responses)
+
+
+def _apply_responses(m2_out: dict, plan: list[dict], responses: list[dict]) -> list[str]:
+    """판정 결과를 술어 status/evidence에 반영하고 도구를 확정한다."""
     by_q: dict[str, list[dict]] = {}
     for r in responses:
         by_q.setdefault(r.get("queried_by"), []).append(r)
     view = _node_view(responses)
 
-    # 질의 사양에서 술어 id → 대상 노드 목록 (질의가 실제로 향했던 노드들)
+    # 판정 사양에서 술어 id → 대상 노드 목록 (그 술어가 실제로 본 노드들)
     q_nodes: dict[str, list[str]] = {}
-    # 0903: 관계 질의는 (a, b) 쌍까지 기억한다. from만 보면 접지 컴파일 보충이 만든
-    # 엉뚱한 쌍(c2_1: fits(빵, 머그) — 빵을 머그에 넣는지 검사)이 from=빵으로 통과해
-    # unsat을 만들고, 그게 재분해 피드백으로 들어가 kind가 stack으로 튀었다.
-    q_pairs: dict[str, set] = {}
-    for q in m2_out.get("m2_queries", []):
-        c = q["m3_call"]
+    for q in plan:
+        c = q["call"]
         if c.get("kind") in ("batch", "swept_space"):   # 0828 신규 — 노드 대신 그룹 대상
             q_nodes.setdefault(q["queried_by"], [])
             continue
-        n = c.get("node_id") or c.get("a") or c.get("tool_id")   # 0908: gap_accessible은 tool_id
+        n = c.get("node_id") or c.get("a") or c.get("tool_id")   # gap_accessible은 tool_id
         if n:
             q_nodes.setdefault(q["queried_by"], [])
             if n not in q_nodes[q["queried_by"]]:
                 q_nodes[q["queried_by"]].append(n)
-        if c.get("kind") == "relational" and c.get("a") and c.get("b"):
-            q_pairs.setdefault(q["queried_by"], set()).add((c["a"], c["b"]))
 
-    logs, n_sat = [], {"sat": 0, "unsat": 0, "unknown": 0, "unanswered": 0, "not_queried": 0}
+    logs, n_sat = [], {"sat": 0, "unsat": 0, "unknown": 0, "not_queried": 0}
     for s in m2_out["m2_subgoals"]:
         for d in s["details"]:
             for p in d["pre"]:
                 if p["eval_by"] != "m3":
                     continue
                 rs = by_q.get(p["id"], [])
-                expected = set(q_nodes.get(p["id"], []))
-                # 관계 응답은 from/to 키를 쓴다. 접지 쪽 컴파일 보충이 만든 예상 밖 쌍
-                # (예: fits({집합}, 영역)을 (원소, 원소)로 오파싱)이 판정을 오염시키지
-                # 않도록, 우리가 질의를 발행한 노드(from)의 응답만 판정에 쓴다 (0831).
-                rels = [r for r in rs if ("pass" in r or "check" in r)
-                        and (not expected or r.get("from") in expected
-                             or r.get("node_id") in expected)]
-                pairs = q_pairs.get(p["id"])
-                if pairs:                        # 관계 술어: 발행한 (from, to) 쌍만 인정
-                    dropped = [r for r in rels if r.get("from") and r.get("to")
-                               and (r["from"], r["to"]) not in pairs]
-                    if dropped:
-                        logs.append(f"  [무시] {p['id']}: 발행하지 않은 쌍 "
-                                    + ", ".join(f"({r['from']}, {r['to']})" for r in dropped)
-                                    + " (접지 컴파일 보충)")
-                    rels = [r for r in rels if r not in dropped]
+                rels = [r for r in rs if ("pass" in r or "check" in r)]
                 answered_nodes = [r.get("node_id") or r.get("from")
                                   for r in rs
                                   if (r.get("node_id") or r.get("from"))]
                 nodes = q_nodes.get(p["id"], []) or answered_nodes
-                # 0908: M2가 직접 발행하지 않은 술어(flat_face, gap_accessible)도 run_m3 컴파일
-                # 보충이 응답을 주면 판정에 쓴다. 응답 노드가 하나도 없을 때만 not_queried
-                # (tool_rest처럼 error 응답만 오는 경우). 도희 0907 리포트: c1_2 flat_face가
-                # 4건 응답됐는데 q_nodes 게이팅에 걸려 미측정 처리 → 리치 여유로 spatula 확정.
+                # 판정 사양이 대상을 못 잡은 술어(도구 거치 위치 tool_rest 등)는 not_queried.
+                # 나머지는 전부 이번 실행에서 계산된 결과가 있다 (왕복이 없어 미회신 없음).
                 if p["id"] not in q_nodes and not answered_nodes:
                     status, ev = "not_queried", []
-                elif not rs:
-                    status, ev = "unanswered", []
                 elif p["head"] in ("batch_feasible", "act_space_clear"):
                     status, ev = _judge_group(p["head"], rs)
                 else:
@@ -485,14 +592,11 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
                                         require_all=not s.get("tool_candidate_ids"))
                 p["status"], p["evidence"] = status, ev
                 n_sat[status] += 1
-                missing = [n for n in nodes if n not in answered_nodes]
                 line = f"  {p['id']:14s} {p['expr'][:52]:52s} -> {status}"
                 if status == "unknown":
-                    line += "  (응답에 판정 근거 필드 없음)"
+                    line += "  (접지값에 판정 근거 필드 없음)"
                 if status == "not_queried":
-                    line += "  (질의 대상 아님: 도구 거치 위치 등)"
-                if missing:
-                    line += f"  [미회신 노드: {', '.join(missing)}]"
+                    line += "  (판정 대상 아님: 도구 거치 위치 등)"
                 logs.append(line)
 
     # 도구 확정 (0821 확정: 객체 선택은 M2이 완결한다 — M3 측정값을 근거로
@@ -540,25 +644,20 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
             continue
         scored.sort(reverse=True)   # 액션 횟수 최소 → 리치 여유 최대 → EE 수 (0905 개정)
         batch_rank, margin, n_ee, chosen, _, part = scored[0]
+        # 0908: 분할 뒤 재판정에서 이 블록이 다시 돈다. LLM이 이미 고른 서브골은
+        # 후보가 그 하나로 좁혀져 있어 규칙이 같은 답을 내지만, 그대로 두면
+        # selection_by가 "rule"로 덮여 어블레이션 로그에서 LLM 판정분이 사라진다.
+        llm_kept = s.get("selection_by") == "llm" and s.get("selected_tool_id") == chosen
         s["selected_tool_id"] = chosen
-        # 0903: kind의 핵심 술어가 미측정이면 확정은 하되 근거에 남기고 경고한다.
-        # (c4_1 gap_accessible, c1_2 flat_face가 M3에 아직 없어 리치 여유 몇 mm로 갈렸음.
-        #  보류로 바꾸면 M4까지 못 가므로 일단 확정 + 표시. M3 구현 시 자동 해소)
+        # 0908 통합: 접지값이 m1에 전부 실려 오므로 "핵심 술어 미측정" 경고는 없앴다.
         core = _CORE_PRED.get(s.get("kind"))
-        if core:
-            st = {p.get("status") for d in s.get("details", []) for p in d.get("pre", [])
-                  if p.get("head") == core}
-            if not (st & {"sat", "unsat"}):
-                s["selection_note"] = f"{core} 미측정 상태에서 확정 (EE 수/리치 여유 기준)"
-                logs.append(f"  [경고] {s['subgoal_id']}: 핵심 술어 {core}가 미측정 — "
-                            f"도구 확정이 측정 근거 없이 EE 수/리치 여유로 결정됨")
         if part and len(part) > 1:
             s["partition_plan"] = part        # regroup이 이 구성대로 서브골을 나눈다
         s["selection_evidence"] = [
             {"node": c2, "feasible_ees": f2, "reach_margin_mm": m3,
              "batch_groups": (len(p2) if p2 else None)}
             for (br2, m3, n2, c2, f2, p2) in scored]
-        s["selection_by"] = "rule"
+        s["selection_by"] = "llm" if llm_kept else "rule"
         # 0908: 후보별 측정표. update_confidence의 LLM 도구 판정 입력이 된다.
         # 규칙 스코어러(액션 횟수 → 리치 여유)는 태스크 적합성(펴기엔 굴릴 몸체, 꺼내기엔
         # 얇고 긴 것)을 못 보고 c1_1 ladle, c1_2 spatula처럼 무관한 값으로 갈렸음.
@@ -594,9 +693,10 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
                 "core_value": core_val.get(c2),
             })
         s["tool_candidates_measured"] = measured
-        logs.append(f"  [도구 확정] {s['subgoal_id']}: {chosen} 선택 "
-                    f"(사용 가능 EE {n_ee}종, 리치 여유 {margin}mm"
-                    + (f", 필요 액션 {len(part)}회" if part else "") + ")")
+        logs.append(f"  [도구 확정] {s['subgoal_id']}: {chosen} "
+                    + ("유지 (LLM 판정)" if llm_kept else "선택 (규칙)")
+                    + f" — 사용 가능 EE {n_ee}종, 리치 여유 {margin}mm"
+                    + (f", 필요 액션 {len(part)}회" if part else ""))
 
     # 0903: 도구 없는 서브골(relocate 다중 target)의 그룹 분할.
     # 위 블록은 도구 후보가 있는 서브골만 partition_plan을 채우므로, 물체 5개짜리
@@ -632,8 +732,7 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
 
     m2_out["m2_stats"]["m3_predicates"] = n_sat
     total = sum(n_sat.values())
-    logs.insert(0, f"[M3 반영] 응답 {len(responses)}건 수신, m3 술어 {total}건 판정: "
+    logs.insert(0, f"[판정] 접지값 {len(responses)}건으로 m3 술어 {total}건 판정: "
                    f"sat {n_sat['sat']} / unsat {n_sat['unsat']} / "
-                   f"unknown {n_sat['unknown']} / 미회신 {n_sat['unanswered']} / "
-                   f"질의대상아님 {n_sat['not_queried']}")
+                   f"unknown {n_sat['unknown']} / 판정대상아님 {n_sat['not_queried']}")
     return logs
