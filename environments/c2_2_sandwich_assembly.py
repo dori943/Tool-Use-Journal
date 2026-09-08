@@ -51,6 +51,7 @@ from environments.robot_pedestal import (
     add_robot_pedestal,
     remove_robot_pedestal,
 )
+from environments.task_camera import add_standard_task_camera
 
 
 ROBOT_SPEC_PATH = (
@@ -319,6 +320,13 @@ class C2_2_SandwichAssembly(KitchenBase):
         )
 
         self._apply_island_layout()
+
+        self._standard_camera = add_standard_task_camera(
+            self.model,
+            robot_base_xy=self._robot_base_xy,
+            robot_base_yaw_rad=self._robot_base_yaw,
+            surface_z=self._island_surface_z,
+        )
 
     # ========================================================
     # Objects

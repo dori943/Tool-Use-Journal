@@ -9,6 +9,8 @@ run_m1.py 와 같은 방식이다. 태스크 id(c1_1, c2_1, ...)만 주면
 
 두 가지 실행 엔진을 하나로 묶었다.
   (기본) 범용 계획 — generic_runner. 태스크 무관 in-process 파이프라인.
+         객체가 제공하는 grasp feature와 물리 메타데이터를 사용해
+         contact-friction PICK을 계획·제어·검증한다.
          --simulate {kinematic,controller} 로 MuJoCo 재생까지 가능.
          controller/video는 등록된 파지 함수를 우선 실행한 뒤 실제 상태로
          후속 경로를 계획한다. --no-scripted-grasps로 기존 일괄 계획을 선택한다.
@@ -19,15 +21,17 @@ run_m1.py 와 같은 방식이다. 태스크 id(c1_1, c2_1, ...)만 주면
 사용법:
   python scripts/run_m5.py c1_1
   python scripts/run_m5.py c2_1 --validate-input-only
+  python scripts/run_m5.py c1_1 --simulate controller # 물리 PICK + MuJoCo viewer
   python scripts/run_m5.py c1_1 --simulate controller --headless
-  python scripts/run_m5.py c1_1 --physical            # 물리 실행
+  python scripts/run_m5.py c1_1 --physical            # 기존 grasp+sweep 전체 workflow
   python scripts/run_m5.py c1_1 --physical --stop-after-pick
   python scripts/run_m5.py --task-planner plan.json \
       --environment C1_1_LegoSweep --output-dir out/   # 태스크 없이 직접 지정
 
 태스크 추가:
-  - 범용 계획만: task_registry.TASKS 에 한 줄.
-  - 물리 실행도: PHYSICAL 에 (task id -> 전용 예제 러너/프로파일) 한 항목.
+  - 범용 계획: task_registry.TASKS 에 한 줄.
+  - 물리 PICK: 환경 object record에 grasp feature/물리 메타데이터를 제공.
+  - 기존 전체 workflow도: PHYSICAL 에 (태스크 id -> 전용 러너/프로파일) 한 항목.
 범용 옵션(--seed, --simulate, ...)은 generic_runner 로, 물리 옵션
 (--motion-profile, --sweep-provider, --pick-keyframes, --stop-after-pick 등)은
 전용 예제 러너로 그대로 전달된다.
@@ -88,6 +92,8 @@ def _expand_task(argv: list[str]) -> list[str]:
         injected += ["--environment", TASK_ENVS[task]]
     if "--output-dir" not in rest:
         injected += ["--output-dir", str(out / "m5")]
+    # Generic runs use common defaults or an explicitly supplied profile.
+    # Never inject a scenario-specific grasp profile based on the task id.
     return injected + rest
 
 

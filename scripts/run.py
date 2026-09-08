@@ -279,6 +279,14 @@ def stage_m4(task, out, args, gk_paths=None):
             "--output", str(out / "m4.json")]
     if args.initial_state:
         argv += ["--initial-state", str(args.initial_state)]
+    aliases = {}
+    for node in read_json(out / "m1.json").get("nodes", []):
+        prefix = f"obj_{node['class']}_"
+        if node["id"].startswith(prefix):
+            aliases[node["id"]] = node["id"][len(prefix):]
+    alias_path = out / "id_aliases.json"
+    alias_path.write_text(json.dumps(aliases, indent=2), encoding="utf-8")
+    argv += ["--id-aliases", str(alias_path)]
     call_main(module, argv, "run_m4")
 
 
