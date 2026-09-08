@@ -4,6 +4,24 @@
 현재 활성 객체, 호출 방법과 검증 결과는 [scripted_grasps/README.md](scripted_grasps/README.md)를 참고한다.
 이 모드는 파지 후 실제 상태에서 다음 M5 요청을 계획한다.
 
+## 기존 객체별 함수로 파지한 뒤 고정하기
+
+`--grasp-provider object-function --simulate controller`는 설정된 `grasp_lab`
+catalog의 기존 `grasp_<object>()`를 호출한다. 함수의 접근·접촉·상승·유지 평가를
+그대로 실행하고 `SUCCESS` 반환 뒤 현재 상대 자세로 `KINEMATIC` attach한다.
+이미 attach한 vacuum 함수는 같은 객체인지 확인하고 재사용한다. 실패 반환은
+후속 운반을 중단하며 함수 성공만으로 attach 성공을 가정하지 않는다.
+
+```powershell
+python scripts/run_m5.py c4_2 --grasp-provider object-function `
+  --simulate controller --headless --initial-ee 2F --stop-after-pick `
+  --output-dir output/c4_2/function-pick-new
+```
+
+외부 catalog checkout을 사용할 때는 `grasp_lab/catalog.py`가 들어 있는 디렉터리의
+상위 경로를 명시한다. 경로를 설정하지 않으면 현재 Python 환경에 설치된
+`grasp_lab`만 사용하며, 저장소 주변의 특정 폴더를 자동 탐색하지 않는다.
+
 ### 외부 객체 함수 catalog 경로 설정
 
 `object_function_grasp.py`는 특정 형제 checkout을 자동 탐색하지 않는다. 외부
@@ -17,6 +35,44 @@ $env:TUJ_SCRIPTED_GRASP_LIBRARY = "C:\path\to\scripted_grasp_lab"
 경로를 지정하지 않으면 현재 Python 환경에서 import 가능한 `grasp_lab`을
 사용한다. 호출 코드에서는 `catalog_library(..., library_root=...)`로 경로를
 직접 전달할 수도 있다.
+
+이 모드는 catalog와 현재 checkout의 M5를 같은 프로세스에서 사용한다.
+`configure_kitchen()`이나 snapshot bootstrap을 호출하지 않는다. RoboCasa 등
+실행 의존성은 호출 환경에 설치하거나 catalog 환경에서 제공해야 한다.
+독립 catalog 실행은 기존 방식대로 유지된다.
+
+초기 환경은 catalog의 clear-home, 손 연동 보정, 1 ms 물리/50 Hz 제어를 사용한다.
+`CatalogContext.from_runtime()`은 이미 존재하는 환경을 reset하거나 물체를 배치하지
+않으며 종료할 때 소유자인 M5의 환경을 닫지 않는다. EE 교체 후 context는 새로 만든다.
+
+파지 이후에는 관측한 관절·물체·attachment 상태로 다음 요청을 계획하고 즉시 실행한다.
+따라서 기존의 전체 시퀀스 사전 계획·재생 경로와 다르다. 함수 실행 기록은
+`functions/<index>-<subgoal>/`, 일반 M5 실행 기록은 `simulation/`에 저장하고,
+둘의 순서는 `m5_summary.json`의 `steps`로 확인한다. 함수 단계는 가짜 MotionPlan으로
+기록하지 않으므로 일반 궤적 manifest만으로 전체 함수 실행을 재생할 수는 없다.
+
+PLACE/RETURN_TOOL의 DETACH → OPEN/OFF 순서를 유지하고, 배치 위치 추종 확인과
+1.5초 release hold 후 후퇴한다. 저수준 `release_object()`를 직접 사용하면 호출자가
+물리 step과 안정화·후퇴 검사를 수행해야 한다. KINEMATIC은 qpos 상대 자세 고정이며
+MuJoCo equality weld가 아니다. 해제 시 속도는 0으로 설정되므로 정지 배치를 대상으로 한다.
+
+객체·EE는 registry와 M4의 지정이 일치해야 한다. 예를 들어 기존 `grasp_lid()`는 vac이므로
+lid를 2F로 지정한 M4 입력은 실행 전에 오류로 처리한다. 자동 EE 대체는 하지 않는다.
+
+```powershell
+# C4-2 실제 함수 → attach → 4 cm 이동 → 원위치 배치 → detach → 12 cm 후퇴
+python scripts/validate_object_function_c4_2.py --objects whisk rolling_pin lid `
+  --output-dir ../reports/c4_2_function_lifecycle_new --video
+
+# 바게트는 원위치 방출 후 기울어지며 상자에 닿으므로 별도 배치 지점 검증
+python scripts/validate_object_function_c4_2.py --objects baguette `
+  --release-offset-xy -0.08 0 --output-dir ../reports/c4_2_baguette_release_new
+```
+
+위 검증은 객체별 attachment 생명주기 검사이며 전체 상자 채우기·뚜껑 닫기 작업의
+성공 판정은 아니다. 결과에는 상대 자세 오차, 해제 후 낙하량, 후퇴 중 객체 이동량을 남긴다.
+release 높이는 실제 파지 자세의 최하단이 상판 위에 오도록 계산한다. 바게트의
+원위치 release 실패는 유지하며, 8 cm 이동한 배치 케이스의 성공과 구분한다.
 
 ## 빠른 시작
 
@@ -152,9 +208,60 @@ report와 manifest는 그대로 보존한다.
 object가 있는 외부 snapshot도 fresh reset으로 재현할 수 없으므로 거부한다. 임의 Task를 바로
 시뮬레이션할 때는 `--environment`를 사용해 계획과 실행이 같은 seed의 deterministic
 reset을 공유하게 하는 것이 가장 안전하다. 범용 evaluator는 grounded Tool 상태,
-pose/joint, 실제 region containment를 판정한다. 그 밖의 scenario-level 성공 조건은
-`UNKNOWN`으로 처리된다. C1 sweep의 검증된 rim grasp, 마찰, closed-loop rollback과
+pose/joint, 회전된 bbox를 반영한 region containment를 판정한다. TRANSPORT의 grounded
+region은 완전 containment가 아니라 target의 `above` 상태로 별도 판정한다. 그 밖의
+scenario-level 성공 조건은 `UNKNOWN`으로 처리된다. C1 sweep의 검증된 rim grasp,
+마찰, closed-loop rollback과
 cleanup 정책까지 필요하면 전용 runner를 사용한다.
+
+### 물체 종류에 독립적인 파지 후보 평가
+
+범용 PICK 경로의 `grasp_geometry.py`는 물체 이름이나 bbox 종횡비로 파지
+템플릿을 선택하지 않는다. 얇은 물체를 plate로 간주하거나 4개 rim 방향을
+추가하지 않으며, bbox 두께로 접촉 폭이나 gripper aperture를 추정하지 않는다.
+기본 경로는 상위 keyframe provider가 만든 후보의 개수·위치·방향을 보존하면서
+다음 지지면 관련 정보를 계산한다. 이후 명확히 차단된 후보를 제외하고 기존
+IK·경로·충돌 검증을 수행한다.
+
+- `under_clearance_m`: 물체 bbox 최하단과 지지면 사이의 수직 간격
+- `object_top_clearance_m`: 물체 bbox 최상단과 지지면 사이의 수직 간격.
+  임의 edge나 손가락 접촉점의 높이를 뜻하지 않는다.
+- `grasp_point_clearance_m`: 후보의 실제 좌표계로 해석한 gripper 기준점과
+  지지면 사이의 수직 간격
+- `contact_point_clearance_m`: 명시적으로 제공된 `contact_center_local_m`을
+  대상 물체 좌표계에서 world로 변환한 접촉 중심과 지지면 사이의 수직 간격.
+  양쪽 손가락 각각의 접촉을 입증하는 값은 아니다.
+
+명시적 `support` / `support_surface` 또는 world `support_relations`가 우선한다.
+없으면 회전된 물체 bbox의 world 범위와 겹치는 장애물·다른 물체의 bbox로
+수평 지지 관계를 추정한다. 이는 수평 지지면에 대한 근사 검사이며, 곡면·경사면의
+국소 여유나 손가락 전체 부피의 충돌을 판정하는 기능은 아니다.
+
+후보의 필요 조건은 `required_under_clearance_m`, `required_grasp_clearance_m`,
+`required_contact_clearance_m`, `uses_underside_contact`로 지정한다.
+GRASP keyframe metadata → candidate metadata → task metadata의
+`grasp_clearance_requirements` 순서로 우선 적용한다. M4 action parameters의
+동일 필드도 M5 task metadata로 전달된다. 길이는 m 단위이며 음수·NaN 등
+잘못된 요구 값은 거부한다. 모호한 기존 `required_edge_height_m`도 거부하므로
+gripper 기준점 또는 명시적 접촉점 기준의 요구 값으로 바꿔야 한다.
+
+결과 `support_clearance_status`는 필요한 정보가 없으면 `UNKNOWN`, 확인된
+조건 위반이면 `BLOCKED`, 사용 가능한 근사 검사를 통과하면 `SCREENED`이다.
+`SCREENED`도 파지 성공을 의미하지 않는다. 전체 gripper·경로 충돌 검사와
+실제 손가락 접촉·리프트·유지 검증은 별도로 필요하다.
+
+상위 모듈이 측정한 접촉 중심·닫힘 축·접근 축·접촉 폭을 제공할 때만
+`physical_metadata.grasp_feature.provider = "TWO_FINGER_OPPOSED_CONTACT"`로
+범용 평행 그리퍼 접촉 바인딩을 사용할 수 있다. 이 입력도 물체별 코딩 없이
+동일하게 처리한다. 접촉 정보가 없다면 새 표면이나 파지 방향을 만들어 내지 않는다.
+기존 thin-plate / elongated-handle provider는 범용 파지 경로에서 제거했다.
+
+`scripts/run_m5.py <task>`는 태스크 이름에 따라 전용 grasp profile을 자동 적용하지
+않는다. 공통 기본값 또는 사용자가 명시한 `--grasp-profile`만 사용한다.
+파지력 추정도 물체 종류·bbox 기반 rim 토크 보정 없이 질량·마찰 및 명시된
+최소 유지력만 사용한다. 이는 일반적인 중량 지지 추정이지 모든 형상의 토크
+안정성을 보장하는 모델은 아니다. 아래 `--physical` 계열의 기존 시나리오 예제는
+별도 경로로 남아 있으며 범용 파지에 자동 연결되지 않는다.
 
 ### C1_1 전용 물리 실행
 
@@ -402,6 +509,15 @@ VLM이 world 좌표와 quaternion을 직접 쓰지 않도록 내부 후보 artif
 `RelativePoseResolver`가 immutable `WorldSnapshot`을 이용해 실제 world pose와
 정규화된 quaternion을 계산한다.
 
+TRANSPORT와 release 전 PLACE 계열 keyframe은 held object가 있으면 metadata의
+`pose_subject=ATTACHED_OBJECT`로 명시한다. 이 경우 resolver 결과는 원하는 object
+pose이며 compiler가 runtime에서 캡처한 `T_reference→object`를 사용해
+`T_world→reference = T_world→object · inverse(T_reference→object)`로 IK target을
+변환한다. Cartesian edge planner도 같은 변환을 적용한 EEF pose를 보간한다. 최종
+keyframe만 retarget하고 중간 sample을 object pose로 보간하면 불필요한 회전과 잘못된
+충돌 판정이 생기므로 두 경로의 변환은 항상 같아야 한다. TRANSPORT artifact에 PLACE
+또는 detach/open/suction-off가 섞이면 IK 전에 거부한다.
+
 `UR5eKinematics.solve_all_ik()`는 keyframe별 full-pose IK 해집합을 보존한다.
 `FirstFeasibleBranchSelector`는 `(keyframe, ik_branch)`를 노드로 하는 계층 그래프에서
 모든 구간이 연결되는 첫 시퀀스를 찾는다. 현재 정책은 비용 최적화가 아니라
@@ -424,6 +540,38 @@ Jacobian 최소 singular value와 condition number를 함께 검사하여 충돌
 branch는 모두 보존하지만 analytic completeness를 주장하지 않는다
 (`enumeration_complete=false`). 이후 calibrated analytic UR solver를 연결하면 이
 flag를 `true`로 올리고 최대 branch를 완전 열거할 수 있다.
+실패 attempt에는 raw/valid branch 수, seed 수, 최선 position/orientation error와 원본
+solver detail을 보존한다. 보수적 reach envelope에서 seed 실행 전 탈락한 경우는
+`TARGET_OUTSIDE_REACH_ENVELOPE`, 수치 탐색 실패는 `IK_SEARCH_EXHAUSTED`, collision
+validator가 모든 branch를 제거한 경우는 `COLLISION_FILTERED_ALL`로 구분한다.
+reach envelope는 소수 seed의 FK 최대값이 아니라 robot body chain, joint anchor,
+slide range, TCP offset으로 계산한 보수적 상한이다. Cartesian 중간 실패도
+`CARTESIAN_INTERMEDIATE_TARGET_OUTSIDE_REACH`,
+`CARTESIAN_INTERMEDIATE_IK_NON_CONVERGENCE`,
+`CARTESIAN_INTERMEDIATE_STATE_INVALID`로 나누고 sample 위치, seed 수, 오차,
+충돌 pair와 clearance를 기록한다.
+
+## 일반화된 container packing과 실행 재개
+
+`PackingKeyframeProvider`는 task/environment/object 이름 대신 현재 world의 target
+object, target region, collision points와 region-local geometry를 사용한다. 상자 안의
+기존 물체 footprint를 계산해 겹치지 않는 후보를 먼저 배치하고, wall inset과 물체 간
+clearance는 요청의 collision margin보다 작아질 수 없다. 자유 공간 transfer/alignment는
+sampling-based, opening을 통과하는 insertion/retreat는 Cartesian으로 역할을 분리하며
+각 keyframe metadata에 motion role, blocker, 실제 margin을 남긴다.
+
+긴 물체처럼 object bounds는 입구를 통과하지만 hand/wrist가 통과하지 못할 수 있는
+경우에는 낮은 release와 함께 물체 높이·hover clearance로 계산한 elevated release를
+후보로 제공한다. elevated release는 물리 settle에 의존하므로 경로 성공만으로 수납
+성공으로 판정하지 않고, release hold 뒤 3-D containment를 반드시 다시 검사한다.
+
+중간 실행 재개에는 raw `qpos.npz` 대신 `runtime_checkpoint.py`의 versioned JSON을
+사용한다. 이 checkpoint는 named joint/actuator state, active EE, gripper command,
+captured hold action, 정확한 attachment transform, held tool과 완료 subgoal을 함께
+저장한다. 복원 시 이미 든 물체에 신규 grasp penetration 검사를 다시 적용하지 않고
+저장한 상대변환의 위치·회전 일관성을 확인한다. 모델 호환성은 reset seed에 따라
+달라질 수 있는 전체 MJCF 문자열이 아니라 joint/body/geom/actuator topology로 검사한다.
+초기 v1 checkpoint는 named-state layout이 정확히 같은 경우에만 호환 복원한다.
 
 ## 일반화된 contact manipulation
 
@@ -880,8 +1028,11 @@ mass/inertia와 `natural_frequency_hz`를 사용해 안정 범위로 자동 축�
 `GRASP_LOST`를 반환하고 required wrench, pose error, contact count/force를
 `FailureObservation.observed`와 report metadata에 저장한다.
 
-detach는 현재 world pose와 velocity를 보존한 채 weld force를 제거한다. 물체를 든
-상태의 EE 교체나 detach 전 gripper open/suction-off는 fail-closed 한다.
+`BREAKABLE_WELD` detach는 현재 world pose와 live velocity를 보존한 채 weld force를
+제거한다. `KINEMATIC` detach는 투영된 world pose를 보존하고 free-joint velocity를
+0으로 초기화하므로 정지 배치/반납에 사용한다. 물체를 든 상태의 EE 교체나 detach 전
+gripper open/suction-off는 fail-closed 한다. contact-friction hold와 synthetic
+attachment는 동시에 활성화할 수 없다.
 
 실제 target checkout에서 event runtime만 독립 확인하려면 stationary smoke plan을 쓴다.
 

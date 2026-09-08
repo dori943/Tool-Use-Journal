@@ -5,12 +5,17 @@
 
 ## 바로 확인하기
 
-저장소 루트에서 의존성을 설치하고 테스트한다.
+저장소 루트에서 Python 3.11 가상환경을 만들고 의존성을 설치한다. 저장소에
+포함된 RoboCasa 런타임은 시뮬레이션에 필요하며, LeRobot 계열의 불필요한 학습
+의존성을 끌어오지 않도록 `--no-deps`로 연결한다. Numba 캐시는 쓰기 가능한
+저장소 로컬 경로를 사용한다.
 
 ```powershell
-python -m venv .venv
+& "$env:LocalAppData\Programs\Python\Python311\python.exe" -m venv .venv
 .\.venv\Scripts\Activate.ps1
 python -m pip install -r requirements.txt
+python -m pip install --no-deps -e .\third_party\robocasa-layout004-style002-runtime
+$env:NUMBA_CACHE_DIR = "$PWD\.numba_cache"
 python -m pytest src\tuj\m5_motion\tests -q
 ```
 
@@ -63,6 +68,12 @@ python scripts\run_m5_motion_planner.py `
 
 MP4가 필요하면 `--video`만 추가해도 controller simulation이 자동으로 실행된다.
 영상 실행은 offscreen이므로 viewer 창을 열지 않는다.
+
+모든 `task_registry.TASKS` 환경은 `environments/task_camera.py`의 동일한
+robot-relative `agentview`를 설치한다. 기본 구도는 로봇 정면의 좌우 대칭 시점,
+약간 높은 각도, 60° 화각이며 M0/M1과 M5 영상 기본 크기는 960×540이다. 새 task도
+환경의 `_load_model()`에서 `add_standard_task_camera(...)`를 호출하면 같은 구도를
+사용한다. 필요할 때만 CLI의 `--camera`, `--width`, `--height`로 명시적으로 덮어쓴다.
 
 ```powershell
 python scripts\run_m5_motion_planner.py `
