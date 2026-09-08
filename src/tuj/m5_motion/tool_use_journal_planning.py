@@ -1374,10 +1374,45 @@ class ToolUseJournalMotionRequestPlanner:
                 if self.ee_attach_policy is EEAttachPolicy.PRECOMPUTED_REQUIRED:
                     raise
                 self._log("[M5][EE_PATH] fallback=dynamic-planner")
+        self._ground_held_region_goal(request)
         return self.pipeline.plan(
             request,
             collision_context_factory=self.collision_context_factory,
         )
+
+    def _ground_held_region_goal(self, request: MotionPlanRequest) -> None:
+        """Give a held TRANSPORT/MOVE or region PLACE an object-space destination.
+
+        The scripted live runtime does this through its grasp retention; the
+        generic ``run.py`` pipeline reaches the keyframe generator without it,
+        so the model used to aim the gripper at a bare region anchor and the
+        carried object clipped the table (transport) or sank through the tray
+        floor (place).  Grounding here derives the current object pose from
+        ``robot_state.eef_pose`` and the recorded grasp transform, picks a free
+        spot inside the region, and publishes ``held_transport_goal`` /
+        ``held_place_goal`` (place also rewrites the stale M4 fallback
+        ``goal.target_pose`` so the released body is frozen where it lands).
+        """
+
+        from tuj.m5_motion.scripted_grasps.transport import (
+            HELD_PLACE_GOAL_ANCHOR,
+            HELD_TRANSPORT_GOAL_ANCHOR,
+            ground_held_region_goal,
+        )
+
+        try:
+            ground_held_region_goal(request)
+        except ValueError as error:
+            self._log(f"[M5][REGION_GOAL] grounding skipped: {error}")
+            return
+        for key in (HELD_TRANSPORT_GOAL_ANCHOR, HELD_PLACE_GOAL_ANCHOR):
+            goal = request.task.metadata.get(key)
+            if isinstance(goal, Mapping):
+                self._log(
+                    f"[M5][REGION_GOAL] {key} object={goal.get('object_id')} "
+                    f"region={request.task.goal.target_region_id} "
+                    f"source={goal.get('source')}"
+                )
 
 
 class WorkcellMotionRequestRouter:
