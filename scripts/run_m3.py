@@ -270,7 +270,8 @@ def main():
                 r = mat.query_flat_face(gk, q["node_id"], queried_by=qid)
             elif kind == "gap_accessible":
                 r = mat.query_gap_accessible(gk, q["tool_id"], q["target_id"],
-                                             queried_by=qid)
+                                             queried_by=qid,
+                                             gap_width_mm=q.get("gap_width_mm"))  # 0908: M2가 실어 보낸 틈 폭
             elif kind in ("batch", "swept_space"):
                 call = {"kind": kind, "action_type": q.get("action_type"),
                         "actor": q.get("actor"), "member_ids": q.get("member_ids", []),

@@ -42,9 +42,12 @@ def _judge(head: str, nodes: list[str], view: dict, rels: list[dict],
         if not rels:
             return "unanswered", []
         ok = [bool(r.get("pass")) for r in rels]
-        ev = [{"check": r.get("check"), "value_mm": r.get("value_mm"),
-               "pass": bool(r.get("pass"))} for r in rels]
-        return ("sat" if all(ok) else "unsat"), ev
+        ev = [{"node": r.get("from") or r.get("node_id"), "check": r.get("check"),
+               "value_mm": r.get("value_mm"), "pass": bool(r.get("pass"))} for r in rels]
+        # 0908: 도구 후보 서브골(require_all=False)은 후보 중 하나라도 되면 sat.
+        # 전원 통과를 요구하면 fits(?tool, tool_rest)가 후보 하나 때문에 unsat이 되어
+        # 재분해(sweep_collect → relocate)를 잘못 트리거한다 (c1_1 0908 실행).
+        return ("sat" if (all(ok) if require_all else any(ok)) else "unsat"), ev
 
     verdicts = []
     for n in nodes:
@@ -65,6 +68,18 @@ def _judge(head: str, nodes: list[str], view: dict, rels: list[dict],
             v = any(x.get("feasible") for x in ee.values()) if ee else None
             ev.append({"node": n,
                        "feasible_ees": [k for k, x in (ee or {}).items() if x.get("feasible")]})
+        elif head == "flat_face":
+            # M3 query_flat_face 응답 {type: flat_face, node_id, value, pass, check}
+            r = next((x for x in rels
+                      if x.get("type") == "flat_face" and x.get("node_id") == n), None)
+            v = r.get("value") if r else None
+            ev.append({"node": n, "flat_face": v, "check": (r or {}).get("check")})
+        elif head == "gap_accessible":
+            # M3 query_gap_accessible 응답 {type: gap_accessible, from: tool, to: target, pass, value_mm}
+            r = next((x for x in rels
+                      if x.get("type") == "gap_accessible" and x.get("from") == n), None)
+            v = r.get("pass") if r else None
+            ev.append({"node": n, "gap_accessible": v, "margin_mm": (r or {}).get("value_mm")})
         else:
             v = None
             ev.append({"node": n})
@@ -128,6 +143,86 @@ JSON 객체만 출력:
 {{"decomposition": 0.0, "object_selection": 0.0, "uncertain_about": ["..."], "reason": "..."}}"""
 
 
+# 0908: 도구 후보가 있는 서브골에는 신뢰도 갱신 호출에 도구 판정을 합친다 (호출 수 동일).
+PROMPT_TOOL_BLOCK = """
+이 서브골은 도구가 필요하다 (kind: {kind}). 도구 후보별 측정값:
+{table}
+
+후보 중 이 작업에 가장 적합한 도구 하나를 골라 selected_tool_id에 쓰고, tool_reason에
+이유를 한국어 한 문장으로 쓰라. 후보 나열 순서에는 의미가 없다.
+작업별 적합 기준:
+- flatten(펴기): 반죽을 굴리거나 눌러 펴야 한다. 원통형 또는 두께가 두꺼운 단단한 몸체
+  (병, 밀대, 컵)가 적합하고, 두께가 몇 mm인 얇은 판(주걱, 뒤집개)은 힘을 주면 휘어 부적합하다.
+- sweep_collect(쓸어 모으기): 넓고 평평한 면. 필요 액션 횟수가 적은 것.
+- extract(틈에서 꺼내기): 틈보다 얇고 대상까지 닿을 만큼 긴 것.
+- scoop_transfer(떠 옮기기): 오목한 면이 있는 것.
+공통 기준:
+- 핵심 술어({core})가 false인 후보는 고르지 말 것. 잡을 수 있는 EE가 없는 후보도 제외.
+- 리치 여유는 양수면 충분하며 우열 기준이 아니다. 잡을 수 있는 EE 종류 수도 우열 기준이 아니다.
+- 질량과 재질은 VLM 추정치라 오차가 크다. 크기, 두께, 형상을 우선하라.
+JSON 객체에 "selected_tool_id"와 "tool_reason" 필드를 추가하라."""
+
+
+def _tool_table(measured: list[dict]) -> str:
+    rows = []
+    for m in measured:
+        ext = m.get("extents_mm")
+        size = "x".join(str(round(x)) for x in ext) + "mm" if ext else "크기 미상"
+        mass = f"{m['mass_kg']}kg(추정)" if m.get("mass_kg") is not None else "질량 미상"
+        parts = [size]
+        if ext:
+            parts.append(f"두께(최소 치수) {round(min(ext), 1)}mm")
+        parts.append(mass)
+        if m.get("material") and m["material"] != "unknown":
+            parts.append(f"재질 {m['material']}")
+        if m.get("cylinder_like"):
+            parts.append("원통형")
+        parts.append(f"잡을 수 있는 EE {m.get('feasible_ees') or []}")
+        if m.get("reach_margin_mm") is not None:
+            parts.append(f"리치 여유 {m['reach_margin_mm']}mm")
+        if m.get("batch_groups"):
+            parts.append(f"필요 액션 {m['batch_groups']}회")
+        if m.get("core_pred"):
+            v = m.get("core_value")
+            parts.append(f"{m['core_pred']}={'미측정' if v is None else v}")
+        rows.append(f"  - {m['node']}: " + ", ".join(parts))
+    return "\n".join(rows)
+
+
+def _apply_llm_tool_choice(s: dict, obj: dict, logs: list[str]) -> None:
+    """LLM이 고른 도구를 검증해 채택한다. 부적합하면 규칙 선택을 유지한다."""
+    pick = obj.get("selected_tool_id")
+    reason = obj.get("tool_reason", "")
+    measured = {m["node"]: m for m in s.get("tool_candidates_measured", [])}
+    rule = s.get("selected_tool_id")
+    if pick not in measured:
+        logs.append(f"  [도구 판정] {s['subgoal_id']}: LLM 선택 {pick!r}이 측정된 후보에 없음 — "
+                    f"규칙 선택 {rule} 유지")
+        return
+    m = measured[pick]
+    if not m.get("feasible_ees"):
+        logs.append(f"  [도구 판정] {s['subgoal_id']}: LLM 선택 {pick}은 잡을 수 있는 EE 없음 — "
+                    f"규칙 선택 {rule} 유지")
+        return
+    if m.get("core_value") is False:
+        logs.append(f"  [도구 판정] {s['subgoal_id']}: LLM 선택 {pick}은 {m.get('core_pred')}=false — "
+                    f"규칙 선택 {rule} 유지")
+        return
+    s["selection_by"] = "llm"
+    s["selection_reason_tool"] = reason
+    if pick == rule:
+        logs.append(f"  [도구 판정] {s['subgoal_id']}: LLM이 규칙 선택 {rule} 동의 ({reason})")
+        return
+    s["selected_tool_id_rule"] = rule
+    s["selected_tool_id"] = pick
+    part = m.get("partition")
+    if part and len(part) > 1:
+        s["partition_plan"] = part
+    else:
+        s.pop("partition_plan", None)
+    logs.append(f"  [도구 판정] {s['subgoal_id']}: {rule} → {pick} 로 변경 ({reason})")
+
+
 def _summarize_for_subgoal(s: dict) -> str:
     """한 서브골의 M3 판정 결과 요약. 상태 성격을 구분해 전달한다
     (not_queried는 불확실성이 아니라 의도적 비측정)."""
@@ -172,6 +267,16 @@ def update_confidence(m2_out: dict, client, model: str = "gpt-4o",
             c_dec=before.get("decomposition"), c_sel=before.get("object_selection"),
             objects=s.get("object_ids", []), tools=s.get("tool_candidate_ids", []),
             unc=before.get("uncertain_about", []), summary=_summarize_for_subgoal(s))
+        # 0908: 도구 후보 측정표가 있으면 같은 호출에서 도구 판정까지 받는다
+        measured = s.get("tool_candidates_measured") or []
+        want_tool = bool(measured) and s.get("selected_tool_id") in {m["node"] for m in measured}
+        if want_tool:
+            # 규칙 선택은 LLM에 알리지 않는다 (앵커링 방지: c1_2에서 "1차 선택 spatula"를
+            # 보여주니 2mm 두께가 휜다고 스스로 적으면서도 동의했음). 후보는 id순으로 중립 나열.
+            prompt += "\n" + PROMPT_TOOL_BLOCK.format(
+                kind=s.get("kind"),
+                table=_tool_table(sorted(measured, key=lambda m: m["node"])),
+                core=(measured[0].get("core_pred") or "없음"))
         err = None
         for attempt in (1, 2):
             msg = prompt if attempt == 1 else prompt + f"\n\n이전 출력 문제: {err}. JSON 객체만."
@@ -190,7 +295,12 @@ def update_confidence(m2_out: dict, client, model: str = "gpt-4o",
                     v = obj.get(k)
                     if not isinstance(v, (int, float)) or not 0.0 <= v <= 1.0:
                         raise ValueError(f"{k}가 0~1 숫자가 아님: {v!r}")
-                conf["after"] = obj
+                if want_tool and not obj.get("selected_tool_id"):
+                    raise ValueError("selected_tool_id가 없음 (도구 후보 중 하나를 골라라)")
+                if want_tool:
+                    _apply_llm_tool_choice(s, obj, logs)
+                conf["after"] = {k: v for k, v in obj.items()
+                                 if k not in ("selected_tool_id", "tool_reason")}
                 conf["delta"] = {k: round(obj[k] - (before.get(k) or 0.0), 3)
                                  for k in ("decomposition", "object_selection")}
                 logs.append(
@@ -215,24 +325,56 @@ def measurement_feedback(m2_out: dict) -> str | None:
     0831 설계: 해법("도구를 써라")은 절대 넣지 않는다 — 측정 사실만 전달하고,
     대안 도출은 분해 LLM의 몫으로 남긴다. 그래야 도구 사용이 창발로 성립한다.
     """
-    lines = []
+    # 0908: unsat을 두 등급으로 나눈다. 이전엔 unsat 하나만 있어도 "다른 kind를 내라"고
+    # 강제해 c2_2(stack → relocate → extract), c4_1(extract → 맨손 relocate),
+    # c4_2(relocate → stack → ...)가 전부 엉뚱한 kind로 튀었다.
+    #   kind 등급  수행 방식 자체가 불가: reachable, ee_usable(도구 없이 못 잡음),
+    #              flat_face / gap_accessible(도구 후보 전원 부적합)
+    #   조정 등급  같은 kind 안에서 순서/짝만 고치면 되는 것: top_exposed(위에 다른 물체가
+    #              있음 → 그 물체를 먼저 치우거나 쌓기 순서 변경), fits(이 쌍만 재검토)
+    # 0908 2차: "수행 방식 불가"를 다시 둘로 나눈다. 도구 후보 전원이 핵심 술어에서
+    # 떨어진 것(flat_face/gap_accessible 전부 false)은 kind가 아니라 후보가 문제다.
+    # c1_2에서 M0 캐시 버그로 flat_face가 전부 false가 되자 LLM이 flatten 대신
+    # sweep_collect("병으로 반죽을 도마에 쓸어 담기")를 내놓았다. 펴기를 쓸기로 바꾸는 건
+    # 어떤 상황에서도 답이 아니므로 kind는 유지하고 도구 후보 확장만 요구한다.
+    kind_lines, tool_lines, adjust_lines = [], [], []
     for s in m2_out.get("m2_subgoals", []):
         for d in s.get("details", []):
             for p in d.get("pre", []):
                 if p.get("status") != "unsat":
                     continue
+                head = p.get("head")
                 # batch/act_space는 unsat이어도 분할(partition)과 제외 목록으로
                 # 해소되는 신호라 재분해 사유가 아니다 (0831 — kind 진동 방지)
-                if p.get("head") in ("batch_feasible", "act_space_clear"):
+                if head in ("batch_feasible", "act_space_clear"):
                     continue
                 # 0903: 목적지 clear 불충족은 수행 방식(kind)을 바꿔도 해소되지 않는다
-                # (트레이가 막힌 건 쓸어 담아도 마찬가지). 이걸 넣으면 "다른 kind를
-                # 내라"는 요구가 되어 엉뚱한 재분해(c2_1: 트레이 담기를 도구 사용으로)가
-                # 나온다. 목적지 정리는 별도 서브골 추가 문제이고, 현재 c2_1의 clear
-                # unsat은 접지 규칙(컨테이너 깊이) 쪽 이슈라 M3 수정 대상. 재분해 사유에서 제외.
-                if p.get("head") == "clear":
+                # (트레이가 막힌 건 쓸어 담아도 마찬가지). 목적지 정리는 별도 서브골 문제.
+                if head == "clear":
                     continue
                 ev = p.get("evidence") or []
+                if head == "top_exposed":
+                    blk = {n for e in ev if e.get("top_exposed") is False
+                           for n in (e.get("blockers") or [])}
+                    who = [e.get("node") for e in ev if e.get("top_exposed") is False]
+                    adjust_lines.append(
+                        f"- {p['expr']} -> 불충족: {', '.join(who)} 위에 다른 물체가 있음"
+                        + (f" ({', '.join(sorted(blk))})" if blk else "")
+                        + ". 위에 있는 물체를 먼저 다루거나 쌓는 순서를 바꿀 것")
+                    continue
+                if head == "fits":
+                    bad = [e.get("node") for e in ev if "pass" in e and not e.get("pass")]
+                    adjust_lines.append(
+                        f"- {p['expr']} -> 불충족 (검사 {len(ev)}건 중 {len(bad)}건: "
+                        f"{', '.join(str(x) for x in bad if x)}). 이 대상만 다른 목적지/받침으로 "
+                        "바꾸거나 별도 서브골로 분리할 것")
+                    continue
+                if head in ("flat_face", "gap_accessible"):
+                    bad = [e.get("node") for e in ev if e.get(head) is False]
+                    tool_lines.append(
+                        f"- {p['expr']} -> 불충족: 도구 후보 {', '.join(str(x) for x in bad if x)} 전부 "
+                        f"{head} 조건을 만족하지 못함")
+                    continue
                 detail = ""
                 falsy = [e for e in ev if e.get("reachable") is False]
                 if falsy:
@@ -245,15 +387,27 @@ def measurement_feedback(m2_out: dict) -> str | None:
                 elif ev and all("pass" in e for e in ev):
                     n_f = sum(1 for e in ev if not e.get("pass"))
                     detail = f" (검사 {len(ev)}건 중 {n_f}건 불충족)"
-                lines.append(f"- {p['expr']} -> 불충족{detail}")
-    if not lines:
+                kind_lines.append(f"- {p['expr']} -> 불충족{detail}")
+    if not kind_lines and not tool_lines and not adjust_lines:
         return None
-    return ("직전 계획 평가: 아래 조건이 실측에서 충족되지 않아 직전 분해는 실행 불가로"
-            " 판정되었다.\n"
-            + "\n".join(lines)
-            + "\n위 제약은 로봇과 장면의 물리적 사실이므로, 같은 kind의 분해를 반복하면"
-              " 동일하게 실행 불가로 판정된다. 위 제약이 적용되지 않는 다른 수행 방식"
-              "(kind)의 분해를 출력하라.")
+    out = ["직전 계획 평가: 아래 조건이 실측에서 충족되지 않았다.",
+           "공통: 재분해하더라도 지시문이 요구하는 최종 상태(펴기, 담기, 쌓기, 꺼내기 등)는 "
+           "바뀌면 안 된다. 바꿀 수 있는 것은 수행 방식, 도구 후보, 순서, 짝이다."]
+    if kind_lines:
+        out.append("[맨손 수행 불가] 아래 제약은 로봇과 장면의 물리적 사실이므로, 같은 kind의 "
+                   "분해를 반복하면 동일하게 실행 불가로 판정된다. 같은 목표를 달성하는 다른 "
+                   "수행 방식(kind, 예: 도구를 쓰는 방식)의 분해를 출력하라.")
+        out += kind_lines
+    if tool_lines:
+        out.append("[도구 후보 부적합] kind는 그대로 유지하라. 대신 장면의 다른 물체 중 이 작업에 "
+                   "쓸 수 있는 것을 도구 후보(tool_candidate_ids)에 추가하거나 교체하라. "
+                   "추가할 물체가 없으면 기존 분해를 그대로 출력하라.")
+        out += tool_lines
+    if adjust_lines:
+        out.append("[순서/짝 조정] 아래 제약은 수행 방식(kind)의 문제가 아니다. kind는 그대로 "
+                   "유지하고, 지목된 물체의 순서, 받침, 목적지, 그룹 구성만 바꿔서 다시 분해하라.")
+        out += adjust_lines
+    return "\n".join(out)
 
 
 # kind별 도구 적합성의 핵심 m3 술어 (측정 없이는 후보를 가를 근거가 없는 것)
@@ -279,7 +433,7 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
         if c.get("kind") in ("batch", "swept_space"):   # 0828 신규 — 노드 대신 그룹 대상
             q_nodes.setdefault(q["queried_by"], [])
             continue
-        n = c.get("node_id") or c.get("a")
+        n = c.get("node_id") or c.get("a") or c.get("tool_id")   # 0908: gap_accessible은 tool_id
         if n:
             q_nodes.setdefault(q["queried_by"], [])
             if n not in q_nodes[q["queried_by"]]:
@@ -314,7 +468,11 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
                                   for r in rs
                                   if (r.get("node_id") or r.get("from"))]
                 nodes = q_nodes.get(p["id"], []) or answered_nodes
-                if p["id"] not in q_nodes:      # 질의 자체를 안 낸 술어 (예: tool_rest는 측정 대상 아님)
+                # 0908: M2가 직접 발행하지 않은 술어(flat_face, gap_accessible)도 run_m3 컴파일
+                # 보충이 응답을 주면 판정에 쓴다. 응답 노드가 하나도 없을 때만 not_queried
+                # (tool_rest처럼 error 응답만 오는 경우). 도희 0907 리포트: c1_2 flat_face가
+                # 4건 응답됐는데 q_nodes 게이팅에 걸려 미측정 처리 → 리치 여유로 spatula 확정.
+                if p["id"] not in q_nodes and not answered_nodes:
                     status, ev = "not_queried", []
                 elif not rs:
                     status, ev = "unanswered", []
@@ -400,6 +558,42 @@ def apply_m3(m2_out: dict, responses: list[dict]) -> list[str]:
             {"node": c2, "feasible_ees": f2, "reach_margin_mm": m3,
              "batch_groups": (len(p2) if p2 else None)}
             for (br2, m3, n2, c2, f2, p2) in scored]
+        s["selection_by"] = "rule"
+        # 0908: 후보별 측정표. update_confidence의 LLM 도구 판정 입력이 된다.
+        # 규칙 스코어러(액션 횟수 → 리치 여유)는 태스크 적합성(펴기엔 굴릴 몸체, 꺼내기엔
+        # 얇고 긴 것)을 못 보고 c1_1 ladle, c1_2 spatula처럼 무관한 값으로 갈렸음.
+        core_val: dict[str, object] = {}
+        if core:
+            for d in s.get("details", []):
+                for p in d.get("pre", []):
+                    if p.get("head") != core:
+                        continue
+                    for e in p.get("evidence") or []:
+                        n = e.get("node")
+                        if n is None:
+                            continue
+                        v = e.get(core, e.get("pass"))
+                        if v is not None:
+                            core_val[n] = v
+        measured = []
+        for (br2, m3, n2, c2, f2, p2) in scored:
+            info = view.get(c2, {})
+            g = info.get("geometry") or {}
+            measured.append({
+                "node": c2,
+                "extents_mm": g.get("extents_mm"),
+                "length_mm": g.get("length_mm"),
+                "cylinder_like": g.get("cylinder_like"),
+                "mass_kg": info.get("mass_kg"),
+                "material": info.get("material"),
+                "feasible_ees": f2,
+                "reach_margin_mm": m3,
+                "batch_groups": (len(p2) if p2 else None),
+                "partition": p2,
+                "core_pred": core,
+                "core_value": core_val.get(c2),
+            })
+        s["tool_candidates_measured"] = measured
         logs.append(f"  [도구 확정] {s['subgoal_id']}: {chosen} 선택 "
                     f"(사용 가능 EE {n_ee}종, 리치 여유 {margin}mm"
                     + (f", 필요 액션 {len(part)}회" if part else "") + ")")

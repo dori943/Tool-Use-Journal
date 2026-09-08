@@ -143,6 +143,9 @@ def main():
                      "  다음 단계로 진행하거나, 처음부터 다시 돌리려면 m2.json을 지운 뒤 실행하십시오.")
 
     rough = LLMRough()                          # 서브골 생성은 항상 LLM
+    # 0908: 순서 요구 서브골(ordered)의 VLM 순서 판정용 장면 이미지 (M1이 저장한 frame.png)
+    _frame = os.path.join(tdir, "frame.png")
+    rough.frame_path = _frame if os.path.exists(_frame) else None
 
     # ── 0831 측정 피드백: 직전 왕복(m2.json+m3.json)이 있으면 unsat 판정 요약을
     #    재분해 프롬프트에 사실로 첨부한다 (호출 추가 없음). 해법은 넣지 않는다.
