@@ -287,6 +287,11 @@ def _goal(
             assignment.goal_region_id
             or parameters.get("target_region_id")
             or parameters.get("target_region")
+            or (
+                assignment.source_binding.get("?base")
+                if action_type.lower() == "place_on"
+                else None
+            )
         ),
         approach_direction=approach,
         approach_distance_m=_distance_m(parameters, "approach_distance_m"),
@@ -488,59 +493,46 @@ class SelectedPlanMotionRequestAdapter:
             contact = _contact_spec(assignment, execution)
             if is_acquire_action(action_type) and not allowed_touch:
                 allowed_touch = list(target_ids)
-            if not isinstance(allowed_touch, list):
-                raise SelectedPlanAdapterError(
-                    "allowed_touch_objects must be a list when supplied"
-                )
-            c1_sweep_policy: dict[str, object] | None = None
-            if (
-                world.metadata.get("environment_name") == "C1_1_LegoSweep"
-                and assignment.tool == "plate"
-                and str(getattr(contact, "primitive", "")).strip().lower()
-                == "sweep"
-            ):
-                from tuj.m5_motion.c1_sweep_policy import (
-                    C1_SWEEP_COLLISION_MARGIN_M,
-                    policy_metadata,
-                )
-
+            elif contact is not None and assignment.tool:
                 allowed_touch = list(allowed_touch)
                 for target_id in target_ids:
                     if target_id not in allowed_touch:
                         allowed_touch.append(target_id)
-                selected_constraints = selected_constraints.model_copy(
-                    update={
-                        "collision_margin_m": min(
-                            selected_constraints.collision_margin_m,
-                            C1_SWEEP_COLLISION_MARGIN_M,
-                        )
-                    }
+            if not isinstance(allowed_touch, list):
+                raise SelectedPlanAdapterError(
+                    "allowed_touch_objects must be a list when supplied"
                 )
-                c1_sweep_policy = policy_metadata()
             action_parameters = _merged_action_parameters(assignment, execution)
             execution_metadata = (
                 dict(self._acquire_task_metadata)
                 if is_acquire_action(action_type)
                 else {}
             )
+            ee_capabilities = sorted(set(assignment.ee_capabilities))
+            execution_metadata["ee_capabilities"] = ee_capabilities
             explicit_execution_metadata = _execution_metadata(action_parameters)
+            execution_metadata.update(explicit_execution_metadata)
             if (
                 is_acquire_action(action_type)
-                and assignment.ee != "2F"
-                and "grasp_execution_mode" not in explicit_execution_metadata
                 and str(execution_metadata.get("grasp_execution_mode", "")).upper()
-                == "CONTACT_FRICTION"
+                == "AUTO"
             ):
-                execution_metadata["grasp_execution_mode"] = "KINEMATIC"
-            execution_metadata.update(explicit_execution_metadata)
-            if c1_sweep_policy is not None:
-                execution_metadata["motion_policy"] = c1_sweep_policy
+                if not ee_capabilities:
+                    raise SelectedPlanAdapterError(
+                        f"subgoal {subgoal_id!r} cannot resolve AUTO grasp mode "
+                        "because M4 supplied no EE capabilities"
+                    )
+                execution_metadata["grasp_execution_mode"] = (
+                    "CONTACT_FRICTION"
+                    if "contact_friction" in ee_capabilities
+                    else "KINEMATIC"
+                )
             if is_acquire_action(action_type):
                 execution_metadata.setdefault("operation", action_type.upper())
                 execution_metadata.setdefault("attach_target", True)
             if (
                 is_acquire_action(action_type)
-                and assignment.ee == "2F"
+                and "opposed_finger_contact" in ee_capabilities
                 and str(
                     execution_metadata.get("grasp_execution_mode", "")
                 ).upper()

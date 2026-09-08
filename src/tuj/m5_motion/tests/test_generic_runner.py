@@ -479,7 +479,6 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
             str(output_dir),
             "--video",
             str(video_path),
-            "--no-scripted-grasps",
         ]
     )
 
@@ -497,11 +496,10 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
 
 
 @pytest.mark.parametrize("mode_args", [
-    ["--simulate", "controller"],
-    ["--video", "test.mp4"],
     ["--simulate", "controller", "--scripted-grasps"],
+    ["--video", "test.mp4", "--scripted-grasps"],
 ])
-def test_controller_defaults_to_scripted_before_constructing_planner(
+def test_explicit_scripted_mode_runs_before_constructing_planner(
     tmp_path, monkeypatch, mode_args
 ):
     from tuj.m5_motion.scripted_grasps import cli

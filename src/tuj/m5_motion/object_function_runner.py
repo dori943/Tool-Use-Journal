@@ -110,25 +110,15 @@ class ReleaseSettlingProvider:
         return artifact
 
 
-def validate_function_assignments(selected, repository, *, environment=None):
+def validate_function_assignments(selected, repository):
     catalog = catalog_library(repository)
-    from tuj.m5_motion.scripted_grasps.registry import resolve
 
     for assignment in selected.candidate_assignments:
         if not is_acquire_action(assignment.action_type):
             continue
         if len(assignment.target_ids) != 1:
             raise ValueError("object-function acquisition requires exactly one target")
-        entry = resolve(
-            environment=environment,
-            object_id=assignment.target_ids[0],
-            ee=assignment.ee,
-        )
-        recipe = (
-            entry.recipe()
-            if entry is not None
-            else catalog.get_recipe(assignment.target_ids[0])
-        )
+        recipe = catalog.get_recipe(assignment.target_ids[0])
         if assignment.ee != recipe.ee_id:
             raise ValueError(
                 f"{recipe.object_id}: M4 selects {assignment.ee}, "
@@ -152,11 +142,7 @@ def run_object_function_sequence(*, selected, repository, world, constraints,
     runtime = recorder = None
     summary = {"grasp_provider": "object-function", "status": "FAILED", "steps": records}
     try:
-        validate_function_assignments(
-            selected,
-            repository,
-            environment=world.metadata.get("environment_name"),
-        )
+        validate_function_assignments(selected, repository)
         runtime = make_function_runtime(
             repository, world.metadata["environment_name"],
             active_ee=world.metadata.get("physical_active_ee"), seed=args.seed,
@@ -164,6 +150,13 @@ def run_object_function_sequence(*, selected, repository, world, constraints,
             # Existing functions perform their own M1 capture even without video.
             has_offscreen_renderer=True,
         )
+        if (
+            "geometry_observation_artifact" in world.metadata
+            or "geometry_evidence" in world.metadata
+        ):
+            from tuj.m5_motion.tool_use_journal import apply_world_snapshot_state
+
+            apply_world_snapshot_state(runtime.env, world)
         from tuj.m5_motion.generic_runner import _validate_runtime_start
         _validate_runtime_start(runtime, world)
         settle_tool_use_journal_free_objects(runtime.env, duration_s=args.settle_seconds)
@@ -198,12 +191,11 @@ def run_object_function_sequence(*, selected, repository, world, constraints,
 
         def planner(request):
             # Compile from the corrected live model and current attachment state.
-            from tuj.m5_motion.packing import PackingKeyframeProvider
             from tuj.m5_motion.vlm_provider import OpenAIKeyframeProvider
             bound = ToolUseJournalMotionRequestPlanner.from_environment(
                 runtime.env, repository, seed=args.seed,
                 provider=ReleaseSettlingProvider(
-                    PackingKeyframeProvider(OpenAIKeyframeProvider())
+                    OpenAIKeyframeProvider()
                 ),
                 ee_attach_registry_root=args.ee_attach_registry,
                 ee_attach_trajectory_paths=tuple(args.ee_attach_trajectory or ()),

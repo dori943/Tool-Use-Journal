@@ -754,12 +754,26 @@ class ToolUseJournalEnvironmentAdapter:
 
     def _obstacles(self) -> list[Any]:
         result: list[Any] = []
+        robot_root_body_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_BODY,
+            str(self.robot.robot_model.root_body),
+        )
+        robot_body_ids = (
+            _descendant_body_ids(self.model, robot_root_body_id)
+            if robot_root_body_id >= 0
+            else set()
+        )
         for geom_id in range(self.model.ngeom):
             geom_name = _name(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
-            if not (
-                geom_name.startswith("table_collision")
-                or geom_name == "ee_rack_base"
-                or geom_name.startswith("ee_rack_support_")
+            # Include all stationary collision geometry (islands, box fixtures,
+            # shelves, etc.), not just a few table/rack names. Moving objects
+            # are represented separately by the current object records.
+            body_id = int(self.model.geom_bodyid[geom_id])
+            if (
+                int(self.model.body_weldid[body_id]) != 0
+                or body_id in robot_body_ids
+                or not (int(self.model.geom_contype[geom_id]) or int(self.model.geom_conaffinity[geom_id]))
             ):
                 continue
             local = _geom_local_points(self.model, geom_id)
@@ -867,6 +881,16 @@ class ToolUseJournalEnvironmentAdapter:
             separators=(",", ":"),
         ).encode("utf-8")
         signature = "tool-use-journal:" + hashlib.sha256(encoded).hexdigest()
+        base_body_id = mujoco.mj_name2id(
+            self.model,
+            mujoco.mjtObj.mjOBJ_BODY,
+            str(self.robot.robot_model.root_body),
+        )
+        robot_base_world_m = (
+            [float(value) for value in self.data.xpos[base_body_id]]
+            if base_body_id >= 0
+            else None
+        )
         return WorldSnapshot(
             scene=SceneRef(
                 signature=signature,
@@ -886,6 +910,7 @@ class ToolUseJournalEnvironmentAdapter:
                 "declared_active_ee": self.declared_active_ee,
                 "ee_metadata_matches_physics": self.ee_metadata_matches_physics,
                 "rack_collision_policy": "PROMOTE_IN_PLANNER_COPY",
+                "robot_base_world_m": robot_base_world_m,
                 "attached_object_transforms": (
                     {
                         attached_object_transform.object_id: (
@@ -897,6 +922,68 @@ class ToolUseJournalEnvironmentAdapter:
                 ),
             },
         )
+
+
+def apply_world_snapshot_state(env: object, world: WorldSnapshot) -> None:
+    """Restore named robot and free-object poses from a planning snapshot.
+
+    Environment recreation is still required to obtain the compiled MuJoCo
+    model.  Seed equality alone does not guarantee that randomized object ids
+    receive the same poses, so M5 restores the M1-captured state by stable joint
+    names before planning or replay.
+    """
+
+    model, data = _raw_model_data(env)
+    for name, value in zip(
+        world.robot_state.joint_names,
+        world.robot_state.joint_positions_rad,
+        strict=True,
+    ):
+        joint_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_JOINT, name)
+        if joint_id < 0:
+            raise ToolUseJournalCompatibilityError(
+                f"WorldSnapshot robot joint {name!r} is absent from the runtime"
+            )
+        data.qpos[int(model.jnt_qposadr[joint_id])] = float(value)
+
+    for object_id, raw_record in world.objects.items():
+        if not isinstance(raw_record, Mapping):
+            continue
+        free_joint_name = raw_record.get("free_joint_name")
+        pose = raw_record.get("pose")
+        if not isinstance(free_joint_name, str) or not isinstance(pose, Mapping):
+            continue
+        joint_id = mujoco.mj_name2id(
+            model, mujoco.mjtObj.mjOBJ_JOINT, free_joint_name
+        )
+        if joint_id < 0:
+            raise ToolUseJournalCompatibilityError(
+                f"WorldSnapshot object {object_id!r} free joint "
+                f"{free_joint_name!r} is absent from the runtime"
+            )
+        position = np.asarray(pose.get("position_m"), dtype=float)
+        quaternion_xyzw = np.asarray(pose.get("orientation_xyzw"), dtype=float)
+        if (
+            position.shape != (3,)
+            or quaternion_xyzw.shape != (4,)
+            or not np.all(np.isfinite(position))
+            or not np.all(np.isfinite(quaternion_xyzw))
+        ):
+            raise ToolUseJournalCompatibilityError(
+                f"WorldSnapshot object {object_id!r} has an invalid world pose"
+            )
+        norm = float(np.linalg.norm(quaternion_xyzw))
+        if norm <= 1e-12:
+            raise ToolUseJournalCompatibilityError(
+                f"WorldSnapshot object {object_id!r} has a zero quaternion"
+            )
+        quaternion_xyzw /= norm
+        address = int(model.jnt_qposadr[joint_id])
+        data.qpos[address : address + 3] = position
+        data.qpos[address + 3 : address + 7] = quaternion_xyzw[[3, 0, 1, 2]]
+
+    data.qvel[:] = 0.0
+    mujoco.mj_forward(model, data)
 
 
 def _joint_qpos_width(joint_type: int) -> int:

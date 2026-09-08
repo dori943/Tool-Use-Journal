@@ -1207,9 +1207,6 @@ class ToolUseJournalMotionRequestPlanner:
             if isinstance(selected_provider, RoutedKeyframeStrategyProvider)
             else RoutedKeyframeStrategyProvider(selected_provider)
         )
-        from tuj.m5_motion.c1_sweep_policy import C1SweepPolicyProvider
-
-        routed_provider = C1SweepPolicyProvider(routed_provider)
         # The routed provider still owns geometry generation.  This decorator
         # changes only explicitly selected physical PICK requests from a
         # synthetic ATTACH_OBJECT event to persistent contact friction.

@@ -1,5 +1,9 @@
 # Motion Planner
 
+기본 실행은 `planner`다. M4가 선택한 EE capability와 M1/M5 통합 기하를
+하나의 요청으로 전달해 전체 keyframe 후보를 생성하고, IK·충돌·연결 경로를
+검증한 뒤 실행한다. 객체별 함수 실행은 명시적으로 선택하는 호환 모드다.
+
 객체별 파지 함수 분기는 `--scripted-grasps --simulate controller`로 켤 수 있다.
 현재 활성 객체, 호출 방법과 검증 결과는 [scripted_grasps/README.md](scripted_grasps/README.md)를 참고한다.
 이 모드는 파지 후 실제 상태에서 다음 M5 요청을 계획한다.
@@ -56,8 +60,8 @@ PLACE/RETURN_TOOL의 DETACH → OPEN/OFF 순서를 유지하고, 배치 위치 �
 물리 step과 안정화·후퇴 검사를 수행해야 한다. KINEMATIC은 qpos 상대 자세 고정이며
 MuJoCo equality weld가 아니다. 해제 시 속도는 0으로 설정되므로 정지 배치를 대상으로 한다.
 
-객체·EE는 registry와 M4의 지정이 일치해야 한다. 예를 들어 기존 `grasp_lid()`는 vac이므로
-lid를 2F로 지정한 M4 입력은 실행 전에 오류로 처리한다. 자동 EE 대체는 하지 않는다.
+외부 catalog recipe의 객체·EE와 M4의 지정이 일치해야 한다. 일치하지 않으면
+실행 전에 오류로 처리한다.
 
 ```powershell
 # C4-2 실제 함수 → attach → 4 cm 이동 → 원위치 배치 → detach → 12 cm 후퇴
@@ -133,7 +137,7 @@ registry에서 환경 이름을 자동 발견한다. 등록된 환경은 reset �
 - `2F`, `3F`, `vac` 각각의 물리 gripper variant 생성
 - 세 EE의 `ee_rack_info`
 - M2/GK ID와 일치하는 `obj_body_id`
-- `model.get_xml()` 및 동일 seed reset 상태 재현
+- `model.get_xml()` 및 이름이 안정적인 robot/object joint 계약
 
 목록 등록은 자동이지만 위 물리 계약은 생략되지 않는다. 계약이 없는 일반 robosuite
 환경은 planning/simulation 전에 명확한 compatibility error로 중단한다.
@@ -156,6 +160,14 @@ python scripts\run_m5_motion_planner.py `
 `--constraints`와 `--options`는 공통 JSON 또는 subgoal id별 JSON mapping을 받는다.
 생략하면 초기 world의 관절 이름을 기준으로 보수적인 기본 제약을 만든다. 출력 폴더를
 생략하면 `artifacts/<Task 입력 폴더명>/`을 사용한다.
+
+통합 `scripts/run.py` 경로는 M1에서 `m1_world.json`과 좌표계가 명시된 관측 bbox를
+저장한다. M5는 이 snapshot의 named robot/object pose를 재생 환경에 복원하고,
+`m1.json`의 bbox를 `--scene-geometry`로 받아 MuJoCo 형상과 대조한다. 일치한 관측
+bbox는 object-local corner로 변환되어 물체가 이동해도 계획용 안전 외피가 함께
+이동한다. 필수 Tool/target의 두 envelope가 허용 오차 이상 떨어져 있으면
+`geometry_alignment.json`을 남기고 trajectory 생성을 시작하지 않는다. 최종 충돌
+판정의 기준은 계속 MuJoCo collision geometry다.
 
 #### M4 입력 grounding 계약
 
@@ -203,11 +215,11 @@ python scripts\run_m5_motion_planner.py `
 simulation 실패 또는 목표 검증 실패 시 runner는 종료 코드 2를 반환하며 생성된
 report와 manifest는 그대로 보존한다.
 
-파일로 받은 `--initial-world`는 environment reset과 같은 관절·EE 상태여야 한다.
-일치하지 않으면 잘못된 scene에서 궤적을 재생하지 않고 중단한다. held/attached
-object가 있는 외부 snapshot도 fresh reset으로 재현할 수 없으므로 거부한다. 임의 Task를 바로
-시뮬레이션할 때는 `--environment`를 사용해 계획과 실행이 같은 seed의 deterministic
-reset을 공유하게 하는 것이 가장 안전하다. 범용 evaluator는 grounded Tool 상태,
+파일로 받은 `--initial-world`의 named robot joint와 free-object pose는 같은 topology의
+environment에 복원된 뒤 검증된다. 이름이나 EE 구성이 다르면 중단한다. held/attached
+object가 있는 외부 snapshot은 여전히 fresh runtime으로 재현할 수 없으므로 거부한다.
+M1에서 시작하는 통합 실행은 같은 seed에만 의존하지 않고 `m1_world.json`을 사용한다.
+범용 evaluator는 grounded Tool 상태,
 pose/joint, 회전된 bbox를 반영한 region containment를 판정한다. TRANSPORT의 grounded
 region은 완전 containment가 아니라 target의 `above` 상태로 별도 판정한다. 그 밖의
 scenario-level 성공 조건은 `UNKNOWN`으로 처리된다. C1 sweep의 검증된 rim grasp,
@@ -260,68 +272,8 @@ gripper 기준점 또는 명시적 접촉점 기준의 요구 값으로 바꿔�
 않는다. 공통 기본값 또는 사용자가 명시한 `--grasp-profile`만 사용한다.
 파지력 추정도 물체 종류·bbox 기반 rim 토크 보정 없이 질량·마찰 및 명시된
 최소 유지력만 사용한다. 이는 일반적인 중량 지지 추정이지 모든 형상의 토크
-안정성을 보장하는 모델은 아니다. 아래 `--physical` 계열의 기존 시나리오 예제는
-별도 경로로 남아 있으며 범용 파지에 자동 연결되지 않는다.
-
-### C1_1 전용 물리 실행
-
-C1_1은 M4 결과에 없는 plate rim-grasp와 분할 sweep geometry를 전용 binder가
-보완하므로 범용 runner와 분리한다. `tuj-m3`, `tuj-m4`가 같은 폴더에 있으면 C1_1
-runner가 M4 결과를 자동으로 찾는다.
-
-```bash
-python ../tuj-m3/scripts/run_m4_task_planner.py
-python ../tuj-m4/scripts/run_m5_c1_1_motion_planner.py --validate-input-only
-
-export OPENAI_API_KEY="<project-api-key>"
-python ../tuj-m4/scripts/run_m5_c1_1_motion_planner.py
-```
-
-PowerShell에서는 마지막 두 명령 앞에 다음과 같이 API key를 설정한다.
-
-```powershell
-$env:OPENAI_API_KEY = "<project-api-key>"
-```
-
-worktree 이름이 다르면 C1_1 runner에 `--task-planner path/to/task_planner.json`으로
-M4 결과를 명시한다. `--controller-kp`, `--planning-time` 등 C1_1 Motion Planner
-옵션은 runner가 그대로 전달한다. Tool과 EE는 두 runner 모두 M4 결과에서 읽는다.
-
-이 입력에서는 GK bundle의 `roles.selected_tool`인 `light_plate`가 M4
-`candidate_assignments`를 거쳐 M5까지 그대로 전달된다. 세 개로 분할된 sweep도 각각의
-target 목록과 실행 순서를 유지한 채 차례대로 motion plan으로 변환된다.
-
-처음에는 `--stop-after-pick`을 추가하면 전체 sweep 전에 설치와 물리 grasp까지만
-짧게 검증할 수 있다.
-
-### 최신 C1_1 물리 실행
-
-최신 개선분은 다음을 포함한다.
-
-- weld 없이 2F finger contact와 마찰로 `light_plate`를 파지하고, 양쪽 접촉·리프트·최종
-  유지 시간을 실제 MuJoCo 관측값으로 검증
-- live tool-in-EEF transform을 사용한 rim contact sweep과 table clearance 보정
-- block별 짧은 closed-loop push, 접촉 손실·진행 부족 시 checkpoint rollback 및
-  감소된 거리 재시도
-- collection zone 포함 여부와 지지 안정성을 확인하는 cleanup pass
-- 실행·goal 평가·recovery directive·artifact lineage 저장
-- 로봇 제어, grasp, contact, push, recovery 값을 검증된 profile로 분리
-
-검증된 C1_1 기본값은
-`src/tuj/m5_motion/examples/c1_1_physical_grasp_profile.json`에 있다. 기존 raw PICK
-keyframe을 재사용하면 API 호출 없이 물리 PICK까지만 재현할 수 있다.
-
-```powershell
-python scripts/run_m5_c1_1_motion_planner.py `
-  --pick-keyframes path\to\pick_keyframes_raw.json `
-  --motion-profile src\tuj\m5_motion\examples\c1_1_physical_grasp_profile.json `
-  --stop-after-pick
-```
-
-영상까지 포함한 전체 실행은 `--video artifacts\c1_1\run.mp4`를 추가한다. PICK
-keyframe을 전달하지 않거나 `--sweep-provider openai`를 선택한 경우에만
-`OPENAI_API_KEY`가 필요하다. 실행에 사용하는 `configs/robot_spec.json`의 2F 항목에는
-검증된 `grip_force_n`과 `fingerpad_friction`이 포함되어야 한다.
+안정성을 보장하는 모델은 아니다. 태스크 전용 실험은 `examples/`에서 직접
+실행하며 범용 runner가 자동 선택하지 않는다.
 
 ## 목표
 

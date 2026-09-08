@@ -21,6 +21,7 @@ from tuj.m5_motion.orchestration import (
     SelectedPlanPlanningResult,
 )
 from tuj.m5_motion.execution import SimulationArtifactStore
+from tuj.m5_motion.geometry_evidence import GeometryEvidenceError
 from tuj.m5_motion.schema import (
     JointDynamicLimit,
     KeyframePlanArtifact,
@@ -626,6 +627,9 @@ def execute_planning_result(
 
     recorder: GenericSimulationVideoRecorder | None = None
     try:
+        from tuj.m5_motion.tool_use_journal import apply_world_snapshot_state
+
+        apply_world_snapshot_state(runtime.env, initial_world)
         _validate_runtime_start(runtime, initial_world)
         if video is not None:
             recorder = GenericSimulationVideoRecorder(
@@ -673,14 +677,15 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Plan any M4 SelectedPlan with the generic M5 orchestration path. "
-            "Controller replay supports validated 2F contact-friction grasping "
-            "without a synthetic object attachment."
+            "Controller replay supports capability-selected contact-friction "
+            "grasping without a synthetic object attachment."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--task-planner", type=Path, required=True)
     parser.add_argument("--grasp-provider", choices=("planner", "object-function"),
-                        default="planner", help="Run existing object functions, then attach after success")
+                        default="planner", help=("Keyframe planning source; "
+                                                 "object-function is an explicit compatibility adapter"))
     parser.add_argument(
         "--initial-world",
         type=Path,
@@ -689,6 +694,28 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
     parser.add_argument(
         "--environment",
         help="Tool-Use-Journal environment name used when capturing a world",
+    )
+    parser.add_argument(
+        "--scene-geometry",
+        type=Path,
+        help="M1 JSON whose observed bbox geometry is reconciled with the M5 world",
+    )
+    parser.add_argument(
+        "--id-aliases",
+        type=Path,
+        help="JSON mapping M1 node ids to canonical M5 object ids",
+    )
+    parser.add_argument(
+        "--geometry-separation-tolerance-m",
+        type=float,
+        default=None,
+        help=("maximum gap between corresponding M1 and M5 envelopes; "
+              "defaults to the strictest task collision margin"),
+    )
+    parser.add_argument(
+        "--allow-geometry-mismatch",
+        action="store_true",
+        help="continue for diagnostics when required M1/M5 geometry is inconsistent",
     )
     parser.add_argument(
         "--initial-ee",
@@ -753,8 +780,8 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
     parser.add_argument("--validate-input-only", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--scripted-grasps", action=argparse.BooleanOptionalAction,
-        default=None,
-        help="prioritize object grasp functions before LLM motion planning (default for controller/video; --no-scripted-grasps selects legacy planning)")
+        default=False,
+        help="explicitly use repository object grasp functions before motion planning")
     parser.add_argument(
         "--simulate",
         choices=("kinematic", "controller"),
@@ -768,8 +795,8 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
         choices=("auto", "kinematic", "contact-friction"),
         default="auto",
         help=(
-            "PICK execution contract; auto selects contact friction for a 2F "
-            "controller replay and kinematic attachment otherwise"
+            "PICK execution contract; auto resolves from the M4-selected EE "
+            "capabilities"
         ),
     )
     parser.add_argument(
@@ -842,6 +869,11 @@ def main(
         parser.error("--realtime-factor must be finite and non-negative")
     if not math.isfinite(args.settle_seconds) or args.settle_seconds < 0.0:
         parser.error("--settle-seconds must be finite and non-negative")
+    if args.geometry_separation_tolerance_m is not None and (
+        not math.isfinite(args.geometry_separation_tolerance_m)
+        or args.geometry_separation_tolerance_m < 0.0
+    ):
+        parser.error("--geometry-separation-tolerance-m must be finite and non-negative")
     if (
         not math.isfinite(args.ee_attach_start_tolerance_rad)
         or args.ee_attach_start_tolerance_rad < 0.0
@@ -867,16 +899,6 @@ def main(
     simulation_mode = args.simulate or (
         "controller" if args.video is not None else None
     )
-    if args.scripted_grasps is None:
-        alternate_grasp_requested = (
-            args.grasp_provider == "object-function"
-            or args.grasp_execution_mode != "auto"
-            or args.grasp_profile is not None
-            or args.pick_keyframes is not None
-        )
-        args.scripted_grasps = (
-            simulation_mode == "controller" and not alternate_grasp_requested
-        )
     if args.scripted_grasps and simulation_mode != "controller":
         parser.error("--scripted-grasps requires --simulate controller")
     if args.scripted_grasps and (
@@ -933,11 +955,9 @@ def main(
         resolved_grasp_mode = (
             "CONTACT_FRICTION"
             if args.grasp_execution_mode == "contact-friction"
-            or (
-                args.grasp_execution_mode == "auto"
-                and simulation_mode == "controller"
-            )
             else "KINEMATIC"
+            if args.grasp_execution_mode == "kinematic"
+            else "AUTO"
         )
         acquire_task_metadata: dict[str, Any] = {
             "grasp_execution_mode": resolved_grasp_mode,
@@ -985,17 +1005,6 @@ def main(
                     settle_seconds=args.settle_seconds,
                 )
 
-        if args.grasp_provider == "object-function":
-            from tuj.m5_motion.object_function_runner import validate_function_assignments
-            try:
-                validate_function_assignments(
-                    selected,
-                    repository_path,
-                    environment=world.metadata.get("environment_name"),
-                )
-            except ValueError as error:
-                raise GenericMotionRunnerError(str(error)) from error
-
         constraints = _load_source(
             args.constraints.expanduser().resolve() if args.constraints else None,
             selected,
@@ -1003,6 +1012,59 @@ def main(
             default_constraints(world),
             "MotionConstraints",
         )
+
+        geometry_report: dict[str, Any] | None = None
+        if args.scene_geometry is not None:
+            from tuj.m5_motion.geometry_evidence import integrate_m1_geometry
+
+            scene_geometry = _read_json(args.scene_geometry.expanduser().resolve())
+            raw_aliases = (
+                _read_json(args.id_aliases.expanduser().resolve())
+                if args.id_aliases is not None
+                else {}
+            )
+            if not isinstance(raw_aliases, Mapping) or not all(
+                isinstance(key, str) and isinstance(value, str)
+                for key, value in raw_aliases.items()
+            ):
+                raise GenericMotionRunnerError("--id-aliases JSON must map strings to strings")
+            required_geometry_ids: set[str] = set()
+            for assignment in selected.candidate_assignments:
+                required_geometry_ids.update(str(value) for value in assignment.target_ids)
+                if assignment.tool:
+                    required_geometry_ids.add(str(assignment.tool))
+            constraint_values = (
+                list(constraints.values())
+                if isinstance(constraints, Mapping)
+                else [constraints]
+            )
+            if not constraint_values:
+                raise GenericMotionRunnerError(
+                    "cannot derive geometry tolerance from empty constraints"
+                )
+            separation_tolerance_m = (
+                args.geometry_separation_tolerance_m
+                if args.geometry_separation_tolerance_m is not None
+                else min(value.collision_margin_m for value in constraint_values)
+            )
+            world, geometry_report = integrate_m1_geometry(
+                world,
+                scene_geometry,
+                aliases=raw_aliases,
+                required_object_ids=required_geometry_ids,
+                separation_tolerance_m=separation_tolerance_m,
+            )
+
+        if args.grasp_provider == "object-function":
+            from tuj.m5_motion.object_function_runner import validate_function_assignments
+            try:
+                validate_function_assignments(
+                    selected,
+                    repository_path,
+                )
+            except ValueError as error:
+                raise GenericMotionRunnerError(str(error)) from error
+
         options = _load_source(
             args.options.expanduser().resolve() if args.options else None,
             selected,
@@ -1017,7 +1079,17 @@ def main(
             options,
             acquire_task_metadata=acquire_task_metadata,
         )
-    except (GenericMotionRunnerError, SelectedPlanAdapterError) as error:
+        if geometry_report is not None:
+            report["geometry_alignment"] = {
+                key: value
+                for key, value in geometry_report.items()
+                if key != "records"
+            }
+    except (
+        GenericMotionRunnerError,
+        GeometryEvidenceError,
+        SelectedPlanAdapterError,
+    ) as error:
         parser.error(str(error))
 
     slug_source = task_planner.parent.name or task_planner.stem
@@ -1027,6 +1099,13 @@ def main(
         else repository_path / "artifacts" / _safe_slug(slug_source)
     )
     output_dir.mkdir(parents=True, exist_ok=True)
+    if geometry_report is not None:
+        geometry_report_path = output_dir / "geometry_alignment.json"
+        geometry_report_path.write_text(
+            json.dumps(geometry_report, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
+        report["geometry_alignment_report"] = str(geometry_report_path)
     initial_world_path = output_dir / "initial_world.json"
     initial_world_path.write_text(world.model_dump_json(indent=2), encoding="utf-8")
     report["initial_world"] = str(initial_world_path)
@@ -1038,7 +1117,37 @@ def main(
     )
     print(json.dumps(report, ensure_ascii=False, indent=2))
     print(f"[M5] validation: {validation_path}")
+    if (
+        geometry_report is not None
+        and not geometry_report["planning_safe"]
+        and not args.allow_geometry_mismatch
+    ):
+        summary = {
+            **report,
+            "status": "GEOMETRY_MISMATCH",
+            "planning_status": "NOT_STARTED",
+            "simulation_successful": False,
+            "detail": (
+                "required M1 observations do not align with the M5 scene: "
+                + ", ".join(geometry_report["unsafe_required_object_ids"])
+            ),
+        }
+        (output_dir / "m5_summary.json").write_text(
+            json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
+        )
+        print("[M5] geometry mismatch: planning was not started")
+        return 2
     if args.validate_input_only or args.dry_run:
+        validation_summary = {
+            **report,
+            "status": "INPUT_VALIDATED",
+            "planning_status": "NOT_STARTED",
+            "simulation_successful": None,
+        }
+        (output_dir / "m5_summary.json").write_text(
+            json.dumps(validation_summary, ensure_ascii=False, indent=2),
+            encoding="utf-8",
+        )
         return 0
     if args.grasp_provider == "object-function":
         from tuj.m5_motion.object_function_runner import run_object_function_sequence

@@ -82,6 +82,7 @@ def _selected_plan() -> SelectedPlan:
                 subgoal_id="sg-pick",
                 candidate_id="candidate-pick",
                 ee="3F",
+                ee_capabilities=["multi_finger_contact"],
                 tool="finger-tip",
                 action_type="acquire",
                 target_ids=["part"],
@@ -265,9 +266,35 @@ def test_adapter_preserves_object_independent_clearance_requirements() -> None:
     assert requests[1].task.metadata["grasp_clearance_requirements"] == requirements
 
 
-def test_auto_contact_friction_falls_back_for_non_two_finger_acquire() -> None:
+def test_contact_intent_allows_grounded_targets_without_scene_name_policy() -> None:
+    selected = _selected_plan()
+    assignment = selected.candidate_assignments[1]
+    assignment.action_type = "tool_act"
+    assignment.mode = "surface_contact"
+    assignment.action_parameters = {
+        "contact": {"primitive": "surface_contact", "maintain_contact": True}
+    }
+
+    requests = SelectedPlanMotionRequestAdapter().convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": _world("scene:pick", [0.2, 0.3]),
+        },
+        constraints=MotionConstraints(collision_margin_m=0.013),
+    )
+
+    request = requests[1]
+    assert request.task.allowed_touch_objects == ["part"]
+    assert request.task.contact is not None
+    assert request.task.contact.primitive == "surface_contact"
+    assert request.constraints.collision_margin_m == pytest.approx(0.013)
+    assert "motion_policy" not in request.task.metadata
+
+
+def test_auto_grasp_mode_uses_selected_ee_capabilities() -> None:
     requests = SelectedPlanMotionRequestAdapter(
-        acquire_task_metadata={"grasp_execution_mode": "CONTACT_FRICTION"}
+        acquire_task_metadata={"grasp_execution_mode": "AUTO"}
     ).convert(
         _selected_plan(),
         worlds={
@@ -279,6 +306,24 @@ def test_auto_contact_friction_falls_back_for_non_two_finger_acquire() -> None:
 
     assert requests[1].task.ee == "3F"
     assert requests[1].task.metadata["grasp_execution_mode"] == "KINEMATIC"
+    assert requests[1].task.metadata["ee_capabilities"] == ["multi_finger_contact"]
+
+
+def test_auto_grasp_mode_rejects_missing_ee_capabilities() -> None:
+    selected = _selected_plan()
+    selected.candidate_assignments[1].ee_capabilities = []
+
+    with pytest.raises(SelectedPlanAdapterError, match="no EE capabilities"):
+        SelectedPlanMotionRequestAdapter(
+            acquire_task_metadata={"grasp_execution_mode": "AUTO"}
+        ).convert(
+            selected,
+            worlds={
+                "sg-place": _world("scene:place", [0.0, 0.1]),
+                "sg-pick": _world("scene:pick", [0.2, 0.3]),
+            },
+            constraints=MotionConstraints(),
+        )
 
 
 @pytest.mark.parametrize("dimensions", [[0.18, 0.18, 0.01], [0.05, 0.05, 0.05], [0.03, 0.04, 0.2]])
@@ -312,6 +357,10 @@ def test_bbox_does_not_select_a_grasp_template_or_aperture(dimensions) -> None:
 def test_auto_contact_friction_detects_explicit_opposed_contact() -> None:
     selected = _selected_plan()
     selected.candidate_assignments[1].ee = "2F"
+    selected.candidate_assignments[1].ee_capabilities = [
+        "contact_friction",
+        "opposed_finger_contact",
+    ]
     pick_world = _world("scene:pick", [0.2, 0.3])
     pick_world.objects["part"].update(
         {

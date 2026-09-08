@@ -86,6 +86,10 @@ def snapshot(runtime, *, previous=None):
         facts=list(previous.scene.facts) if previous else [],
     )
     world.robot_state.held_tool_id = runtime.held_tool_id
+    if previous is not None:
+        from tuj.m5_motion.geometry_evidence import carry_observation_geometry
+
+        world = carry_observation_geometry(previous, world)
     return world
 
 
@@ -144,8 +148,17 @@ def execute_object_function_grasp(
         reused = runtime.attached_object_id == object_id
         if runtime.attached_object_id not in {None, object_id}:
             raise ObjectFunctionGraspError("ATTACHMENT_TARGET_MISMATCH")
+        recipe_data = recipe.to_dict() if hasattr(recipe, "to_dict") else {}
+        gripper_actuation = str(
+            recipe_data.get(
+                "gripper_actuation",
+                "suction" if "vacuum_attachment_mode" in recipe_data else "grip",
+            )
+        ).strip().lower()
         if not reused:
-            runtime.command_gripper(engaged=True, suction=recipe.ee_id == "vac")
+            runtime.command_gripper(
+                engaged=True, suction=gripper_actuation == "suction"
+            )
             try:
                 # Keep M5's existing geometry limits. The function has already
                 # validated real contacts and a completed lift/hold.
@@ -154,7 +167,7 @@ def execute_object_function_grasp(
                 raise ObjectFunctionGraspError(
                     f"POST_GRASP_ATTACH_FAILED: {error}"
                 ) from error
-        if recipe.ee_id != "vac":
+        if gripper_actuation != "suction":
             runtime.capture_gripper_hold()
         if resource_kind == "tool":
             runtime.mark_attached_object_as_tool(object_id)
@@ -200,14 +213,17 @@ def execute_object_function_grasp(
         context.close()
 
 
-def release_object(runtime, object_id):
+def release_object(runtime, object_id, *, gripper_actuation="grip"):
     """Share the release order with normal DETACH/open event semantics.
 
     Requires an attached matching object; callers must subsequently step physics
     to open the fingers and settle the released body.
     """
     attachment = runtime.detach_object(object_id)
-    runtime.command_gripper(engaged=False, suction=runtime.active_ee == "vac")
+    runtime.command_gripper(
+        engaged=False,
+        suction=str(gripper_actuation).strip().lower() == "suction",
+    )
     return attachment
 
 

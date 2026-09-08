@@ -854,6 +854,26 @@ def main():
     for o in objects:
         print(f"     {o['name']:24s} points={len(o['points'])}")
     m1 = build_m1(objects)
+    m1["geometry_metadata"] = {
+        "schema": "M1_GEOMETRY_V2",
+        "length_unit": "mm",
+        "meters_per_unit": 0.001,
+        "bbox_kind": "WORLD_AXIS_ALIGNED_OBSERVED_ENVELOPE",
+        "coordinate_frame": {
+            "frame_id": "m1_observation_frame",
+            "axes": "world_aligned",
+            "transform_to_world": {
+                "translation_m": [float(value) / 1000.0 for value in base_off],
+                "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+            },
+        },
+        "source": "DEPTH_INSTANCE_SEGMENTATION",
+        "completeness": "OBSERVED_SURFACES_ONLY",
+    }
+    from tuj.m5_motion.tool_use_journal import ToolUseJournalEnvironmentAdapter
+
+    m1_world = ToolUseJournalEnvironmentAdapter(env).world_snapshot()
+    m1_world.metadata["geometry_observation_artifact"] = str(OUT / "m1.json")
 
     OUT.mkdir(parents=True, exist_ok=True)
     if rgb is None:
@@ -867,7 +887,6 @@ def main():
     # 크롭 파일명 = 노드 id. inst 이름을 그대로 키로 (multi-underscore 이름도 안전)
     node_ids = {o["name"]: f"obj_{o['cls']}_{o['name']}" for o in objects}
     save_crops(crop_rgb, crop_seg, name_of_id, node_ids, OUT / "crops")   # 2차 뷰 있으면 그 프레임
-    ee_pool, reach_mm = _ee_pool()
     ee_pool, reach_mm = _ee_pool()
     backend = (SiPhyBackend(model=model, repo_root=ROOT, verbose=True)
                if backend_name == "siphy" else MockBackend())
@@ -884,6 +903,9 @@ def main():
     )
     (OUT / "m1.json").write_text(
         json.dumps(serialize(m1), ensure_ascii=False, indent=2), encoding="utf-8")
+    (OUT / "m1_world.json").write_text(
+        m1_world.model_dump_json(indent=2), encoding="utf-8"
+    )
     np.savez_compressed(OUT / "m1_points.npz",
                         **{n["id"]: n["_points"] for n in m1["nodes"]})
     print("[M1] grounding: "
@@ -897,7 +919,7 @@ def main():
           f"crops={len(list((OUT / 'crops').glob('*.png')))}")
     for e in m1["edges"]:
         print(f"     {e['type']:9s} {e['from']} -> {e['to']}")
-    print(f"[{name}] -> {OUT}/m1.json, {OUT}/m1_points.npz")
+    print(f"[{name}] -> {OUT}/m1.json, {OUT}/m1_world.json, {OUT}/m1_points.npz")
 
     if view:
         import time

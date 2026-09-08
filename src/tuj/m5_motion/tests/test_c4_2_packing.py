@@ -4,7 +4,6 @@ import numpy as np
 import pytest
 
 from tuj.m5_motion.attachment_retarget import retarget_resolved_pose
-from tuj.m5_motion.c4_2_packing import C4_2PackingKeyframeProvider
 from tuj.m5_motion.geometry import RelativePoseResolver, quaternion_matrix_xyzw
 from tuj.m5_motion.packing import PackingKeyframeProvider
 from tuj.m5_motion.phase_contract import validate_keyframe_phase_contract
@@ -103,7 +102,7 @@ def _request(action: str) -> MotionPlanRequest:
 
 def test_milk_transport_uses_box_frame_and_attached_object_pose():
     request = _request("TRANSPORT")
-    artifact = C4_2PackingKeyframeProvider(_UnexpectedFallback()).generate(request)
+    artifact = PackingKeyframeProvider(_UnexpectedFallback()).generate(request)
 
     validate_keyframe_phase_contract(request, artifact)
     assert len(artifact.candidates) == 6
@@ -125,7 +124,7 @@ def test_milk_transport_uses_box_frame_and_attached_object_pose():
 
 def test_milk_place_retargets_until_release_then_retreats_as_eef():
     request = _request("PLACE")
-    artifact = C4_2PackingKeyframeProvider(_UnexpectedFallback()).generate(request)
+    artifact = PackingKeyframeProvider(_UnexpectedFallback()).generate(request)
 
     validate_keyframe_phase_contract(request, artifact)
     for candidate in artifact.candidates:

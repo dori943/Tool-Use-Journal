@@ -180,9 +180,14 @@ class ToolUseJournalExecutionAdapter:
     ) -> ToolUseJournalKinematicTrajectoryPlayer:
         probe = self.collision_probe(request, plan, index)
         if self.controller and uses_contact_friction(request):
-            if request.task.ee != "2F":
+            capabilities = {
+                str(value).strip().lower()
+                for value in request.task.metadata.get("ee_capabilities", [])
+                if isinstance(value, str)
+            }
+            if "opposed_finger_contact" not in capabilities:
                 raise ValueError(
-                    "CONTACT_FRICTION currently requires the 2F end-effector"
+                    "CONTACT_FRICTION requires opposed_finger_contact capability"
                 )
             target = (
                 request.task.goal.target_object_id
