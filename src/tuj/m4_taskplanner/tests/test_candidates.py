@@ -49,13 +49,14 @@ def test_normalized_input_rejects_tool_candidates() -> None:
         )
 
 
-def test_score_below_threshold_removed() -> None:
+@pytest.mark.parametrize("source", ["vlm", "knowledge_graph"])
+def test_score_below_threshold_removed(source: str) -> None:
     subgoal = sg("S1", targets=["obj1"])
     candidates = _normalize(
         subgoal,
         [
-            prop("S1-c1", "S1", "A", score=0.5, source="vlm"),
-            prop("S1-c2", "S1", "A", score=0.9, source="vlm"),
+            prop("S1-c1", "S1", "A", score=0.5, source=source),
+            prop("S1-c2", "S1", "A", score=0.9, source=source),
         ],
     )
     kept, rejections = filter_candidates(
@@ -119,6 +120,102 @@ class _MixedCompletenessScorer:
                 )
             },
         )
+
+
+class _LowMarginPassingScorer:
+    def score(self, _candidate, _subgoal) -> SuitabilityAssessment:
+        return SuitabilityAssessment(
+            0.5,
+            {
+                "payload": SuitabilityComponent(
+                    SuitabilityStatus.PASS,
+                    score=0.5,
+                    required=1.0,
+                    capacity=1.0,
+                )
+            },
+        )
+
+
+@pytest.mark.parametrize("source", ["deterministic_rule", "manual"])
+def test_physical_pass_below_threshold_is_retained_for_local_candidate(
+    source: str,
+) -> None:
+    subgoal = sg("S1", targets=["obj1"])
+    candidates = _normalize(
+        subgoal,
+        [
+            prop(
+                "S1-c1",
+                "S1",
+                "A",
+                score=None,
+                source=source,
+            )
+        ],
+    )
+
+    kept, rejections = filter_candidates(
+        subgoal,
+        candidates,
+        _checker(),
+        PlanningPolicy(),
+        suitability_scorer=_LowMarginPassingScorer(),
+    )
+
+    assert [candidate.candidate_id for candidate in kept] == ["S1-c1"]
+    assert kept[0].suitability_score == 0.5
+    assert not any(
+        rejection.reason_code is ReasonCode.SCORE_BELOW_THRESHOLD
+        for rejection in rejections
+    )
+
+
+def test_vlm_quality_threshold_precedes_physical_margin_scoring() -> None:
+    subgoal = sg("S1", targets=["obj1"])
+    candidates = _normalize(
+        subgoal,
+        [
+            prop("S1-low", "S1", "A", score=0.5, source="vlm"),
+            prop("S1-high", "S1", "A", score=0.9, source="vlm"),
+        ],
+    )
+
+    kept, rejections = filter_candidates(
+        subgoal,
+        candidates,
+        _checker(),
+        PlanningPolicy(),
+        suitability_scorer=_LowMarginPassingScorer(),
+    )
+
+    assert [candidate.candidate_id for candidate in kept] == ["S1-high"]
+    assert kept[0].suitability_score == 0.5
+    assert kept[0].metadata["provided_suitability_score"] == 0.9
+    assert any(
+        rejection.reason_code is ReasonCode.SCORE_BELOW_THRESHOLD
+        and rejection.candidate_id == "S1-low"
+        for rejection in rejections
+    )
+
+
+def test_vlm_missing_score_is_not_filled_by_physical_scorer() -> None:
+    subgoal = sg("S1", targets=["obj1"])
+    candidates = _normalize(
+        subgoal,
+        [prop("S1-c1", "S1", "A", score=None, source="vlm")],
+    )
+
+    kept, rejections = filter_candidates(
+        subgoal,
+        candidates,
+        _checker(),
+        PlanningPolicy(),
+        suitability_scorer=_LowMarginPassingScorer(),
+    )
+
+    assert kept == []
+    assert rejections[0].reason_code is ReasonCode.MISSING_SCORE
 
 
 def test_unknown_suitability_is_not_ranked_as_perfect() -> None:
