@@ -180,6 +180,119 @@ def test_plan_builder_applies_event_scoped_collision_state() -> None:
     assert plan.metadata["selection_policy"] == "FIRST_FEASIBLE_CONNECTED_SEQUENCE"
 
 
+def test_plan_builder_tracks_generic_contact_friction_acquire_and_release() -> None:
+    context = CollisionContext(
+        context_id="contact-friction",
+        scene_state_id="contact-friction",
+        active_ee="2f",
+        collision_model_version="model-contact-friction",
+    )
+
+    acquire = _request()
+    acquire.task.action_type = "acquire"
+    acquire.task.target_ids = ["obj1"]
+    acquire.task.goal.target_object_id = "obj1"
+    acquire.task.metadata = {
+        "operation": "ACQUIRE",
+        "grasp_execution_mode": "CONTACT_FRICTION",
+    }
+    grasp = RelativeKeyframeSpec(
+        keyframe_id="physical-grasp",
+        keyframe_type=KeyframeType.GRASP,
+        frame_ref="object:obj1",
+        anchor="center",
+        approach_axis_xyz=(0.0, 0.0, 1.0),
+        planner=KeyframePlannerType.CARTESIAN,
+        events_after=[KeyframeEventType.GRIPPER_CLOSE],
+        collision_context_id=context.context_id,
+        metadata={
+            "event_target_id": "obj1",
+            "planned_contact_friction_transform": {
+                "object_id": "obj1",
+                "free_joint_name": "obj1_free",
+                "reference_kind": "body",
+                "reference_name": "right_hand",
+                "position_in_reference_m": [0.0, 0.0, 0.1],
+                "orientation_in_reference_xyzw": [0.0, 0.0, 0.0, 1.0],
+            },
+        },
+    )
+    acquired_plan = MotionPlanBuilder().build(
+        acquire,
+        ConnectedStrategy(
+            strategy_id="physical-acquire",
+            nodes=(_node(grasp, (0.2, 0.1)),),
+            edges=(
+                EdgePlanResult(
+                    valid=True,
+                    joint_path=((0.0, 0.0), (0.2, 0.1)),
+                ),
+            ),
+            edge_evaluations=1,
+        ),
+        plan_id="physical-acquire-plan",
+        provenance=ArtifactProvenance(
+            artifact_id="physical-acquire-plan-artifact",
+            artifact_type="MotionPlan",
+            produced_by=ModuleName.MOTION_PLANNER,
+            invocation_id="physical-acquire",
+        ),
+        collision_contexts={context.context_id: context},
+        initial_collision_context_id=context.context_id,
+        final_segment_validator=lambda waypoints, selected: bool(waypoints),
+    )
+
+    assert acquired_plan.expected_final_state.attached_object_id is None
+    assert acquired_plan.expected_final_state.held_tool_id == "obj1"
+    assert acquired_plan.metadata["grasp_execution_mode"] == "CONTACT_FRICTION"
+
+    release = _request()
+    release.world.robot_state.held_tool_id = "obj1"
+    release.task.action_type = "place"
+    release.task.target_ids = ["obj1"]
+    release.task.goal.target_object_id = "obj1"
+    release.task.metadata = {"operation": "PLACE"}
+    place = RelativeKeyframeSpec(
+        keyframe_id="physical-place",
+        keyframe_type=KeyframeType.PLACE,
+        frame_ref="world",
+        anchor="origin",
+        approach_axis_xyz=(0.0, 0.0, 1.0),
+        planner=KeyframePlannerType.CARTESIAN,
+        events_after=[KeyframeEventType.GRIPPER_OPEN],
+        collision_context_id=context.context_id,
+        metadata={"event_target_id": "obj1"},
+    )
+    released_plan = MotionPlanBuilder().build(
+        release,
+        ConnectedStrategy(
+            strategy_id="physical-release",
+            nodes=(_node(place, (0.2, 0.1)),),
+            edges=(
+                EdgePlanResult(
+                    valid=True,
+                    joint_path=((0.0, 0.0), (0.2, 0.1)),
+                ),
+            ),
+            edge_evaluations=1,
+        ),
+        plan_id="physical-release-plan",
+        provenance=ArtifactProvenance(
+            artifact_id="physical-release-plan-artifact",
+            artifact_type="MotionPlan",
+            produced_by=ModuleName.MOTION_PLANNER,
+            invocation_id="physical-release",
+        ),
+        collision_contexts={context.context_id: context},
+        initial_collision_context_id=context.context_id,
+        final_segment_validator=lambda waypoints, selected: bool(waypoints),
+    )
+
+    assert released_plan.expected_final_state.held_tool_id is None
+    assert released_plan.expected_final_state.gripper is not None
+    assert released_plan.expected_final_state.gripper.mode is GripperMode.OPEN
+
+
 def test_plan_builder_holds_pose_between_close_and_attach_events() -> None:
     grasp = RelativeKeyframeSpec(
         keyframe_id="settled-grasp",
@@ -241,7 +354,7 @@ def test_plan_builder_holds_pose_between_close_and_attach_events() -> None:
                 "contact_height_max_downward_offset_m": 0.002,
             },
             "event_time_offsets_s": {
-                "GRIPPER_CLOSE": 0.0,
+                "GRIPPER_CLOSE": 0.25,
                 "ATTACH_OBJECT": 0.75,
             },
             "event_parameters": {
@@ -338,7 +451,11 @@ def test_plan_builder_holds_pose_between_close_and_attach_events() -> None:
     assert plan.events[0].event_type is EventType.GRIPPER_CLOSE
     assert plan.events[0].command == 0.25
     assert plan.events[0].parameters == {}
-    assert plan.events[0].time_from_start_s == motion_end
+    assert plan.events[0].time_from_start_s == motion_end + 0.25
+    assert any(
+        waypoint.time_from_start_s == plan.events[0].time_from_start_s
+        for waypoint in segment.waypoints
+    )
     assert plan.events[1].event_type is EventType.ATTACH_OBJECT
     assert plan.events[1].time_from_start_s == segment.end_time_s
 

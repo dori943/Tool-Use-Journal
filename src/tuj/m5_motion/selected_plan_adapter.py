@@ -48,6 +48,18 @@ OptionSource: TypeAlias = (
 )
 
 
+_EXECUTION_METADATA_KEYS = (
+    "operation",
+    "attach_target",
+    "grasp_execution_mode",
+    "grasp_profile",
+    "grasp_geometry_provider",
+    "grasp_clearance_requirements",
+    "grasp_preshape_aperture_m",
+    "grasp_preshape_tolerance_m",
+)
+
+
 def _canonical_json(value: Any) -> str:
     return json.dumps(
         value,
@@ -182,6 +194,16 @@ def _merged_action_parameters(
     if isinstance(nested, Mapping):
         result.update(nested)
     return result
+
+
+def _execution_metadata(parameters: Mapping[str, Any]) -> dict[str, Any]:
+    """Promote execution-control fields out of the archival parameter bag."""
+
+    return {
+        key: parameters[key]
+        for key in _EXECUTION_METADATA_KEYS
+        if key in parameters
+    }
 
 
 def _action_type(
@@ -362,6 +384,13 @@ class SelectedPlanMotionRequestAdapter:
     stale joint/object state cannot silently contaminate later paths.
     """
 
+    def __init__(
+        self,
+        *,
+        acquire_task_metadata: Mapping[str, Any] | None = None,
+    ) -> None:
+        self._acquire_task_metadata = dict(acquire_task_metadata or {})
+
     def convert(
         self,
         selected: SelectedPlan,
@@ -463,6 +492,95 @@ class SelectedPlanMotionRequestAdapter:
                 raise SelectedPlanAdapterError(
                     "allowed_touch_objects must be a list when supplied"
                 )
+            c1_sweep_policy: dict[str, object] | None = None
+            if (
+                world.metadata.get("environment_name") == "C1_1_LegoSweep"
+                and assignment.tool == "plate"
+                and str(getattr(contact, "primitive", "")).strip().lower()
+                == "sweep"
+            ):
+                from tuj.m5_motion.c1_sweep_policy import (
+                    C1_SWEEP_COLLISION_MARGIN_M,
+                    policy_metadata,
+                )
+
+                allowed_touch = list(allowed_touch)
+                for target_id in target_ids:
+                    if target_id not in allowed_touch:
+                        allowed_touch.append(target_id)
+                selected_constraints = selected_constraints.model_copy(
+                    update={
+                        "collision_margin_m": min(
+                            selected_constraints.collision_margin_m,
+                            C1_SWEEP_COLLISION_MARGIN_M,
+                        )
+                    }
+                )
+                c1_sweep_policy = policy_metadata()
+            action_parameters = _merged_action_parameters(assignment, execution)
+            execution_metadata = (
+                dict(self._acquire_task_metadata)
+                if is_acquire_action(action_type)
+                else {}
+            )
+            explicit_execution_metadata = _execution_metadata(action_parameters)
+            if (
+                is_acquire_action(action_type)
+                and assignment.ee != "2F"
+                and "grasp_execution_mode" not in explicit_execution_metadata
+                and str(execution_metadata.get("grasp_execution_mode", "")).upper()
+                == "CONTACT_FRICTION"
+            ):
+                execution_metadata["grasp_execution_mode"] = "KINEMATIC"
+            execution_metadata.update(explicit_execution_metadata)
+            if c1_sweep_policy is not None:
+                execution_metadata["motion_policy"] = c1_sweep_policy
+            if is_acquire_action(action_type):
+                execution_metadata.setdefault("operation", action_type.upper())
+                execution_metadata.setdefault("attach_target", True)
+            if (
+                is_acquire_action(action_type)
+                and assignment.ee == "2F"
+                and str(
+                    execution_metadata.get("grasp_execution_mode", "")
+                ).upper()
+                == "CONTACT_FRICTION"
+                and "grasp_geometry_provider" not in execution_metadata
+            ):
+                from tuj.m5_motion.grasp_geometry import (
+                    TWO_FINGER_OPPOSED_CONTACT,
+                    opposed_contact_spec,
+                )
+                from tuj.m5_motion.profiles import PhysicalGraspProfile
+
+                target = goal.target_object_id or next(iter(target_ids), None)
+                opposed_contact = (
+                    opposed_contact_spec(world.objects.get(target))
+                    if target is not None
+                    else None
+                )
+                raw_profile = execution_metadata.get("grasp_profile")
+                physical_profile = PhysicalGraspProfile.from_mapping(
+                    raw_profile if isinstance(raw_profile, Mapping) else None
+                )
+                if opposed_contact is not None:
+                    execution_metadata["grasp_geometry_provider"] = (
+                        TWO_FINGER_OPPOSED_CONTACT
+                    )
+                    execution_metadata.setdefault(
+                        "grasp_preshape_aperture_m",
+                        (
+                            opposed_contact.preshape_aperture_m
+                            if opposed_contact.preshape_aperture_m is not None
+                            else opposed_contact.contact_span_m
+                            + physical_profile.preshape.clearance_m
+                        ),
+                    )
+                    if opposed_contact.preshape_tolerance_m is not None:
+                        execution_metadata.setdefault(
+                            "grasp_preshape_tolerance_m",
+                            opposed_contact.preshape_tolerance_m,
+                        )
 
             request_digest = _digest(
                 {
@@ -511,9 +629,8 @@ class SelectedPlanMotionRequestAdapter:
                             "task_planner_steps": [
                                 step.model_dump(mode="json") for step in steps
                             ],
-                            "action_parameters": _merged_action_parameters(
-                                assignment, execution
-                            ),
+                            "action_parameters": action_parameters,
+                            **execution_metadata,
                         },
                     ),
                     constraints=selected_constraints.model_copy(deep=True),

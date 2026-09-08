@@ -9,6 +9,12 @@ from typing import Any
 from tuj.m5_motion.execution import SelectedPlanSimulationOrchestrator
 from tuj.m5_motion.mujoco_collision import MuJoCoCollisionModelRegistry
 from tuj.m5_motion.orchestration import SelectedPlanPlanningResult
+from tuj.m5_motion.physical_grasp import (
+    PhysicalGraspControllerTrajectoryPlayer,
+    PhysicalGraspMonitor,
+    uses_contact_friction,
+)
+from tuj.m5_motion.profiles import PhysicalGraspProfile
 from tuj.m5_motion.schema import (
     CollisionContext,
     ExecutionReport,
@@ -156,6 +162,48 @@ class ToolUseJournalExecutionAdapter:
         self, request: MotionPlanRequest, plan: MotionPlan, index: int
     ) -> ToolUseJournalKinematicTrajectoryPlayer:
         probe = self.collision_probe(request, plan, index)
+        if self.controller and uses_contact_friction(request):
+            if request.task.ee != "2F":
+                raise ValueError(
+                    "CONTACT_FRICTION currently requires the 2F end-effector"
+                )
+            target = (
+                request.task.goal.target_object_id
+                or request.task.tool
+                or next(iter(request.task.target_ids), None)
+            )
+            if target is None:
+                raise ValueError("CONTACT_FRICTION PICK has no target object")
+            raw_profile = request.task.metadata.get("grasp_profile")
+            profile = PhysicalGraspProfile.from_mapping(
+                raw_profile if isinstance(raw_profile, Mapping) else None
+            )
+            monitor = PhysicalGraspMonitor.from_runtime(
+                self.runtime, str(target), profile
+            )
+            raw_preshape = request.task.metadata.get(
+                "grasp_preshape_aperture_m"
+            )
+            preshape = (
+                float(raw_preshape)
+                if isinstance(raw_preshape, (int, float))
+                else None
+            )
+            raw_preshape_tolerance = request.task.metadata.get(
+                "grasp_preshape_tolerance_m"
+            )
+            preshape_tolerance = (
+                float(raw_preshape_tolerance)
+                if isinstance(raw_preshape_tolerance, (int, float))
+                else None
+            )
+            return PhysicalGraspControllerTrajectoryPlayer(
+                self.runtime,
+                collision_probe=probe,
+                monitor=monitor,
+                preshape_aperture_m=preshape,
+                preshape_tolerance_m=preshape_tolerance,
+            )
         player_type = (
             ToolUseJournalControllerTrajectoryPlayer
             if self.controller
@@ -195,6 +243,16 @@ class ToolUseJournalExecutionAdapter:
         )
         if report.final_robot_state is not None:
             world.robot_state = report.final_robot_state.model_copy(deep=True)
+        transform = report.metadata.get("physical_grasp_transform")
+        if (
+            report.metadata.get("physical_grasp_execution_succeeded") is True
+            and isinstance(transform, Mapping)
+        ):
+            held = dict(world.metadata.get("contact_friction_held_objects", {}))
+            held[str(transform.get("object_id") or request.task.tool)] = dict(
+                transform
+            )
+            world.metadata["contact_friction_held_objects"] = held
         return world
 
     def orchestrator(self, **kwargs: Any) -> SelectedPlanSimulationOrchestrator:

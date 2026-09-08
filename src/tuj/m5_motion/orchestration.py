@@ -33,7 +33,12 @@ from tuj.m5_motion.selected_plan_adapter import (
     SelectedPlanAdapterError,
     SelectedPlanMotionRequestAdapter,
 )
-from tuj.m5_motion.task_semantics import is_ee_exchange_task, is_release_task
+from tuj.m5_motion.task_semantics import (
+    is_acquire_task,
+    is_ee_exchange_task,
+    is_release_task,
+    task_operation,
+)
 
 
 def _world_target_pose(
@@ -481,11 +486,50 @@ def _predicted_world(
         )
         result.metadata["physical_active_ee"] = final_active_ee
         result.metadata["declared_active_ee"] = final_active_ee
-    operation = request.task.metadata.get("operation")
-    if operation in {"PICK_TOOL"}:
-        result.metadata["held_tool"] = request.task.metadata.get("tool_id")
-    elif operation in {"RETURN_TOOL", "TERMINAL_RETURN_TOOL"}:
-        result.metadata["held_tool"] = None
+    operation = task_operation(request.task)
+    target_object = (
+        request.task.goal.target_object_id
+        or request.task.tool
+        or next(iter(request.task.target_ids), None)
+    )
+    if is_acquire_task(request.task):
+        if operation == "PICK_TOOL":
+            result.metadata["held_tool"] = target_object
+        physical_transform = plan.metadata.get(
+            "planned_contact_friction_transform"
+        )
+        if (
+            target_object is not None
+            and result.robot_state.held_tool_id == target_object
+            and isinstance(physical_transform, Mapping)
+        ):
+            result.metadata["contact_friction_held_objects"] = {
+                str(target_object): dict(physical_transform)
+            }
+    elif is_release_task(request.task):
+        raw_contact_holds = result.metadata.get(
+            "contact_friction_held_objects", {}
+        )
+        released_contact_object = (
+            target_object is not None
+            and (
+                request.world.robot_state.held_tool_id == target_object
+                or (
+                    isinstance(raw_contact_holds, Mapping)
+                    and target_object in raw_contact_holds
+                )
+            )
+        )
+        if released_contact_object or operation in {
+            "RETURN_TOOL",
+            "TERMINAL_RETURN_TOOL",
+        }:
+            result.metadata["contact_friction_held_objects"] = {}
+        if operation in {"RETURN_TOOL", "TERMINAL_RETURN_TOOL"} or (
+            target_object is not None
+            and result.metadata.get("held_tool") == target_object
+        ):
+            result.metadata["held_tool"] = None
     signature = _digest(
         {
             "previous": world.scene.signature,
@@ -512,10 +556,14 @@ class SelectedPlanMotionOrchestrator:
         *,
         store: MotionPlanStore | None = None,
         adapter: SelectedPlanMotionRequestAdapter | None = None,
+        request_handler: Callable[[MotionPlanRequest], WorldSnapshot | None] | None = None,
+        plan_executor: Callable[[MotionPlanRequest, MotionPlan], WorldSnapshot] | None = None,
     ) -> None:
         self._request_planner = request_planner
         self._store = store
         self._adapter = adapter or SelectedPlanMotionRequestAdapter()
+        self._request_handler = request_handler
+        self._plan_executor = plan_executor
 
     def plan(
         self,
@@ -536,6 +584,16 @@ class SelectedPlanMotionOrchestrator:
         request_paths: list[Path] = []
         paths: list[Path] = []
         selected_options: OptionSource = options or PlannerOptions()
+
+        def observed_completion(world: WorldSnapshot, completed: str | None) -> WorldSnapshot:
+            result = world.model_copy(deep=True)
+            if completed and completed not in result.scene.completed_subgoals:
+                result.scene.completed_subgoals.append(completed)
+                result.scene.signature = "observed:" + _digest({
+                    "previous": world.scene.signature,
+                    "completed_subgoals": result.scene.completed_subgoals,
+                })
+            return result
 
         def execute(request: MotionPlanRequest, completed: str | None) -> None:
             nonlocal current_world
@@ -565,6 +623,12 @@ class SelectedPlanMotionOrchestrator:
                         },
                     }
                 )
+            handled_world = (
+                self._request_handler(request) if self._request_handler else None
+            )
+            if handled_world is not None:
+                current_world = observed_completion(handled_world, completed)
+                return
             plan = _unwrap_plan(self._request_planner(request), request)
             requests.append(request)
             plans.append(plan)
@@ -573,9 +637,12 @@ class SelectedPlanMotionOrchestrator:
                     self._store.save_request(request, index=len(plans) - 1)
                 )
                 paths.append(self._store.save_plan(plan, index=len(plans) - 1))
-            current_world = _predicted_world(
-                current_world, request, plan, completed_subgoal=completed
-            )
+            if self._plan_executor is not None:
+                current_world = observed_completion(self._plan_executor(request, plan), completed)
+            else:
+                current_world = _predicted_world(
+                    current_world, request, plan, completed_subgoal=completed
+                )
 
         for index, subgoal_id in enumerate(selected.subgoal_order):
             selected_constraints = _source_value(

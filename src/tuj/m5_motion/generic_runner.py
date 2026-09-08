@@ -23,6 +23,7 @@ from tuj.m5_motion.orchestration import (
 from tuj.m5_motion.execution import SimulationArtifactStore
 from tuj.m5_motion.schema import (
     JointDynamicLimit,
+    KeyframePlanArtifact,
     MotionConstraints,
     PlannerOptions,
     WorldSnapshot,
@@ -34,6 +35,7 @@ from tuj.m5_motion.selected_plan_adapter import (
     SelectedPlanAdapterError,
     SelectedPlanMotionRequestAdapter,
 )
+from tuj.m5_motion.task_semantics import is_acquire_action
 
 
 REPOSITORY = Path(__file__).resolve().parents[3]
@@ -85,6 +87,75 @@ def load_world(path: Path) -> WorldSnapshot:
         return WorldSnapshot.model_validate(payload)
     except Exception as error:  # noqa: BLE001
         raise GenericMotionRunnerError(f"invalid initial WorldSnapshot: {error}") from error
+
+
+def load_keyframe_artifact(path: Path) -> KeyframePlanArtifact:
+    payload = _read_json(path)
+    try:
+        return KeyframePlanArtifact.model_validate(payload)
+    except Exception as error:  # noqa: BLE001
+        raise GenericMotionRunnerError(
+            f"invalid PICK keyframe artifact: {error}"
+        ) from error
+
+
+def truncate_after_first_acquire(selected: SelectedPlan) -> SelectedPlan:
+    """Return a diagnostic plan ending at the first grounded PICK action."""
+
+    assignments = {
+        assignment.subgoal_id: assignment
+        for assignment in selected.candidate_assignments
+    }
+    stop_index = next(
+        (
+            index
+            for index, subgoal_id in enumerate(selected.subgoal_order)
+            if subgoal_id in assignments
+            and is_acquire_action(assignments[subgoal_id].action_type or "")
+        ),
+        None,
+    )
+    if stop_index is None:
+        raise GenericMotionRunnerError(
+            "--stop-after-pick requested but SelectedPlan has no acquire action"
+        )
+    kept_order = list(selected.subgoal_order[: stop_index + 1])
+    kept = set(kept_order)
+    payload = selected.model_dump(mode="python")
+    payload["subgoal_order"] = kept_order
+    payload["candidate_assignments"] = [
+        assignment
+        for assignment in selected.candidate_assignments
+        if assignment.subgoal_id in kept
+    ]
+    payload["steps"] = [
+        step for step in selected.steps if step.subgoal_id in kept
+    ]
+    return SelectedPlan.model_validate(payload)
+
+
+def truncate_after_subgoal(selected: SelectedPlan, subgoal_id: str) -> SelectedPlan:
+    """Return a diagnostic plan ending at an explicitly selected subgoal."""
+
+    try:
+        stop_index = list(selected.subgoal_order).index(subgoal_id)
+    except ValueError as error:
+        raise GenericMotionRunnerError(
+            f"--stop-after-subgoal {subgoal_id!r} is not in SelectedPlan"
+        ) from error
+    kept_order = list(selected.subgoal_order[: stop_index + 1])
+    kept = set(kept_order)
+    payload = selected.model_dump(mode="python")
+    payload["subgoal_order"] = kept_order
+    payload["candidate_assignments"] = [
+        assignment
+        for assignment in selected.candidate_assignments
+        if assignment.subgoal_id in kept
+    ]
+    payload["steps"] = [
+        step for step in selected.steps if step.subgoal_id in kept
+    ]
+    return SelectedPlan.model_validate(payload)
 
 
 def default_constraints(world: WorldSnapshot) -> MotionConstraints:
@@ -147,6 +218,8 @@ def validate_selected_plan(
     world: WorldSnapshot,
     constraints: ConstraintSource,
     options: OptionSource,
+    *,
+    acquire_task_metadata: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate every grounded subgoal without OpenAI or trajectory planning."""
 
@@ -154,7 +227,9 @@ def validate_selected_plan(
         subgoal_id: world.model_copy(deep=True)
         for subgoal_id in selected.subgoal_order
     }
-    requests = SelectedPlanMotionRequestAdapter().convert(
+    requests = SelectedPlanMotionRequestAdapter(
+        acquire_task_metadata=acquire_task_metadata
+    ).convert(
         selected,
         worlds=worlds,
         constraints=_source_for_validation(constraints, selected),
@@ -197,10 +272,12 @@ def capture_initial_world(
     initial_ee: str | None,
     seed: int,
     scripted_grasps: bool = False,
+    settle_seconds: float = 5.0,
 ) -> WorldSnapshot:
     from tuj.m5_motion.tool_use_journal import (
         ToolUseJournalEnvironmentAdapter,
         make_tool_use_journal_env,
+        settle_tool_use_journal_free_objects,
     )
 
     env = make_tool_use_journal_env(
@@ -212,12 +289,17 @@ def capture_initial_world(
     )
     try:
         env.reset()  # type: ignore[attr-defined]
+        settle_steps = settle_tool_use_journal_free_objects(
+            env, duration_s=settle_seconds
+        )
         adapter = ToolUseJournalEnvironmentAdapter(env)
         adapter.require_physical_ee(initial_ee)
         world = adapter.world_snapshot()
         world.metadata["environment_name"] = environment_name
         world.metadata["physical_active_ee"] = initial_ee
         world.metadata["declared_active_ee"] = initial_ee
+        world.metadata["free_object_settle_seconds"] = settle_seconds
+        world.metadata["free_object_settle_steps"] = settle_steps
         return world
     finally:
         close = getattr(env, "close", None)
@@ -233,12 +315,12 @@ class ToolUseJournalPlannerPool:
         repository: Path,
         *,
         seed: int,
-        provider: Any = None,
         ee_attach_registry_root: Path | None = None,
         ee_attach_trajectory_paths: Sequence[Path] = (),
         ee_return_trajectory_paths: Sequence[Path] = (),
         ee_attach_policy: EEAttachPolicy | str = EEAttachPolicy.PRECOMPUTED_REQUIRED,
         ee_attach_start_tolerance_rad: float = 0.01,
+        provider: Any | None = None,
     ) -> None:
         self.repository = repository
         self.seed = seed
@@ -287,6 +369,7 @@ class ToolUseJournalPlannerPool:
                 ee_attach_start_tolerance_rad=(
                     self.ee_attach_start_tolerance_rad
                 ),
+                provider=self.provider,
             )
             self._planners[key] = planner
         return planner(request)
@@ -590,11 +673,14 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(
         description=(
             "Plan any M4 SelectedPlan with the generic M5 orchestration path. "
-            "Use run_m5_c1_1_motion_planner.py for the C1_1-specific physical demo."
+            "Controller replay supports validated 2F contact-friction grasping "
+            "without a synthetic object attachment."
         ),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
     parser.add_argument("--task-planner", type=Path, required=True)
+    parser.add_argument("--grasp-provider", choices=("planner", "object-function"),
+                        default="planner", help="Run existing object functions, then attach after success")
     parser.add_argument(
         "--initial-world",
         type=Path,
@@ -617,6 +703,14 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
     parser.add_argument("--provider", choices=("openai", "gemini"),
         default=os.environ.get("TUJ_LLM_PROVIDER", "openai"))
     parser.add_argument("--model", help="M5 keyframe model; defaults to the provider's model")
+    parser.add_argument(
+        "--settle-seconds",
+        type=float,
+        default=5.0,
+        help=(
+            "physics settling time for free objects before initial world capture"
+        ),
+    )
     parser.add_argument(
         "--ee-attach-policy",
         choices=tuple(policy.value for policy in EEAttachPolicy),
@@ -670,6 +764,43 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--grasp-execution-mode",
+        choices=("auto", "kinematic", "contact-friction"),
+        default="auto",
+        help=(
+            "PICK execution contract; auto selects contact friction for a 2F "
+            "controller replay and kinematic attachment otherwise"
+        ),
+    )
+    parser.add_argument(
+        "--grasp-profile",
+        type=Path,
+        help=(
+            "generic physical-grasp profile JSON; historical C1_1 pick_* keys "
+            "are accepted"
+        ),
+    )
+    parser.add_argument(
+        "--pick-keyframes",
+        type=Path,
+        help=(
+            "reuse and retarget an existing relative PICK keyframe artifact; "
+            "with --stop-after-pick this removes the OpenAI requirement"
+        ),
+    )
+    parser.add_argument(
+        "--stop-after-pick",
+        action="store_true",
+        help=(
+            "plan and execute only through the first selected PICK; useful for "
+            "physical grasp validation"
+        ),
+    )
+    parser.add_argument(
+        "--stop-after-subgoal",
+        help="plan and execute through this subgoal, then stop",
+    )
+    parser.add_argument(
         "--headless",
         action="store_true",
         help="run simulation without opening the live MuJoCo viewer",
@@ -691,8 +822,8 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
         help="record offscreen simulation to MP4 (implies --simulate controller)",
     )
     parser.add_argument("--camera", default="agentview")
-    parser.add_argument("--width", type=int, default=640)
-    parser.add_argument("--height", type=int, default=640)
+    parser.add_argument("--width", type=int, default=960)
+    parser.add_argument("--height", type=int, default=540)
     parser.add_argument("--video-fps", type=float, default=20.0)
     parser.add_argument("--video-hold-seconds", type=float, default=3.0)
     return parser
@@ -709,6 +840,8 @@ def main(
         not math.isfinite(args.realtime_factor) or args.realtime_factor < 0.0
     ):
         parser.error("--realtime-factor must be finite and non-negative")
+    if not math.isfinite(args.settle_seconds) or args.settle_seconds < 0.0:
+        parser.error("--settle-seconds must be finite and non-negative")
     if (
         not math.isfinite(args.ee_attach_start_tolerance_rad)
         or args.ee_attach_start_tolerance_rad < 0.0
@@ -735,9 +868,45 @@ def main(
         "controller" if args.video is not None else None
     )
     if args.scripted_grasps is None:
-        args.scripted_grasps = simulation_mode == "controller"
+        alternate_grasp_requested = (
+            args.grasp_provider == "object-function"
+            or args.grasp_execution_mode != "auto"
+            or args.grasp_profile is not None
+            or args.pick_keyframes is not None
+        )
+        args.scripted_grasps = (
+            simulation_mode == "controller" and not alternate_grasp_requested
+        )
     if args.scripted_grasps and simulation_mode != "controller":
         parser.error("--scripted-grasps requires --simulate controller")
+    if args.scripted_grasps and (
+        args.grasp_provider != "planner"
+        or args.grasp_execution_mode != "auto"
+        or args.grasp_profile is not None
+        or args.pick_keyframes is not None
+    ):
+        parser.error(
+            "--scripted-grasps cannot be combined with object-function or "
+            "generic grasp execution options"
+        )
+    if args.grasp_provider == "object-function":
+        if args.grasp_profile is not None or args.pick_keyframes is not None:
+            parser.error("object-function uses the registered object recipe; do not supply --grasp-profile or --pick-keyframes")
+        if args.grasp_execution_mode == "contact-friction":
+            parser.error("object-function requires post-grasp KINEMATIC attachment")
+        if not (args.validate_input_only or args.dry_run) and simulation_mode != "controller":
+            parser.error("object-function requires --simulate controller")
+        args.grasp_execution_mode = "kinematic"
+    if (
+        args.grasp_execution_mode == "contact-friction"
+        and simulation_mode != "controller"
+        and not args.validate_input_only
+        and not args.dry_run
+    ):
+        parser.error(
+            "--grasp-execution-mode contact-friction requires "
+            "--simulate controller (or --video)"
+        )
     if simulation_mode is not None and args.validate_input_only:
         parser.error("--simulate cannot be combined with --validate-input-only")
     if simulation_mode is not None and args.dry_run:
@@ -750,7 +919,36 @@ def main(
         parser.error(f"repository not found: {repository_path}")
 
     try:
+        raw_grasp_profile: Mapping[str, Any] | None = None
+        if args.grasp_profile is not None:
+            profile_payload = _read_json(args.grasp_profile.expanduser().resolve())
+            if not isinstance(profile_payload, Mapping):
+                raise GenericMotionRunnerError("grasp profile JSON must be an object")
+            raw_grasp_profile = profile_payload
+        pick_keyframes = (
+            load_keyframe_artifact(args.pick_keyframes.expanduser().resolve())
+            if args.pick_keyframes is not None
+            else None
+        )
+        resolved_grasp_mode = (
+            "CONTACT_FRICTION"
+            if args.grasp_execution_mode == "contact-friction"
+            or (
+                args.grasp_execution_mode == "auto"
+                and simulation_mode == "controller"
+            )
+            else "KINEMATIC"
+        )
+        acquire_task_metadata: dict[str, Any] = {
+            "grasp_execution_mode": resolved_grasp_mode,
+        }
+        if raw_grasp_profile is not None:
+            acquire_task_metadata["grasp_profile"] = dict(raw_grasp_profile)
         selected, envelope = load_selected_plan(task_planner)
+        if args.stop_after_pick:
+            selected = truncate_after_first_acquire(selected)
+        if args.stop_after_subgoal:
+            selected = truncate_after_subgoal(selected, args.stop_after_subgoal)
         if args.initial_world is not None:
             world = load_world(args.initial_world.expanduser().resolve())
             world_environment = world.metadata.get("environment_name")
@@ -766,13 +964,37 @@ def main(
                 raise GenericMotionRunnerError(
                     "provide --initial-world or --environment"
                 )
-            world = capture_initial_world(
-                repository_path,
-                args.environment,
-                initial_ee=_parse_initial_ee(args.initial_ee),
-                seed=args.seed,
-                **({"scripted_grasps": True} if args.scripted_grasps else {}),
-            )
+            if args.grasp_provider == "object-function":
+                from tuj.m5_motion.object_function_grasp import make_function_runtime, snapshot
+                from tuj.m5_motion.tool_use_journal import settle_tool_use_journal_free_objects
+                initial_runtime = make_function_runtime(repository_path, args.environment,
+                    active_ee=_parse_initial_ee(args.initial_ee), seed=args.seed,
+                    ignore_done=True, use_camera_obs=False, has_offscreen_renderer=False)
+                try:
+                    settle_tool_use_journal_free_objects(initial_runtime.env, duration_s=args.settle_seconds)
+                    world = snapshot(initial_runtime)
+                finally:
+                    initial_runtime.close()
+            else:
+                world = capture_initial_world(
+                    repository_path,
+                    args.environment,
+                    initial_ee=_parse_initial_ee(args.initial_ee),
+                    seed=args.seed,
+                    scripted_grasps=args.scripted_grasps,
+                    settle_seconds=args.settle_seconds,
+                )
+
+        if args.grasp_provider == "object-function":
+            from tuj.m5_motion.object_function_runner import validate_function_assignments
+            try:
+                validate_function_assignments(
+                    selected,
+                    repository_path,
+                    environment=world.metadata.get("environment_name"),
+                )
+            except ValueError as error:
+                raise GenericMotionRunnerError(str(error)) from error
 
         constraints = _load_source(
             args.constraints.expanduser().resolve() if args.constraints else None,
@@ -788,7 +1010,13 @@ def main(
             PlannerOptions(random_seed=args.seed),
             "PlannerOptions",
         )
-        report = validate_selected_plan(selected, world, constraints, options)
+        report = validate_selected_plan(
+            selected,
+            world,
+            constraints,
+            options,
+            acquire_task_metadata=acquire_task_metadata,
+        )
     except (GenericMotionRunnerError, SelectedPlanAdapterError) as error:
         parser.error(str(error))
 
@@ -802,6 +1030,7 @@ def main(
     initial_world_path = output_dir / "initial_world.json"
     initial_world_path.write_text(world.model_dump_json(indent=2), encoding="utf-8")
     report["initial_world"] = str(initial_world_path)
+    report["grasp_execution_mode"] = resolved_grasp_mode
     validation_path = output_dir / "m5_input_validation.json"
     validation_path.write_text(
         json.dumps(report, ensure_ascii=False, indent=2),
@@ -811,12 +1040,18 @@ def main(
     print(f"[M5] validation: {validation_path}")
     if args.validate_input_only or args.dry_run:
         return 0
+    if args.grasp_provider == "object-function":
+        from tuj.m5_motion.object_function_runner import run_object_function_sequence
+        return run_object_function_sequence(selected=selected, repository=repository_path,
+            world=world, constraints=constraints, options=options, output_dir=output_dir, args=args)
+    offline_pick = pick_keyframes is not None and args.stop_after_pick
     key_name = "GEMINI_API_KEY" if args.provider == "gemini" else "OPENAI_API_KEY"
     has_key = os.environ.get(key_name) or (args.provider == "gemini" and os.environ.get("GOOGLE_API_KEY"))
-    if not args.scripted_grasps and not has_key:
+    if not args.scripted_grasps and not offline_pick and not has_key:
         parser.error(
             f"{key_name} is required for generic keyframe generation; "
-            "use --validate-input-only to check inputs without it"
+            "use --pick-keyframes with --stop-after-pick, or "
+            "--validate-input-only to check inputs without it"
         )
 
     selected_hash = hashlib.sha256(
@@ -863,11 +1098,22 @@ def main(
 
         return execute_selected_plan_live(args, selected, world, constraints, options,
             repository_path, output_dir, artifact_id, planner_pool_options)
+    if pick_keyframes is not None:
+        from tuj.m5_motion.physical_grasp import (
+            RetargetedAcquireKeyframeProvider,
+        )
+
+        planner_pool_options["provider"] = RetargetedAcquireKeyframeProvider(
+            pick_keyframes
+        )
     planners = ToolUseJournalPlannerPool(repository_path, **planner_pool_options)
     try:
         result = SelectedPlanMotionOrchestrator(
             planners,
             store=MotionPlanStore(output_dir),
+            adapter=SelectedPlanMotionRequestAdapter(
+                acquire_task_metadata=acquire_task_metadata
+            ),
         ).plan(
             selected,
             initial_world=world,
@@ -971,7 +1217,10 @@ __all__ = [
     "default_constraints",
     "execute_planning_result",
     "load_selected_plan",
+    "load_keyframe_artifact",
     "load_world",
     "main",
+    "truncate_after_first_acquire",
+    "truncate_after_subgoal",
     "validate_selected_plan",
 ]

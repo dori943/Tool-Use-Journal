@@ -195,6 +195,140 @@ def test_acquire_without_structured_grasp_is_grounded_for_m5_planning() -> None:
     assert requests[1].task.goal.target_pose is not None
 
 
+def test_promotes_physical_grasp_metadata_for_two_finger_acquire() -> None:
+    selected = _selected_plan()
+    assignment = selected.candidate_assignments[1]
+    assignment.ee = "2F"
+    assignment.action_parameters = {
+        "grasp_execution_mode": "CONTACT_FRICTION",
+        "grasp_profile": {"minimum_lift_m": 0.07},
+    }
+
+    requests = SelectedPlanMotionRequestAdapter(
+        acquire_task_metadata={"grasp_execution_mode": "KINEMATIC"}
+    ).convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": _world("scene:pick", [0.2, 0.3]),
+        },
+        constraints=MotionConstraints(),
+    )
+
+    metadata = requests[1].task.metadata
+    assert metadata["grasp_execution_mode"] == "CONTACT_FRICTION"
+    assert metadata["grasp_profile"] == {"minimum_lift_m": 0.07}
+    assert metadata["operation"] == "ACQUIRE"
+    assert metadata["attach_target"] is True
+
+
+def test_adapter_preserves_object_independent_clearance_requirements() -> None:
+    selected = _selected_plan()
+    requirements = {
+        "required_contact_clearance_m": 0.02,
+        "uses_underside_contact": False,
+    }
+    selected.candidate_assignments[1].action_parameters = {
+        "grasp_clearance_requirements": requirements,
+    }
+
+    requests = SelectedPlanMotionRequestAdapter().convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": _world("scene:pick", [0.2, 0.3]),
+        },
+        constraints=MotionConstraints(),
+    )
+
+    assert requests[1].task.metadata["grasp_clearance_requirements"] == requirements
+
+
+def test_auto_contact_friction_falls_back_for_non_two_finger_acquire() -> None:
+    requests = SelectedPlanMotionRequestAdapter(
+        acquire_task_metadata={"grasp_execution_mode": "CONTACT_FRICTION"}
+    ).convert(
+        _selected_plan(),
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": _world("scene:pick", [0.2, 0.3]),
+        },
+        constraints=MotionConstraints(),
+    )
+
+    assert requests[1].task.ee == "3F"
+    assert requests[1].task.metadata["grasp_execution_mode"] == "KINEMATIC"
+
+
+@pytest.mark.parametrize("dimensions", [[0.18, 0.18, 0.01], [0.05, 0.05, 0.05], [0.03, 0.04, 0.2]])
+def test_bbox_does_not_select_a_grasp_template_or_aperture(dimensions) -> None:
+    selected = _selected_plan()
+    selected.candidate_assignments[1].ee = "2F"
+    pick_world = _world("scene:pick", [0.2, 0.3])
+    pick_world.objects["part"].update(
+        {
+            "dimensions_m": dimensions,
+            "anchors": {"center": [0.0, 0.0, 0.0]},
+        }
+    )
+
+    requests = SelectedPlanMotionRequestAdapter(
+        acquire_task_metadata={"grasp_execution_mode": "CONTACT_FRICTION"}
+    ).convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": pick_world,
+        },
+        constraints=MotionConstraints(),
+    )
+
+    metadata = requests[1].task.metadata
+    assert "grasp_geometry_provider" not in metadata
+    assert "grasp_preshape_aperture_m" not in metadata
+
+
+def test_auto_contact_friction_detects_explicit_opposed_contact() -> None:
+    selected = _selected_plan()
+    selected.candidate_assignments[1].ee = "2F"
+    pick_world = _world("scene:pick", [0.2, 0.3])
+    pick_world.objects["part"].update(
+        {
+            "pose": {
+                "position_m": [0.0, 0.0, 0.0],
+                "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+            },
+            "anchors": {"center": [0.0, 0.0, 0.0]},
+            "physical_metadata": {
+                "grasp_feature": {
+                    "provider": "TWO_FINGER_OPPOSED_CONTACT",
+                    "contact_center_local_m": [0.0, -0.04, -0.02],
+                    "closing_axis_local_xyz": [1.0, 0.0, 0.0],
+                    "approach_axis_local_xyz": [0.0, 0.0, 1.0],
+                    "contact_span_m": 0.015,
+                }
+            },
+        }
+    )
+
+    requests = SelectedPlanMotionRequestAdapter(
+        acquire_task_metadata={"grasp_execution_mode": "CONTACT_FRICTION"}
+    ).convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": pick_world,
+        },
+        constraints=MotionConstraints(),
+    )
+
+    metadata = requests[1].task.metadata
+    assert metadata["grasp_geometry_provider"] == (
+        "TWO_FINGER_OPPOSED_CONTACT"
+    )
+    assert metadata["grasp_preshape_aperture_m"] == pytest.approx(0.035)
+
+
 @pytest.mark.parametrize(
     ("target_id", "message"),
     [

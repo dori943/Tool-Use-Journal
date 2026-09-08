@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from pathlib import Path
 from types import SimpleNamespace
 
@@ -43,6 +44,11 @@ from tuj.m5_motion.tool_use_journal_runtime import (
     ToolUseJournalKinematicTrajectoryPlayer,
     ToolUseJournalRuntimeError,
     tool_use_journal_joint_position_controller_config,
+)
+from tuj.m5_motion.runtime_checkpoint import (
+    RuntimeCheckpointError,
+    restore_runtime_checkpoint,
+    save_runtime_checkpoint,
 )
 
 
@@ -445,6 +451,19 @@ def test_runtime_model_swap_is_atomic_when_factory_builds_wrong_ee() -> None:
     runtime.close()
 
 
+def test_function_finger_hold_copies_targets_and_clears_on_ee_change() -> None:
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    gripper = runtime.env.robots[0].gripper["right"]
+    gripper.current_action = np.array([.37])
+    runtime.command_gripper(engaged=True, suction=False)
+    runtime.capture_gripper_hold()
+    gripper.current_action[:] = .9
+    assert runtime._captured_gripper_action == pytest.approx([.37])
+    runtime.unlock("2F")
+    assert runtime._captured_gripper_action is None
+    runtime.close()
+
+
 def test_runtime_grasp_attach_tracks_hand_and_blocks_tool_exchange() -> None:
     runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
     model = runtime.env.sim.model._model
@@ -504,6 +523,108 @@ def test_runtime_grasp_attach_tracks_hand_and_blocks_tool_exchange() -> None:
     runtime.close()
 
 
+def test_runtime_checkpoint_restores_exact_attachment_without_new_grasp(
+    tmp_path: Path,
+) -> None:
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    hand_id = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_BODY, "robot0_right_hand"
+    )
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    data.qpos[apple_qpos : apple_qpos + 3] = data.xpos[hand_id]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+    runtime.env.robots[0].gripper["right"].current_action = np.array([0.37])
+    runtime.command_gripper(engaged=True, suction=False)
+    runtime.capture_gripper_hold()
+    runtime.attach_object(
+        "apple",
+        max_attach_distance_m=0.05,
+        max_attach_penetration_m=0.05,
+    )
+    runtime.mark_attached_object_as_tool("apple")
+    shoulder = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, ARM_JOINTS[0]
+    )
+    data.qpos[int(model.jnt_qposadr[shoulder])] = 0.3
+    mujoco.mj_forward(model, data)
+    runtime.synchronize_attached_object()
+    expected_qpos = data.qpos.copy()
+    checkpoint = tmp_path / "held-apple.checkpoint.json"
+    save_runtime_checkpoint(
+        checkpoint,
+        runtime,
+        progress={"completed_subgoals": ["acquire", "transport"]},
+    )
+    runtime.close()
+
+    restored = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    result = restore_runtime_checkpoint(checkpoint, restored)
+
+    restored_data = restored.env.sim.data._data
+    assert restored_data.qpos == pytest.approx(expected_qpos)
+    assert restored.attached_object_id == "apple"
+    assert restored.held_tool_id == "apple"
+    assert restored.captured_gripper_action == pytest.approx((0.37,))
+    assert result.progress["completed_subgoals"] == ["acquire", "transport"]
+    restored.close()
+
+
+def test_runtime_checkpoint_rejects_wrong_active_ee(tmp_path: Path) -> None:
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    checkpoint = tmp_path / "two-finger.checkpoint.json"
+    save_runtime_checkpoint(checkpoint, runtime)
+    runtime.close()
+
+    wrong = ToolUseJournalEERuntime(_fake_env("3F"), _fake_env)
+    with pytest.raises(RuntimeCheckpointError, match="requires active EE"):
+        restore_runtime_checkpoint(checkpoint, wrong)
+    wrong.close()
+
+
+def test_runtime_checkpoint_accepts_legacy_v1_after_named_layout_check(
+    tmp_path: Path,
+) -> None:
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    checkpoint = tmp_path / "legacy.checkpoint.json"
+    save_runtime_checkpoint(checkpoint, runtime, progress={"step": 3})
+    runtime.close()
+
+    payload = json.loads(checkpoint.read_text(encoding="utf-8"))
+    payload.pop("model_signature_kind")
+    payload["model_signature"] = "unstable-full-mjcf-hash"
+    checkpoint.write_text(json.dumps(payload), encoding="utf-8")
+
+    restored = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    result = restore_runtime_checkpoint(checkpoint, restored)
+
+    assert result.progress == {"step": 3}
+    restored.close()
+
+
+def test_runtime_contact_friction_hold_has_no_synthetic_attachment() -> None:
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+
+    runtime.command_gripper(engaged=True, suction=False)
+    runtime.mark_contact_friction_object_as_tool("apple")
+
+    assert runtime.held_tool_id == "apple"
+    assert runtime.attached_object_id is None
+    with pytest.raises(ToolUseJournalRuntimeError, match="cannot attach"):
+        runtime.attach_object("apple")
+    with pytest.raises(ToolUseJournalRuntimeError, match="contact friction"):
+        runtime.unlock("2F")
+
+    runtime.command_gripper(engaged=False, suction=False)
+    assert runtime.held_tool_id is None
+    runtime.close()
+
+
 def test_controller_config_uses_absolute_joint_targets() -> None:
     config = tool_use_journal_joint_position_controller_config(
         kp=80.0, damping_ratio=1.2
@@ -547,7 +668,7 @@ def test_live_joint_controller_gains_can_be_retuned_between_phases() -> None:
 
 def test_controller_player_advances_the_real_robosuite_physics_loop() -> None:
     pytest.importorskip("robosuite")
-    repository = Path(__file__).resolve().parents[2] / "Tool-Use-Journal"
+    repository = Path(__file__).resolve().parents[4]
     if not repository.is_dir():
         pytest.skip("workspace Tool-Use-Journal checkout is unavailable")
     runtime = ToolUseJournalEERuntime.from_repository_for_controller(
@@ -658,6 +779,101 @@ def test_breakable_weld_can_require_opposed_finger_contacts() -> None:
     assert ToolUseJournalEERuntime._contact_contract_failures(
         one_sided, config
     ) == ("CONTACT_GROUPS:right_finger",)
+
+
+def test_metric_preshape_quantizes_to_adjacent_wider_2f_state() -> None:
+    robot = SimpleNamespace(
+        action_dim=2,
+        composite_controller=SimpleNamespace(
+            _action_split_indexes={
+                "right": (0, 1),
+                "right_gripper": (1, 2),
+            }
+        ),
+        robot_model=SimpleNamespace(joints=("joint",)),
+    )
+    aperture_states = (0.04, 0.022)
+    state_index = 0
+    commands: list[dict[str, object]] = []
+    runtime = SimpleNamespace(
+        active_ee="2F",
+        env=SimpleNamespace(robots=[robot]),
+        fingerpad_separation_m=lambda: aperture_states[state_index],
+        command_gripper=lambda **kwargs: commands.append(kwargs),
+    )
+    player = object.__new__(ToolUseJournalControllerTrajectoryPlayer)
+    player.runtime = runtime
+    player._actual_joint_positions = lambda env, names: np.zeros(len(names))
+
+    def advance(action: np.ndarray) -> float:
+        nonlocal state_index
+        if action[1] > 0.0:
+            state_index = min(state_index + 1, len(aperture_states) - 1)
+        elif action[1] < 0.0:
+            state_index = max(state_index - 1, 0)
+        return 0.0
+
+    player._advance_controller = advance
+
+    actual = player.preshape_finger_gripper_to_aperture(
+        target_aperture_m=0.031,
+        tolerance_m=0.002,
+        settle_ticks_per_iteration=1,
+        final_settle_ticks=1,
+        allow_wider_discrete_state=True,
+    )
+
+    assert actual == pytest.approx(0.04)
+    assert actual > 0.031
+    assert commands == [
+        {"engaged": True, "suction": False, "command": 0.0}
+    ]
+
+
+def test_metric_preshape_can_reject_discrete_quantization() -> None:
+    robot = SimpleNamespace(
+        action_dim=2,
+        composite_controller=SimpleNamespace(
+            _action_split_indexes={
+                "right": (0, 1),
+                "right_gripper": (1, 2),
+            }
+        ),
+        robot_model=SimpleNamespace(joints=("joint",)),
+    )
+    aperture_states = (0.04, 0.022)
+    state_index = 0
+    runtime = SimpleNamespace(
+        active_ee="2F",
+        env=SimpleNamespace(robots=[robot]),
+        fingerpad_separation_m=lambda: aperture_states[state_index],
+        command_gripper=lambda **kwargs: None,
+    )
+    player = object.__new__(ToolUseJournalControllerTrajectoryPlayer)
+    player.runtime = runtime
+    player._actual_joint_positions = lambda env, names: np.zeros(len(names))
+
+    def advance(action: np.ndarray) -> float:
+        nonlocal state_index
+        if action[1] > 0.0:
+            state_index = min(state_index + 1, len(aperture_states) - 1)
+        elif action[1] < 0.0:
+            state_index = max(state_index - 1, 0)
+        return 0.0
+
+    player._advance_controller = advance
+
+    with pytest.raises(
+        ToolUseJournalRuntimeError,
+        match="between discrete 2F controller states",
+    ):
+        player.preshape_finger_gripper_to_aperture(
+            target_aperture_m=0.031,
+            tolerance_m=0.002,
+            settle_ticks_per_iteration=1,
+            final_settle_ticks=1,
+            allow_wider_discrete_state=False,
+        )
 
 
 def test_breakable_weld_detaches_when_required_torque_exceeds_limit() -> None:

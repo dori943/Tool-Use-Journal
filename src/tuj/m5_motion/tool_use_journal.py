@@ -91,6 +91,52 @@ def _raw_model_data(env: object) -> tuple[mujoco.MjModel, mujoco.MjData]:
         ) from error
 
 
+def settle_tool_use_journal_free_objects(
+    env: object,
+    *,
+    duration_s: float = 5.0,
+) -> int:
+    """Advance free bodies to a deterministic resting pose with the robot fixed.
+
+    Object placement initializers write poses and call ``mj_forward`` but do not
+    integrate gravity. Planning directly from that transient state is unsafe
+    for non-flat tools, which can rotate before the robot reaches them. During
+    settling, every non-free joint is restored after each MuJoCo step so only
+    object free joints evolve.
+    """
+
+    if not math.isfinite(duration_s) or duration_s < 0.0:
+        raise ValueError("duration_s must be finite and non-negative")
+    model, data = _raw_model_data(env)
+    if duration_s == 0.0:
+        return 0
+    timestep_s = float(model.opt.timestep)
+    steps = max(1, int(math.ceil(duration_s / timestep_s)))
+    free_qpos = np.zeros(int(model.nq), dtype=bool)
+    free_dofs = np.zeros(int(model.nv), dtype=bool)
+    for joint_id in range(int(model.njnt)):
+        if int(model.jnt_type[joint_id]) != int(mujoco.mjtJoint.mjJNT_FREE):
+            continue
+        qpos_address = int(model.jnt_qposadr[joint_id])
+        dof_address = int(model.jnt_dofadr[joint_id])
+        free_qpos[qpos_address : qpos_address + 7] = True
+        free_dofs[dof_address : dof_address + 6] = True
+    fixed_qpos = ~free_qpos
+    fixed_dofs = ~free_dofs
+    fixed_positions = np.asarray(data.qpos[fixed_qpos], dtype=float).copy()
+    previous_ctrl = np.asarray(data.ctrl, dtype=float).copy()
+    data.ctrl[:] = 0.0
+    try:
+        for _ in range(steps):
+            mujoco.mj_step(model, data)
+            data.qpos[fixed_qpos] = fixed_positions
+            data.qvel[fixed_dofs] = 0.0
+        mujoco.mj_forward(model, data)
+    finally:
+        data.ctrl[:] = previous_ctrl
+    return steps
+
+
 def _name(model: mujoco.MjModel, kind: mujoco.mjtObj, object_id: int) -> str:
     return mujoco.mj_id2name(model, kind, object_id) or ""
 
@@ -232,13 +278,13 @@ def _geom_local_points(model: mujoco.MjModel, geom_id: int) -> np.ndarray | None
     return None
 
 
-def _body_local_bounds(
+def _body_local_points(
     model: mujoco.MjModel,
     data: mujoco.MjData,
     root_body_id: int,
     *,
     collision_only: bool,
-) -> tuple[np.ndarray, np.ndarray] | None:
+) -> np.ndarray | None:
     root_position = np.asarray(data.xpos[root_body_id], dtype=float)
     root_rotation = np.asarray(data.xmat[root_body_id], dtype=float).reshape(3, 3)
     points: list[np.ndarray] = []
@@ -259,7 +305,28 @@ def _body_local_bounds(
     if not points:
         return None
     combined = np.concatenate(points, axis=0)
-    return np.min(combined, axis=0), np.max(combined, axis=0)
+    # Geometry meshes often repeat shared vertices.  A compact unique point
+    # set preserves exact extrema under arbitrary object rotations without
+    # bloating every M5 world snapshot.
+    return np.unique(np.round(combined, decimals=9), axis=0)
+
+
+def _body_local_bounds(
+    model: mujoco.MjModel,
+    data: mujoco.MjData,
+    root_body_id: int,
+    *,
+    collision_only: bool,
+) -> tuple[np.ndarray, np.ndarray] | None:
+    points = _body_local_points(
+        model,
+        data,
+        root_body_id,
+        collision_only=collision_only,
+    )
+    if points is None:
+        return None
+    return np.min(points, axis=0), np.max(points, axis=0)
 
 
 def _pose_record(
@@ -286,6 +353,11 @@ def _object_record(
     ]
     bounds = _body_local_bounds(
         model, data, body_id, collision_only=bool(collision_ids)
+    )
+    collision_points = (
+        _body_local_points(model, data, body_id, collision_only=True)
+        if collision_ids
+        else None
     )
     record: dict[str, Any] = {
         "body_name": _name(model, mujoco.mjtObj.mjOBJ_BODY, body_id),
@@ -315,6 +387,8 @@ def _object_record(
                 float(lower[2]),
             ],
         }
+    if collision_points is not None:
+        record["collision_points_m"] = collision_points.tolist()
     free_joints = [
         _name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
         for joint_id in range(model.njnt)
@@ -443,6 +517,13 @@ def make_tool_use_journal_env(
         "hard_reset": False,
     }
     options.update(suite_make_kwargs)
+    from robosuite.environments.base import REGISTERED_ENVS
+    is_kitchen = any(cls.__module__.startswith("robocasa.")
+        for cls in REGISTERED_ENVS[env_name].__mro__)
+    if is_kitchen:
+        # RoboCasa controls reset itself. Every registered task installs the
+        # same fixed, robot-relative agentview camera in its compiled model.
+        options.pop("hard_reset", None)
     options["gripper_types"] = (
         TOOL_USE_JOURNAL_EE_GRIPPER_TYPES[active_ee]
         if active_ee is not None
@@ -729,6 +810,42 @@ class ToolUseJournalEnvironmentAdapter:
             )
             for object_id, body_id in sorted(self.object_body_ids.items())
         }
+        anchor_provider = getattr(self.env, "get_motion_anchor_offsets", None)
+        if callable(anchor_provider):
+            for object_id, record in objects.items():
+                center = np.asarray(record.get("anchors", {}).get("center", [0, 0, 0]))
+                for anchor, offset in anchor_provider(object_id).items():
+                    record.setdefault("anchors", {})[anchor] = (center + np.asarray(offset)).tolist()
+                if "handle_grasp" in record.get("anchors", {}):
+                    record["grasp_hint"] = "Use handle_grasp for finger acquisition; center is a wire head, not a graspable handle."
+        metadata_provider = getattr(
+            self.env, "get_tool_physical_metadata", None
+        )
+        if callable(metadata_provider):
+            for object_id, record in objects.items():
+                try:
+                    physical_metadata = metadata_provider(object_id)
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if isinstance(physical_metadata, Mapping):
+                    # Keep environment-owned object / grasp facts explicit in
+                    # the snapshot. Geometry binders then remain independent
+                    # of task ids and concrete object names.
+                    record["physical_metadata"] = dict(physical_metadata)
+        packing_metadata_provider = getattr(
+            self.env, "get_motion_packing_metadata", None
+        )
+        if callable(packing_metadata_provider):
+            for object_id, record in objects.items():
+                try:
+                    packing_metadata = packing_metadata_provider(object_id)
+                except (KeyError, TypeError, ValueError):
+                    continue
+                if isinstance(packing_metadata, Mapping) and packing_metadata:
+                    # Clear container volume and feasible object orientations
+                    # belong to the environment geometry contract.  The generic
+                    # provider consumes this compact data without task-name checks.
+                    record["packing_metadata"] = dict(packing_metadata)
         xml_hash = hashlib.sha256(self.source_mjcf.encode("utf-8")).hexdigest()
         signature_payload = {
             "adapter": "tool-use-journal-v1",
@@ -1083,6 +1200,7 @@ class ToolUseJournalCollisionModelCompiler:
         *,
         seed: int = 0,
         source_revision: str = TOOL_USE_JOURNAL_TESTED_REVISION,
+        environment_preparer: Callable[[object, str | None], object] | None = None,
         **suite_make_kwargs: Any,
     ) -> "ToolUseJournalCollisionModelCompiler":
         env_name = _environment_name(reference_env)
@@ -1090,13 +1208,20 @@ class ToolUseJournalCollisionModelCompiler:
             suite_make_kwargs.setdefault("scripted_grasps", True)
 
         def factory(active_ee: str | None) -> object:
-            return make_tool_use_journal_env(
+            env = make_tool_use_journal_env(
                 repository_root,
                 env_name,
                 active_ee=active_ee,
                 seed=seed,
                 **suite_make_kwargs,
             )
+            if environment_preparer is not None:
+                try:
+                    return environment_preparer(env, active_ee)
+                except Exception:
+                    env.close()
+                    raise
+            return env
 
         return cls.from_environment_factory(
             reference_env,
