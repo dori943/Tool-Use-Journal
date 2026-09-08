@@ -154,6 +154,61 @@ def _make_runtime(repository: Path, environment: str, seed: int) -> Any:
     )
 
 
+def _reset_robot_to_bare_home(env: Any) -> None:
+    """Force the robot arm to TOOL_USE_JOURNAL_BARE_HOME_QPOS before snapshot.
+
+    M5 pipeline 의 initial_world 는 이 홈 자세를 캡처하므로 커밋션 시작 자세도
+    같아야 재생 시 START_STATE_MISMATCH 가 안 난다. from_repository_for_controller
+    는 joint-position controller 를 세팅해 reset 시점의 로봇 자세가 홈과 어긋날
+    수 있어(RoboCasa Kitchen 특히) 여기서 강제로 되돌린다.
+
+    3단계로 반영을 확실히 한다:
+      1) robosuite Manipulator 의 set_robot_joint_positions 를 우선 시도
+         — 컨트롤러 target 까지 홈 자세로 동기화한다. 없으면 raw MjData 세팅 폴백.
+      2) env.sim.forward() 로 sim wrapper 캐시(_data) 를 동기화.
+      3) mujoco.mj_forward 로 kinematics 재계산."""
+    import mujoco
+    from tuj.m5_motion.tool_use_journal import (
+        TOOL_USE_JOURNAL_BARE_HOME_QPOS,
+        _raw_model_data,
+    )
+
+    robot = env.robots[0]
+    home = list(TOOL_USE_JOURNAL_BARE_HOME_QPOS)
+    setter = getattr(robot, "set_robot_joint_positions", None)
+    if callable(setter):
+        try:
+            setter(home)
+        except Exception:
+            setter = None
+    if not callable(setter):
+        model, data = _raw_model_data(env)
+        robot_joints = list(robot.robot_joints)
+        if len(robot_joints) != len(home):
+            raise RuntimeError(
+                f"expected {len(home)} arm joints, got {len(robot_joints)}: "
+                f"{robot_joints}"
+            )
+        for name, value in zip(robot_joints, home):
+            qposadr = int(model.joint(name).qposadr)
+            data.qpos[qposadr] = float(value)
+            dofadr = int(model.joint(name).dofadr)
+            data.qvel[dofadr] = 0.0
+    # Sync robosuite sim wrapper (env.sim.data caches values that _arm_state reads
+    # via env.sim.data._data). forward() propagates positions into both layers.
+    forward = getattr(getattr(env, "sim", None), "forward", None)
+    if callable(forward):
+        forward()
+    model, data = _raw_model_data(env)
+    mujoco.mj_forward(model, data)
+    # Diagnostic: verify what world_snapshot will actually read.
+    joint_names = list(robot.robot_joints)
+    positions = [float(data.qpos[int(model.joint(n).qposadr)]) for n in joint_names]
+    max_err = max(abs(a - b) for a, b in zip(positions, home))
+    print(f"  [reset] robot arm forced to bare-home; max residual={max_err:.4f} rad "
+          f"({', '.join(f'{v:+.4f}' for v in positions)})")
+
+
 def _make_planner(
     runtime: Any,
     repository: Path,
@@ -280,6 +335,7 @@ def _replay_template(
     for replay_index in range(replay_count):
         runtime = _make_runtime(repository, environment, seed)
         try:
+            _reset_robot_to_bare_home(runtime.env)
             world = ToolUseJournalEnvironmentAdapter(runtime.env).world_snapshot()
             request = _request(
                 world,
@@ -315,21 +371,54 @@ def _replay_template(
     return results
 
 
+def _resolve_output_directory(
+    repository: Path,
+    environment: str,
+    seed: int,
+) -> Path:
+    """Return the signature-keyed cache directory for ``environment``.
+
+    Opens the environment once (bare-home reset + world snapshot) to compute
+    the portable rack signature, then closes it.  Falling back to the legacy
+    environment-name mapping keeps a broken snapshot from stalling the
+    commissioning workflow.
+    """
+
+    from tuj.m5_motion.precomputed_ee_attach import (
+        portable_ee_path_directory_for,
+        portable_ee_path_directory_from_world,
+    )
+    from tuj.m5_motion.tool_use_journal import ToolUseJournalEnvironmentAdapter
+
+    registry_root = repository / "configs" / "precomputed_ee_paths"
+    runtime = _make_runtime(repository, environment, seed)
+    try:
+        _reset_robot_to_bare_home(runtime.env)
+        world = ToolUseJournalEnvironmentAdapter(runtime.env).world_snapshot()
+        subdirectory = portable_ee_path_directory_from_world(world)
+    except Exception as error:  # noqa: BLE001 - fall back to legacy mapping
+        print(
+            f"  [resolve] world snapshot failed ({error!r}); "
+            f"falling back to legacy directory for {environment}"
+        )
+        subdirectory = portable_ee_path_directory_for(environment)
+    finally:
+        runtime.close()
+    return registry_root / subdirectory
+
+
 def main() -> int:
     _install_source_roots()
-    from tuj.m5_motion.precomputed_ee_attach import portable_ee_path_directory_for
 
     args = _parse_args()
     repository = args.repository.expanduser().resolve()
-    output = (
-        args.output.expanduser().resolve()
-        if args.output is not None
-        else repository
-        / "configs"
-        / "precomputed_ee_paths"
-        / portable_ee_path_directory_for(args.environment)
-        / f"bare_to_{args.target_ee}.json"
-    )
+    if args.output is not None:
+        output = args.output.expanduser().resolve()
+    else:
+        output = (
+            _resolve_output_directory(repository, args.environment, args.seed)
+            / f"bare_to_{args.target_ee}.json"
+        )
     if args.replay_existing and not output.is_file():
         raise SystemExit(f"trajectory to replay does not exist: {output}")
     if output.exists() and not args.overwrite and not args.replay_existing:
@@ -374,6 +463,7 @@ def main() -> int:
             planning_seed = args.seed + offset
             runtime = _make_runtime(repository, args.environment, args.seed)
             try:
+                _reset_robot_to_bare_home(runtime.env)
                 world = ToolUseJournalEnvironmentAdapter(
                     runtime.env
                 ).world_snapshot()

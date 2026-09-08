@@ -428,14 +428,50 @@ def _parse_args() -> argparse.Namespace:
     return args
 
 
+def _resolve_shared_rack_root(
+    repository: Path,
+    environment: str,
+    source_ee: str,
+    seed: int,
+) -> Path:
+    """Return the signature-keyed cache directory for ``environment``.
+
+    Opens the environment once to compute the portable rack signature, then
+    closes it.  Falls back to the legacy environment-name mapping when the
+    world snapshot fails so commissioning still has a shot at recovering.
+    """
+
+    from tuj.m5_motion.precomputed_ee_attach import (
+        portable_ee_path_directory_for,
+        portable_ee_path_directory_from_world,
+    )
+    from tuj.m5_motion.tool_use_journal import ToolUseJournalEnvironmentAdapter
+
+    registry_root = repository / "configs" / "precomputed_ee_paths"
+    runtime = _make_runtime(repository, environment, source_ee, seed)
+    try:
+        world = ToolUseJournalEnvironmentAdapter(runtime.env).world_snapshot()
+        subdirectory = portable_ee_path_directory_from_world(world)
+    except Exception as error:  # noqa: BLE001 - fall back to legacy mapping
+        print(
+            f"  [resolve] world snapshot failed ({error!r}); "
+            f"falling back to legacy directory for {environment}"
+        )
+        subdirectory = portable_ee_path_directory_for(environment)
+    finally:
+        runtime.close()
+    return registry_root / subdirectory
+
+
 def main() -> int:
     _install_source_roots()
-    from tuj.m5_motion.precomputed_ee_attach import portable_ee_path_directory_for
 
     args = _parse_args()
     repository = args.repository.expanduser().resolve()
     registry_root = repository / "configs" / "precomputed_ee_paths"
-    shared_rack_root = registry_root / portable_ee_path_directory_for(args.environment)
+    shared_rack_root = _resolve_shared_rack_root(
+        repository, args.environment, args.source_ee, args.seed
+    )
     attach_path = shared_rack_root / f"bare_to_{args.source_ee}.json"
     output = (
         args.output.expanduser().resolve()

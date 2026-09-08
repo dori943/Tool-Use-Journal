@@ -456,6 +456,17 @@ def _collect_gk_nodes(
 ) -> tuple[dict[str, dict[str, Any]], dict[str, str]]:
     result: dict[str, dict[str, Any]] = {}
     raw_to_canonical: dict[str, str] = {}
+    # 1차 패스: M1 이 노드에 실은 source_name(env 인스턴스명) 을 파싱 전에 등록.
+    # id 를 첫 언더스코어로 파싱하면 class·name 이 언더스코어를 포함한 객체
+    # (rolling_pin, packing_box 등)에서 잘못 잘리는데 (obj_rolling_pin_rolling_pin
+    # → pin_rolling_pin), source_name 을 우선 넣으면 파싱이 아예 안 돌아 정확히 매칭됨.
+    for record in records:
+        for raw_id, raw_node in _mapping(record.get("nodes")).items():
+            if not isinstance(raw_id, str):
+                continue
+            source_name = _mapping(raw_node).get("source_name")
+            if isinstance(source_name, str) and raw_id not in raw_to_canonical:
+                raw_to_canonical[raw_id] = source_name
     for record in records:
         for raw_id, raw_node in _mapping(record.get("nodes")).items():
             if not isinstance(raw_id, str):
@@ -619,6 +630,15 @@ def _derive_catalog(
             robot_spec=deepcopy(dict(raw)),
         )
 
+    # M1 이 노드에 실은 source_name(env 인스턴스명)을 raw_to_canonical 에 먼저 등록해
+    # id 파싱 실패(class·name 이 언더스코어 포함 — rolling_pin, packing_box 등)를 우회한다.
+    # M5 는 world.objects 키를 env 인스턴스명으로 갖고 있어 반드시 이 이름과 매칭해야 한다.
+    for raw_node in m1.get("nodes") or []:
+        record = _mapping(raw_node)
+        raw_id = record.get("id")
+        source_name = record.get("source_name")
+        if isinstance(raw_id, str) and isinstance(source_name, str) and raw_id not in raw_to_canonical:
+            raw_to_canonical[raw_id] = source_name
     objects: dict[str, ObjectSpec] = {}
     for raw_node in m1.get("nodes") or []:
         record = _mapping(raw_node)
