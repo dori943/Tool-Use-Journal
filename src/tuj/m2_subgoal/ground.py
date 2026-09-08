@@ -9,13 +9,9 @@
 쌍/집합 술어(fits, gap_accessible, batch, swept_space)는 M2가 관계 함수를 import해
 직접 계산한다 — 여기서 도는 VLM 호출은 없다.
 
-두 가지를 흡수한다:
-  1) 관계 함수 위치. 통합 뒤 이름(relations.batch_partition, relations.swept_space)을
-     먼저 찾고, 없으면 현재 레포의 m3_grounding.relational + 종전 Materializer 산술로
-     폴백한다. 통합 전후 어느 쪽에서도 M2가 돈다.
-  2) 접지값이 아직 m1.json에 없는 경우. m3_intrinsic.json(물성표)만 있으면 EE 판정,
-     리치, top_exposed/clear/flat_face는 전부 산술이라 여기서 채운다. 물성표조차 없는
-     노드는 접지값 없이 남고 해당 술어는 unknown이 된다 (몰래 VLM을 돌지 않는다).
+관계 함수는 통합 산출물(tuj.m1_scene.relations)에서 가져오며, 구버전 레포를 위해
+m3_grounding.relational 폴백을 남겨 둔다. 함수 이름이나 인자가 달라도 _call이
+시그니처에 있는 키워드만 넘겨 흡수한다.
 """
 from __future__ import annotations
 
@@ -153,81 +149,3 @@ def load_ee_pool(robot_spec: str | Path) -> tuple[list[dict], float]:
             e["seal_rms_tol_mm"] = e["flatness_tol_rms_mm"]
         pool.append(e)
     return pool, float(spec["reach_mm"])
-
-
-def _legacy_props(out_dir: Path) -> dict:
-    """통합 전 산출물에서 물성표를 긁어온다 (m3_intrinsic.json → m3.json 순)."""
-    p = out_dir / "m3_intrinsic.json"
-    if p.exists():
-        raw = json.loads(p.read_text(encoding="utf-8"))
-        return {k: v for k, v in raw.items() if isinstance(v, dict) and "geometry" in v}
-    p = out_dir / "m3.json"
-    if p.exists():
-        raw = json.loads(p.read_text(encoding="utf-8"))
-        if isinstance(raw, dict) and isinstance(raw.get("objects"), dict):
-            return {k: v for k, v in raw["objects"].items()
-                    if isinstance(v, dict) and "geometry" in v}
-        merged: dict[str, dict] = {}
-        for r in (raw.get("responses") if isinstance(raw, dict) else raw) or []:
-            nid = r.get("node_id")
-            if nid and isinstance(r.get("geometry"), dict):
-                merged.setdefault(nid, {}).update(
-                    {k: v for k, v in r.items()
-                     if k not in ("subgoal_id", "queried_by", "node_id", "ee",
-                                  "reachability", "type", "value", "pass")})
-        return merged
-    return {}
-
-
-def _flat_face(geometry: dict, rms_tol_mm=2.0, min_face_mm=40.0, patch_tol_mm=1.5) -> dict:
-    rms = geometry.get("surface_rms_mm", float("nan"))
-    patch = geometry.get("seal_patch_rms_mm", 99.9)
-    face = min(geometry.get("footprint_mm", [0.0, 0.0]))
-    planar = (rms == rms) and rms <= rms_tol_mm and patch <= patch_tol_mm
-    ok = bool(planar and face >= min_face_mm)
-    return {"value": ok, "face_mm": round(float(face), 1),
-            "check": f"rms_{rms}<={rms_tol_mm} & patch_{patch}<={patch_tol_mm} "
-                     f"& face_{round(float(face), 1)}>={min_face_mm}"}
-
-
-def ensure_measurements(m1: dict, ee_pool: list[dict] | None = None,
-                        reach_mm: float | None = None,
-                        out_dir: str | Path | None = None) -> list[str]:
-    """접지값(ee/reachability/predicates)이 없는 노드를 채운다 — 통합 전 임시 경로.
-
-    통합 뒤 m1.json에는 전부 실려 오므로 이 함수는 아무것도 하지 않는다.
-    통합 전에는 남아 있는 m3_intrinsic.json/m3.json 물성표를 읽어 산술로 채운다
-    (EE 판정·리치·단항 술어는 전부 계산 가능). 물성표에도 없는 노드는 접지값 없이
-    남고 관련 술어는 unknown이 된다 — M2가 몰래 VLM을 돌지 않는다.
-    통합이 머지되면 이 함수와 _legacy_props는 지워도 된다.
-    """
-    nodes = {n["id"]: n for n in m1["nodes"]}
-    edges = m1.get("edges", [])
-    props = _legacy_props(Path(out_dir)) if out_dir else {}
-    logs, filled, missing = [], 0, []
-    for nid, n in nodes.items():
-        preds = n.setdefault("predicates", {})
-        preds.setdefault("top_exposed", top_exposed(nid, edges))
-        preds.setdefault("clear", region_clear(nid, edges))
-        if "ee" in n and "flat_face" in preds:
-            continue
-        intr = {k: v for k, v in (props.get(nid) or {}).items() if not k.startswith("_")}
-        if not intr.get("geometry"):
-            if "ee" not in n:
-                missing.append(nid)
-            continue
-        for k, v in intr.items():                 # 물성도 노드에 실어 둔다 (도구 측정표용)
-            n.setdefault(k, v)
-        if "ee" not in n and ee_pool:
-            from tuj.m3_grounding.ee_conditioned import evaluate_ee, reach_check
-            n["ee"] = {e["ee_id"]: evaluate_ee(e, intr) for e in ee_pool}
-            n["reachability"] = reach_check(reach_mm, n["center_mm"])
-        preds.setdefault("flat_face", flat_face(intr["geometry"]))
-        filled += 1
-    if filled:
-        logs.append(f"  [접지 보완] m1에 접지값이 없어 물성표로 {filled}개 노드를 채움 "
-                    f"(M1&M3 통합 머지 후에는 실행되지 않음)")
-    if missing:
-        logs.append(f"  [접지 없음] 물성 미측정 노드 {len(missing)}개 — 관련 술어는 unknown: "
-                    f"{sorted(missing)[:8]}{' ...' if len(missing) > 8 else ''}")
-    return logs
