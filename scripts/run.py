@@ -154,8 +154,25 @@ def stage_m1(task, out, args):
     module = load_script("run_m1")
     if task not in TASK_ENV:
         sys.exit(f"[err] 등록되지 않은 태스크 {task!r}. 등록됨: {list(TASK_ENV)}")
-    argv = [task] + (["--view"] if args.view else [])
+    argv = _stage_m1_argv(task, out, args)
     call_main(module, argv, "run_m1")
+
+
+def _stage_m1_argv(task, out, args):
+    """run_m1 에 넘기는 argv — --memory / backend / model / M0 thresholds 포함."""
+    argv = [
+        task,
+        "--output-dir", str(out),
+        "--seed", str(args.seed),
+        "--backend", args.backend,
+        "--model", args.model,
+        "--memory", args.memory,
+        "--m0-bbox-threshold", str(args.m0_bbox_threshold),
+        "--m0-density-threshold", str(args.m0_density_threshold),
+    ]
+    if getattr(args, "view", False):
+        argv.append("--view")
+    return argv
 
 
 def stage_m2(task, out, args):

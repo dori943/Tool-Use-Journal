@@ -143,6 +143,40 @@ def _effective_probs(probs: np.ndarray, gap_threshold: float = TOP1_GAP):
     return probs, top, gap, False
 
 
+def confidences_to_probs(confidences) -> np.ndarray:
+    """0–10 (or any non-negative) confidence → normalized material probabilities."""
+    conf = np.asarray(confidences, dtype=np.float64)
+    if len(conf) == 0:
+        raise ValueError("confidences empty")
+    if conf.sum() > 0:
+        return conf / conf.sum()
+    return np.full(len(conf), 1.0 / len(conf))
+
+
+def aggregate_density_kgm3(materials, gap_threshold: float = TOP1_GAP) -> dict:
+    """Full SiPhy / C3 공통 density scalar.
+
+    materials: each item needs ``density`` as (lo, hi) and ``confidence``.
+    Uses range midpoints, confidence→prob normalization, then ``_effective_probs``
+    (top-1 commit when gap > threshold).
+
+    → density_kgm3, probs_raw, probs, top_idx, gap, committed
+    """
+    if not materials:
+        raise ValueError("materials empty")
+    probs_raw = confidences_to_probs([m["confidence"] for m in materials])
+    probs, top, gap, committed = _effective_probs(probs_raw, gap_threshold)
+    dens = np.asarray([m["density"] for m in materials], dtype=np.float64)  # (K,2)
+    return {
+        "density_kgm3": round(float(probs @ dens.mean(axis=1)), 1),
+        "probs_raw": probs_raw,
+        "probs": probs,
+        "top_idx": int(top),
+        "gap": float(gap),
+        "committed": bool(committed),
+    }
+
+
 # Gemini 는 OpenAI 호환 엔드포인트를 제공 → OPENAI_API_KEY 없고 GEMINI_API_KEY 만
 # 있어도 동일 client 로 돌아가게 한다.
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
@@ -259,10 +293,10 @@ class SiPhyBackend(PropertyBackend):
         prop = self._propose(crop_rgb)
         mats = prop["materials"]
 
-        conf = np.array([m["confidence"] for m in mats], dtype=np.float64)
-        probs_raw = conf / conf.sum() if conf.sum() > 0 else np.full(len(mats), 1 / len(mats))
-        # top-1 gap 게이트: gap > 임계면 원-핫 확정, 아니면 분포 유지 (원 SiPhy 철학)
-        probs, top, gap, committed = _effective_probs(probs_raw)
+        # density / top-1 commit: C3 Density-only 와 동일 helper
+        agg = aggregate_density_kgm3(mats)
+        probs_raw, probs = agg["probs_raw"], agg["probs"]
+        top, gap, committed = agg["top_idx"], agg["gap"], agg["committed"]
 
         dens = np.array([m["density"] for m in mats])            # (K,2)
         thick = np.array([m["thickness_cm"] for m in mats])      # (K,2)
@@ -270,7 +304,7 @@ class SiPhyBackend(PropertyBackend):
 
         out = {
             "material": mats[top]["name"],
-            "density_kgm3": round(float(probs @ dens.mean(axis=1)), 1),   # committed면 top-1 밀도
+            "density_kgm3": agg["density_kgm3"],                 # committed면 top-1 밀도
             "youngs_gpa": round(float(probs @ youngs.mean(axis=1)), 2),   # committed면 top-1 E
             "mass_kg": None,
             "confidence": round(float(probs_raw[top]), 3),

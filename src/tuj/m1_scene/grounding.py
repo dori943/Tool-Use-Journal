@@ -161,7 +161,25 @@ class FrictionHead:
 # ── 기하 스키마 ────────────────────────────────────────
 # EE 규칙이 요구하는 기하 필드. 메모리 hit이 이 필드를 못 갖추면(옛 스키마) 재계산한다.
 # 새 기하 필드를 추가하면 여기에도 등록할 것 — 그래야 캐시가 자동 갱신된다.
-GEOMETRY_REQUIRED = ("footprint_mm", "height_mm", "seal_patch_rms_mm")
+GEOMETRY_REQUIRED = ("footprint_mm", "height_mm", "seal_patch_rms_mm", "surface_rms_mm")
+# vac flatness / seal_patch / grasp footprint 등 EE 평가에 필요한 numeric 필드.
+GEOMETRY_FINITE_SCALARS = ("surface_rms_mm", "seal_patch_rms_mm", "height_mm")
+
+
+def _finite_number(value) -> bool:
+    """EE 비교에 쓸 수 있는 finite float 인가 (None / NaN / ±Inf 제외)."""
+    if value is None:
+        return False
+    try:
+        if hasattr(value, "item") and not isinstance(value, (bytes, str)):
+            try:
+                value = value.item()
+            except (ValueError, AttributeError):
+                pass
+        f = float(value)
+    except (TypeError, ValueError):
+        return False
+    return f == f and f not in (float("inf"), float("-inf"))
 
 
 def geometry_from_node(node: dict) -> dict:
@@ -176,8 +194,19 @@ def geometry_from_node(node: dict) -> dict:
 
 
 def geometry_is_current(geometry) -> bool:
-    """기하 dict가 현재 EE 규칙이 요구하는 필드를 모두 갖췄는가."""
-    return bool(geometry) and all(k in geometry for k in GEOMETRY_REQUIRED)
+    """기하 dict가 EE 평가에 필요한 키·finite numeric 값을 갖췄는가."""
+    if not geometry:
+        return False
+    if not all(k in geometry for k in GEOMETRY_REQUIRED):
+        return False
+    if not all(_finite_number(geometry.get(k)) for k in GEOMETRY_FINITE_SCALARS):
+        return False
+    fp = geometry.get("footprint_mm")
+    try:
+        seq = list(fp) if fp is not None else []
+    except TypeError:
+        return False
+    return len(seq) >= 2 and all(_finite_number(x) for x in seq[:2])
 
 
 # ── intrinsic 접지 진입점 ─────────────────────────────
