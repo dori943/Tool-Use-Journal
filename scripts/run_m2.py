@@ -2,22 +2,24 @@
 """M2 실행기 — task_registry 에 등록된 태스크에 M2을 돌려 서브골 JSON을 산출.
 
 사용법:
-  python scripts/run_m2.py c1_1              # output/c1_1/m1.json 있으면 그걸로, 없으면 mock
+  python scripts/run_m2.py c1_1              # output/c1_1/m1.json (접지 포함) 사용
   python scripts/run_m2.py c1_2              # 지시문은 task_registry 가 단일 출처
   python scripts/run_m2.py c1_1 --m1-json path.json   # M1 JSON 경로 직접 지정
 
-서브골 생성은 항상 LLM이다. 기본 Gemini(GEMINI_API_KEY), TUJ_LLM_PROVIDER=openai 면 OpenAI(OPENAI_API_KEY).
+0908 파이프라인 재구조 (M1&M3 통합):
+  입력은 m1.json 하나다. 접지값(ee/reachability/predicates/물성)이 노드에 실려 온다.
+  M3 왕복(m2_queries → m3.json → 재분해)은 없어졌고, 한 번의 실행 안에서
+    분해(LLM) → 판정(apply_grounding) → [피드백 재분해(LLM)] → 도구 확정(LLM) → 분할 → 재판정
+  까지 끝낸다. 쌍/집합 술어는 M2가 관계 함수를 import해 직접 계산한다 (VLM 0회).
 
-출력: output/<task>/m2.json (팀 구조 — main의 M1·M3 산출물 폴더 명명과 동일: output/c1_1/)
-      내용: 서브골·부분순서·mutex·M3 질의 사양·invariant
+서브골 생성은 항상 LLM이다. 기본 Gemini(GEMINI_API_KEY), TUJ_LLM_PROVIDER=openai 면 OpenAI.
 
-G_k는 여기서 만들지 않는다. G_k 조립은 M3 몫 — M2은 질의 목록(m2_queries)만
-넘기고, M3가 답을 채워 G_k를 조립한다. (0820 합의: M2 아웃풋에서 G_k 제외)
-
-mock M1 수치는 예빈 씬 노션 표 기준의 근사값 — 실제 실행 시 M1가 대체한다.
+출력: output/<task>/m2.json — 서브골·부분순서·mutex·invariant·서브골별 measurements
+      G_k 조립은 scripts/assemble_gk.py (m1.json + m2.json).
 """
 from __future__ import annotations
 
+import copy
 import json
 import os
 import sys
@@ -29,11 +31,15 @@ sys.path.insert(0, _ROOT)                      # task_registry (단일 출처)
 import numpy as np
 
 from tuj.m1_scene.abstraction import build_m1, serialize
+from tuj.m2_subgoal.ground import ensure_measurements, load_ee_pool, load_scene
+from tuj.m2_subgoal.ingest import apply_grounding, measurement_feedback, update_confidence
 from tuj.m2_subgoal.pipeline import run_m2
+from tuj.m2_subgoal.regroup import split_by_partition
 from tuj.m2_subgoal.rough import LLMRough
 from task_registry import instruction as task_instruction
 
 RNG = np.random.default_rng(0)          # mock 점군 결정론
+MAX_REDECOMPOSE = 2                     # 피드백 재분해 상한 (왕복이 없어 M2 안에서 끝낸다)
 
 
 def box_points(center_mm, size_mm, n=400):
@@ -82,6 +88,12 @@ def scene_c2_1():
 MOCK_SCENES = {"c1_1": scene_c1_1, "c2_1": scene_c2_1}
 
 
+def _serialized(m1: dict) -> dict:
+    """분해 LLM에 넘길 M1 뷰 — 점군만 뺀다 (접지값은 프롬프트 컨텍스트로 유용)."""
+    return {"nodes": [{k: v for k, v in n.items() if k != "_points"} for n in m1["nodes"]],
+            "edges": m1["edges"]}
+
+
 def main():
     name = sys.argv[1] if len(sys.argv) > 1 else "c1_1"
     m1_json = None
@@ -89,6 +101,9 @@ def main():
         m1_json = sys.argv[sys.argv.index("--m1-json") + 1]
     tdir = (os.path.abspath(sys.argv[sys.argv.index("--output-dir") + 1])
             if "--output-dir" in sys.argv else os.path.join("output", name))
+    robot_spec = (sys.argv[sys.argv.index("--robot-spec") + 1]
+                  if "--robot-spec" in sys.argv
+                  else os.path.join(_ROOT, "configs", "robot_spec.json"))
     os.makedirs(tdir, exist_ok=True)
     if not m1_json and os.path.exists(os.path.join(tdir, "m1.json")):
         m1_json = os.path.join(tdir, "m1.json")             # M1 모듈 출력 자동 사용
@@ -103,9 +118,8 @@ def main():
                  "  task_registry.py 의 TASKS 에 instruction 을 등록하십시오.")
     print(f"[M2] 지시문: {task}")
 
-    if m1_json:                          # 실제 M1 serialize() 출력으로
-        with open(m1_json, encoding="utf-8") as f:
-            m1s = json.load(f)
+    if m1_json:                          # 실제 M1 출력 (접지값 포함)
+        m1 = load_scene(m1_json)
         print(f"[M1] {m1_json} 사용")
     else:                                # mock M1 (씬 근사 수치)
         make_scene = MOCK_SCENES.get(name)
@@ -113,97 +127,64 @@ def main():
             sys.exit(f"[중단] '{name}' 은 mock 씬이 없습니다.\n"
                      f"  먼저 run_m1 으로 output/{name}/m1.json 을 만드십시오.")
         _, spec = make_scene()
-        m1s = serialize(build_m1(spec_to_objects(spec)))
+        m1 = serialize(build_m1(spec_to_objects(spec)))
         print("[M1] mock 수치 사용 (실제 M1 JSON 없음)")
 
-    # ── M3 응답 경로 결정: output/<task-id>/m3.json 자동 또는 --m3-json 경로 ──
-    m3_json = None
-    if "--m3-json" in sys.argv:
-        m3_json = sys.argv[sys.argv.index("--m3-json") + 1]
-    elif os.path.exists(os.path.join(tdir, "m3.json")):
-        m3_json = os.path.join(tdir, "m3.json")
-
-    # ── 0828 안전장치(사전): 직전 왕복이 이미 완료된 세트면 덮어쓰지 않는다 ──
-    # 분할된 m2.json과 그 자식 질의에 대한 m3.json이 짝으로 남아 있을 때 run_m2을
-    # 또 돌리면, 새 분해(부모 id)와 자식 응답이 매칭되지 않아 분할이 풀린 계획으로
-    # 덮어써진다. 왕복의 마지막은 항상 run_m3다.
-    prev_path = os.path.join(tdir, "m2.json")
-    if m3_json and os.path.exists(prev_path):
-        with open(prev_path, encoding="utf-8") as f:
-            prev = json.load(f)
-        with open(m3_json, encoding="utf-8") as f:
-            raw0 = json.load(f)
-        prev_q = {q["queried_by"] for q in prev.get("m2_queries", [])}
-        resp_q = {r.get("queried_by")
-                  for r in (raw0["responses"] if isinstance(raw0, dict) else raw0)
-                  if r.get("queried_by")}
-        if prev.get("m2_stats", {}).get("n_split_subgoals") and resp_q and resp_q <= prev_q:
-            sys.exit("[중단] 분할 완료된 m2.json과 m3.json이 이미 짝이 맞는 최종 세트입니다.\n"
-                     "  여기서 run_m2을 다시 돌리면 분할이 풀린 계획으로 덮어써집니다.\n"
-                     "  다음 단계로 진행하거나, 처음부터 다시 돌리려면 m2.json을 지운 뒤 실행하십시오.")
+    ee_pool, reach_mm = load_ee_pool(robot_spec)
+    for line in ensure_measurements(m1, ee_pool, reach_mm, out_dir=tdir):
+        print(line)
+    m1s = _serialized(m1)
 
     rough = LLMRough()                          # 서브골 생성은 항상 LLM
+    # 0908: 순서 요구 서브골(ordered)의 VLM 순서 판정용 장면 이미지 (M1이 저장한 frame.png)
+    _frame = os.path.join(tdir, "frame.png")
+    rough.frame_path = _frame if os.path.exists(_frame) else None
 
-    # ── 0831 측정 피드백: 직전 왕복(m2.json+m3.json)이 있으면 unsat 판정 요약을
-    #    재분해 프롬프트에 사실로 첨부한다 (호출 추가 없음). 해법은 넣지 않는다.
-    if m3_json and os.path.exists(prev_path):
-        import copy as _copy
-        from tuj.m2_subgoal.ingest import apply_m3 as _apply_prev, measurement_feedback
-        judged = _copy.deepcopy(prev)
-        _apply_prev(judged, raw0["responses"] if isinstance(raw0, dict) else raw0)
-        fb = measurement_feedback(judged)
-        if fb:
-            rough.feedback = fb
-            print("[M2] 직전 측정 피드백을 재분해에 반영:")
-            for ln in fb.splitlines():
-                print("    " + ln)
-        else:
-            # 0831: 기각 사유가 없으면 직전 분해를 유지한다 — 분해 LLM 생략.
-            # (재분해는 측정이 계획을 기각했을 때만. 불필요한 재분해는 결과가
-            #  되돌아갈 수 있고(kind 진동) 호출 낭비다.)
-            keep = _copy.deepcopy(prev)
-            print("[M2] 직전 측정에서 재분해 사유 없음 — 기존 분해 유지 (분해 LLM 생략)")
-
-    out = locals().get("keep")
-    if out is None:
+    # ── 분해 → 판정 → (기각되면) 재분해. 왕복이 없으므로 여기서 수렴시킨다 ──
+    out = run_m2(task, m1s, rough=rough)
+    for line in apply_grounding(out, m1):
+        print(line)
+    for attempt in range(1, MAX_REDECOMPOSE + 1):
+        fb = measurement_feedback(out)
+        if not fb:
+            break
+        # 0831: 해법은 넣지 않는다 — 측정 사실만 전달하고 대안 도출은 분해 LLM 몫.
+        # (그래야 도구 사용이 창발로 성립한다)
+        print(f"[M2] 판정에서 기각된 조건이 있어 재분해 ({attempt}/{MAX_REDECOMPOSE}):")
+        for ln in fb.splitlines():
+            print("    " + ln)
+        rough.feedback = fb
+        prev = copy.deepcopy(out)
         out = run_m2(task, m1s, rough=rough)
+        for line in apply_grounding(out, m1):
+            print(line)
+        if measurement_feedback(out) == fb:      # 같은 사유 반복 — 더 돌려도 같다
+            print("[M2] 재분해해도 같은 조건이 기각됨 — 직전 분해로 진행")
+            out = prev
+            break
+    else:
+        print(f"[M2] 재분해 상한({MAX_REDECOMPOSE}회) 도달 — 현재 분해로 진행")
 
-    if m3_json:
-        from tuj.m2_subgoal.ingest import apply_m3, update_confidence
-        with open(m3_json, encoding="utf-8") as f:
-            raw = json.load(f)
-        responses = raw["responses"] if isinstance(raw, dict) else raw
-        # ── 0828 안전장치(사후): 응답이 이번 분해의 질의와 하나도 안 맞으면 중단 ──
-        qids = {q["queried_by"] for q in out["m2_queries"]}
-        rids = {r.get("queried_by") for r in responses if r.get("queried_by")}
-        if rids and not (qids & rids):
-            if rough.feedback:
-                # 0903: 피드백 재분해로 구조가 바뀌면 직전 응답과 안 맞는 게 정상이다.
-                # 새 질의는 다음 접지 라운드(run.py 왕복)가 측정한다. 판정·신뢰도 갱신·
-                # 분할은 그때 응답으로 하고, 여기서는 재분해 결과만 저장한다.
-                print("[M2] 재분해로 질의가 바뀌어 직전 m3.json 응답과 매칭되지 않음 — "
-                      "판정/신뢰도 갱신/분할은 다음 접지 라운드 후에 수행")
-                responses = None
-                out["m2_stats"]["pending_grounding"] = True   # run.py 왕복 계속 신호
-            else:
-                sys.exit("[중단] m3.json 응답이 이번 분해의 질의와 하나도 매칭되지 않습니다.\n"
-                         "  run_m3 -> run_m2 -> run_m3 왕복 순서를 확인하십시오. (m2.json 미변경)")
-        if responses is not None:
-            out["m2_stats"].pop("pending_grounding", None)
-            for line in apply_m3(out, responses):
-                print(line)
-            # 측정 반영 후 자기보고 신뢰도 갱신 (LLM 3차 호출)
-            if rough._client is None:               # 분해 생략 경로에서도 클라이언트 보장
-                from tuj.m2_subgoal.rough import make_llm_client
-                rough._client = make_llm_client()
-            for line in update_confidence(out, rough._client, rough.model,
-                                          usage_acc=rough.usage):
-                print(line)
-            # 0828: batch 응답의 partition대로 서브골 분할 (확보/반환은 한 번만 생성)
-            from tuj.m2_subgoal.regroup import split_after_m3
-            for line in split_after_m3(out):
-                print(line)
-        out["m2_stats"]["llm_usage"] = rough.usage
+    # 측정 반영 후 자기보고 신뢰도 갱신 + 도구 확정 (LLM, 서브골당 1회)
+    if rough._client is None:
+        from tuj.m2_subgoal.rough import make_llm_client
+        rough._client = make_llm_client()
+    for line in update_confidence(out, rough._client, rough.model, usage_acc=rough.usage):
+        print(line)
+
+    # partition대로 서브골 분할 → 자식 기준으로 술어 재판정 (VLM 0회라 저렴)
+    split_logs = split_by_partition(out)
+    for line in split_logs:
+        print(line)
+    if split_logs:
+        for line in apply_grounding(out, m1):
+            print(line)
+
+    unresolved = [s["subgoal_id"] for s in out["m2_subgoals"]
+                  if s.get("tool_candidate_ids") and not s.get("selected_tool_id")]
+    if unresolved:
+        print(f"[M2] 경고: 도구 미확정 서브골 {unresolved} — assemble_gk에서 멈춥니다")
+    out["m2_stats"]["llm_usage"] = rough.usage
 
     with open(os.path.join(tdir, "m2.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)
@@ -218,7 +199,7 @@ def main():
             for k, e in usage.items())
         print(f"  [M2 tokens] {parts} | 합계 {total}tok, {tsec:.1f}s")
     print(f"[{name}] 서브골 {s['n_subgoals']} → 상세 {s['n_details']} | "
-          f"DAG 엣지 {s['n_edges']} | mutex {s['n_mutex']} | M3 질의 {s['n_m3_queries']}")
+          f"DAG 엣지 {s['n_edges']} | mutex {s['n_mutex']} | 술어 판정 {s.get('n_evaluations', 0)}")
     for e in out["m2_partial_order"]:
         print(f"  {e['from']} -> {e['to']}   ({e['why']})")
     print(f"-> {tdir}/m2.json")

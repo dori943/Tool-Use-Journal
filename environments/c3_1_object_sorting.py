@@ -157,7 +157,7 @@ OBJECT_CATEGORY = {
 
 
 
-class C2_1_ObjectSorting(ManipulationEnv):
+class C3_1_ObjectSorting(ManipulationEnv):
     """사과·빵→초록, 머그→파랑, 접시·숟가락→빨강."""
 
     def __init__(

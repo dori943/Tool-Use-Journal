@@ -40,7 +40,9 @@ def coarse_relations(nodes) -> list:
             if _inside(a, b):
                 edges.append({"from": a["id"], "to": b["id"], "type": "inside"})
                 related.add(frozenset((a["id"], b["id"])))
-            elif _xy_overlap(a, b) > 0.4 and _on(a, b):
+            # 0908: b가 a 안에 들어 있으면(접시 안 토마토) a가 b 위라고 판정하지 않는다.
+            # 용기 bbox 중심이 얇은 내용물 중심보다 높아 on(접시, 토마토)로 뒤집혔음 (c2_2).
+            elif _xy_overlap(a, b) > 0.4 and _on(a, b) and not _inside(b, a):
                 edges.append({"from": a["id"], "to": b["id"], "type": "on"})
                 related.add(frozenset((a["id"], b["id"])))
     for a in nodes:

@@ -194,7 +194,7 @@ def filter_candidates(
     banned_candidate_ids: frozenset[str] = frozenset(),
     suitability_scorer: "SuitabilityScorer | None" = None,
 ) -> tuple[list[Candidate], list[Rejection]]:
-    """Threshold -> static feasibility -> top-k (with EE coverage guard)."""
+    """Proposal quality -> physical/static feasibility -> ranked top-k."""
     rejections: list[Rejection] = []
 
     scored: list[Candidate] = []
@@ -210,6 +210,36 @@ def filter_candidates(
                 )
             )
             continue
+        provided_score = cand.suitability_score
+        requires_provided_score = cand.source not in (
+            "deterministic_rule",
+            "manual",
+        )
+        if requires_provided_score:
+            if provided_score is None:
+                rejections.append(
+                    make_rejection(
+                        "candidate",
+                        ReasonCode.MISSING_SCORE,
+                        f"source={cand.source!r} candidates must carry a "
+                        "suitability_score",
+                        subgoal_id=subgoal.subgoal_id,
+                        candidate_id=cand.candidate_id,
+                    )
+                )
+                continue
+            if provided_score < policy.candidate_score_threshold:
+                rejections.append(
+                    make_rejection(
+                        "candidate",
+                        ReasonCode.SCORE_BELOW_THRESHOLD,
+                        f"provided score {provided_score} < threshold "
+                        f"{policy.candidate_score_threshold}",
+                        subgoal_id=subgoal.subgoal_id,
+                        candidate_id=cand.candidate_id,
+                    )
+                )
+                continue
         if suitability_scorer is not None:
             assessment = suitability_scorer.score(cand, subgoal)
             physical_rejection = assessment.rejection(cand, subgoal)
@@ -238,40 +268,15 @@ def filter_candidates(
                     continue
                 if policy.unknown_suitability_policy == "defer":
                     metadata["suitability_deferred"] = True
-            if assessment.overall_score is not None:
-                if cand.suitability_score is not None:
-                    metadata["provided_suitability_score"] = cand.suitability_score
-                    suitability_details["provided_suitability_score"] = (
-                        cand.suitability_score
-                    )
-                cand = replace(cand, suitability_score=assessment.overall_score)
+            if provided_score is not None:
+                metadata["provided_suitability_score"] = provided_score
+                suitability_details["provided_suitability_score"] = provided_score
+            # From this point on, suitability_score has one meaning: the
+            # physical margin used for ranking. Proposal quality has already
+            # served its purpose above and remains available in metadata.
+            cand = replace(cand, suitability_score=assessment.overall_score)
             metadata["suitability"] = suitability_details
             cand = replace(cand, metadata=metadata)
-        if cand.suitability_score is None:
-            if cand.source not in ("deterministic_rule", "manual"):
-                rejections.append(
-                    make_rejection(
-                        "candidate",
-                        ReasonCode.MISSING_SCORE,
-                        f"source={cand.source!r} candidates must carry a "
-                        "suitability_score",
-                        subgoal_id=subgoal.subgoal_id,
-                        candidate_id=cand.candidate_id,
-                    )
-                )
-                continue
-        elif cand.suitability_score < policy.candidate_score_threshold:
-            rejections.append(
-                make_rejection(
-                    "candidate",
-                    ReasonCode.SCORE_BELOW_THRESHOLD,
-                    f"score {cand.suitability_score} < threshold "
-                    f"{policy.candidate_score_threshold}",
-                    subgoal_id=subgoal.subgoal_id,
-                    candidate_id=cand.candidate_id,
-                )
-            )
-            continue
         scored.append(cand)
 
     feasible: list[Candidate] = []

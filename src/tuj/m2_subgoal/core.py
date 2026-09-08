@@ -43,7 +43,10 @@ TEMPLATES = {
     "tool_act:flatten": (["holding(?t)", "flat_face(?t)",
                           "act_space_clear(?t, ?targets, ?work)", "path_clear(?t, ?work)"],
                          ["flattened(?targets)"], []),
-    "place_on": (["holding(?o)", "above(?o, ?base)", "top_exposed(?base)", "fits(?o, ?base)"],
+    # 0908: place_on에서 fits(?o, ?base) 제거. fits는 M3 fits_inside(용기 안에 들어가는가)로
+    # 접지되는데, 쌓기는 받침 위에 얹는 것이라 치즈가 빵보다 조금 커도 문제없다. c2_2에서
+    # fits(치즈, 빵) unsat 4건이 재분해를 촉발해 stack이 relocate/extract로 튀었음.
+    "place_on": (["holding(?o)", "above(?o, ?base)", "top_exposed(?base)"],
                  ["on(?o, ?base)", "hand_empty"], ["holding(?o)", "above(?o, ?base)"]),
     "tool_act:scoop": (["holding(?t)", "batch_feasible(?t, ?targets)",
                         "act_space_clear(?t, ?targets, ?r)", "path_clear(?t, ?r)"],
@@ -259,8 +262,9 @@ def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
             # 같은 그룹의 생산자만 하드 순서로 못 박는다.
             # 예외(0903): 컨테이너 담기 ≺ 덮기 사전조건(auto=container_seal)은 서브골(그룹)을
             # 가로지르는 물리 제약이라 그룹이 달라도 하드 엣지로 둔다.
+            # 예외(0908): 지시문 순서(auto=instruction_order, VLM이 정한 relocate 처리 순서)도 동일.
             for a in producers:
-                if a["group_id"] == b["group_id"] or p.get("auto") == "container_seal":
+                if a["group_id"] == b["group_id"] or p.get("auto") in ("container_seal", "instruction_order"):
                     edges.append({"from": a["detail_id"], "to": b["detail_id"],
                                   "why": f"causal_link: {p['expr']}"})
             # 그룹 밖 생산자만 있으면(예: hand_empty) 배타 자원 — mutex
@@ -317,11 +321,51 @@ def _set_members(v) -> list[str]:
     return [v]
 
 
-def build_queries(subgoal: dict, details: list[dict]) -> list[dict]:
-    """eval_by == m3 인 술어 인스턴스 → Materializer 호출 사양.
+def gap_width_mm(m1: dict | None, target_id: str, exclude: set[str] | None = None) -> float | None:
+    """대상을 양쪽에서 끼고 있는 두 물체 사이의 틈 폭(mm). 없으면 None.
 
-    m3_call.kind ∈ intrinsic | relational | ee  (m3_grounding.Materializer의 질의 3종)
-    queried_by에 술어 id를 실어 보낸다 — M6 역추적 계약.
+    0908: M3 query_gap_accessible은 gap_width_mm 미지정 시 대상의 최소변(카드 두께)을
+    틈 폭으로 쓰기 때문에 어떤 도구도 통과 판정을 못 받았다 (c4_1: 후보 5개 전부 false →
+    재분해로 맨손 relocate). 새 구조에선 환경 기하가 M3 몫이지만, 지금은 M1 bbox로
+    M2가 계산해 질의에 실어 보낸다. x, y 각 축에서 대상 중심을 사이에 두고 마주보는
+    두 물체(다른 축에서 대상 중심을 덮는 것만)의 마주보는 면 사이 거리 중 최소값.
+    """
+    if not m1:
+        return None
+    nodes = {n["id"]: n for n in m1.get("nodes", [])}
+    t = nodes.get(target_id)
+    if not t:
+        return None
+    exclude = set(exclude or ()) | {target_id}
+    tc, best = t["center_mm"], None
+    for ax, other in ((0, 1), (1, 0)):
+        lo, hi = [], []
+        for n in nodes.values():
+            if n["id"] in exclude:
+                continue
+            c, s = n["center_mm"], n["bbox_mm"]
+            if abs(c[other] - tc[other]) > s[other] / 2:      # 다른 축에서 대상을 덮지 않으면 제외
+                continue
+            if c[ax] + s[ax] / 2 <= tc[ax]:
+                lo.append(c[ax] + s[ax] / 2)
+            elif c[ax] - s[ax] / 2 >= tc[ax]:
+                hi.append(c[ax] - s[ax] / 2)
+        if lo and hi:
+            w = min(hi) - max(lo)
+            if w > 0 and (best is None or w < best):
+                best = w
+    return round(best, 1) if best is not None else None
+
+
+def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None) -> list[dict]:
+    """eval_by == m3 인 술어 인스턴스 → 판정 사양 (술어 1건이 어느 노드/쌍을 보는지).
+
+    0908 파이프라인 재구조 전에는 이것이 M3로 나가는 질의 목록(m2_queries)이었다.
+    이제 왕복이 없어 M2가 직접 판정하지만, "fits(?o,?r)의 ?o가 어느 노드인가" 같은
+    바인딩 해소는 여전히 필요하므로 같은 사양을 내부용으로 만든다 (ingest.apply_grounding).
+    call.kind ∈ intrinsic | relational | ee | top_exposed | clear | gap_accessible | batch | swept_space
+    queried_by에 술어 id를 실어 둔다 — M6 역추적 계약.
+    m1은 gap_accessible의 틈 폭 계산용.
     """
     q = []
     tool_ids = subgoal.get("tool_candidate_ids", [])
@@ -340,21 +384,41 @@ def build_queries(subgoal: dict, details: list[dict]) -> list[dict]:
                 kind = "top_exposed" if head == "top_exposed" else "intrinsic"
                 for t in targets:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                              "m3_call": {"kind": kind, "node_id": t}})
+                              "call": {"kind": kind, "node_id": t}})
             elif head == "ee_usable":
                 oid = b.get("?o")
                 targets = tool_ids if oid == "?tool" else _set_members(oid)
                 for t in targets:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                              "m3_call": {"kind": "ee", "node_id": t}})
+                              "call": {"kind": "ee", "node_id": t}})
             elif head == "fits":
                 oid, rid = b.get("?o"), b.get("?r")
                 if oid in (None, "?tool") or rid in (None, "tool_rest"):
                     continue                       # 도구 거치 위치는 측정 대상 아님
                 for t in _set_members(oid):          # 집합이면 원소별 관계 질의
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                              "m3_call": {"kind": "relational", "a": t, "b": rid,
+                              "call": {"kind": "relational", "a": t, "b": rid,
                                           "relation": "fits_inside"}})
+            elif head == "flat_face":
+                # 0908: 종전에는 M2가 발행하지 않아 run_m3 컴파일 보충이 대신 질의했다.
+                # 왕복이 없어진 뒤로는 보충해 줄 곳이 없으므로 M2가 직접 낸다.
+                for t in (tool_ids if b.get("?t") in ("?tool", None) else
+                          _set_members(b.get("?t"))):
+                    q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
+                              "call": {"kind": "flat_face", "node_id": t}})
+            elif head == "gap_accessible":
+                # 0908: (?tool, ?o) 쌍마다 발행 + 틈 폭 동봉. 이전엔 M2가 발행하지 않아
+                # run_m3 컴파일 보충이 틈 폭 없이 질의했고, 응답은 apply_m3 게이팅에 걸렸음.
+                targets = _set_members(b.get("?o"))
+                excl = set(tool_ids) | set(targets) | {subgoal.get("container_id")}
+                for o in targets:
+                    w = gap_width_mm(m1, o, excl)
+                    for t in tool_ids:
+                        call = {"kind": "gap_accessible", "tool_id": t, "target_id": o}
+                        if w is not None:
+                            call["gap_width_mm"] = w
+                        q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
+                                  "call": call})
             elif head == "clear":
                 # clear(?r) = 목적지 영역이 비어 있는가 (점유 객체 유무, M3 query_clear).
                 # 0905: 이전엔 clearance(컨테이너 깊이 - 물체 높이)로 잘못 매핑돼
@@ -362,8 +426,11 @@ def build_queries(subgoal: dict, details: list[dict]) -> list[dict]:
                 rid = b.get("?r")
                 if rid in (None, "tool_rest"):
                     continue
+                # 0908: 담는 목적지면 원소별 수용 여부(depth_clearance)로도 판정한다.
+                # members가 비어 있으면 종전대로 영역 점유(clear)만 본다.
+                members = [m for m in _set_members(b.get("?o")) if m != "?tool"]
                 q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                          "m3_call": {"kind": "clear", "node_id": rid}})
+                          "call": {"kind": "clear", "node_id": rid, "members": members}})
             elif head in ("batch_feasible", "act_space_clear"):
                 # 0828 신규 질의. 물체 1개짜리는 묶기 판정이 필요 없어 질의를 내지 않는다
                 # (not_queried — tool_rest와 같은 취급). 액션 주체(actor):
@@ -387,11 +454,11 @@ def build_queries(subgoal: dict, details: list[dict]) -> list[dict]:
                     call["to"] = rid
                 for a in actors:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
-                              "m3_call": {**call, "actor": a}})
+                              "call": {**call, "actor": a}})
     # 동일 호출 중복 제거 (같은 노드 intrinsic 2회 등 — M3 캐시가 있지만 명세도 깨끗하게)
     seen, uniq = set(), []
     for x in q:
-        k = (x["queried_by"], json.dumps(x["m3_call"], sort_keys=True, ensure_ascii=False))
+        k = (x["queried_by"], json.dumps(x["call"], sort_keys=True, ensure_ascii=False))
         if k not in seen:
             seen.add(k)
             uniq.append(x)
