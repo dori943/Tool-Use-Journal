@@ -38,6 +38,10 @@ def ground_scene(m1: dict, *, backend=None, memory=None, ee_pool: list[dict] = (
 
     for node in m1["nodes"]:
         nid = node["id"]
+        observation_geometry = {
+            "center": list(node["center_mm"]),
+            "aabb_size": list(node["bbox_mm"]),
+        }
         intr = memory.lookup(nid) if memory is not None else None
         if intr is not None:
             stats["memory_hits"] += 1
@@ -59,6 +63,14 @@ def ground_scene(m1: dict, *, backend=None, memory=None, ee_pool: list[dict] = (
         cache[nid] = intr
 
         node.update(intr)                          # geometry, material, mass_kg, mu, ...
+        # ``intr["geometry"]`` stores shape / surface properties that may be
+        # reused from memory.  ``node["geometry"]`` also carries the current
+        # observation bbox consumed by M5.  Keep both, and let this episode's
+        # observation win if a cached record ever contains the same keys.
+        node["geometry"] = {
+            **intr.get("geometry", {}),
+            **observation_geometry,
+        }
         node["grounding_source"] = how
         node["ee"] = {e["ee_id"]: evaluate_ee(e, intr) for e in ee_pool}
         if reach_mm is not None:
