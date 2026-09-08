@@ -19,6 +19,7 @@ from tuj.m5_motion.precomputed_ee_attach import (
     PrecomputedEEPathError,
     compute_rack_signature,
     compute_workcell_signature,
+    portable_ee_path_metadata,
 )
 from tuj.m5_motion.precomputed_ee_exchange import (
     PrecomputedEEExchangePlanner,
@@ -188,6 +189,7 @@ def _attach_template(
         target_active_ee=target,
         joint_names=JOINT_NAMES,
         start_joint_positions_rad=[0.0] * 6,
+        start_eef_pose=world.robot_state.eef_pose.model_copy(deep=True),
         workcell_signature=compute_workcell_signature(world, selected),
         rack_signature=compute_rack_signature(world),
         collision_model_versions={
@@ -264,8 +266,14 @@ def _request(source: str = "2F", target: str = "3F") -> MotionPlanRequest:
     )
 
 
-def _write_attach(root: Path, template: EEAttachTrajectoryTemplate) -> None:
-    destination = root / template.environment_name / f"bare_to_{template.target_active_ee}.json"
+def _write_attach(
+    root: Path,
+    template: EEAttachTrajectoryTemplate,
+    *,
+    shared: bool = False,
+) -> None:
+    directory = "ee_rack" if shared else template.environment_name
+    destination = root / directory / f"bare_to_{template.target_active_ee}.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(template.model_dump_json(indent=2), encoding="utf-8")
 
@@ -292,22 +300,26 @@ class _CollisionChecker:
         )
 
 
-def _setup(tmp_path: Path):
+def _setup(tmp_path: Path, *, portable: bool = False):
     request = _request()
     contexts = _contexts("2F", "3F")
     bare_world = _world(active_ee=None, position=0.0)
     attach_source = _attach_template("2F", bare_world, contexts)
     attach_target = _attach_template("3F", bare_world, contexts)
+    if portable:
+        attach_source.metadata.update(portable_ee_path_metadata(bare_world))
+        attach_target.metadata.update(portable_ee_path_metadata(bare_world))
     returned = derive_return_template_from_attach(
         attach_source,
         request.world,
         contexts,
         trajectory_id="ur5e-2F-to-bare-test-v1",
     )
-    destination = tmp_path / "C1_1_LegoSweep" / "2F_to_bare.json"
+    directory = "ee_rack" if portable else "C1_1_LegoSweep"
+    destination = tmp_path / directory / "2F_to_bare.json"
     destination.parent.mkdir(parents=True, exist_ok=True)
     destination.write_text(returned.model_dump_json(indent=2), encoding="utf-8")
-    _write_attach(tmp_path, attach_target)
+    _write_attach(tmp_path, attach_target, shared=portable)
     attach_planner = PrecomputedEEAttachPlanner(
         PrecomputedEEAttachRegistry(tmp_path),
         joint_position_limits_rad=[(-6.3, 6.3)] * 6,
@@ -319,6 +331,26 @@ def _setup(tmp_path: Path):
         log=lambda _: None,
     )
     return request, contexts, returned, exchange
+
+
+def _translate_request(
+    request: MotionPlanRequest, delta: tuple[float, float, float]
+) -> MotionPlanRequest:
+    translated = request.model_copy(deep=True)
+    translated.world.metadata["environment_name"] = "C4_2_DiagonalFitPacking"
+    for rack in translated.world.rack.values():
+        rack["dock_pose"]["position_m"] = [
+            value + offset
+            for value, offset in zip(rack["dock_pose"]["position_m"], delta)
+        ]
+    assert translated.world.robot_state.eef_pose is not None
+    translated.world.robot_state.eef_pose.position_m = tuple(
+        value + offset
+        for value, offset in zip(
+            translated.world.robot_state.eef_pose.position_m, delta
+        )
+    )
+    return translated
 
 
 def _entry_request(request: MotionPlanRequest, *, position: float) -> MotionPlanRequest:
@@ -380,6 +412,77 @@ def test_exchange_entry_moves_to_stored_return_start_without_generic_pipeline(
     assert plan.metadata["planner"] == "DIRECT_JOINT"
     assert plan.metadata["target_active_ee"] == "2F"
     assert plan.metadata["dynamic_planner_invoked"] is True
+    assert plan.expected_final_state.joint_positions_rad == pytest.approx(
+        returned.start_joint_positions_rad
+    )
+    assert plan.segments[0].collision_context_before.active_ee == "2F"
+    assert plan.events == []
+
+
+def test_portable_return_and_attach_are_reused_across_environments(
+    tmp_path: Path,
+) -> None:
+    request, source_contexts, returned, exchange = _setup(
+        tmp_path, portable=True
+    )
+    delta = (2.5, -3.2, 0.12)
+    request = _translate_request(request, delta)
+    contexts = {
+        key: value.model_copy(
+            update={
+                "collision_model_version": (
+                    f"current-attached-{value.active_ee}-v2"
+                    if value.active_ee is not None
+                    else "current-bare-v2"
+                )
+            }
+        )
+        for key, value in source_contexts.items()
+    }
+
+    plan = exchange.plan(
+        request,
+        collision_contexts=contexts,
+        collision_checker=_CollisionChecker(),
+    )
+
+    assert plan.metadata["dynamic_planner_invoked"] is False
+    assert plan.events[0].event_type is EventType.TOOL_UNLOCK
+    assert plan.events[-1].event_type is EventType.VERIFY_TOOL_LOCK
+    assert plan.segments[0].waypoints[0].eef_pose is not None
+    assert plan.segments[0].waypoints[0].eef_pose.position_m == pytest.approx(
+        tuple(
+            value + offset
+            for value, offset in zip(returned.start_eef_pose.position_m, delta)
+        )
+    )
+
+
+def test_portable_exchange_entry_rebases_expected_eef_pose(
+    tmp_path: Path,
+) -> None:
+    request, contexts, returned, exchange = _setup(tmp_path, portable=True)
+    delta = (2.5, -3.2, 0.12)
+    entry = _translate_request(_entry_request(request, position=0.05), delta)
+    planner = EEExchangeEntryPlanner(
+        exchange.return_registry,
+        joint_position_limits_rad=[(-6.3, 6.3)] * 6,
+        log=lambda _: None,
+    )
+
+    plan = planner.plan(
+        entry,
+        collision_contexts=contexts,
+        collision_checker=_CollisionChecker(),
+    )
+
+    assert plan.expected_final_state.eef_pose is not None
+    assert plan.expected_final_state.eef_pose.position_m == pytest.approx(
+        tuple(
+            value + offset
+            for value, offset in zip(returned.start_eef_pose.position_m, delta)
+        )
+    )
     assert plan.expected_final_state.joint_positions_rad == pytest.approx(
         returned.start_joint_positions_rad
     )

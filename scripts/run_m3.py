@@ -30,6 +30,9 @@ ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
+if __name__ == "__main__":
+    sys.exit("M3 has been merged into M1. Run scripts/run_m1.py or scripts/run.py instead.")
+
 from tuj.m3_grounding import Materializer, MockBackend, PropertyMemory, SiPhyBackend, new_gk
 
 
@@ -154,8 +157,15 @@ def main():
     backend_name = args[args.index("--backend") + 1] if "--backend" in args else "siphy"
     model = args[args.index("--model") + 1] if "--model" in args else "gpt-4o-mini"
     memory_path = args[args.index("--memory") + 1] if "--memory" in args else str(ROOT / "output" / "memory.json")
+    bbox_threshold = float(args[args.index("--m0-bbox-threshold") + 1]) \
+        if "--m0-bbox-threshold" in args else 0.25
+    density_threshold = float(args[args.index("--m0-density-threshold") + 1]) \
+        if "--m0-density-threshold" in args else 0.20
+    debug_label = (args[args.index("--retrieval-debug-label") + 1]
+                   if "--retrieval-debug-label" in args else "M3")
 
-    OUT = ROOT / "output" / name
+    OUT = (Path(args[args.index("--output-dir") + 1]).resolve()
+           if "--output-dir" in args else ROOT / "output" / name)
     if not (OUT / "m1.json").exists():
         sys.exit(f"[err] {OUT}/m1.json 없음 — 먼저 python scripts/run_m1.py {name}")
 
@@ -176,8 +186,18 @@ def main():
             e["seal_rms_tol_mm"] = e["flatness_tol_rms_mm"]
         ee_pool.append(e)
 
-    memory = None if memory_path == "none" else PropertyMemory(memory_path)
-    mat = Materializer(m1, backend=backend, memory=memory,
+    memory = None if memory_path == "none" else PropertyMemory(
+        memory_path, task_id=name, bbox_relative_threshold=bbox_threshold,
+        density_relative_threshold=density_threshold)
+    if backend_name == "siphy":
+        density_backend = DensityOnlyBackend(model=backend.model, client=backend.client,
+                                             repo_root=ROOT)
+        density_infer = density_backend.infer
+    else:
+        density_infer = lambda _crop: DensityOnlyResult(
+            None, False, error="density-only inference unavailable with mock backend")
+    mat = Materializer(m1, backend=backend, memory=None, task_id=name,
+                       object_knowledge=memory, density_infer=density_infer,
                        logger=lambda **kw: print("  [m3]", kw))
     preloaded = len(mat._cache)
     if preloaded:
@@ -251,7 +271,8 @@ def main():
                 r = mat.query_flat_face(gk, q["node_id"], queried_by=qid)
             elif kind == "gap_accessible":
                 r = mat.query_gap_accessible(gk, q["tool_id"], q["target_id"],
-                                             queried_by=qid)
+                                             queried_by=qid,
+                                             gap_width_mm=q.get("gap_width_mm"))  # 0908: M2가 실어 보낸 틈 폭
             elif kind in ("batch", "swept_space"):
                 call = {"kind": kind, "action_type": q.get("action_type"),
                         "actor": q.get("actor"), "member_ids": q.get("member_ids", []),
@@ -341,11 +362,26 @@ def main():
     for gk in gks:
         (OUT / f"gk_{gk['subgoal_id']}.json").write_text(
             json.dumps(strip(gk), ensure_ascii=False, indent=2), encoding="utf-8")
+    # 이전 실행(다른 분할 구성)의 stale gk 정리 — 이번 실행이 만든 것만 남긴다.
+    # (gk_bundle.json은 M4 산출물이라 제외)
+    keep = {f"gk_{gk['subgoal_id']}.json" for gk in gks}
+    stale = [q for q in OUT.glob("gk_*.json")
+             if q.name not in keep and q.name != "gk_bundle.json"]
+    for q in stale:
+        q.unlink()
+    if stale:
+        print(f"[M3] stale gk 정리 {len(stale)}건: {sorted(q.name for q in stale)}")
     (OUT / "m3.json").write_text(
         json.dumps({"responses": strip(responses)}, ensure_ascii=False, indent=2),
         encoding="utf-8")
     (OUT / "m3_intrinsic.json").write_text(
         json.dumps(strip(dict(mat._cache)), ensure_ascii=False, indent=2), encoding="utf-8")
+    retrieval_debug = strip({"round": debug_label, "objects": mat.retrieval_debug})
+    debug_text = json.dumps(retrieval_debug, ensure_ascii=False, indent=2)
+    (OUT / "m0_retrieval.json").write_text(debug_text, encoding="utf-8")
+    debug_slug = "".join(ch.lower() if ch.isalnum() else "_" for ch in debug_label).strip("_")
+    (OUT / f"m0_retrieval.{debug_slug or 'm3'}.json").write_text(
+        debug_text, encoding="utf-8")
 
     n_t2 = len(mat._cache)
     if memory is not None:

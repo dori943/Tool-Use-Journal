@@ -40,7 +40,9 @@ def coarse_relations(nodes) -> list:
             if _inside(a, b):
                 edges.append({"from": a["id"], "to": b["id"], "type": "inside"})
                 related.add(frozenset((a["id"], b["id"])))
-            elif _xy_overlap(a, b) > 0.4 and _on(a, b):
+            # 0908: b가 a 안에 들어 있으면(접시 안 토마토) a가 b 위라고 판정하지 않는다.
+            # 용기 bbox 중심이 얇은 내용물 중심보다 높아 on(접시, 토마토)로 뒤집혔음 (c2_2).
+            elif _xy_overlap(a, b) > 0.4 and _on(a, b) and not _inside(b, a):
                 edges.append({"from": a["id"], "to": b["id"], "type": "on"})
                 related.add(frozenset((a["id"], b["id"])))
     for a in nodes:
@@ -81,8 +83,15 @@ def _xy_overlap(a, b):
     return ov
 
 def _on(a, b):
-    """a가 b 위에: a 바닥 ≈ b 상단, 그리고 a 중심이 b 중심보다 위 (얇은 객체 양방향 오발화 방지)."""
-    return (abs(_iv(a, 2)[0] - _iv(b, 2)[1]) < ON_TOL_MM
+    """a가 b 위에 놓임: a 바닥 ≈ b 상단, 그리고 a 중심이 b 중심보다 위 (얇은 객체 양방향 오발화 방지).
+
+    위에서 내려다본 점군은 a의 아랫면·하단 측면이 가려져 관측 바닥이 실제 바닥보다
+    위로 뜬다 — 볼록한 덩어리일수록 심하고, 최대 a 자체 높이만큼이다. (c1_2 반죽:
+    관측 간격 26.8mm > 허용 25mm 로 탈락 → 도마 위 반죽이 near 로만 나와 M2가
+    불필요한 재배치 서브골을 만들었음.) 그래서 아래쪽은 센서 노이즈(ON_TOL_MM)만,
+    위쪽은 노이즈 + a 높이까지 허용한다. xy 겹침 조건은 호출부에서 별도로 건다."""
+    gap = _iv(a, 2)[0] - _iv(b, 2)[1]              # a 바닥 − b 상단 (양수 = 떠 보임)
+    return (-ON_TOL_MM <= gap <= ON_TOL_MM + a["bbox_mm"][2]
             and a["center_mm"][2] > b["center_mm"][2])
 
 def _inside(a, b):

@@ -51,7 +51,7 @@ SCRIPTS = ROOT / "scripts"
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
-STAGES = ("m1", "m2", "m3", "m4", "m5")
+STAGES = ("m1", "m2", "m4", "m5")
 
 # 태스크 id <-> 환경 이름은 단일 출처(task_registry)에서 가져온다.
 # (M5 가 환경을 다시 만들 때 등 robosuite import 없이 이름만 필요할 때 쓴다.)
@@ -154,17 +154,18 @@ def stage_m1(task, out, args):
     module = load_script("run_m1")
     if task not in TASK_ENV:
         sys.exit(f"[err] 등록되지 않은 태스크 {task!r}. 등록됨: {list(TASK_ENV)}")
-    argv = [task] + (["--view"] if args.view else [])
+    argv = [task, "--backend", args.backend, "--model", args.model,
+            "--memory", args.memory] + (["--view"] if args.view else [])
     call_main(module, argv, "run_m1")
 
 
-def stage_m2(task, out, args, pass_no):
+def stage_m2(task, out, args):
     """scripts/run_m2.py — 서브골 분해(LLM).
 
     1차: m3.json 이 없어야 순수 분해가 된다. 2차: m3.json 을 읽어 측정 반영 + 분할.
     """
     m3 = out / "m3.json"
-    if pass_no == 1 and m3.exists():
+    if False and m3.exists():
         # 이전 실행의 응답이 남아 있으면 run_m2 가 그것을 이번 분해에 섞거나
         # 안전장치에 걸려 멈춘다. 1차는 항상 깨끗한 분해여야 한다.
         backup = out / "m3.prev.json"
@@ -172,7 +173,7 @@ def stage_m2(task, out, args, pass_no):
         print(f"[M2] 이전 m3.json 을 {backup.name} 으로 옮기고 새로 분해합니다.")
 
     module = load_script("run_m2")
-    argv = [task]
+    argv = [task, "--output-dir", str(out)]
     if args.m1_json:
         argv += ["--m1-json", str(out / "m1.json")]
     call_main(module, argv, "run_m2")
@@ -183,6 +184,7 @@ def _gk_files(out):
 
 
 def stage_m3(task, out, args, label="M3"):
+    return stage_gk(task, out)
     """scripts/run_m3.py — 물리/기하 접지, m3.json + gk_<SG>.json 생성.
 
     반환: 이번 호출에서 새로 쓰인 gk 파일 목록 (이전 실행의 잔여 파일 배제용).
@@ -190,7 +192,11 @@ def stage_m3(task, out, args, label="M3"):
     before = {p: p.stat().st_mtime for p in _gk_files(out)}
     module = load_script("run_m3")
     argv = [task, "--backend", args.backend, "--model", args.model,
-            "--memory", args.memory]
+        "--memory", args.memory,
+        "--output-dir", str(out),
+        "--m0-bbox-threshold", str(args.m0_bbox_threshold),
+        "--m0-density-threshold", str(args.m0_density_threshold),
+        "--retrieval-debug-label", label]
     call_main(module, argv, "run_m3")
     fresh = [p for p in _gk_files(out)
              if p not in before or p.stat().st_mtime > before[p]]
@@ -198,6 +204,13 @@ def stage_m3(task, out, args, label="M3"):
     if stale:
         print(f"[{label}] 이번 실행에서 갱신되지 않은 gk 파일: {stale}")
     return fresh
+
+
+def stage_gk(task, out):
+    """Assemble per-subgoal graphs from M1's integrated grounding and M2 output."""
+    module = load_script("assemble_gk")
+    call_main(module, [task], "assemble_gk")
+    return _gk_files(out)
 
 
 def _m2_plan_complete(out):
@@ -382,7 +395,8 @@ def stage_m5(task, out, args):
         argv = ["--task-planner", str(m4),
                 "--environment", env_name,
                 "--output-dir", str(m5_dir),
-                "--seed", str(args.seed)]
+                "--seed", str(args.seed),
+                "--provider", os.environ["TUJ_LLM_PROVIDER"]]
         if args.m5_validate_only:
             argv.append("--validate-input-only")
         elif args.m5_simulate:
@@ -413,6 +427,8 @@ def build_parser():
                    help="M1 JSON 경로 직접 지정 (지정 시 씬 재로드 없음)")
     p.add_argument("--seed", type=int, default=0,
                    help="씬 배치 난수 시드 — M1 과 M5 환경 생성에 동일 적용")
+    p.add_argument("--output-dir", type=Path,
+                   help="별도 M1~M5 실행 폴더 (기본 output/<task>)")
     p.add_argument("--backend", default="siphy", choices=("siphy", "mock"),
                    help="M3 물성 백엔드")
     p.add_argument("--model", default=None,
@@ -421,6 +437,10 @@ def build_parser():
                    help="LLM 제공자 (미지정 시 --model 접두어로 추론, 그래도 없으면 gemini)")
     p.add_argument("--memory", default=str(ROOT / "output" / "memory.json"),
                    help="M3 물성 메모리 경로 ('none' 이면 사용 안 함)")
+    p.add_argument("--m0-bbox-threshold", type=float, default=0.25,
+                   help="provisional bbox 최대 축 상대차 threshold")
+    p.add_argument("--m0-density-threshold", type=float, default=0.20,
+                   help="provisional density 상대차 threshold")
     p.add_argument("--robot-spec", default=str(ROOT / "configs" / "robot_spec.json"),
                    help="M4 로봇/EE 스펙")
     p.add_argument("--initial-state", default=None,
@@ -473,11 +493,43 @@ def _resolve_llm(args):
     print(f"[run] LLM provider={provider} model={args.model}")
 
 
+def _run_integrated(task, out, args, start, stop):
+    """M1 owns geometry and physical grounding; no M3 round-trip remains."""
+    gk_paths = None
+    if start <= 0:
+        banner("M1  Scene + Physical Grounding")
+        stage_m1(task, out, args)
+    if stop < 1:
+        return
+    if start <= 1:
+        banner("M2  Subgoal Decomposition")
+        stage_m2(task, out, args)
+    if stop < 2:
+        return
+    if start <= 2:
+        banner("G_k  Subgoal Graph Assembly")
+        gk_paths = stage_gk(task, out)
+    if stop < 2:
+        return
+    if args.skip_m4 or start > 2:
+        print("\n[M4] " + ("skipped" if args.skip_m4 else "using existing m4.json"))
+    else:
+        banner("M4  Task Planner")
+        stage_m4(task, out, args, gk_paths)
+    if stop < 3:
+        return
+    if args.skip_m5:
+        print("\n[M5] skipped")
+        return
+    banner("M5  Motion Planner")
+    stage_m5(task, out, args)
+
+
 def main():
     args = build_parser().parse_args()
     _resolve_llm(args)
     task = args.task
-    out = ROOT / "output" / task
+    out = args.output_dir.resolve() if args.output_dir else ROOT / "output" / task
     out.mkdir(parents=True, exist_ok=True)
     start = STAGES.index(args.start_from) if args.start_from else 0
     stop = STAGES.index(args.stop_after) if args.stop_after else len(STAGES) - 1
@@ -486,6 +538,7 @@ def main():
     gk_paths = None
 
     print(f"[run] task={task} seed={args.seed} out={out}")
+    return _run_integrated(task, out, args, start, stop)
     print(f"[run] 단계: {' -> '.join(STAGES[start:stop + 1])}"
           + ("" if not args.no_roundtrip else "  (M2<->M3 왕복 생략)")
           + ("" if start == 0 else f"  (m1~{STAGES[start - 1]} 는 기존 산출물 재사용)"))

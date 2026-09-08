@@ -57,6 +57,17 @@ TOOL_USE_JOURNAL_EE_GRIPPER_TYPES: dict[str, str] = {
 TOOL_USE_JOURNAL_TESTED_REVISION = (
     "113f84686d94203dbd90f1836187e351aa0b246d"
 )
+# Every commissioned rack path starts and ends at this bare-flange home. The
+# rack and robot are installed as one translated workcell in each task, so the
+# same joint state is the environment-independent trajectory seam.
+TOOL_USE_JOURNAL_BARE_HOME_QPOS = (
+    -0.47,
+    -1.735,
+    2.48,
+    -2.275,
+    -1.59,
+    -1.991,
+)
 _EXPECTED_EES = frozenset(TOOL_USE_JOURNAL_EE_GRIPPER_TYPES)
 _REFERENCE_ACTIVE_EE = object()
 _PHYSICAL_EE_BY_CLASS = {
@@ -390,6 +401,7 @@ def make_tool_use_journal_env(
     env_name: str,
     *,
     active_ee: str | None,
+    scripted_grasps: bool = False,
     **suite_make_kwargs: Any,
 ) -> object:
     """Create one target environment with a physically matching mounted EE.
@@ -421,8 +433,12 @@ def make_tool_use_journal_env(
         "has_renderer": False,
         "has_offscreen_renderer": False,
         "use_camera_obs": False,
-        # C1's branch default names a camera that is not in the compiled model.
-        "render_camera": "frontview",
+        # render_camera는 has_renderer=False여도 robosuite reset()의
+        # initialize_renderer()가 이름을 resolve하므로 컴파일된 모델에 실제로
+        # 존재해야 한다. "frontview"는 테이블 아레나(c1_1)에만 있고 RoboCasa 주방
+        # 모델에는 없어 ValueError로 중단됐다. 로봇에 붙은 robot0_robotview는
+        # 씬과 무관하게 모든 환경에 존재하므로 이것을 쓴다 (렌더링에는 안 쓰임).
+        "render_camera": "robot0_robotview",
         "initialization_noise": None,
         "hard_reset": False,
     }
@@ -432,7 +448,25 @@ def make_tool_use_journal_env(
         if active_ee is not None
         else None
     )
+    if scripted_grasps and env_name != "C1_1_LegoSweep":
+        # Kitchen initializes with OSC actions; switch to joint control after reset.
+        options.pop("controller_configs", None)
+        options.pop("hard_reset", None)
+        if env_name in {"C1_2_DoughFlatten", "C2_2_SandwichAssembly", "C4_2_DiagonalFitPacking"}:
+            if options.get("render_camera") in {"frontview", "agentview"}:
+                options["render_camera"] = "robot0_robotview"
     env = suite.make(env_name=env_name, **options)
+    if active_ee is None and getattr(env, "robot_configs", None):
+        # Set this before the caller's first reset. RoboCasa constructs the
+        # robot lazily, and a task-specific default here would make a reusable
+        # rack trajectory fail its exact start-state contract.
+        env.robot_configs[0]["initial_qpos"] = list(
+            TOOL_USE_JOURNAL_BARE_HOME_QPOS
+        )
+    if scripted_grasps:
+        from tuj.m5_motion.scripted_grasps.profiles import configure_environment
+
+        configure_environment(env, env_name, active_ee)
     # 요청한 EE를 선언 상태로 각인 (tool_use_journal_runtime의 env 생성과 동일 처리).
     # 없으면 초기 EE 장착 이후 생성되는 planner env가 declared None으로 남아
     # require_physical_ee의 declared/physical 불일치로 중단된다 (0831).
@@ -465,6 +499,13 @@ class ToolUseJournalEnvironmentAdapter:
             raise ToolUseJournalCompatibilityError(
                 "env is missing Tool-Use-Journal runtime metadata; call reset() first"
             ) from error
+        # This task adds its box directly to worldbody, so robosuite omits it
+        # from obj_body_id. It is still a physical destination and obstacle.
+        if self.environment_name == "C4_2_DiagonalFitPacking":
+            box_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_BODY, "packing_box")
+            if box_id < 0:
+                raise ToolUseJournalCompatibilityError("C4_2 is missing its static packing_box body")
+            self.object_body_ids["packing_box"] = int(box_id)
         if set(self.rack_info) != _EXPECTED_EES:
             raise ToolUseJournalCompatibilityError(
                 f"rack EE ids are {sorted(self.rack_info)}; expected "
@@ -567,6 +608,18 @@ class ToolUseJournalEnvironmentAdapter:
             if isinstance(robot_spec, Mapping)
             else "ur5e_0"
         )
+        eef_position = tuple(float(value) for value in self.data.xpos[hand_id])
+        eef_orientation = _quaternion_wxyz_to_xyzw(self.data.xquat[hand_id])
+        if getattr(self.env, "scripted_grasp_profile", None) is not None and self.physical_active_ee is not None:
+            # Match make_kinematics(): mounted-hand IK targets the grip site,
+            # not the wrist body. Use that same reference for goal evaluation.
+            gripper = next(iter(self.robot.gripper.values()))
+            site_name = gripper.important_sites["grip_site"]
+            site_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_SITE, site_name)
+            quat = np.empty(4)
+            mujoco.mju_mat2Quat(quat, self.data.site_xmat[site_id])
+            eef_position = tuple(float(value) for value in self.data.site_xpos[site_id])
+            eef_orientation = _quaternion_wxyz_to_xyzw(quat)
         return RobotState(
             robot_id=robot_id,
             joint_names=list(joint_names),
@@ -574,10 +627,8 @@ class ToolUseJournalEnvironmentAdapter:
             joint_velocities_rad_s=velocities,
             eef_pose=Pose(
                 frame_id="world",
-                position_m=tuple(float(value) for value in self.data.xpos[hand_id]),
-                orientation_xyzw=_quaternion_wxyz_to_xyzw(
-                    self.data.xquat[hand_id]
-                ),
+                position_m=eef_position,
+                orientation_xyzw=eef_orientation,
             ),
             gripper=GripperState(mode=GripperMode.UNKNOWN),
             attached_object_id=attached_object_id,
@@ -1000,22 +1051,29 @@ class ToolUseJournalCollisionModelCompiler:
         *,
         source_revision: str = TOOL_USE_JOURNAL_TESTED_REVISION,
     ) -> "ToolUseJournalCollisionModelCompiler":
-        variants: dict[str | None, object] = {}
-        try:
-            for active_ee in (None, "2F", "3F", "vac"):
-                env = factory(active_ee)
+        # Captures contain XML and scalar state, not live MuJoCo environments.
+        # Keeping four kitchen environments alive can exhaust renderer memory.
+        import gc
+        adapter = ToolUseJournalEnvironmentAdapter(reference_env, source_revision=source_revision)
+        captures = {}
+        for active_ee in (None, "2F", "3F", "vac"):
+            if active_ee == adapter.physical_active_ee:
+                captures[active_ee] = _capture_environment(reference_env, active_ee)
+                continue
+            env = factory(active_ee)
+            try:
                 env.reset()  # type: ignore[attr-defined]
-                variants[active_ee] = env
-            return cls.from_environments(
-                reference_env,
-                variants,
-                source_revision=source_revision,
-            )
-        finally:
-            for env in variants.values():
+                captures[active_ee] = _capture_environment(env, active_ee)
+            finally:
                 close = getattr(env, "close", None)
                 if callable(close):
                     close()
+                del close, env
+                gc.collect()
+        return cls(captures,
+            reference_joint_states=_joint_state_map(adapter.model, adapter.data),
+            source_revision=source_revision,
+            reference_active_ee=adapter.physical_active_ee)
 
     @classmethod
     def from_repository(
@@ -1028,6 +1086,8 @@ class ToolUseJournalCollisionModelCompiler:
         **suite_make_kwargs: Any,
     ) -> "ToolUseJournalCollisionModelCompiler":
         env_name = _environment_name(reference_env)
+        if getattr(reference_env, "scripted_grasp_profile", None) is not None:
+            suite_make_kwargs.setdefault("scripted_grasps", True)
 
         def factory(active_ee: str | None) -> object:
             return make_tool_use_journal_env(

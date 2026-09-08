@@ -629,6 +629,14 @@ class ToolUseJournalEERuntime:
             )
         self._held_tool_id = object_id
 
+    def mark_contact_friction_object_as_tool(self, object_id: str) -> None:
+        """Record a validated free-body grasp without attaching or projecting it."""
+        if self._attachment is not None or not self.grasp_engaged:
+            raise ToolUseJournalRuntimeError("contact grasp requires an engaged, unattached gripper")
+        if object_id not in self.env.obj_body_id:
+            raise ToolUseJournalRuntimeError(f"unknown grasp object {object_id!r}")
+        self._held_tool_id = object_id
+
     @property
     def last_attachment_break(self) -> AttachmentBreakObservation | None:
         return self._last_attachment_break
@@ -1150,6 +1158,12 @@ class ToolUseJournalEERuntime:
             )
         self._gripper_command = normalized
         self._grasp_engaged = engaged
+        if not engaged:
+            self._held_tool_id = None
+            retention = getattr(self, "scripted_grasp_retention", None)
+            if retention is not None and hasattr(retention, "close"):
+                retention.close()
+            self.scripted_grasp_retention = None
         return self._gripper_command
 
     def hold_gripper_position(self) -> None:
@@ -1858,6 +1872,8 @@ class ToolUseJournalEERuntime:
                 f"{self._attachment.object_id!r} is attached"
             )
 
+        if self._held_tool_id is not None:
+            raise ToolUseJournalRuntimeError("release the contact-held object before EE exchange")
         old_env = self._env
         state = _capture_runtime_state(old_env)
         new_env: object | None = None
@@ -2173,7 +2189,17 @@ class ToolUseJournalKinematicTrajectoryPlayer:
                 )
             return message
         if event.event_type is EventType.DETACH_OBJECT:
+            retention = getattr(self.runtime, "scripted_grasp_retention", None)
+            if (retention is not None and self.runtime.attachment is None
+                    and target == self.runtime.held_tool_id == retention.entry.object_id):
+                self.runtime.command_gripper(engaged=False, suction=False)
+                return f"opened gripper to release contact-held {target}"
             attachment = self.runtime.detach_object(target)
+            # Stop retention before the next tick; suction-off is normally the
+            # next event at this same boundary.
+            if retention is not None and hasattr(retention, "close"):
+                retention.close()
+            self.runtime.scripted_grasp_retention = None
             return f"detached {attachment.object_id} and preserved world pose"
         if event.event_type is EventType.TOOL_UNLOCK:
             if not target:
@@ -2394,6 +2420,10 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             if self.runtime.attached_object_id is not None
             else set()
         )
+        if context.metadata.get("attachment_proxy") == "CONTACT_FRICTION":
+            retention = getattr(self.runtime, "scripted_grasp_retention", None)
+            if retention is not None and self.runtime.held_tool_id == retention.entry.object_id:
+                actual_objects = {retention.entry.object_id}
         if expected_objects != actual_objects:
             raise ToolUseJournalRuntimeError(
                 f"{label} expects attached objects {sorted(expected_objects)}, "
@@ -2908,6 +2938,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
         max_iterations: int = 30,
         settle_ticks_per_iteration: int = 20,
         final_settle_ticks: int = 25,
+        allow_wider_discrete_state: bool = False,
     ) -> float:
         """Pre-shape 2F to a metric aperture independent of actuator gain."""
 
@@ -2918,6 +2949,8 @@ class ToolUseJournalControllerTrajectoryPlayer(
             raise ValueError("target_aperture_m must be within (0, 0.085)")
         if not math.isfinite(tolerance_m) or tolerance_m <= 0.0:
             raise ValueError("tolerance_m must be finite and positive")
+        if not isinstance(allow_wider_discrete_state, bool):
+            raise ValueError("allow_wider_discrete_state must be boolean")
         for name, value in {
             "max_iterations": max_iterations,
             "settle_ticks_per_iteration": settle_ticks_per_iteration,
@@ -2964,13 +2997,29 @@ class ToolUseJournalControllerTrajectoryPlayer(
             if (
                 previous_error_m is not None
                 and direction != previous_direction
-                and abs(error_m) >= abs(previous_error_m)
+                and (allow_wider_discrete_state or abs(error_m) >= abs(previous_error_m))
             ):
-                raise ToolUseJournalRuntimeError(
-                    "target aperture is between discrete 2F controller states: "
-                    f"target={target_aperture_m:.6f}, actual={aperture_m:.6f}, "
-                    f"tolerance={tolerance_m:.6f}"
-                )
+                if not allow_wider_discrete_state:
+                    raise ToolUseJournalRuntimeError(
+                        "target aperture is between discrete 2F controller states: "
+                        f"target={target_aperture_m:.6f}, actual={aperture_m:.6f}, "
+                        f"tolerance={tolerance_m:.6f}"
+                    )
+                # Reproduce the calibrated lab's metric preshape after an EE
+                # mount: one public reverse pulse recovers the wider adjacent
+                # state. Never accept a narrower-than-requested aperture.
+                if aperture_m < target_aperture_m - tolerance_m:
+                    action[gripper_start:gripper_end] = direction
+                    self._advance_controller(action)
+                    action[gripper_start:gripper_end] = 0.0
+                    for _ in range(settle_ticks_per_iteration):
+                        self._advance_controller(action)
+                for _ in range(final_settle_ticks):
+                    self._advance_controller(action)
+                aperture_m = self.runtime.fingerpad_separation_m()
+                if aperture_m < target_aperture_m - tolerance_m:
+                    raise ToolUseJournalRuntimeError("2F safe wider aperture quantization failed")
+                break
             # Exercise the public GRIP input for exactly one policy tick. This
             # preserves the Robotiq85 underactuated joint path instead of
             # writing its private persistent target directly.
@@ -2996,6 +3045,10 @@ class ToolUseJournalControllerTrajectoryPlayer(
     def _advance_controller(self, action: np.ndarray) -> float:
         """Advance one robosuite policy period without calling reward()."""
 
+        tick_started = time.monotonic()
+        retention = getattr(self.runtime, "scripted_grasp_retention", None)
+        if retention is not None:
+            action = retention.before_tick(action)
         env = self.runtime.env
         model, data = _raw_model_data(env)
         try:
@@ -3034,6 +3087,8 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 sim.step()
             self.runtime.synchronize_attached_object()
             self.runtime.finish_attachment_step()
+            if retention is not None:
+                retention.audit_substep()
             update_observables = getattr(env, "_update_observables", None)
             if callable(update_observables):
                 update_observables()
@@ -3041,6 +3096,13 @@ class ToolUseJournalControllerTrajectoryPlayer(
         if hasattr(env, "cur_time"):
             env.cur_time += control_timestep  # type: ignore[attr-defined]
         # Use MuJoCo time as the source of truth across EE topology swaps.
+        if retention is not None:
+            retention.after_tick(float(data.time))
+        if getattr(self.runtime, "scripted_render", False):
+            self.runtime.render()
+        factor = getattr(self.runtime, "scripted_realtime_factor", 0.)
+        if factor > 0:
+            time.sleep(max(0., control_timestep / factor - (time.monotonic() - tick_started)))
         return float(data.time)
 
     def _prime_gripper_command(
@@ -3050,6 +3112,9 @@ class ToolUseJournalControllerTrajectoryPlayer(
 
         env = self.runtime.env
         action = self._controller_action(plan, desired)
+        retention = getattr(self.runtime, "scripted_grasp_retention", None)
+        if retention is not None:
+            action = retention.before_tick(action)
         pre_action = getattr(env, "_pre_action", None)
         if not callable(pre_action):
             raise ToolUseJournalRuntimeError(

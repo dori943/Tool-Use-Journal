@@ -19,7 +19,7 @@ batch 질의 응답의 partition(그룹 구성)대로, 서브골 하나를 그�
 """
 from __future__ import annotations
 
-from .core import _detail, add_container_seal_pres, build_queries, decompose, invariants_for, partial_order
+from .core import _detail, add_container_seal_pres, decompose, invariants_for, partial_order
 
 
 def _cycle_check(details: list[dict], edges: list[dict]) -> list[str]:
@@ -99,17 +99,36 @@ def _split_sweep(s: dict, part: list[list[str]]) -> list[dict]:
 
 
 def _split_relocate(s: dict, part: list[list[str]]) -> list[dict]:
-    """relocate 분할 — 공용 확보/반환 단계가 없어 그룹마다 독립 체인. decompose를 그대로 쓴다."""
+    """relocate 분할 — 공용 확보/반환 단계가 없어 그룹마다 독립 체인. decompose를 그대로 쓴다.
+
+    0908: ordered 서브골(VLM이 target_ids를 지시문 순서로 정렬해 둠)은 그룹을 그 순서대로
+    배열하고, k+1번째 자식의 acquire에 k번째 자식의 place가 establish하는 in(...)을
+    사전조건(auto=instruction_order)으로 붙여 partial_order가 체인 엣지로 잡게 한다.
+    (container_seal과 같은 수법. M4 gk_adapter는 m2_partial_order를 그대로 DAG로 읽는다.)
+    """
     sid = s["subgoal_id"]
+    ordered = bool(s.get("ordered")) and len(s.get("target_ids", [])) > 1
+    if ordered:
+        rank = {t: i for i, t in enumerate(s["target_ids"])}
+        part = sorted((sorted(g, key=lambda t: rank.get(t, 1e9)) for g in part),
+                      key=lambda g: min(rank.get(t, 1e9) for t in g))
     children = []
     for k, members in enumerate(part, 1):
         child = _child(s, sid, k, len(part), members, "옮긴다")
         child["details"] = decompose(child)
+        if ordered and children:
+            prev = children[-1]
+            pm = prev["target_ids"]
+            po = pm[0] if len(pm) == 1 else "{" + ",".join(pm) + "}"   # decompose의 ?o 표기와 동일
+            first = child["details"][0]
+            first["pre"].append({"id": f"{first['detail_id']}_p{len(first['pre'])}",
+                                 "expr": f"in({po}, {s['container_id']})", "head": "in",
+                                 "eval_by": "m2", "auto": "instruction_order"})
         children.append(child)
     return children
 
 
-def split_after_m3(m2_out: dict) -> list[str]:
+def split_by_partition(m2_out: dict) -> list[str]:
     """partition_plan이 있는 서브골을 그룹별 서브골로 나누고 순서·불변식·통계를 재계산한다.
 
     partition_plan이 하나도 없으면 아무것도 바꾸지 않는다 (측정 모듈 미구현 시 폴백).
@@ -130,6 +149,9 @@ def split_after_m3(m2_out: dict) -> list[str]:
         return logs
 
     m2_out["m2_subgoals"] = new_subs
+    chain = [s["subgoal_id"] for s in new_subs if s.get("split_from") and s.get("ordered")]
+    if len(chain) > 1:
+        logs.append(f"  [순서] 지시문 순서(VLM) 체인: {' -> '.join(chain)}")
     logs += add_container_seal_pres(new_subs)   # 0903: 분할 자식 기준으로 담기 ≺ 덮기 재부착
     all_details = [d for s2 in new_subs for d in s2["details"]]
     edges, mutex = partial_order(all_details)
@@ -138,18 +160,10 @@ def split_after_m3(m2_out: dict) -> list[str]:
         raise ValueError(f"분할 후 DAG에 사이클 발생: {stuck}")
     m2_out["m2_partial_order"], m2_out["m2_mutex"] = edges, mutex
     m2_out["m2_invariants"] = invariants_for(new_subs)
-    # 질의 목록 재생성: 분할 안 된 서브골 것은 유지, 자식은 자기 detail 기준으로 새로 발행
-    # (측정 모듈이 이 목록으로 서브골별 서브그래프를 다시 조립한다. 접지는 캐시라 저렴)
-    kept_ids = {s2["subgoal_id"] for s2 in new_subs if "split_from" not in s2}
-    queries = [q for q in m2_out.get("m2_queries", []) if q["subgoal_id"] in kept_ids]
-    for s2 in new_subs:
-        if "split_from" in s2:
-            queries += build_queries(s2, s2["details"])
-    # ignore_ids (0831): 분할 자식의 swept_space 질의에 형제 서브골의 target 목록을 싣는다.
-    # 형제 target은 어차피 같은 목적지로 처리될 물체라 실제 방해물이 아닌데, 접지가 이를
-    # 모르면 형제끼리 서로를 blocker로 판정한다 (0830 도희 보고 이슈 2). 누가 형제인지는
-    # 계획 구조를 아는 이 모듈만 알므로 질의에 명시해 보낸다. 접지 쪽 반영은 방해물
-    # 계산에서 이 목록을 제외하는 것 — 필드를 아직 읽지 않아도 기존 동작과 동일하다.
+    # ignore_ids (0831): 형제 서브골의 target은 어차피 같은 목적지로 처리될 물체라 실제
+    # 방해물이 아닌데, 통로 판정이 이를 모르면 형제끼리 서로를 blocker로 잡는다
+    # (0830 도희 보고 이슈 2). 누가 형제인지는 계획 구조를 아는 이 모듈만 안다.
+    # 0908: 질의에 싣던 것을 서브골 필드로 옮겼다 (apply_grounding이 읽는다).
     sib_of: dict[str, list[dict]] = {}
     for s2 in new_subs:
         if s2.get("split_from"):
@@ -158,17 +172,22 @@ def split_after_m3(m2_out: dict) -> list[str]:
         for s2 in group:
             ignore = sorted({t for k in group if k is not s2
                              for t in k.get("target_ids", [])})
-            if not ignore:
-                continue
-            for q in queries:
-                if (q["subgoal_id"] == s2["subgoal_id"]
-                        and q["m3_call"].get("kind") == "swept_space"):
-                    q["m3_call"]["ignore_ids"] = ignore
-    m2_out["m2_queries"] = queries
+            if ignore:
+                s2["ignore_ids"] = ignore
+    # 0908: 자식이 부모 object_ids를 통째로 물려받아 lint가 대량으로 떴다 —
+    # 자기 대상 + 컨테이너 + 확정 도구만 남긴다.
+    for s2 in new_subs:
+        if "split_from" not in s2:
+            continue
+        own = list(s2.get("target_ids", []))
+        for extra in (s2.get("container_id"), s2.get("base_id"),
+                      s2.get("selected_tool_id"), *s2.get("tool_candidate_ids", [])):
+            if extra and extra not in own:
+                own.append(extra)
+        s2["object_ids"] = own
     st = m2_out.setdefault("m2_stats", {})
     st.update({"n_subgoals": len(new_subs), "n_details": len(all_details),
                "n_edges": len(edges), "n_mutex": len(mutex),
-               "n_m3_queries": len(queries),
                "n_split_subgoals": sum(1 for s2 in new_subs if "split_from" in s2)})
     logs.append(f"  [분할] 재계산: 서브골 {len(new_subs)} / 상세 {len(all_details)} / "
                 f"엣지 {len(edges)} / mutex {len(mutex)} / 사이클 없음")

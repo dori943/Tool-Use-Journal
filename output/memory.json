@@ -1,7 +1,15 @@
 {
-  "objects": {
-    "obj_plate_light_plate": {
-      "props": {
+  "schema_version": "1.0",
+  "failure_recovery_experience": {
+    "experiences": []
+  },
+  "object_knowledge": {
+    "objects": {
+      "legacy::obj_plate_light_plate": {
+        "identity": {
+          "object_id": "obj_plate_light_plate",
+          "caption": null
+        },
         "geometry": {
           "length_mm": 178.5,
           "diameter_mm": null,
@@ -14,25 +22,47 @@
           "cylinder_like": false,
           "surface_rms_mm": 0.3
         },
-        "material": "plastic",
-        "density_kgm3": 950,
-        "mass_kg": 0.279,
-        "youngs_gpa": 2.0,
-        "mu": {
-          "mu": 0.338,
-          "stage": 0,
-          "material": "plastic",
-          "rms_mm": 0.3
+        "physical_properties": {
+          "material": {
+            "value": "plastic",
+            "confidence": 0.85
+          },
+          "density_kgm3": {
+            "value": 950
+          },
+          "mass_kg": {
+            "value": 0.279,
+            "range": null
+          },
+          "youngs_gpa": {
+            "value": 2.0
+          },
+          "friction": {
+            "value": 0.338,
+            "stage": 0,
+            "material_basis": "plastic",
+            "surface_rms_mm": 0.3
+          }
         },
-        "confidence": 0.85
+        "material_hypotheses": [],
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "mock",
+          "source_task": null,
+          "source_episode": null,
+          "episodes_seen": 2,
+          "updated_at": "2026-08-29T09:13:02+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0,
+          "legacy_key": "obj_plate_light_plate"
+        }
       },
-      "stage": 0,
-      "source": "mock",
-      "episodes_seen": 2,
-      "updated_at": "2026-08-29T09:13:02+00:00"
-    },
-    "obj_ladle_ladle": {
-      "props": {
+      "legacy::obj_ladle_ladle": {
+        "identity": {
+          "object_id": "obj_ladle_ladle",
+          "caption": "metallic sphere"
+        },
         "geometry": {
           "length_mm": 62.1,
           "diameter_mm": null,
@@ -45,22 +75,32 @@
           "cylinder_like": false,
           "surface_rms_mm": 1.38
         },
-        "material": "steel",
-        "density_kgm3": 7151.9,
-        "mass_kg": 0.243,
-        "youngs_gpa": 159.07,
-        "mu": {
-          "mu": 0.459,
-          "stage": 0,
-          "material": "steel",
-          "rms_mm": 1.38
+        "physical_properties": {
+          "material": {
+            "value": "steel",
+            "confidence": 0.296
+          },
+          "density_kgm3": {
+            "value": 7151.9
+          },
+          "mass_kg": {
+            "value": 0.243,
+            "range": [
+              0.079,
+              0.407
+            ]
+          },
+          "youngs_gpa": {
+            "value": 159.07
+          },
+          "friction": {
+            "value": 0.459,
+            "stage": 0,
+            "material_basis": "steel",
+            "surface_rms_mm": 1.38
+          }
         },
-        "confidence": 0.296,
-        "mass_range_kg": [
-          0.079,
-          0.407
-        ],
-        "materials_topk": [
+        "material_hypotheses": [
           {
             "name": "steel",
             "prob": 0.296,
@@ -122,43 +162,68 @@
             ]
           }
         ],
-        "caption": "metallic sphere"
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": null,
+          "source_episode": null,
+          "episodes_seen": 6,
+          "updated_at": "2026-09-02T20:07:10+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0,
+          "legacy_key": "obj_ladle_ladle"
+        }
       },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 6,
-      "updated_at": "2026-09-02T20:07:10+00:00"
-    },
-    "obj_dough_dough": {
-      "props": {
+      "legacy::obj_dough_dough": {
+        "identity": {
+          "object_id": "obj_dough_dough",
+          "caption": "Round brown object"
+        },
         "geometry": {
-          "length_mm": 56.9,
+          "length_mm": 57.6,
           "diameter_mm": null,
           "extents_mm": [
-            56.9,
-            54.2,
-            22.2
+            57.6,
+            57.7,
+            26.2
           ],
-          "height_z_mm": 45.4,
+          "height_z_mm": 33.5,
           "cylinder_like": false,
-          "surface_rms_mm": 1.23
+          "surface_rms_mm": 0.96,
+          "seal_patch_rms_mm": 0.625,
+          "footprint_mm": [
+            52.9,
+            57.0
+          ],
+          "height_mm": 33.5
         },
-        "material": "wood",
-        "density_kgm3": 1145.0,
-        "mass_kg": 0.036,
-        "youngs_gpa": 14.33,
-        "mu": {
-          "mu": 0.506,
-          "stage": 0,
-          "material": "wood",
-          "rms_mm": 1.23
+        "physical_properties": {
+          "material": {
+            "value": "wood",
+            "confidence": 0.3
+          },
+          "density_kgm3": {
+            "value": 1145.0
+          },
+          "mass_kg": {
+            "value": 0.036,
+            "range": [
+              0.008,
+              0.065
+            ]
+          },
+          "youngs_gpa": {
+            "value": 14.33
+          },
+          "friction": {
+            "value": 0.506,
+            "stage": 0,
+            "material_basis": "wood",
+            "surface_rms_mm": 1.23
+          }
         },
-        "confidence": 0.3,
-        "mass_range_kg": [
-          0.008,
-          0.065
-        ],
-        "materials_topk": [
+        "material_hypotheses": [
           {
             "name": "wood",
             "prob": 0.3,
@@ -206,29 +271,26 @@
               0.5,
               2.0
             ]
-          },
-          {
-            "name": "fiberboard",
-            "prob": 0.1,
-            "density_kgm3": [
-              600.0,
-              800.0
-            ],
-            "thickness_cm": [
-              1.0,
-              4.0
-            ]
           }
         ],
-        "caption": "Round brown object"
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": null,
+          "source_episode": null,
+          "episodes_seen": 7,
+          "updated_at": "2026-09-08T15:33:03+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0,
+          "legacy_key": "obj_dough_dough"
+        }
       },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 6,
-      "updated_at": "2026-09-03T12:35:23+00:00"
-    },
-    "obj_apple_apple": {
-      "props": {
+      "legacy::obj_apple_apple": {
+        "identity": {
+          "object_id": "obj_apple_apple",
+          "caption": "apple"
+        },
         "geometry": {
           "length_mm": 69.7,
           "diameter_mm": null,
@@ -241,22 +303,32 @@
           "cylinder_like": false,
           "surface_rms_mm": NaN
         },
-        "material": "fiber",
-        "density_kgm3": 890.6,
-        "mass_kg": 0.002,
-        "youngs_gpa": 0.74,
-        "mu": {
-          "mu": 0.45,
-          "stage": 0,
-          "material": "fiber",
-          "rms_mm": NaN
+        "physical_properties": {
+          "material": {
+            "value": "fiber",
+            "confidence": 0.258
+          },
+          "density_kgm3": {
+            "value": 890.6
+          },
+          "mass_kg": {
+            "value": 0.002,
+            "range": [
+              0.001,
+              0.004
+            ]
+          },
+          "youngs_gpa": {
+            "value": 0.74
+          },
+          "friction": {
+            "value": 0.45,
+            "stage": 0,
+            "material_basis": "fiber",
+            "surface_rms_mm": NaN
+          }
         },
-        "confidence": 0.258,
-        "mass_range_kg": [
-          0.001,
-          0.004
-        ],
-        "materials_topk": [
+        "material_hypotheses": [
           {
             "name": "fiber",
             "prob": 0.258,
@@ -318,337 +390,68 @@
             ]
           }
         ],
-        "caption": "apple"
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": null,
+          "source_episode": null,
+          "episodes_seen": 4,
+          "updated_at": "2026-09-03T04:43:57+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0,
+          "legacy_key": "obj_apple_apple"
+        }
       },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 4,
-      "updated_at": "2026-09-03T04:43:57+00:00"
-    },
-    "obj_bread_bread": {
-      "props": {
+      "legacy::obj_spoon_spoon": {
+        "identity": {
+          "object_id": "obj_spoon_spoon",
+          "caption": "Ladle with a wooden handle"
+        },
         "geometry": {
-          "length_mm": 122.4,
+          "length_mm": 109.3,
           "diameter_mm": null,
           "extents_mm": [
-            122.4,
-            73.5,
-            42.8
+            109.3,
+            51.5,
+            27.6
           ],
-          "height_z_mm": 53.2,
+          "height_z_mm": 27.4,
           "cylinder_like": false,
-          "surface_rms_mm": 1.65
+          "surface_rms_mm": 0.37,
+          "seal_patch_rms_mm": 99.9,
+          "footprint_mm": [
+            110.6,
+            51.4
+          ],
+          "height_mm": 27.4
         },
-        "material": "granite",
-        "density_kgm3": 2321.4,
-        "mass_kg": 0.44,
-        "youngs_gpa": 35.12,
-        "mu": {
-          "mu": 0.465,
-          "stage": 0,
-          "material": "granite",
-          "rms_mm": 1.65
-        },
-        "confidence": 0.25,
-        "mass_range_kg": [
-          0.239,
-          0.642
-        ],
-        "materials_topk": [
-          {
-            "name": "granite",
-            "prob": 0.25,
-            "density_kgm3": [
-              2500.0,
-              2700.0
-            ],
-            "thickness_cm": [
-              5.0,
-              10.0
+        "physical_properties": {
+          "material": {
+            "value": "wood",
+            "confidence": 0.333
+          },
+          "density_kgm3": {
+            "value": 2938.9
+          },
+          "mass_kg": {
+            "value": 0.029,
+            "range": [
+              0.015,
+              0.042
             ]
           },
-          {
-            "name": "sandstone",
-            "prob": 0.214,
-            "density_kgm3": [
-              2200.0,
-              2600.0
-            ],
-            "thickness_cm": [
-              5.0,
-              15.0
-            ]
+          "youngs_gpa": {
+            "value": 47.19
           },
-          {
-            "name": "limestone",
-            "prob": 0.179,
-            "density_kgm3": [
-              2200.0,
-              2400.0
-            ],
-            "thickness_cm": [
-              5.0,
-              10.0
-            ]
-          },
-          {
-            "name": "quartzite",
-            "prob": 0.214,
-            "density_kgm3": [
-              2500.0,
-              2800.0
-            ],
-            "thickness_cm": [
-              5.0,
-              12.0
-            ]
-          },
-          {
-            "name": "clay",
-            "prob": 0.143,
-            "density_kgm3": [
-              1000.0,
-              1500.0
-            ],
-            "thickness_cm": [
-              3.0,
-              8.0
-            ]
+          "friction": {
+            "value": 0.483,
+            "stage": 0,
+            "material_basis": "wood",
+            "surface_rms_mm": 0.34
           }
-        ],
-        "caption": "A smooth, rounded stone."
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 4,
-      "updated_at": "2026-09-03T04:43:57+00:00"
-    },
-    "obj_mug_mug": {
-      "props": {
-        "geometry": {
-          "length_mm": 71.0,
-          "diameter_mm": null,
-          "extents_mm": [
-            71.0,
-            82.5,
-            102.1
-          ],
-          "height_z_mm": 77.4,
-          "cylinder_like": false,
-          "surface_rms_mm": 2.86
         },
-        "material": "ceramic",
-        "density_kgm3": 2000.0,
-        "mass_kg": 0.127,
-        "youngs_gpa": 35.0,
-        "mu": {
-          "mu": 0.492,
-          "stage": 0,
-          "material": "ceramic",
-          "rms_mm": 2.86
-        },
-        "confidence": 0.421,
-        "mass_range_kg": [
-          0.042,
-          0.211
-        ],
-        "materials_topk": [
-          {
-            "name": "ceramic",
-            "prob": 0.421,
-            "density_kgm3": [
-              1500.0,
-              2500.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.5
-            ]
-          },
-          {
-            "name": "glass",
-            "prob": 0.263,
-            "density_kgm3": [
-              2400.0,
-              3000.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.5
-            ]
-          },
-          {
-            "name": "plastic",
-            "prob": 0.158,
-            "density_kgm3": [
-              800.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              0.2,
-              0.7
-            ]
-          },
-          {
-            "name": "metal",
-            "prob": 0.105,
-            "density_kgm3": [
-              2700.0,
-              8000.0
-            ],
-            "thickness_cm": [
-              0.4,
-              1.0
-            ]
-          },
-          {
-            "name": "wood",
-            "prob": 0.053,
-            "density_kgm3": [
-              600.0,
-              900.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.0
-            ]
-          }
-        ],
-        "caption": "Ceramic coffee mug"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 4,
-      "updated_at": "2026-09-03T04:43:57+00:00"
-    },
-    "obj_plate_plate": {
-      "props": {
-        "geometry": {
-          "length_mm": 180.8,
-          "diameter_mm": null,
-          "extents_mm": [
-            180.8,
-            180.1,
-            9.9
-          ],
-          "height_z_mm": 9.8,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.24
-        },
-        "material": "ceramic",
-        "density_kgm3": 2373.1,
-        "mass_kg": 0.387,
-        "youngs_gpa": 56.0,
-        "mu": {
-          "mu": 0.433,
-          "stage": 0,
-          "material": "ceramic",
-          "rms_mm": 0.24
-        },
-        "confidence": 0.308,
-        "mass_range_kg": [
-          0.107,
-          0.667
-        ],
-        "materials_topk": [
-          {
-            "name": "ceramic",
-            "prob": 0.308,
-            "density_kgm3": [
-              2000.0,
-              3000.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.5
-            ]
-          },
-          {
-            "name": "plastic",
-            "prob": 0.231,
-            "density_kgm3": [
-              800.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.0
-            ]
-          },
-          {
-            "name": "glass",
-            "prob": 0.192,
-            "density_kgm3": [
-              2400.0,
-              2600.0
-            ],
-            "thickness_cm": [
-              0.3,
-              1.0
-            ]
-          },
-          {
-            "name": "metal",
-            "prob": 0.154,
-            "density_kgm3": [
-              2700.0,
-              8000.0
-            ],
-            "thickness_cm": [
-              0.5,
-              2.0
-            ]
-          },
-          {
-            "name": "wood",
-            "prob": 0.115,
-            "density_kgm3": [
-              300.0,
-              900.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.5
-            ]
-          }
-        ],
-        "caption": "Round flat dish"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 4,
-      "updated_at": "2026-09-03T04:43:57+00:00"
-    },
-    "obj_spoon_spoon": {
-      "props": {
-        "geometry": {
-          "length_mm": 86.9,
-          "diameter_mm": null,
-          "extents_mm": [
-            86.9,
-            51.3,
-            29.6
-          ],
-          "height_z_mm": 26.8,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.34
-        },
-        "material": "wood",
-        "density_kgm3": 2938.9,
-        "mass_kg": 0.029,
-        "youngs_gpa": 47.19,
-        "mu": {
-          "mu": 0.483,
-          "stage": 0,
-          "material": "wood",
-          "rms_mm": 0.34
-        },
-        "confidence": 0.333,
-        "mass_range_kg": [
-          0.015,
-          0.042
-        ],
-        "materials_topk": [
+        "material_hypotheses": [
           {
             "name": "metal",
             "prob": 0.296,
@@ -710,15 +513,24 @@
             ]
           }
         ],
-        "caption": "Ladle with a wooden handle"
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": null,
+          "source_episode": null,
+          "episodes_seen": 11,
+          "updated_at": "2026-09-08T15:33:03+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0,
+          "legacy_key": "obj_spoon_spoon"
+        }
       },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 10,
-      "updated_at": "2026-09-03T12:35:23+00:00"
-    },
-    "obj_card_card": {
-      "props": {
+      "legacy::obj_card_card": {
+        "identity": {
+          "object_id": "obj_card_card",
+          "caption": "Blue arrow icon"
+        },
         "geometry": {
           "length_mm": 49.0,
           "diameter_mm": null,
@@ -731,22 +543,32 @@
           "cylinder_like": false,
           "surface_rms_mm": 0.0
         },
-        "material": "plastic",
-        "density_kgm3": 1100.0,
-        "mass_kg": 0.001,
-        "youngs_gpa": 2.0,
-        "mu": {
-          "mu": 0.333,
-          "stage": 0,
-          "material": "plastic",
-          "rms_mm": 0.0
+        "physical_properties": {
+          "material": {
+            "value": "plastic",
+            "confidence": 0.4
+          },
+          "density_kgm3": {
+            "value": 1100.0
+          },
+          "mass_kg": {
+            "value": 0.001,
+            "range": [
+              0.001,
+              0.002
+            ]
+          },
+          "youngs_gpa": {
+            "value": 2.0
+          },
+          "friction": {
+            "value": 0.333,
+            "stage": 0,
+            "material_basis": "plastic",
+            "surface_rms_mm": 0.0
+          }
         },
-        "confidence": 0.4,
-        "mass_range_kg": [
-          0.001,
-          0.002
-        ],
-        "materials_topk": [
+        "material_hypotheses": [
           {
             "name": "plastic",
             "prob": 0.4,
@@ -808,1289 +630,24 @@
             ]
           }
         ],
-        "caption": "Blue arrow icon"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:03:13+00:00"
-    },
-    "obj_bread_a_bread_a": {
-      "props": {
-        "geometry": {
-          "length_mm": 97.6,
-          "diameter_mm": null,
-          "extents_mm": [
-            97.6,
-            9.9,
-            6.6
-          ],
-          "height_z_mm": 9.9,
-          "cylinder_like": false,
-          "surface_rms_mm": NaN
-        },
-        "material": "wood",
-        "density_kgm3": 2771.9,
-        "mass_kg": 0.004,
-        "youngs_gpa": 78.89,
-        "mu": {
-          "mu": 0.5,
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": null,
+          "source_episode": null,
+          "episodes_seen": 2,
+          "updated_at": "2026-09-02T20:03:13+00:00",
+          "stale": false,
+          "stale_reason": null,
           "stage": 0,
-          "material": "wood",
-          "rms_mm": NaN
-        },
-        "confidence": 0.375,
-        "mass_range_kg": [
-          0.001,
-          0.006
-        ],
-        "materials_topk": [
-          {
-            "name": "wood",
-            "prob": 0.375,
-            "density_kgm3": [
-              350.0,
-              800.0
-            ],
-            "thickness_cm": [
-              1.0,
-              3.0
-            ]
-          },
-          {
-            "name": "metal",
-            "prob": 0.25,
-            "density_kgm3": [
-              7800.0,
-              8900.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          },
-          {
-            "name": "plastic",
-            "prob": 0.167,
-            "density_kgm3": [
-              800.0,
-              1300.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.3
-            ]
-          },
-          {
-            "name": "rubber",
-            "prob": 0.125,
-            "density_kgm3": [
-              500.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              0.2,
-              0.5
-            ]
-          },
-          {
-            "name": "ceramic",
-            "prob": 0.083,
-            "density_kgm3": [
-              1500.0,
-              3000.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.0
-            ]
-          }
-        ],
-        "caption": "Wooden carving tool"
+          "legacy_key": "obj_card_card"
+        }
       },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:07:10+00:00"
-    },
-    "obj_turkey_turkey_1": {
-      "props": {
-        "geometry": {
-          "length_mm": 45.0,
-          "diameter_mm": null,
-          "extents_mm": [
-            45.0,
-            16.6,
-            4.3
-          ],
-          "height_z_mm": 3.5,
-          "cylinder_like": false,
-          "surface_rms_mm": NaN
+      "legacy::obj_lid_lid": {
+        "identity": {
+          "object_id": "obj_lid_lid",
+          "caption": "Wooden plank"
         },
-        "material": "metal",
-        "density_kgm3": 7500.0,
-        "mass_kg": 0.011,
-        "youngs_gpa": 135.0,
-        "mu": {
-          "mu": 0.45,
-          "stage": 0,
-          "material": "metal",
-          "rms_mm": NaN
-        },
-        "confidence": 0.4,
-        "mass_range_kg": [
-          0.005,
-          0.017
-        ],
-        "materials_topk": [
-          {
-            "name": "metal",
-            "prob": 0.4,
-            "density_kgm3": [
-              7000.0,
-              8000.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.5
-            ]
-          },
-          {
-            "name": "plastic",
-            "prob": 0.25,
-            "density_kgm3": [
-              800.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.0
-            ]
-          },
-          {
-            "name": "glass",
-            "prob": 0.15,
-            "density_kgm3": [
-              2400.0,
-              2600.0
-            ],
-            "thickness_cm": [
-              0.3,
-              0.8
-            ]
-          },
-          {
-            "name": "wood",
-            "prob": 0.1,
-            "density_kgm3": [
-              500.0,
-              800.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.2
-            ]
-          },
-          {
-            "name": "ceramic",
-            "prob": 0.1,
-            "density_kgm3": [
-              2000.0,
-              3000.0
-            ],
-            "thickness_cm": [
-              0.2,
-              0.5
-            ]
-          }
-        ],
-        "caption": "Curved metallic object"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:07:10+00:00"
-    },
-    "obj_turkey_turkey_2": {
-      "props": {
-        "geometry": {
-          "length_mm": 46.4,
-          "diameter_mm": null,
-          "extents_mm": [
-            46.4,
-            21.1,
-            5.9
-          ],
-          "height_z_mm": 5.6,
-          "cylinder_like": false,
-          "surface_rms_mm": NaN
-        },
-        "material": "gold",
-        "density_kgm3": 10250.0,
-        "mass_kg": 0.008,
-        "youngs_gpa": 90.0,
-        "mu": {
-          "mu": 0.45,
-          "stage": 0,
-          "material": "gold",
-          "rms_mm": NaN
-        },
-        "confidence": 0.45,
-        "mass_range_kg": [
-          0.0,
-          0.015
-        ],
-        "materials_topk": [
-          {
-            "name": "gold",
-            "prob": 0.45,
-            "density_kgm3": [
-              1200.0,
-              19300.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          },
-          {
-            "name": "silver",
-            "prob": 0.25,
-            "density_kgm3": [
-              10490.0,
-              10800.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          },
-          {
-            "name": "copper",
-            "prob": 0.15,
-            "density_kgm3": [
-              8900.0,
-              9000.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          },
-          {
-            "name": "platinum",
-            "prob": 0.1,
-            "density_kgm3": [
-              2150.0,
-              23000.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          },
-          {
-            "name": "palladium",
-            "prob": 0.05,
-            "density_kgm3": [
-              12000.0,
-              12250.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          }
-        ],
-        "caption": "Curved gold jewelry piece"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:07:10+00:00"
-    },
-    "obj_turkey_turkey_3": {
-      "props": {
-        "geometry": {
-          "length_mm": 72.4,
-          "diameter_mm": null,
-          "extents_mm": [
-            72.4,
-            43.8,
-            0.7
-          ],
-          "height_z_mm": 0.8,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.02
-        },
-        "material": "wood",
-        "density_kgm3": 651.9,
-        "mass_kg": 0.002,
-        "youngs_gpa": 13.13,
-        "mu": {
-          "mu": 0.476,
-          "stage": 0,
-          "material": "wood",
-          "rms_mm": 0.02
-        },
-        "confidence": 0.308,
-        "mass_range_kg": [
-          0.001,
-          0.003
-        ],
-        "materials_topk": [
-          {
-            "name": "wood",
-            "prob": 0.308,
-            "density_kgm3": [
-              400.0,
-              900.0
-            ],
-            "thickness_cm": [
-              0.5,
-              2.0
-            ]
-          },
-          {
-            "name": "plywood",
-            "prob": 0.231,
-            "density_kgm3": [
-              500.0,
-              700.0
-            ],
-            "thickness_cm": [
-              0.5,
-              2.0
-            ]
-          },
-          {
-            "name": "bamboo",
-            "prob": 0.192,
-            "density_kgm3": [
-              500.0,
-              800.0
-            ],
-            "thickness_cm": [
-              0.5,
-              2.0
-            ]
-          },
-          {
-            "name": "mdf",
-            "prob": 0.154,
-            "density_kgm3": [
-              600.0,
-              800.0
-            ],
-            "thickness_cm": [
-              0.5,
-              2.0
-            ]
-          },
-          {
-            "name": "fiberboard",
-            "prob": 0.115,
-            "density_kgm3": [
-              600.0,
-              800.0
-            ],
-            "thickness_cm": [
-              0.5,
-              2.0
-            ]
-          }
-        ],
-        "caption": "Oval wooden object"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:07:10+00:00"
-    },
-    "obj_cheese_cheese_1": {
-      "props": {
-        "geometry": {
-          "length_mm": 57.9,
-          "diameter_mm": null,
-          "extents_mm": [
-            57.9,
-            33.7,
-            3.0
-          ],
-          "height_z_mm": 2.4,
-          "cylinder_like": false,
-          "surface_rms_mm": NaN
-        },
-        "material": "steel",
-        "density_kgm3": 5955.8,
-        "mass_kg": 0.009,
-        "youngs_gpa": 116.69,
-        "mu": {
-          "mu": 0.45,
-          "stage": 0,
-          "material": "steel",
-          "rms_mm": NaN
-        },
-        "confidence": 0.308,
-        "mass_range_kg": [
-          0.004,
-          0.014
-        ],
-        "materials_topk": [
-          {
-            "name": "steel",
-            "prob": 0.308,
-            "density_kgm3": [
-              7850.0,
-              8050.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.5
-            ]
-          },
-          {
-            "name": "aluminum",
-            "prob": 0.231,
-            "density_kgm3": [
-              2700.0,
-              2800.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.5
-            ]
-          },
-          {
-            "name": "plastic",
-            "prob": 0.154,
-            "density_kgm3": [
-              900.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              0.3,
-              1.0
-            ]
-          },
-          {
-            "name": "copper",
-            "prob": 0.192,
-            "density_kgm3": [
-              8900.0,
-              9000.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.5
-            ]
-          },
-          {
-            "name": "brass",
-            "prob": 0.115,
-            "density_kgm3": [
-              8500.0,
-              8700.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.5
-            ]
-          }
-        ],
-        "caption": "Curved metallic object"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:07:10+00:00"
-    },
-    "obj_cheese_cheese_2": {
-      "props": {
-        "geometry": {
-          "length_mm": 57.3,
-          "diameter_mm": null,
-          "extents_mm": [
-            57.3,
-            33.0,
-            6.1
-          ],
-          "height_z_mm": 6.2,
-          "cylinder_like": false,
-          "surface_rms_mm": NaN
-        },
-        "material": "gold",
-        "density_kgm3": 2007.5,
-        "mass_kg": 0.001,
-        "youngs_gpa": 107.33,
-        "mu": {
-          "mu": 0.45,
-          "stage": 0,
-          "material": "gold",
-          "rms_mm": NaN
-        },
-        "confidence": 0.267,
-        "mass_range_kg": [
-          0.0,
-          0.002
-        ],
-        "materials_topk": [
-          {
-            "name": "gold",
-            "prob": 0.267,
-            "density_kgm3": [
-              1200.0,
-              1900.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          },
-          {
-            "name": "silver",
-            "prob": 0.233,
-            "density_kgm3": [
-              900.0,
-              1050.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          },
-          {
-            "name": "copper",
-            "prob": 0.2,
-            "density_kgm3": [
-              800.0,
-              900.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          },
-          {
-            "name": "brass",
-            "prob": 0.167,
-            "density_kgm3": [
-              850.0,
-              870.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          },
-          {
-            "name": "stainless steel",
-            "prob": 0.133,
-            "density_kgm3": [
-              7800.0,
-              8000.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          }
-        ],
-        "caption": "Curved metallic object, possibly a pendant."
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:07:10+00:00"
-    },
-    "obj_cheese_cheese_3": {
-      "props": {
-        "geometry": {
-          "length_mm": 53.4,
-          "diameter_mm": null,
-          "extents_mm": [
-            53.4,
-            51.2,
-            2.0
-          ],
-          "height_z_mm": 1.9,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.05
-        },
-        "material": "granite",
-        "density_kgm3": 2564.0,
-        "mass_kg": 0.007,
-        "youngs_gpa": 38.5,
-        "mu": {
-          "mu": 0.429,
-          "stage": 0,
-          "material": "granite",
-          "rms_mm": 0.05
-        },
-        "confidence": 0.28,
-        "mass_range_kg": [
-          0.004,
-          0.011
-        ],
-        "materials_topk": [
-          {
-            "name": "granite",
-            "prob": 0.28,
-            "density_kgm3": [
-              2500.0,
-              2700.0
-            ],
-            "thickness_cm": [
-              5.0,
-              10.0
-            ]
-          },
-          {
-            "name": "limestone",
-            "prob": 0.24,
-            "density_kgm3": [
-              2200.0,
-              2600.0
-            ],
-            "thickness_cm": [
-              5.0,
-              15.0
-            ]
-          },
-          {
-            "name": "sandstone",
-            "prob": 0.2,
-            "density_kgm3": [
-              2200.0,
-              3000.0
-            ],
-            "thickness_cm": [
-              5.0,
-              12.0
-            ]
-          },
-          {
-            "name": "shale",
-            "prob": 0.16,
-            "density_kgm3": [
-              2200.0,
-              2700.0
-            ],
-            "thickness_cm": [
-              5.0,
-              10.0
-            ]
-          },
-          {
-            "name": "basalt",
-            "prob": 0.12,
-            "density_kgm3": [
-              2800.0,
-              3000.0
-            ],
-            "thickness_cm": [
-              5.0,
-              10.0
-            ]
-          }
-        ],
-        "caption": "Rounded stone or rock fragment"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:07:10+00:00"
-    },
-    "obj_tomato_slice_tomato_slice": {
-      "props": {
-        "geometry": {
-          "length_mm": 57.4,
-          "diameter_mm": null,
-          "extents_mm": [
-            57.4,
-            56.3,
-            1.5
-          ],
-          "height_z_mm": 1.5,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.0
-        },
-        "material": "plastic",
-        "density_kgm3": 1742.5,
-        "mass_kg": 0.005,
-        "youngs_gpa": 28.11,
-        "mu": {
-          "mu": 0.333,
-          "stage": 0,
-          "material": "plastic",
-          "rms_mm": 0.0
-        },
-        "confidence": 0.35,
-        "mass_range_kg": [
-          0.002,
-          0.008
-        ],
-        "materials_topk": [
-          {
-            "name": "plastic",
-            "prob": 0.35,
-            "density_kgm3": [
-              900.0,
-              1300.0
-            ],
-            "thickness_cm": [
-              0.2,
-              0.5
-            ]
-          },
-          {
-            "name": "rubber",
-            "prob": 0.3,
-            "density_kgm3": [
-              500.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              0.2,
-              0.5
-            ]
-          },
-          {
-            "name": "metal",
-            "prob": 0.15,
-            "density_kgm3": [
-              2700.0,
-              8000.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.3
-            ]
-          },
-          {
-            "name": "ceramic",
-            "prob": 0.1,
-            "density_kgm3": [
-              1800.0,
-              3000.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.0
-            ]
-          },
-          {
-            "name": "wood",
-            "prob": 0.1,
-            "density_kgm3": [
-              300.0,
-              900.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.0
-            ]
-          }
-        ],
-        "caption": "Round red object"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:07:10+00:00"
-    },
-    "obj_bread_b_bread_b": {
-      "props": {
-        "geometry": {
-          "length_mm": 112.1,
-          "diameter_mm": null,
-          "extents_mm": [
-            112.1,
-            112.2,
-            14.7
-          ],
-          "height_z_mm": 14.6,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.12
-        },
-        "material": "wheat flour",
-        "density_kgm3": 1055.0,
-        "mass_kg": 0.023,
-        "youngs_gpa": 1.96,
-        "mu": {
-          "mu": 0.43,
-          "stage": 0,
-          "material": "wheat flour",
-          "rms_mm": 0.12
-        },
-        "confidence": 0.308,
-        "mass_range_kg": [
-          0.011,
-          0.035
-        ],
-        "materials_topk": [
-          {
-            "name": "wheat flour",
-            "prob": 0.308,
-            "density_kgm3": [
-              600.0,
-              800.0
-            ],
-            "thickness_cm": [
-              1.0,
-              2.0
-            ]
-          },
-          {
-            "name": "water",
-            "prob": 0.231,
-            "density_kgm3": [
-              960.0,
-              1000.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.5
-            ]
-          },
-          {
-            "name": "yeast",
-            "prob": 0.192,
-            "density_kgm3": [
-              300.0,
-              500.0
-            ],
-            "thickness_cm": [
-              0.01,
-              0.1
-            ]
-          },
-          {
-            "name": "salt",
-            "prob": 0.154,
-            "density_kgm3": [
-              2000.0,
-              2500.0
-            ],
-            "thickness_cm": [
-              0.01,
-              0.1
-            ]
-          },
-          {
-            "name": "sugar",
-            "prob": 0.115,
-            "density_kgm3": [
-              1600.0,
-              1700.0
-            ],
-            "thickness_cm": [
-              0.01,
-              0.1
-            ]
-          }
-        ],
-        "caption": "Slice of bread"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:07:10+00:00"
-    },
-    "obj_baguette_baguette": {
-      "props": {
-        "geometry": {
-          "length_mm": 184.3,
-          "diameter_mm": null,
-          "extents_mm": [
-            184.3,
-            50.8,
-            19.4
-          ],
-          "height_z_mm": 21.3,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.66
-        },
-        "material": "keratin",
-        "density_kgm3": 150.0,
-        "mass_kg": 0.002,
-        "youngs_gpa": 1.75,
-        "mu": {
-          "mu": 0.442,
-          "stage": 0,
-          "material": "keratin",
-          "rms_mm": 0.66
-        },
-        "confidence": 0.391,
-        "mass_range_kg": [
-          0.0,
-          0.004
-        ],
-        "materials_topk": [
-          {
-            "name": "keratin",
-            "prob": 0.391,
-            "density_kgm3": [
-              100.0,
-              200.0
-            ],
-            "thickness_cm": [
-              0.01,
-              0.5
-            ]
-          },
-          {
-            "name": "lipids",
-            "prob": 0.217,
-            "density_kgm3": [
-              800.0,
-              900.0
-            ],
-            "thickness_cm": [
-              0.01,
-              0.1
-            ]
-          },
-          {
-            "name": "water",
-            "prob": 0.13,
-            "density_kgm3": [
-              997.0,
-              1000.0
-            ],
-            "thickness_cm": [
-              0.001,
-              0.01
-            ]
-          },
-          {
-            "name": "calcium carbonate",
-            "prob": 0.087,
-            "density_kgm3": [
-              2700.0,
-              3000.0
-            ],
-            "thickness_cm": [
-              0.005,
-              0.05
-            ]
-          },
-          {
-            "name": "collagen",
-            "prob": 0.174,
-            "density_kgm3": [
-              1100.0,
-              1500.0
-            ],
-            "thickness_cm": [
-              0.01,
-              0.1
-            ]
-          }
-        ],
-        "caption": "Feather"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:19:25+00:00"
-    },
-    "obj_cereal_cereal": {
-      "props": {
-        "geometry": {
-          "length_mm": 147.5,
-          "diameter_mm": null,
-          "extents_mm": [
-            147.5,
-            122.0,
-            24.2
-          ],
-          "height_z_mm": 145.2,
-          "cylinder_like": false,
-          "surface_rms_mm": 3.67
-        },
-        "material": "cardboard",
-        "density_kgm3": 940.7,
-        "mass_kg": 0.012,
-        "youngs_gpa": 2.56,
-        "mu": {
-          "mu": 0.51,
-          "stage": 0,
-          "material": "cardboard",
-          "rms_mm": 3.67
-        },
-        "confidence": 0.333,
-        "mass_range_kg": [
-          0.005,
-          0.019
-        ],
-        "materials_topk": [
-          {
-            "name": "cardboard",
-            "prob": 0.333,
-            "density_kgm3": [
-              600.0,
-              800.0
-            ],
-            "thickness_cm": [
-              0.2,
-              0.5
-            ]
-          },
-          {
-            "name": "plastic",
-            "prob": 0.148,
-            "density_kgm3": [
-              800.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.3
-            ]
-          },
-          {
-            "name": "ink",
-            "prob": 0.222,
-            "density_kgm3": [
-              1000.0,
-              1600.0
-            ],
-            "thickness_cm": [
-              0.001,
-              0.005
-            ]
-          },
-          {
-            "name": "glue",
-            "prob": 0.111,
-            "density_kgm3": [
-              1000.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              0.01,
-              0.05
-            ]
-          },
-          {
-            "name": "paper",
-            "prob": 0.185,
-            "density_kgm3": [
-              700.0,
-              900.0
-            ],
-            "thickness_cm": [
-              0.1,
-              0.3
-            ]
-          }
-        ],
-        "caption": "Cereal box packaging"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:19:25+00:00"
-    },
-    "obj_rolling_pin_rolling_pin": {
-      "props": {
-        "geometry": {
-          "length_mm": 214.9,
-          "diameter_mm": null,
-          "extents_mm": [
-            214.9,
-            39.7,
-            17.8
-          ],
-          "height_z_mm": 21.3,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.64
-        },
-        "material": "wood",
-        "density_kgm3": 650.0,
-        "mass_kg": 0.048,
-        "youngs_gpa": 12.5,
-        "mu": {
-          "mu": 0.491,
-          "stage": 0,
-          "material": "wood",
-          "rms_mm": 0.64
-        },
-        "confidence": 0.529,
-        "mass_range_kg": [
-          0.019,
-          0.077
-        ],
-        "materials_topk": [
-          {
-            "name": "wood",
-            "prob": 0.529,
-            "density_kgm3": [
-              500.0,
-              800.0
-            ],
-            "thickness_cm": [
-              2.0,
-              5.0
-            ]
-          },
-          {
-            "name": "plastic",
-            "prob": 0.176,
-            "density_kgm3": [
-              900.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              1.0,
-              2.0
-            ]
-          },
-          {
-            "name": "metal",
-            "prob": 0.118,
-            "density_kgm3": [
-              7000.0,
-              8000.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.0
-            ]
-          },
-          {
-            "name": "ceramic",
-            "prob": 0.059,
-            "density_kgm3": [
-              2000.0,
-              3000.0
-            ],
-            "thickness_cm": [
-              0.3,
-              0.7
-            ]
-          },
-          {
-            "name": "composite",
-            "prob": 0.118,
-            "density_kgm3": [
-              1500.0,
-              2000.0
-            ],
-            "thickness_cm": [
-              1.0,
-              3.0
-            ]
-          }
-        ],
-        "caption": "Wooden rolling pin"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:19:25+00:00"
-    },
-    "obj_whisk_whisk": {
-      "props": {
-        "geometry": {
-          "length_mm": 146.8,
-          "diameter_mm": null,
-          "extents_mm": [
-            146.8,
-            16.1,
-            21.3
-          ],
-          "height_z_mm": 21.3,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.55
-        },
-        "material": "steel",
-        "density_kgm3": 3123.4,
-        "mass_kg": 0.054,
-        "youngs_gpa": 74.51,
-        "mu": {
-          "mu": 0.44,
-          "stage": 0,
-          "material": "steel",
-          "rms_mm": 0.55
-        },
-        "confidence": 0.281,
-        "mass_range_kg": [
-          0.031,
-          0.077
-        ],
-        "materials_topk": [
-          {
-            "name": "wood",
-            "prob": 0.25,
-            "density_kgm3": [
-              400.0,
-              800.0
-            ],
-            "thickness_cm": [
-              2.0,
-              5.0
-            ]
-          },
-          {
-            "name": "steel",
-            "prob": 0.281,
-            "density_kgm3": [
-              7500.0,
-              8000.0
-            ],
-            "thickness_cm": [
-              1.0,
-              2.0
-            ]
-          },
-          {
-            "name": "plastic",
-            "prob": 0.188,
-            "density_kgm3": [
-              1000.0,
-              1200.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.0
-            ]
-          },
-          {
-            "name": "aluminum",
-            "prob": 0.156,
-            "density_kgm3": [
-              2700.0,
-              2900.0
-            ],
-            "thickness_cm": [
-              0.5,
-              1.5
-            ]
-          },
-          {
-            "name": "rubber",
-            "prob": 0.125,
-            "density_kgm3": [
-              1100.0,
-              1300.0
-            ],
-            "thickness_cm": [
-              0.3,
-              0.7
-            ]
-          }
-        ],
-        "caption": "Garden hand rake"
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:19:25+00:00"
-    },
-    "obj_lid_lid": {
-      "props": {
         "geometry": {
           "length_mm": 266.4,
           "diameter_mm": null,
@@ -2103,22 +660,32 @@
           "cylinder_like": false,
           "surface_rms_mm": 0.0
         },
-        "material": "wood",
-        "density_kgm3": 666.1,
-        "mass_kg": 0.094,
-        "youngs_gpa": 9.03,
-        "mu": {
-          "mu": 0.475,
-          "stage": 0,
-          "material": "wood",
-          "rms_mm": 0.0
+        "physical_properties": {
+          "material": {
+            "value": "wood",
+            "confidence": 0.29
+          },
+          "density_kgm3": {
+            "value": 666.1
+          },
+          "mass_kg": {
+            "value": 0.094,
+            "range": [
+              0.027,
+              0.161
+            ]
+          },
+          "youngs_gpa": {
+            "value": 9.03
+          },
+          "friction": {
+            "value": 0.475,
+            "stage": 0,
+            "material_basis": "wood",
+            "surface_rms_mm": 0.0
+          }
         },
-        "confidence": 0.29,
-        "mass_range_kg": [
-          0.027,
-          0.161
-        ],
-        "materials_topk": [
+        "material_hypotheses": [
           {
             "name": "wood",
             "prob": 0.29,
@@ -2180,141 +747,68 @@
             ]
           }
         ],
-        "caption": "Wooden plank"
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": null,
+          "source_episode": null,
+          "episodes_seen": 2,
+          "updated_at": "2026-09-02T20:19:25+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0,
+          "legacy_key": "obj_lid_lid"
+        }
       },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 2,
-      "updated_at": "2026-09-02T20:19:25+00:00"
-    },
-    "obj_bottle_bottle": {
-      "props": {
+      "legacy::obj_spatula_spatula": {
+        "identity": {
+          "object_id": "obj_spatula_spatula",
+          "caption": "A rustic wooden broom or sweeping tool"
+        },
         "geometry": {
-          "length_mm": 135.6,
+          "length_mm": 246.6,
           "diameter_mm": null,
           "extents_mm": [
-            135.6,
-            46.3,
-            35.5
+            246.6,
+            44.1,
+            1.5
           ],
-          "height_z_mm": 131.7,
+          "height_z_mm": 1.8,
           "cylinder_like": false,
-          "surface_rms_mm": 3.63
+          "surface_rms_mm": 0.03,
+          "seal_patch_rms_mm": 0.0,
+          "footprint_mm": [
+            246.6,
+            44.1
+          ],
+          "height_mm": 1.8
         },
-        "material": "aluminum",
-        "density_kgm3": 2700.0,
-        "mass_kg": 0.001,
-        "youngs_gpa": 69.0,
-        "mu": {
-          "mu": 0.509,
-          "stage": 0,
-          "material": "aluminum",
-          "rms_mm": 3.63
-        },
-        "confidence": 0.435,
-        "mass_range_kg": [
-          0.001,
-          0.002
-        ],
-        "materials_topk": [
-          {
-            "name": "aluminum",
-            "prob": 0.435,
-            "density_kgm3": [
-              2700.0,
-              2700.0
-            ],
-            "thickness_cm": [
-              0.01,
-              0.02
+        "physical_properties": {
+          "material": {
+            "value": "wood",
+            "confidence": 0.281
+          },
+          "density_kgm3": {
+            "value": 557.8
+          },
+          "mass_kg": {
+            "value": 0.003,
+            "range": [
+              0.001,
+              0.006
             ]
           },
-          {
-            "name": "steel",
-            "prob": 0.261,
-            "density_kgm3": [
-              7700.0,
-              8000.0
-            ],
-            "thickness_cm": [
-              0.01,
-              0.015
-            ]
+          "youngs_gpa": {
+            "value": 9.53
           },
-          {
-            "name": "polyethylene",
-            "prob": 0.087,
-            "density_kgm3": [
-              900.0,
-              960.0
-            ],
-            "thickness_cm": [
-              0.01,
-              0.03
-            ]
-          },
-          {
-            "name": "tin",
-            "prob": 0.13,
-            "density_kgm3": [
-              7200.0,
-              7300.0
-            ],
-            "thickness_cm": [
-              0.01,
-              0.02
-            ]
-          },
-          {
-            "name": "polypropylene",
-            "prob": 0.087,
-            "density_kgm3": [
-              850.0,
-              920.0
-            ],
-            "thickness_cm": [
-              0.02,
-              0.05
-            ]
+          "friction": {
+            "value": 0.475,
+            "stage": 0,
+            "material_basis": "wood",
+            "surface_rms_mm": 0.01
           }
-        ],
-        "caption": "A cylindrical metal soda or beverage drink can."
-      },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 4,
-      "updated_at": "2026-09-03T12:35:23+00:00"
-    },
-    "obj_spatula_spatula": {
-      "props": {
-        "geometry": {
-          "length_mm": 215.4,
-          "diameter_mm": null,
-          "extents_mm": [
-            215.4,
-            43.1,
-            1.4
-          ],
-          "height_z_mm": 1.9,
-          "cylinder_like": false,
-          "surface_rms_mm": 0.01
         },
-        "material": "wood",
-        "density_kgm3": 557.8,
-        "mass_kg": 0.003,
-        "youngs_gpa": 9.53,
-        "mu": {
-          "mu": 0.475,
-          "stage": 0,
-          "material": "wood",
-          "rms_mm": 0.01
-        },
-        "confidence": 0.281,
-        "mass_range_kg": [
-          0.001,
-          0.006
-        ],
-        "materials_topk": [
+        "material_hypotheses": [
           {
             "name": "wood",
             "prob": 0.281,
@@ -2376,43 +870,68 @@
             ]
           }
         ],
-        "caption": "A rustic wooden broom or sweeping tool"
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": null,
+          "source_episode": null,
+          "episodes_seen": 5,
+          "updated_at": "2026-09-08T15:33:03+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0,
+          "legacy_key": "obj_spatula_spatula"
+        }
       },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 4,
-      "updated_at": "2026-09-03T12:35:23+00:00"
-    },
-    "obj_tongs_tongs": {
-      "props": {
+      "legacy::obj_tongs_tongs": {
+        "identity": {
+          "object_id": "obj_tongs_tongs",
+          "caption": "A pair of metallic kitchen serving tongs."
+        },
         "geometry": {
-          "length_mm": 251.7,
+          "length_mm": 253.0,
           "diameter_mm": null,
           "extents_mm": [
-            251.7,
-            25.5,
-            16.7
+            253.0,
+            29.9,
+            20.9
           ],
-          "height_z_mm": 20.9,
+          "height_z_mm": 21.7,
           "cylinder_like": false,
-          "surface_rms_mm": 0.66
+          "surface_rms_mm": 0.63,
+          "seal_patch_rms_mm": 0.953,
+          "footprint_mm": [
+            253.0,
+            29.0
+          ],
+          "height_mm": 21.7
         },
-        "material": "stainless steel",
-        "density_kgm3": 7925.0,
-        "mass_kg": 0.015,
-        "youngs_gpa": 200.0,
-        "mu": {
-          "mu": 0.442,
-          "stage": 0,
-          "material": "stainless steel",
-          "rms_mm": 0.66
+        "physical_properties": {
+          "material": {
+            "value": "stainless steel",
+            "confidence": 0.5
+          },
+          "density_kgm3": {
+            "value": 7925.0
+          },
+          "mass_kg": {
+            "value": 0.015,
+            "range": [
+              0.01,
+              0.021
+            ]
+          },
+          "youngs_gpa": {
+            "value": 200.0
+          },
+          "friction": {
+            "value": 0.442,
+            "stage": 0,
+            "material_basis": "stainless steel",
+            "surface_rms_mm": 0.66
+          }
         },
-        "confidence": 0.5,
-        "mass_range_kg": [
-          0.01,
-          0.021
-        ],
-        "materials_topk": [
+        "material_hypotheses": [
           {
             "name": "stainless steel",
             "prob": 0.5,
@@ -2474,12 +993,874 @@
             ]
           }
         ],
-        "caption": "A pair of metallic kitchen serving tongs."
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": null,
+          "source_episode": null,
+          "episodes_seen": 5,
+          "updated_at": "2026-09-08T15:33:03+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0,
+          "legacy_key": "obj_tongs_tongs"
+        }
       },
-      "stage": 0,
-      "source": "siphy",
-      "episodes_seen": 4,
-      "updated_at": "2026-09-03T12:35:23+00:00"
+      "legacy::obj_cutting_board_cutting_board": {
+        "identity": {
+          "object_id": "obj_cutting_board_cutting_board",
+          "caption": "Rectangular wooden board with rounded corners and central hole."
+        },
+        "geometry": {
+          "length_mm": 246.8,
+          "diameter_mm": null,
+          "extents_mm": [
+            246.8,
+            149.7,
+            11.4
+          ],
+          "height_z_mm": 11.5,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.25,
+          "seal_patch_rms_mm": 0.019,
+          "footprint_mm": [
+            149.3,
+            246.8
+          ],
+          "height_mm": 11.5
+        },
+        "physical_properties": {
+          "material": {
+            "value": "hardwood",
+            "confidence": 0.27
+          },
+          "density_kgm3": {
+            "value": 706.2
+          },
+          "mass_kg": {
+            "value": 0.132,
+            "range": [
+              0.064,
+              0.199
+            ]
+          },
+          "youngs_gpa": {
+            "value": 9.55
+          },
+          "friction": {
+            "value": 0.433,
+            "stage": 0,
+            "material_basis": "hardwood",
+            "surface_rms_mm": 0.25
+          }
+        },
+        "material_hypotheses": [
+          {
+            "name": "hardwood",
+            "prob": 0.27,
+            "density_kgm3": [
+              650.0,
+              800.0
+            ],
+            "thickness_cm": [
+              1.5,
+              3.5
+            ]
+          },
+          {
+            "name": "bamboo",
+            "prob": 0.243,
+            "density_kgm3": [
+              600.0,
+              800.0
+            ],
+            "thickness_cm": [
+              1.5,
+              3.5
+            ]
+          },
+          {
+            "name": "softwood",
+            "prob": 0.189,
+            "density_kgm3": [
+              400.0,
+              600.0
+            ],
+            "thickness_cm": [
+              1.5,
+              3.5
+            ]
+          },
+          {
+            "name": "plastic",
+            "prob": 0.162,
+            "density_kgm3": [
+              900.0,
+              960.0
+            ],
+            "thickness_cm": [
+              1.0,
+              3.0
+            ]
+          },
+          {
+            "name": "wood composite",
+            "prob": 0.135,
+            "density_kgm3": [
+              600.0,
+              800.0
+            ],
+            "thickness_cm": [
+              1.5,
+              3.5
+            ]
+          }
+        ],
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": null,
+          "source_episode": null,
+          "episodes_seen": 1,
+          "updated_at": "2026-09-08T15:33:03+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0,
+          "legacy_key": "obj_cutting_board_cutting_board"
+        }
+      },
+      "c1_2::obj_bottle_bottle": {
+        "identity": {
+          "object_id": "obj_bottle_bottle",
+          "caption": "Section of cylindrical pipe, possibly with a joint."
+        },
+        "geometry": {
+          "length_mm": 102.1,
+          "diameter_mm": null,
+          "extents_mm": [
+            102.1,
+            48.0,
+            36.2
+          ],
+          "height_z_mm": 93.9,
+          "cylinder_like": false,
+          "surface_rms_mm": 1.93,
+          "seal_patch_rms_mm": 0.051,
+          "footprint_mm": [
+            48.2,
+            43.6
+          ],
+          "height_mm": 93.9
+        },
+        "physical_properties": {
+          "material": {
+            "value": "steel",
+            "confidence": 0.257
+          },
+          "density_kgm3": {
+            "value": 4520.0
+          },
+          "mass_kg": {
+            "value": 0.121,
+            "range": [
+              0.045,
+              0.196
+            ]
+          },
+          "youngs_gpa": {
+            "value": 92.96
+          },
+          "friction": {
+            "value": 0.471,
+            "stage": 0,
+            "material_basis": "steel",
+            "surface_rms_mm": 1.93
+          }
+        },
+        "material_hypotheses": [
+          {
+            "name": "steel",
+            "prob": 0.257,
+            "density_kgm3": [
+              7800.0,
+              7900.0
+            ],
+            "thickness_cm": [
+              0.5,
+              2.0
+            ]
+          },
+          {
+            "name": "pvc",
+            "prob": 0.229,
+            "density_kgm3": [
+              1300.0,
+              1500.0
+            ],
+            "thickness_cm": [
+              0.2,
+              1.0
+            ]
+          },
+          {
+            "name": "cast iron",
+            "prob": 0.2,
+            "density_kgm3": [
+              6800.0,
+              7800.0
+            ],
+            "thickness_cm": [
+              0.8,
+              3.0
+            ]
+          },
+          {
+            "name": "aluminum",
+            "prob": 0.171,
+            "density_kgm3": [
+              2700.0,
+              2800.0
+            ],
+            "thickness_cm": [
+              0.3,
+              1.5
+            ]
+          },
+          {
+            "name": "fiber-reinforced polymer",
+            "prob": 0.143,
+            "density_kgm3": [
+              1500.0,
+              2000.0
+            ],
+            "thickness_cm": [
+              0.5,
+              2.0
+            ]
+          }
+        ],
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": "c1_2",
+          "source_episode": null,
+          "episodes_seen": 1,
+          "updated_at": "2026-09-08T17:19:39+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0
+        }
+      },
+      "c1_2::obj_cutting_board_cutting_board": {
+        "identity": {
+          "object_id": "obj_cutting_board_cutting_board",
+          "caption": "Wooden cutting board with a central circular hole."
+        },
+        "geometry": {
+          "length_mm": 246.8,
+          "diameter_mm": null,
+          "extents_mm": [
+            246.8,
+            149.7,
+            11.4
+          ],
+          "height_z_mm": 11.5,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.25,
+          "seal_patch_rms_mm": 0.019,
+          "footprint_mm": [
+            149.3,
+            246.8
+          ],
+          "height_mm": 11.5
+        },
+        "physical_properties": {
+          "material": {
+            "value": "hardwood",
+            "confidence": 0.286
+          },
+          "density_kgm3": {
+            "value": 1020.0
+          },
+          "mass_kg": {
+            "value": 0.164,
+            "range": [
+              0.087,
+              0.242
+            ]
+          },
+          "youngs_gpa": {
+            "value": 15.77
+          },
+          "friction": {
+            "value": 0.433,
+            "stage": 0,
+            "material_basis": "hardwood",
+            "surface_rms_mm": 0.25
+          }
+        },
+        "material_hypotheses": [
+          {
+            "name": "hardwood",
+            "prob": 0.286,
+            "density_kgm3": [
+              600.0,
+              800.0
+            ],
+            "thickness_cm": [
+              2.0,
+              4.0
+            ]
+          },
+          {
+            "name": "bamboo",
+            "prob": 0.257,
+            "density_kgm3": [
+              650.0,
+              850.0
+            ],
+            "thickness_cm": [
+              1.5,
+              3.0
+            ]
+          },
+          {
+            "name": "hdpe",
+            "prob": 0.2,
+            "density_kgm3": [
+              930.0,
+              970.0
+            ],
+            "thickness_cm": [
+              1.0,
+              2.5
+            ]
+          },
+          {
+            "name": "paper composite",
+            "prob": 0.171,
+            "density_kgm3": [
+              1100.0,
+              1400.0
+            ],
+            "thickness_cm": [
+              0.5,
+              1.5
+            ]
+          },
+          {
+            "name": "tempered glass",
+            "prob": 0.086,
+            "density_kgm3": [
+              2400.0,
+              2800.0
+            ],
+            "thickness_cm": [
+              0.3,
+              0.8
+            ]
+          }
+        ],
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": "c1_2",
+          "source_episode": null,
+          "episodes_seen": 1,
+          "updated_at": "2026-09-08T17:19:39+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0
+        }
+      },
+      "c1_2::obj_dough_dough": {
+        "identity": {
+          "object_id": "obj_dough_dough",
+          "caption": "Round, textured, brown cookie with darker chocolate chips."
+        },
+        "geometry": {
+          "length_mm": 57.6,
+          "diameter_mm": null,
+          "extents_mm": [
+            57.6,
+            57.7,
+            26.2
+          ],
+          "height_z_mm": 33.5,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.96,
+          "seal_patch_rms_mm": 0.625,
+          "footprint_mm": [
+            52.9,
+            57.0
+          ],
+          "height_mm": 33.5
+        },
+        "physical_properties": {
+          "material": {
+            "value": "baked dough",
+            "confidence": 0.312
+          },
+          "density_kgm3": {
+            "value": 982.8
+          },
+          "mass_kg": {
+            "value": 0.04,
+            "range": [
+              0.009,
+              0.071
+            ]
+          },
+          "youngs_gpa": {
+            "value": 6.19
+          },
+          "friction": {
+            "value": 0.449,
+            "stage": 0,
+            "material_basis": "baked dough",
+            "surface_rms_mm": 0.96
+          }
+        },
+        "material_hypotheses": [
+          {
+            "name": "baked dough",
+            "prob": 0.312,
+            "density_kgm3": [
+              300.0,
+              600.0
+            ],
+            "thickness_cm": [
+              3.0,
+              8.0
+            ]
+          },
+          {
+            "name": "cooked meat",
+            "prob": 0.219,
+            "density_kgm3": [
+              800.0,
+              1100.0
+            ],
+            "thickness_cm": [
+              3.0,
+              8.0
+            ]
+          },
+          {
+            "name": "plastic",
+            "prob": 0.188,
+            "density_kgm3": [
+              1000.0,
+              1400.0
+            ],
+            "thickness_cm": [
+              0.2,
+              8.0
+            ]
+          },
+          {
+            "name": "ceramic",
+            "prob": 0.156,
+            "density_kgm3": [
+              1800.0,
+              2400.0
+            ],
+            "thickness_cm": [
+              0.5,
+              8.0
+            ]
+          },
+          {
+            "name": "wood",
+            "prob": 0.125,
+            "density_kgm3": [
+              400.0,
+              900.0
+            ],
+            "thickness_cm": [
+              3.0,
+              8.0
+            ]
+          }
+        ],
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": "c1_2",
+          "source_episode": null,
+          "episodes_seen": 1,
+          "updated_at": "2026-09-08T17:19:39+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0
+        }
+      },
+      "c1_2::obj_spatula_spatula": {
+        "identity": {
+          "object_id": "obj_spatula_spatula",
+          "caption": "Leopard print high-back chair or throne with a blocky design."
+        },
+        "geometry": {
+          "length_mm": 246.6,
+          "diameter_mm": null,
+          "extents_mm": [
+            246.6,
+            44.1,
+            1.5
+          ],
+          "height_z_mm": 1.8,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.03,
+          "seal_patch_rms_mm": 0.0,
+          "footprint_mm": [
+            246.6,
+            44.1
+          ],
+          "height_mm": 1.8
+        },
+        "physical_properties": {
+          "material": {
+            "value": "wood",
+            "confidence": 0.225
+          },
+          "density_kgm3": {
+            "value": 1522.2
+          },
+          "mass_kg": {
+            "value": 0.004,
+            "range": [
+              0.002,
+              0.007
+            ]
+          },
+          "youngs_gpa": {
+            "value": 33.41
+          },
+          "friction": {
+            "value": 0.476,
+            "stage": 0,
+            "material_basis": "wood",
+            "surface_rms_mm": 0.03
+          }
+        },
+        "material_hypotheses": [
+          {
+            "name": "wood",
+            "prob": 0.225,
+            "density_kgm3": [
+              500.0,
+              800.0
+            ],
+            "thickness_cm": [
+              2.0,
+              5.0
+            ]
+          },
+          {
+            "name": "medium-density fiberboard",
+            "prob": 0.2,
+            "density_kgm3": [
+              600.0,
+              850.0
+            ],
+            "thickness_cm": [
+              1.5,
+              3.0
+            ]
+          },
+          {
+            "name": "polyurethane foam",
+            "prob": 0.2,
+            "density_kgm3": [
+              25.0,
+              60.0
+            ],
+            "thickness_cm": [
+              5.0,
+              15.0
+            ]
+          },
+          {
+            "name": "polyester fabric",
+            "prob": 0.225,
+            "density_kgm3": [
+              100.0,
+              300.0
+            ],
+            "thickness_cm": [
+              0.1,
+              0.3
+            ]
+          },
+          {
+            "name": "steel",
+            "prob": 0.15,
+            "density_kgm3": [
+              7800.0,
+              7900.0
+            ],
+            "thickness_cm": [
+              0.2,
+              1.0
+            ]
+          }
+        ],
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": "c1_2",
+          "source_episode": null,
+          "episodes_seen": 1,
+          "updated_at": "2026-09-08T17:19:39+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0
+        }
+      },
+      "c1_2::obj_spoon_spoon": {
+        "identity": {
+          "object_id": "obj_spoon_spoon",
+          "caption": "Stylized mallet or mace with round head and handle."
+        },
+        "geometry": {
+          "length_mm": 109.3,
+          "diameter_mm": null,
+          "extents_mm": [
+            109.3,
+            51.5,
+            27.6
+          ],
+          "height_z_mm": 27.4,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.37,
+          "seal_patch_rms_mm": 99.9,
+          "footprint_mm": [
+            110.6,
+            51.4
+          ],
+          "height_mm": 27.4
+        },
+        "physical_properties": {
+          "material": {
+            "value": "hardwood",
+            "confidence": 0.25
+          },
+          "density_kgm3": {
+            "value": 1815.3
+          },
+          "mass_kg": {
+            "value": 0.112,
+            "range": [
+              0.021,
+              0.203
+            ]
+          },
+          "youngs_gpa": {
+            "value": 33.68
+          },
+          "friction": {
+            "value": 0.436,
+            "stage": 0,
+            "material_basis": "hardwood",
+            "surface_rms_mm": 0.37
+          }
+        },
+        "material_hypotheses": [
+          {
+            "name": "hardwood",
+            "prob": 0.25,
+            "density_kgm3": [
+              600.0,
+              900.0
+            ],
+            "thickness_cm": [
+              2.0,
+              15.0
+            ]
+          },
+          {
+            "name": "softwood",
+            "prob": 0.222,
+            "density_kgm3": [
+              400.0,
+              700.0
+            ],
+            "thickness_cm": [
+              2.0,
+              4.0
+            ]
+          },
+          {
+            "name": "abs plastic",
+            "prob": 0.222,
+            "density_kgm3": [
+              1000.0,
+              1100.0
+            ],
+            "thickness_cm": [
+              0.3,
+              15.0
+            ]
+          },
+          {
+            "name": "rubber",
+            "prob": 0.167,
+            "density_kgm3": [
+              900.0,
+              1200.0
+            ],
+            "thickness_cm": [
+              8.0,
+              15.0
+            ]
+          },
+          {
+            "name": "steel",
+            "prob": 0.139,
+            "density_kgm3": [
+              7800.0,
+              8000.0
+            ],
+            "thickness_cm": [
+              1.0,
+              15.0
+            ]
+          }
+        ],
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": "c1_2",
+          "source_episode": null,
+          "episodes_seen": 1,
+          "updated_at": "2026-09-08T17:19:39+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0
+        }
+      },
+      "c1_2::obj_tongs_tongs": {
+        "identity": {
+          "object_id": "obj_tongs_tongs",
+          "caption": "Kitchen or serving tongs with a simple spring design."
+        },
+        "geometry": {
+          "length_mm": 253.0,
+          "diameter_mm": null,
+          "extents_mm": [
+            253.0,
+            29.9,
+            20.9
+          ],
+          "height_z_mm": 21.7,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.63,
+          "seal_patch_rms_mm": 0.953,
+          "footprint_mm": [
+            253.0,
+            29.0
+          ],
+          "height_mm": 21.7
+        },
+        "physical_properties": {
+          "material": {
+            "value": "stainless steel",
+            "confidence": 0.265
+          },
+          "density_kgm3": {
+            "value": 4600.7
+          },
+          "mass_kg": {
+            "value": 0.029,
+            "range": [
+              0.016,
+              0.042
+            ]
+          },
+          "youngs_gpa": {
+            "value": 110.3
+          },
+          "friction": {
+            "value": 0.442,
+            "stage": 0,
+            "material_basis": "stainless steel",
+            "surface_rms_mm": 0.63
+          }
+        },
+        "material_hypotheses": [
+          {
+            "name": "stainless steel",
+            "prob": 0.265,
+            "density_kgm3": [
+              7800.0,
+              8000.0
+            ],
+            "thickness_cm": [
+              0.1,
+              0.3
+            ]
+          },
+          {
+            "name": "aluminum alloy",
+            "prob": 0.206,
+            "density_kgm3": [
+              2700.0,
+              2800.0
+            ],
+            "thickness_cm": [
+              0.2,
+              0.4
+            ]
+          },
+          {
+            "name": "nylon",
+            "prob": 0.176,
+            "density_kgm3": [
+              1050.0,
+              1150.0
+            ],
+            "thickness_cm": [
+              0.3,
+              0.6
+            ]
+          },
+          {
+            "name": "spring steel",
+            "prob": 0.206,
+            "density_kgm3": [
+              7800.0,
+              7900.0
+            ],
+            "thickness_cm": [
+              0.1,
+              0.3
+            ]
+          },
+          {
+            "name": "polypropylene",
+            "prob": 0.147,
+            "density_kgm3": [
+              900.0,
+              910.0
+            ],
+            "thickness_cm": [
+              0.4,
+              0.7
+            ]
+          }
+        ],
+        "metadata": {
+          "source_module": "M3",
+          "source_method": "siphy",
+          "source_task": "c1_2",
+          "source_episode": null,
+          "episodes_seen": 1,
+          "updated_at": "2026-09-08T17:19:39+00:00",
+          "stale": false,
+          "stale_reason": null,
+          "stage": 0
+        }
+      }
     }
   }
 }

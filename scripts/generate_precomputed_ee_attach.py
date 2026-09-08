@@ -325,7 +325,7 @@ def main() -> int:
         else repository
         / "configs"
         / "precomputed_ee_paths"
-        / args.environment
+        / "ee_rack"
         / f"bare_to_{args.target_ee}.json"
     )
     if args.replay_existing and not output.is_file():

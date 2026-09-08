@@ -82,9 +82,16 @@ PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 �
 
 태스크: {task}
 장면 노드 id: {ids}
+장면 관계 (on(A, B) = A가 B 위에 놓여 있음, inside(A, B) = A가 B 안에 있음):
+{relations}
 
 규칙:
 - 서브골은 로봇 세부 동작이 아니라 의미 단위 작업이다.
+- 위에 다른 물체가 놓인 물체(on(X, Y)의 Y)는 X를 먼저 치우기 전엔 집을 수 없다.
+  stack에서는 지금 노출된 물체부터 집을 수 있게 순서를 정하고, 밑에 깔린 물체를
+  바닥(첫 target 또는 container)으로 삼지 않는다.
+- 뚜껑을 덮거나 물체를 다른 물체 위에 얹는 것은 stack이다
+  (target_ids=[얹을 물체], container_id=받침). relocate의 target_ids에 섞지 않는다.
 - 태스크에 명시된 목표만 서브골로 만든다. 태스크에 없는 목표(예: 장애물 치우기,
   정리하기)를 발명하지 않는다.
 - target_ids / container_id / tool_candidate_ids 에는 위 노드 id만 쓴다.
@@ -94,7 +101,8 @@ PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 �
   extract(좁은 틈에서 빼내기) 중 하나.
 - kind는 지시문의 동사 표현이 아니라 장면 구성과 물리적 제약을 근거로 고른다.
   직전 계획 평가가 아래에 주어진 경우, 평가에서 실행 불가로 드러난 제약을
-  해소하지 못하는 분해는 무효다.
+  해소하지 못하는 분해는 무효다. 단 지시문이 요구하는 최종 상태(펴기, 담기, 쌓기,
+  꺼내기)는 재분해에서도 바뀌면 안 된다. 바꾸는 것은 수행 방식, 도구 후보, 순서다.
 - kind와 무관하게, 같은 목적지로 가는 대상 전체를 서브골 하나의 target_ids에 담는다.
   대상별로 쪼개지 않는다. 몇 그룹으로 나눠 처리할지는 뒤 모듈이 측정값을 보고 정한다.
 - 도구는 여기서 다루지 않는다. 도구 선별은 다음 단계(객체 선택)가 한다.
@@ -102,10 +110,13 @@ PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 �
 - confidence: 이 서브골 분해가 옳다는 확신을 0.0~1.0으로 매긴다. 지금은 물체의
   질량·재질·파지 가능 여부 등 측정값이 없는 상태다. 근거 없이 후하게 주지 말 것.
   (0.9 이상 = 거의 확실 / 0.7 = 대체로 확신 / 0.5 = 반반 / 0.3 = 실패 가능성 높음)
+- ordered: 지시문이 대상들을 처리하는 순서를 명시하는가 (예: 왼쪽부터, 순서대로,
+  큰 것부터). 순서 요구가 없으면 false. 순서 자체는 여기서 정하지 않는다 (뒤 단계가
+  장면 이미지를 보고 정한다).
 - JSON 배열만 출력한다.
 
 출력 형식:
-[{{"subgoal_id":"SG1","goal":"...","kind":"relocate","target_ids":["..."],"container_id":"...","confidence":0.0}}]"""
+[{{"subgoal_id":"SG1","goal":"...","kind":"relocate","target_ids":["..."],"container_id":"...","ordered":false,"confidence":0.0}}]"""
 
 
 PROMPT_SELECT = """너는 로봇 계획의 객체 선택 단계다. 각 서브골에 대해, 장면 노드 중
@@ -114,6 +125,8 @@ PROMPT_SELECT = """너는 로봇 계획의 객체 선택 단계다. 각 서브�
 태스크: {task}
 장면 노드 (id: class):
 {nodes}
+장면 관계 (on(A, B) = A가 B 위에 놓여 있음, inside(A, B) = A가 B 안에 있음):
+{relations}
 
 서브골:
 {subgoals}
@@ -146,9 +159,16 @@ PROMPT_COMBINED = """로봇 매니퓰레이션 태스크를 planning-level 서�
 태스크: {task}
 장면 노드 (id: class):
 {nodes}
+장면 관계 (on(A, B) = A가 B 위에 놓여 있음, inside(A, B) = A가 B 안에 있음):
+{relations}
 
 분해 규칙:
 - 서브골은 로봇 세부 동작이 아니라 의미 단위 작업이다.
+- 위에 다른 물체가 놓인 물체(on(X, Y)의 Y)는 X를 먼저 치우기 전엔 집을 수 없다.
+  stack에서는 지금 노출된 물체부터 집을 수 있게 순서를 정하고, 밑에 깔린 물체를
+  바닥(첫 target 또는 container)으로 삼지 않는다.
+- 뚜껑을 덮거나 물체를 다른 물체 위에 얹는 것은 stack이다
+  (target_ids=[얹을 물체], container_id=받침). relocate의 target_ids에 섞지 않는다.
 - 태스크에 명시된 목표만 서브골로 만든다. 태스크에 없는 목표(예: 장애물 치우기,
   정리하기)를 발명하지 않는다.
 - target_ids / container_id / tool_candidate_ids / object_ids 에는 위 노드 id만 쓴다.
@@ -157,7 +177,8 @@ PROMPT_COMBINED = """로봇 매니퓰레이션 태스크를 planning-level 서�
   extract(좁은 틈에서 빼내기) 중 하나.
 - kind는 지시문의 동사 표현이 아니라 장면 구성과 물리적 제약을 근거로 고른다.
   직전 계획 평가가 아래에 주어진 경우, 평가에서 실행 불가로 드러난 제약을
-  해소하지 못하는 분해는 무효다.
+  해소하지 못하는 분해는 무효다. 단 지시문이 요구하는 최종 상태(펴기, 담기, 쌓기,
+  꺼내기)는 재분해에서도 바뀌면 안 된다. 바꾸는 것은 수행 방식, 도구 후보, 순서다.
 - kind와 무관하게, 같은 목적지로 가는 대상 전체를 서브골 하나의 target_ids에 담는다.
   대상별로 쪼개지 않는다. 몇 그룹으로 나눠 처리할지는 뒤 모듈이 측정값을 보고 정한다.
 - goal은 한국어 한 문장으로 쓴다.
@@ -183,6 +204,31 @@ PROMPT_COMBINED = """로봇 매니퓰레이션 태스크를 planning-level 서�
 [{{"subgoal_id":"SG1","goal":"...","kind":"relocate","target_ids":["..."],"container_id":"...",
   "object_ids":["..."],"tool_candidate_ids":[],"reason":"...",
   "confidence":{{"decomposition":0.0,"object_selection":0.0}},"uncertain_about":["..."]}}]"""
+
+
+PROMPT_ORDER = """이미지는 로봇 작업대를 카메라로 본 장면이다.
+지시문: {task}
+
+지시문이 요구하는 처리 순서대로 아래 물체들을 나열하라. 물체는 이미지에서 종류(class)로
+식별한다. 방향(왼쪽, 오른쪽, 앞, 뒤)은 이 이미지 기준이다.
+물체 (id: class):
+{nodes}
+
+규칙:
+- 위 id를 전부 정확히 한 번씩 포함한 배열을 낸다. 새 id를 만들지 않는다.
+- reason에 어떤 기준으로 정렬했는지 한국어 한 문장.
+- JSON 객체만 출력한다.
+
+출력 형식:
+{{"order": ["..."], "reason": "..."}}"""
+
+
+def _image_part(path: str) -> dict:
+    """frame.png → OpenAI 호환 image_url 파트 (Gemini 호환 엔드포인트도 같은 형식)."""
+    import base64
+    with open(path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    return {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}}
 
 
 def track_usage(acc: dict, stage: str, response, seconds: float = 0.0) -> None:
@@ -227,6 +273,7 @@ def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
     for s in subs:
         s.setdefault("container_id", None)
         s.setdefault("tool_candidate_ids", [])
+        s["ordered"] = bool(s.get("ordered", False))     # 0908: 순서 요구 여부 (VLM 순서 판정 게이트)
         out.append(s)   # 0828: relocate 물체당 강제 분리 제거 — 분할은 측정 후 regroup이 한다
 
     # 같은 (kind, 목적지) 서브골은 하나로 합친다. 분해 시점에는 목적지 단위로만 묶고,
@@ -239,6 +286,7 @@ def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
             t["target_ids"] += [x for x in s["target_ids"] if x not in t["target_ids"]]
             t["tool_candidate_ids"] += [x for x in s["tool_candidate_ids"]
                                         if x not in t["tool_candidate_ids"]]
+            t["ordered"] = t.get("ordered", False) or s.get("ordered", False)
             verb = {"sweep_collect": "쓸어 담는다", "flatten": "평평하게 편다",
                     "stack": "쌓는다", "scoop_transfer": "떠서 옮긴다",
                     "extract": "빼낸다"}.get(s.get("kind"), "옮긴다")
@@ -341,6 +389,42 @@ class LLMRough:
         # 직전 왕복의 측정 실패 요약 (0831 — 재분해 때 분해 프롬프트에 사실로 첨부.
         # 호출 추가 없음: 어차피 불리는 2차 분해 호출의 입력만 풍부해진다)
         self.feedback: str | None = None
+        # 0908: 순서 판정용 장면 이미지 경로 (run_m2가 output/<task>/frame.png 를 넣어준다).
+        # 순서를 요구하는 서브골(ordered)이 있을 때만 VLM 1회 호출. 없으면 VLM 0회.
+        self.frame_path: str | None = None
+
+    def _order_targets(self, task: str, s: dict, m1: dict) -> None:
+        """ordered 서브골의 target_ids를 VLM(frame.png)으로 지시문 순서에 맞게 정렬한다."""
+        ids = list(s.get("target_ids", []))
+        if len(ids) < 2 or not self.frame_path or not os.path.exists(self.frame_path):
+            return
+        cls = {n["id"]: n.get("class", "?") for n in m1["nodes"]}
+        node_lines = "\n".join(f"  {i}: {cls.get(i, '?')}" for i in ids)
+        prompt = PROMPT_ORDER.format(task=task, nodes=node_lines)
+        if self._client is None:
+            self._client = make_llm_client()
+        err = None
+        for attempt in (1, 2):
+            msg = prompt if attempt == 1 else prompt + f"\n\n이전 출력의 문제: {err}. 고쳐서 JSON 객체만 다시 출력하라."
+            t0 = time.monotonic()
+            r = self._client.chat.completions.create(
+                model=self.model, temperature=0,
+                messages=[{"role": "user", "content": [{"type": "text", "text": msg},
+                                                       _image_part(self.frame_path)]}])
+            track_usage(self.usage, "순서(VLM)", r, seconds=time.monotonic() - t0)
+            text = r.choices[0].message.content.strip()
+            try:
+                obj = json.loads(text[text.find("{"): text.rfind("}") + 1])
+                order = obj.get("order")
+                if not isinstance(order, list) or sorted(order) != sorted(ids):
+                    raise ValueError(f"order가 target_ids의 순열이 아님: {order!r} (기대 집합 {ids})")
+                s["target_ids"] = list(order)
+                s["target_order"] = {"source": "vlm", "reason": obj.get("reason", "")}
+                return
+            except (ValueError, json.JSONDecodeError) as e:
+                err = str(e)
+        # 실패해도 계획은 계속 — 순서 없이 진행하고 기록만 남긴다
+        s["target_order"] = {"source": "vlm_failed", "reason": err}
 
     def _json_call(self, prompt: str, validate, stage: str):
         """호출 → JSON 파싱 → 검문. 실패 시 오류를 붙여 1회 재시도."""
@@ -365,14 +449,22 @@ class LLMRough:
     def generate(self, task, m1):
         ids = [n["id"] for n in m1["nodes"]]
         node_lines = "\n".join(f"  {n['id']}: {n.get('class', '?')}" for n in m1["nodes"])
+        # 0908: M1의 on/inside 관계를 프롬프트에 넣는다. 없으면 LLM이 밑에 깔린 물체를
+        # 바닥으로 고르는 등(c2_2: bread_b 아래의 bread_a를 1층으로) 장면 상태를 모른다.
+        # near/overlaps는 노이즈라 제외.
+        rel_lines = "\n".join(f"  {e['type']}({e['from']}, {e['to']})"
+                              for e in m1.get("edges", []) if e.get("type") in ("on", "inside"))
+        self._relations = rel_lines or "  (없음)"
 
         # ── 실험 모드 (0828, 랩미팅 지적): TUJ_M2_SINGLE_CALL=1 이면
         #    분해+선택을 1회 호출로 통합. 검문은 기존 2단 검문을 그대로 재사용.
         if os.environ.get("TUJ_M2_SINGLE_CALL") == "1":
-            return self._generate_single(task, ids, node_lines)
+            subgoals = self._generate_single(task, ids, node_lines)
+            self._apply_order(task, subgoals, m1)
+            return subgoals
 
         # 1차 — 서브골 분해 (직전 측정 피드백이 있으면 사실로 첨부)
-        base = PROMPT.format(task=task, ids=", ".join(ids))
+        base = PROMPT.format(task=task, ids=", ".join(ids), relations=self._relations)
         if self.feedback:
             base += "\n\n" + self.feedback
         subgoals = self._json_call(
@@ -383,7 +475,7 @@ class LLMRough:
                   "target_ids": s["target_ids"], "container_id": s["container_id"]}
                  for s in subgoals]
         sel = self._json_call(
-            PROMPT_SELECT.format(task=task, nodes=node_lines,
+            PROMPT_SELECT.format(task=task, nodes=node_lines, relations=self._relations,
                                  subgoals=json.dumps(brief, ensure_ascii=False, indent=2)),
             lambda x: validate_selection(x, subgoals, ids), "객체 선택")
 
@@ -398,7 +490,15 @@ class LLMRough:
                            "object_selection": e.get("confidence"),
                            "uncertain_about": e.get("uncertain_about", [])},
             }
+        self._apply_order(task, subgoals, m1)
         return subgoals
+
+    def _apply_order(self, task, subgoals, m1):
+        # 0908: 순서 요구가 있는 relocate 서브골만 VLM으로 정렬 (도희 0905 요청 —
+        # M1 좌→우 정렬 규칙 대신 frame.png를 보고 판단, 순서 없는 태스크는 VLM 미호출).
+        for s in subgoals:
+            if s.get("ordered") and s.get("kind") == "relocate":
+                self._order_targets(task, s, m1)
 
     def _generate_single(self, task, ids, node_lines):
         """실험: 분해+선택 통합 1회 호출. 출력 구조는 2회 호출과 동일하게 맞춘다."""
@@ -427,7 +527,8 @@ class LLMRough:
             return subs
 
         subgoals = self._json_call(
-            PROMPT_COMBINED.format(task=task, nodes=node_lines)
+            PROMPT_COMBINED.format(task=task, nodes=node_lines,
+                                   relations=getattr(self, "_relations", "  (없음)"))
             + ("\n\n" + self.feedback if self.feedback else ""),
             validate, "통합(분해+선택)")
         for s in subgoals:
