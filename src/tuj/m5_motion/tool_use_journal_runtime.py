@@ -2610,7 +2610,21 @@ class ToolUseJournalKinematicTrajectoryPlayer:
         )
         if context.metadata.get("attachment_proxy") == "CONTACT_FRICTION":
             held_object_id = self.runtime.held_tool_id
-            if not actual_objects and held_object_id is not None:
+            scripted_retention = getattr(
+                self.runtime, "scripted_grasp_retention", None
+            )
+            scripted_object_id = getattr(
+                getattr(scripted_retention, "entry", None), "object_id", None
+            )
+            contact_retention = getattr(
+                self.runtime, "_contact_friction_retention", None
+            )
+            contact_object_id = getattr(contact_retention, "object_id", None)
+            if (
+                not actual_objects
+                and held_object_id is not None
+                and held_object_id in {scripted_object_id, contact_object_id}
+            ):
                 actual_objects = {held_object_id}
         if expected_objects != actual_objects:
             raise ToolUseJournalRuntimeError(
@@ -3252,7 +3266,9 @@ class ToolUseJournalControllerTrajectoryPlayer(
         if retention is not None:
             action = retention.before_tick(action)
         env = self.runtime.env
-        contact_retention = self.runtime._contact_friction_retention
+        contact_retention = getattr(
+            self.runtime, "_contact_friction_retention", None
+        )
         model, data = _raw_model_data(env)
         try:
             control_timestep = float(env.control_timestep)  # type: ignore[attr-defined]
