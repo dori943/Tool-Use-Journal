@@ -41,6 +41,7 @@ from tuj.m5_motion.strategy import (
     InterpolatingEdgePlanner,
     StateValidator,
 )
+from tuj.m5_motion.trajectory_processing import TrajectoryProcessingError
 
 
 class KeyframeStrategyProvider(Protocol):
@@ -380,7 +381,11 @@ class MotionPlanningPipeline:
                     final_segment_validator=final_validator,
                     joint_position_limits_rad=joint_limits,
                 )
-            except MotionPlanBuildError as error:
+            except (
+                MotionPlanBuildError,
+                TrajectoryProcessingError,
+                ValueError,
+            ) as error:
                 last_build_error = error
                 connected_attempt = attempts.pop()
                 attempts.append(

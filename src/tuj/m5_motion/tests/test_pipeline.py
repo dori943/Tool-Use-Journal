@@ -12,6 +12,7 @@ from tuj.m5_motion.pipeline import (
     MotionPlanningPipeline,
     MotionPlanningPipelineError,
 )
+from tuj.m5_motion.plan_builder import MotionPlanBuilder
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
     CollisionContext,
@@ -34,6 +35,7 @@ from tuj.m5_motion.vlm_provider import (
     OpenAIKeyframeProvider,
     OpenAIKeyframeProviderConfig,
 )
+from tuj.m5_motion.trajectory_processing import TrajectoryProcessingError
 
 
 def _request() -> MotionPlanRequest:
@@ -315,6 +317,56 @@ def test_pipeline_retries_after_connected_strategy_fails_final_validation() -> N
         None,
     ]
     assert result.compilation.attempts[0].strategy_id.endswith(":blocked")
+
+
+@pytest.mark.parametrize(
+    "build_error",
+    [
+        TrajectoryProcessingError("invalid time parameterization"),
+        ValueError("invalid motion plan payload"),
+    ],
+)
+def test_pipeline_retries_after_non_build_validation_error(build_error) -> None:
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(),
+    )
+    delegate = MotionPlanBuilder()
+
+    class FailFirstBuilder:
+        def __init__(self) -> None:
+            self.calls = 0
+
+        def build(self, *args, **kwargs):
+            self.calls += 1
+            if self.calls == 1:
+                raise build_error
+            return delegate.build(*args, **kwargs)
+
+    pipeline = MotionPlanningPipeline(
+        provider,
+        _FakeKinematics(),
+        plan_builder=FailFirstBuilder(),
+    )
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    result = pipeline.plan(
+        _request(),
+        state_validator=lambda q, keyframe: True,
+        collision_contexts={context.context_id: context},
+        initial_collision_context_id=context.context_id,
+        final_segment_validator=lambda waypoints, selected_context: True,
+    )
+
+    assert [attempt.failure_code for attempt in result.compilation.attempts] == [
+        "FINAL_VALIDATION_FAILED",
+        None,
+    ]
+    assert type(build_error).__name__ in result.compilation.attempts[0].detail
 
 
 def test_pipeline_accepts_one_artifact_aware_collision_factory() -> None:
