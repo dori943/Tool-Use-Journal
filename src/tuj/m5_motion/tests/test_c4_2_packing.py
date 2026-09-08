@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
+from tuj.m5_motion.attachment_retarget import retarget_resolved_pose
 from tuj.m5_motion.c4_2_packing import C4_2PackingKeyframeProvider
+from tuj.m5_motion.geometry import RelativePoseResolver, quaternion_matrix_xyzw
 from tuj.m5_motion.packing import PackingKeyframeProvider
 from tuj.m5_motion.phase_contract import validate_keyframe_phase_contract
 from tuj.m5_motion.schema import (
@@ -138,6 +141,64 @@ def test_milk_place_retargets_until_release_then_retreats_as_eef():
         assert place.metadata["packing_motion_role"] == "CONSTRAINED_INSERTION"
         assert pre_place.metadata["packing_inset_margin_m"] == pytest.approx(0.005)
         assert "pose_subject" not in retreat.metadata
+
+
+def test_non_pose_retreat_preserves_release_eef_pose_and_moves_up_region_axis():
+    request = _request("PLACE")
+    artifact = PackingKeyframeProvider(_UnexpectedFallback()).generate(request)
+    _, place, retreat = artifact.candidates[0].keyframes
+    resolver = RelativePoseResolver(request.world)
+
+    place_eef = retarget_resolved_pose(
+        request.world,
+        place,
+        resolver.resolve(place),
+    )
+    retreat_eef = retarget_resolved_pose(
+        request.world,
+        retreat,
+        resolver.resolve(retreat),
+    )
+    region_rotation = quaternion_matrix_xyzw(
+        request.world.objects["packing_box"]["pose"]["orientation_xyzw"]
+    )
+    displacement = np.asarray(retreat_eef.position_m) - np.asarray(
+        place_eef.position_m
+    )
+
+    assert displacement == pytest.approx(region_rotation[:, 2] * 0.045)
+    assert quaternion_matrix_xyzw(retreat_eef.orientation_xyzw) == pytest.approx(
+        quaternion_matrix_xyzw(place_eef.orientation_xyzw)
+    )
+
+
+def test_packing_orientation_is_world_relative_for_rotated_region():
+    request = _request("TRANSPORT")
+    half_sqrt = 2.0**-0.5
+    request.world.objects["packing_box"]["pose"]["orientation_xyzw"] = [
+        0.0,
+        0.0,
+        half_sqrt,
+        half_sqrt,
+    ]
+    request.world.objects["milk"]["packing_metadata"] = {
+        "orientation_candidates": [
+            {
+                "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                "dimensions_m": [0.0456612, 0.0456612, 0.144],
+                "center_offset_m": [0.0, 0.0, 0.0],
+            }
+        ]
+    }
+
+    artifact = PackingKeyframeProvider(_UnexpectedFallback()).generate(request)
+    object_pose = RelativePoseResolver(request.world).resolve(
+        artifact.candidates[0].keyframes[0]
+    )
+
+    assert quaternion_matrix_xyzw(object_pose.orientation_xyzw) == pytest.approx(
+        np.eye(3)
+    )
 
 
 def test_generic_provider_uses_bound_ids_without_environment_name_dependency():

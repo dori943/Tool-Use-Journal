@@ -21,8 +21,10 @@ from tuj.m5_motion.attachment_retarget import (
     POSE_SUBJECT_KEY,
     POSE_SUBJECT_OBJECT_ID_KEY,
     held_pose_subject,
+    retarget_resolved_pose,
 )
 from tuj.m5_motion.geometry import (
+    RelativePoseResolver,
     matrix_quaternion_xyzw,
     quaternion_matrix_xyzw,
     tool_rotation_from_axis,
@@ -851,6 +853,65 @@ def _object_keyframe(
     )
 
 
+def _eef_retreat_keyframe(
+    request: MotionPlanRequest,
+    binding: PackingBinding,
+    *,
+    place_keyframe: RelativeKeyframeSpec,
+    keyframe_id: str,
+    anchor: str,
+    blocking_object_ids: tuple[str, ...],
+    release_clearance_m: float | None,
+) -> RelativeKeyframeSpec:
+    """Retreat from the release EE pose along the container's local +Z axis."""
+
+    place_object_pose = RelativePoseResolver(request.world).resolve(place_keyframe)
+    place_eef_pose = retarget_resolved_pose(
+        request.world,
+        place_keyframe,
+        place_object_pose,
+    )
+    region_pose = _record_pose(request.world.objects[binding.region_id])
+    if region_pose is None:  # Binding resolution already requires this pose.
+        raise ValueError(f"packing region {binding.region_id!r} has no usable pose")
+    region_position, region_rotation = region_pose
+    release_eef_local = region_rotation.T @ (
+        np.asarray(place_eef_pose.position_m, dtype=float) - region_position
+    )
+    retreat_eef_local = release_eef_local + np.asarray(
+        (0.0, 0.0, binding.profile.retreat_clearance_m),
+        dtype=float,
+    )
+    _anchor(
+        request,
+        binding,
+        anchor,
+        tuple(float(value) for value in retreat_eef_local),
+    )
+    return RelativeKeyframeSpec(
+        keyframe_id=keyframe_id,
+        keyframe_type=KeyframeType.RETREAT,
+        frame_ref=f"object:{binding.region_id}",
+        anchor=anchor,
+        approach_axis_xyz=(0.0, 0.0, 1.0),
+        tool_axis_to_align="+z",
+        offset_along_approach_m=0.0,
+        roll_rad=0.0,
+        planner=KeyframePlannerType.CARTESIAN,
+        metadata={
+            "packing_orientation_xyzw": list(place_eef_pose.orientation_xyzw),
+            "packing_motion_role": "CONSTRAINED_RETREAT",
+            "packing_candidate_blockers": list(blocking_object_ids),
+            "packing_occupied_object_ids": [
+                footprint.object_id for footprint in binding.occupied_footprints
+            ],
+            "packing_inset_margin_m": binding.inset_margin_m,
+            "packing_occupancy_clearance_m": binding.occupancy_clearance_m,
+            "packing_release_clearance_m": release_clearance_m,
+        },
+    )
+
+
 def _transport(
     request: MotionPlanRequest,
     binding: PackingBinding,
@@ -935,13 +996,47 @@ def _place(
             low,
             (target.x_m, target.y_m, target.release_z_m),
         )
-        _anchor(
-            request,
-            binding,
-            retreat,
-            (target.x_m, target.y_m, target.retreat_z_m),
-        )
         prefix = f"{request.task.subgoal_id}:packing_place_{index}"
+        place_keyframe = _object_keyframe(
+            binding,
+            keyframe_id=f"{prefix}:2:release",
+            kind=KeyframeType.PLACE,
+            anchor=low,
+            planner=KeyframePlannerType.CARTESIAN,
+            pose=target.pose,
+            events=events,
+            motion_role="CONSTRAINED_INSERTION",
+            blocking_object_ids=target.blocking_object_ids,
+            release_clearance_m=target.release_clearance_m,
+        )
+        if target.pose is not None:
+            _anchor(
+                request,
+                binding,
+                retreat,
+                (target.x_m, target.y_m, target.retreat_z_m),
+            )
+            retreat_keyframe = _object_keyframe(
+                binding,
+                keyframe_id=f"{prefix}:3:retreat",
+                kind=KeyframeType.RETREAT,
+                anchor=retreat,
+                planner=KeyframePlannerType.CARTESIAN,
+                pose=target.pose,
+                motion_role="CONSTRAINED_RETREAT",
+                blocking_object_ids=target.blocking_object_ids,
+                release_clearance_m=target.release_clearance_m,
+            )
+        else:
+            retreat_keyframe = _eef_retreat_keyframe(
+                request,
+                binding,
+                place_keyframe=place_keyframe,
+                keyframe_id=f"{prefix}:3:retreat",
+                anchor=retreat,
+                blocking_object_ids=target.blocking_object_ids,
+                release_clearance_m=target.release_clearance_m,
+            )
         candidates.append(
             KeyframePlanCandidate(
                 strategy_id=prefix,
@@ -959,60 +1054,8 @@ def _place(
                         blocking_object_ids=target.blocking_object_ids,
                         release_clearance_m=target.release_clearance_m,
                     ),
-                    _object_keyframe(
-                        binding,
-                        keyframe_id=f"{prefix}:2:release",
-                        kind=KeyframeType.PLACE,
-                        anchor=low,
-                        planner=KeyframePlannerType.CARTESIAN,
-                        pose=target.pose,
-                        events=events,
-                        motion_role="CONSTRAINED_INSERTION",
-                        blocking_object_ids=target.blocking_object_ids,
-                        release_clearance_m=target.release_clearance_m,
-                    ),
-                    (
-                        _object_keyframe(
-                            binding,
-                            keyframe_id=f"{prefix}:3:retreat",
-                            kind=KeyframeType.RETREAT,
-                            anchor=retreat,
-                            planner=KeyframePlannerType.CARTESIAN,
-                            pose=target.pose,
-                            motion_role="CONSTRAINED_RETREAT",
-                            blocking_object_ids=target.blocking_object_ids,
-                            release_clearance_m=target.release_clearance_m,
-                        )
-                        if target.pose is not None
-                        else RelativeKeyframeSpec(
-                            keyframe_id=f"{prefix}:3:retreat",
-                            keyframe_type=KeyframeType.RETREAT,
-                            frame_ref=f"object:{binding.region_id}",
-                            anchor=retreat,
-                            approach_axis_xyz=(0.0, 0.0, -1.0),
-                            tool_axis_to_align="+z",
-                            offset_along_approach_m=0.0,
-                            roll_rad=0.0,
-                            planner=KeyframePlannerType.CARTESIAN,
-                            metadata={
-                                "packing_motion_role": "CONSTRAINED_RETREAT",
-                                "packing_candidate_blockers": list(
-                                    target.blocking_object_ids
-                                ),
-                                "packing_occupied_object_ids": [
-                                    footprint.object_id
-                                    for footprint in binding.occupied_footprints
-                                ],
-                                "packing_inset_margin_m": binding.inset_margin_m,
-                                "packing_occupancy_clearance_m": (
-                                    binding.occupancy_clearance_m
-                                ),
-                                "packing_release_clearance_m": (
-                                    target.release_clearance_m
-                                ),
-                            },
-                        )
-                    ),
+                    place_keyframe,
+                    retreat_keyframe,
                 ],
                 rationale=(
                     f"Lower {binding.object_id} through the opening of "

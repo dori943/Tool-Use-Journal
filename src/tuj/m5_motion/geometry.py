@@ -230,7 +230,17 @@ class RelativePoseResolver:
             if keyframe.tool_axis_to_align == "+z"
             else -axis_world
         )
-        rotation = _tool_rotation_from_axis(aligned_axis, keyframe.roll_rad)
+        packing_orientation = keyframe.metadata.get("packing_orientation_xyzw")
+        if packing_orientation is not None:
+            if not isinstance(packing_orientation, Sequence) or isinstance(
+                packing_orientation, (str, bytes)
+            ):
+                raise GeometryResolutionError(
+                    "packing_orientation_xyzw must contain four quaternion values"
+                )
+            rotation = _quaternion_matrix_xyzw(packing_orientation)
+        else:
+            rotation = _tool_rotation_from_axis(aligned_axis, keyframe.roll_rad)
         return Pose(
             frame_id="world",
             position_m=tuple(float(value) for value in position),

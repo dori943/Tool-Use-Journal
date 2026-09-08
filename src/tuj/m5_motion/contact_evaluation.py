@@ -45,10 +45,18 @@ def _result(
 class RegionContainmentEvaluator:
     """Require every grounded target footprint to fit inside its region."""
 
-    def __init__(self, *, inset_margin_m: float = 0.0) -> None:
+    def __init__(
+        self,
+        *,
+        inset_margin_m: float = 0.0,
+        include_vertical: bool = False,
+        require_interior_geometry: bool = False,
+    ) -> None:
         if inset_margin_m < 0.0:
             raise ValueError("inset margin must be non-negative")
         self._inset = inset_margin_m
+        self._include_vertical = include_vertical
+        self._require_interior_geometry = require_interior_geometry
 
     def evaluate(
         self,
@@ -71,8 +79,41 @@ class RegionContainmentEvaluator:
                 GoalEvaluationStatus.UNKNOWN,
                 "observed world is unavailable",
             )
+        if self._require_interior_geometry:
+            region_record = observed_world.objects.get(region_id)
+            packing_metadata = (
+                region_record.get("packing_metadata")
+                if isinstance(region_record, Mapping)
+                else None
+            )
+            interior_dimensions = np.asarray(
+                packing_metadata.get("interior_dimensions_m")
+                if isinstance(packing_metadata, Mapping)
+                else None,
+                dtype=float,
+            )
+            interior_center = np.asarray(
+                packing_metadata.get("interior_center_m")
+                if isinstance(packing_metadata, Mapping)
+                else None,
+                dtype=float,
+            )
+            if not (
+                interior_dimensions.shape == (3,)
+                and interior_center.shape == (3,)
+                and np.all(np.isfinite(interior_dimensions))
+                and np.all(interior_dimensions > 0.0)
+                and np.all(np.isfinite(interior_center))
+            ):
+                return _result(
+                    request,
+                    GoalEvaluationStatus.UNKNOWN,
+                    "container interior geometry is unavailable",
+                    observed={"region_id": region_id, "include_vertical": True},
+                )
         inside: list[str] = []
         errors: dict[str, str] = {}
+        outside: list[str] = []
         for target_id in targets:
             try:
                 if target_fully_inside_region(
@@ -80,25 +121,33 @@ class RegionContainmentEvaluator:
                     target_id=target_id,
                     region_id=region_id,
                     inset_margin_m=self._inset,
+                    include_vertical=self._include_vertical,
                 ):
                     inside.append(target_id)
+                else:
+                    outside.append(target_id)
             except ValueError as error:
                 errors[target_id] = str(error)
-        satisfied = len(inside) == len(targets) and not errors
+        if outside:
+            status = GoalEvaluationStatus.FAILED
+            detail = "one or more target footprints are outside the goal region"
+        elif errors:
+            status = GoalEvaluationStatus.UNKNOWN
+            detail = "region containment geometry is unavailable"
+        else:
+            status = GoalEvaluationStatus.SATISFIED
+            detail = "all target footprints are inside the goal region"
         return _result(
             request,
-            GoalEvaluationStatus.SATISFIED if satisfied else GoalEvaluationStatus.FAILED,
-            (
-                "all target footprints are inside the goal region"
-                if satisfied
-                else "one or more target footprints are outside the goal region"
-            ),
+            status,
+            detail,
             observed={
                 "region_id": region_id,
                 "inside_target_ids": inside,
-                "outside_target_ids": [target for target in targets if target not in inside],
+                "outside_target_ids": outside,
                 "geometry_errors": errors,
                 "inset_margin_m": self._inset,
+                "include_vertical": self._include_vertical,
             },
         )
 
@@ -368,6 +417,10 @@ class TaskAwareGoalEvaluator:
             joint_tolerance_rad=joint_tolerance_rad
         )
         self._region = RegionContainmentEvaluator()
+        self._container_region = RegionContainmentEvaluator(
+            include_vertical=True,
+            require_interior_geometry=True,
+        )
         self._above_region = AboveRegionEvaluator()
         self._grasp = GraspRetentionEvaluator()
 
@@ -389,6 +442,18 @@ class TaskAwareGoalEvaluator:
             or is_ee_exchange_task(task)
         )
         operation = task_operation(task)
+        region_record = request.world.objects.get(task.goal.target_region_id or "")
+        packing_metadata = (
+            region_record.get("packing_metadata")
+            if isinstance(region_record, Mapping)
+            else None
+        )
+        region_evaluator = (
+            self._container_region
+            if isinstance(packing_metadata, Mapping)
+            and str(packing_metadata.get("kind", "")).upper() == "CONTAINER"
+            else self._region
+        )
         if (
             operation == "TRANSPORT"
             and task.goal.target_region_id is not None
@@ -422,7 +487,7 @@ class TaskAwareGoalEvaluator:
                     f"placed object {target!r} is still attached",
                     observed={"attached_object_id": state.attached_object_id},
                 )
-            return self._region.evaluate(request, report, observed_world)
+            return region_evaluator.evaluate(request, report, observed_world)
         if (
             not is_resource_transition
             and task.goal.target_region_id is not None
@@ -441,7 +506,7 @@ class TaskAwareGoalEvaluator:
                 }
             )
         ):
-            return self._region.evaluate(request, report, observed_world)
+            return region_evaluator.evaluate(request, report, observed_world)
         return self._state.evaluate(request, report, observed_world)
 
 

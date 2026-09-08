@@ -369,6 +369,35 @@ def test_place_into_region_requires_detachment_and_containment() -> None:
     assert "still attached" in attached.detail
 
 
+def test_place_into_container_requires_vertical_containment() -> None:
+    request = _request(target_x_m=0.04)
+    request.task.action_type = "place"
+    request.task.contact = None
+    request.world.objects["region"]["packing_metadata"] = {
+        "kind": "CONTAINER",
+        "interior_dimensions_m": [0.20, 0.20, 0.10],
+        "interior_center_m": [0.0, 0.0, 0.05],
+    }
+    request.world.objects["block"]["pose"]["position_m"][2] = 0.12
+
+    result = TaskAwareGoalEvaluator().evaluate(request, _report(), request.world)
+
+    assert result.status is GoalEvaluationStatus.FAILED
+    assert result.observed["include_vertical"] is True
+
+
+def test_place_into_container_without_interior_geometry_is_unknown() -> None:
+    request = _request(target_x_m=0.04)
+    request.task.action_type = "place"
+    request.task.contact = None
+    request.world.objects["region"]["packing_metadata"] = {"kind": "CONTAINER"}
+
+    result = TaskAwareGoalEvaluator().evaluate(request, _report(), request.world)
+
+    assert result.status is GoalEvaluationStatus.UNKNOWN
+    assert "interior geometry" in result.detail
+
+
 def test_profiles_reject_nonphysical_retry_configuration() -> None:
     with pytest.raises(ValueError, match="cannot exceed"):
         PushPlanningProfile(
