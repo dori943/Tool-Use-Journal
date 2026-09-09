@@ -201,6 +201,7 @@ class CartesianEdgePlanner:
         previous = tuple(float(value) for value in source)
         path: list[JointConfig] = [previous]
         minimum: float | None = None
+        rejected_minimum: float | None = None
         for index in range(1, steps + 1):
             fraction = index / steps
             position = start_xyz + fraction * (target_xyz - start_xyz)
@@ -224,17 +225,33 @@ class CartesianEdgePlanner:
                     )
                     if valid:
                         valid_solutions.append(candidate)
-                    elif len(rejected) < 3:
-                        rejected.append(
-                            f"{solution.branch_id}: "
-                            f"{failure_code or 'STATE_INVALID'}: {detail}"
-                        )
-                    if clearance is not None:
-                        minimum = (
-                            clearance
-                            if minimum is None
-                            else min(minimum, clearance)
-                        )
+                        # Only a state that is actually selectable contributes to
+                        # the segment's clearance.  Rejected IK branches can be
+                        # wildly self-colliding (e.g. a forearm buried in the
+                        # table); folding their negative clearance into
+                        # ``minimum`` poisons the selected path's min_clearance
+                        # and trips the TrajectorySegment >= 0 validator on an
+                        # otherwise valid edge.
+                        if clearance is not None:
+                            minimum = (
+                                clearance
+                                if minimum is None
+                                else min(minimum, clearance)
+                            )
+                    else:
+                        # Rejected branches feed only the failure diagnostic,
+                        # never a selected edge's clearance.
+                        if clearance is not None:
+                            rejected_minimum = (
+                                clearance
+                                if rejected_minimum is None
+                                else min(rejected_minimum, clearance)
+                            )
+                        if len(rejected) < 3:
+                            rejected.append(
+                                f"{solution.branch_id}: "
+                                f"{failure_code or 'STATE_INVALID'}: {detail}"
+                            )
                 if not valid_solutions:
                     position_text = ", ".join(f"{value:.6f}" for value in position)
                     if not solutions.solutions:
@@ -259,6 +276,13 @@ class CartesianEdgePlanner:
                             f"raw_ik_count={len(solutions.solutions)}; "
                             f"rejected={' | '.join(rejected)}"
                         )
+                    failure_clearance = minimum
+                    if rejected_minimum is not None:
+                        failure_clearance = (
+                            rejected_minimum
+                            if failure_clearance is None
+                            else min(failure_clearance, rejected_minimum)
+                        )
                     return EdgePlanResult(
                         valid=False,
                         failure_code=failure_code,
@@ -267,7 +291,7 @@ class CartesianEdgePlanner:
                             f"{index}/{steps}; position_m=[{position_text}]; "
                             f"{reason}"
                         ),
-                        min_clearance_m=minimum,
+                        min_clearance_m=failure_clearance,
                     )
                 selected = min(
                     valid_solutions,

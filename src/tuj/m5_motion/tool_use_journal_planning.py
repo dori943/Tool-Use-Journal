@@ -1435,6 +1435,24 @@ class ToolUseJournalMotionRequestPlanner:
                 kinematics, adapter.data.qpos[adapter.robot._ref_joint_pos_indexes]
             )
         pipeline = MotionPlanningPipeline(execution_provider, kinematics)
+        # Portable (cross-environment) EE-path validation compares a template's
+        # stored canonical EEF pose against current-model forward kinematics.
+        # Every portable template records that pose in the bare-flange frame
+        # (it is commissioned with the no-gripper kinematics), so validation
+        # must evaluate the flange too.  ``kinematics`` above targets the
+        # mounted EE's grip site when one is mounted (needed for IK), which for
+        # a return/exchange template would offset the check by the whole
+        # gripper mount (~0.14 m) and reject a geometrically identical rack.
+        # Build a dedicated EE-independent flange FK for validation only; it is
+        # never used for IK or planning.
+        from tuj.m5_motion.kinematics import UR5eKinematics
+
+        try:
+            portable_validation_kinematics: Any = UR5eKinematics.from_robosuite_env(
+                env
+            )
+        except Exception:  # noqa: BLE001 - fall back to the planning kinematics
+            portable_validation_kinematics = kinematics
         factory = ToolUseJournalCollisionContextFactory(
             compiler,
             attachment_reference_name=(
@@ -1468,7 +1486,7 @@ class ToolUseJournalMotionRequestPlanner:
                 registry_root,
                 trajectory_paths=ee_attach_trajectory_paths,
             ),
-            forward_kinematics=kinematics,
+            forward_kinematics=portable_validation_kinematics,
             start_tolerance_rad=ee_attach_start_tolerance_rad,
             joint_position_limits_rad=getattr(
                 kinematics, "joint_limits_rad", None
@@ -1587,10 +1605,45 @@ class ToolUseJournalMotionRequestPlanner:
                 if self.ee_attach_policy is EEAttachPolicy.PRECOMPUTED_REQUIRED:
                     raise
                 self._log("[M5][EE_PATH] fallback=dynamic-planner")
+        self._ground_held_region_goal(request)
         return self.pipeline.plan(
             request,
             collision_context_factory=self.collision_context_factory,
         )
+
+    def _ground_held_region_goal(self, request: MotionPlanRequest) -> None:
+        """Give a held TRANSPORT/MOVE or region PLACE an object-space destination.
+
+        The scripted live runtime does this through its grasp retention; the
+        generic ``run.py`` pipeline reaches the keyframe generator without it,
+        so the model used to aim the gripper at a bare region anchor and the
+        carried object clipped the table (transport) or sank through the tray
+        floor (place).  Grounding here derives the current object pose from
+        ``robot_state.eef_pose`` and the recorded grasp transform, picks a free
+        spot inside the region, and publishes ``held_transport_goal`` /
+        ``held_place_goal`` (place also rewrites the stale M4 fallback
+        ``goal.target_pose`` so the released body is frozen where it lands).
+        """
+
+        from tuj.m5_motion.scripted_grasps.transport import (
+            HELD_PLACE_GOAL_ANCHOR,
+            HELD_TRANSPORT_GOAL_ANCHOR,
+            ground_held_region_goal,
+        )
+
+        try:
+            ground_held_region_goal(request)
+        except ValueError as error:
+            self._log(f"[M5][REGION_GOAL] grounding skipped: {error}")
+            return
+        for key in (HELD_TRANSPORT_GOAL_ANCHOR, HELD_PLACE_GOAL_ANCHOR):
+            goal = request.task.metadata.get(key)
+            if isinstance(goal, Mapping):
+                self._log(
+                    f"[M5][REGION_GOAL] {key} object={goal.get('object_id')} "
+                    f"region={request.task.goal.target_region_id} "
+                    f"source={goal.get('source')}"
+                )
 
 
 class WorkcellMotionRequestRouter:

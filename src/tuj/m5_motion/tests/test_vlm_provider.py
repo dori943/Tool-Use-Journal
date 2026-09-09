@@ -594,3 +594,209 @@ def test_return_tool_detaches_the_tool_resource() -> None:
     assert place.metadata["event_parameters"]["DETACH_OBJECT"] == {
         "resource_kind": "tool"
     }
+
+
+def _transfer_batch() -> GeneratedKeyframeBatch:
+    def strategy(strategy_id: str, anchor: str) -> GeneratedStrategy:
+        return GeneratedStrategy(
+            strategy_id=strategy_id,
+            rationale="Carry the held object over the tray.",
+            keyframes=[
+                GeneratedKeyframe(
+                    keyframe_id="start",
+                    keyframe_type="TRANSFER",
+                    frame_ref="object:tray",
+                    anchor="held_transport_start",
+                    approach_axis_xyz=[0.0, 0.0, 1.0],
+                    tool_axis_to_align="-z",
+                    offset_along_approach_m=0.0,
+                    roll_rad=0.3,
+                    planner="SAMPLING_BASED",
+                ),
+                GeneratedKeyframe(
+                    keyframe_id="goal",
+                    keyframe_type="TRANSFER",
+                    frame_ref="object:tray",
+                    anchor=anchor,
+                    approach_axis_xyz=[0.0, 0.0, 1.0],
+                    tool_axis_to_align="-z",
+                    offset_along_approach_m=0.0,
+                    roll_rad=0.3,
+                    planner="SAMPLING_BASED",
+                ),
+            ],
+        )
+
+    return GeneratedKeyframeBatch(
+        candidates=[strategy("direct", "held_transport_goal"), strategy("hover", "top_center")]
+    )
+
+
+def _held_transport_request() -> MotionPlanRequest:
+    request = _request()
+    request.task.action_type = "transport"
+    request.task.metadata["operation"] = "TRANSPORT"
+    request.task.goal = MotionGoal(
+        goal_type=GoalType.POSE, target_object_id="bottle", target_region_id="tray"
+    )
+    request.world.robot_state.held_tool_id = "bottle"
+    request.world.objects["tray"] = {
+        "pose": {"position_m": [0.2, 0.3, 0.7], "orientation_xyzw": [0.0, 0.0, 0.0, 1.0]},
+        "dimensions_m": [0.3, 0.2, 0.05],
+        "anchors": {
+            "center": [0.0, 0.0, 0.0],
+            "held_transport_goal": [0.0, 0.0, 0.15],
+            "held_transport_start": [0.3, -0.2, 0.1],
+        },
+    }
+    return request
+
+
+def test_held_transport_transfer_keyframes_describe_the_object_pose() -> None:
+    request = _held_transport_request()
+    request.task.metadata["held_transport_goal"] = {
+        "frame_ref": "object:tray",
+        "anchor": "held_transport_goal",
+        "start_anchor": "held_transport_start",
+        "preserve_grasp_orientation": True,
+        "object_orientation_xyzw": [0.0, 0.0, 0.7071067811865476, 0.7071067811865476],
+        "object_id": "bottle",
+    }
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_transfer_batch()),
+    )
+
+    artifact = provider.generate(request)
+
+    assert len(artifact.candidates) == 2
+    for candidate in artifact.candidates:
+        for keyframe in candidate.keyframes:
+            assert keyframe.metadata["pose_subject"] == "ATTACHED_OBJECT"
+            assert keyframe.metadata["pose_subject_object_id"] == "bottle"
+            assert keyframe.metadata["packing_orientation_xyzw"] == [
+                0.0,
+                0.0,
+                0.7071067811865476,
+                0.7071067811865476,
+            ]
+
+
+def test_held_transport_without_grounded_goal_still_retargets_but_keeps_model_roll() -> None:
+    request = _held_transport_request()
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_transfer_batch()),
+    )
+
+    artifact = provider.generate(request)
+
+    keyframe = artifact.candidates[0].keyframes[1]
+    assert keyframe.metadata["pose_subject"] == "ATTACHED_OBJECT"
+    assert keyframe.metadata["pose_subject_object_id"] == "bottle"
+    assert "packing_orientation_xyzw" not in keyframe.metadata
+
+
+def test_pick_keyframes_are_never_pose_subject_retargeted() -> None:
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_batch()),
+    )
+
+    artifact = provider.generate(_request())
+
+    for candidate in artifact.candidates:
+        for keyframe in candidate.keyframes:
+            assert "pose_subject" not in keyframe.metadata
+
+
+def _place_batch() -> GeneratedKeyframeBatch:
+    def strategy(strategy_id: str) -> GeneratedStrategy:
+        def keyframe(keyframe_id, kind, offset):
+            return GeneratedKeyframe(
+                keyframe_id=keyframe_id,
+                keyframe_type=kind,
+                frame_ref="object:tray",
+                anchor="held_place_goal",
+                approach_axis_xyz=[0.0, 0.0, 1.0],
+                tool_axis_to_align="-z",
+                offset_along_approach_m=offset,
+                roll_rad=0.7,
+                planner="CARTESIAN",
+            )
+
+        return GeneratedStrategy(
+            strategy_id=strategy_id,
+            rationale="Lower the held object onto the tray floor and retreat.",
+            keyframes=[
+                keyframe("pre", "PRE_PLACE", 0.08),
+                keyframe("place", "PLACE", 0.0),
+                keyframe("up", "RETREAT", 0.12),
+            ],
+        )
+
+    return GeneratedKeyframeBatch(candidates=[strategy("down"), strategy("down-alt")])
+
+
+def test_region_place_keyframes_describe_the_object_and_retreat_keeps_the_wrist() -> None:
+    request = _request()
+    request.task.action_type = "place"
+    request.task.metadata["operation"] = "PLACE"
+    request.task.goal = MotionGoal(
+        goal_type=GoalType.POSE,
+        target_object_id="bottle",
+        target_region_id="tray",
+        target_pose=Pose(
+            frame_id="world",
+            position_m=(0.2, 0.3, 0.75),
+            orientation_xyzw=(0.0, 0.0, 0.0, 1.0),
+        ),
+    )
+    request.world.robot_state.held_tool_id = "bottle"
+    request.world.objects["tray"] = {
+        "pose": {"position_m": [0.2, 0.3, 0.7], "orientation_xyzw": [0.0, 0.0, 0.0, 1.0]},
+        "dimensions_m": [0.3, 0.2, 0.05],
+        "anchors": {"center": [0.0, 0.0, 0.0], "held_place_goal": [0.0, 0.0, 0.05]},
+    }
+    object_q = [0.0, 0.0, 0.7071067811865476, 0.7071067811865476]
+    eef_q = [1.0, 0.0, 0.0, 0.0]
+    request.task.metadata["held_place_goal"] = {
+        "frame_ref": "object:tray",
+        "anchor": "held_place_goal",
+        "preserve_grasp_orientation": True,
+        "object_orientation_xyzw": object_q,
+        "eef_orientation_xyzw": eef_q,
+        "object_id": "bottle",
+    }
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_place_batch()),
+    )
+
+    artifact = provider.generate(request)
+
+    pre, place, retreat = artifact.candidates[0].keyframes
+    for keyframe in (pre, place):
+        assert keyframe.metadata["pose_subject"] == "ATTACHED_OBJECT"
+        assert keyframe.metadata["pose_subject_object_id"] == "bottle"
+        assert keyframe.metadata["packing_orientation_xyzw"] == object_q
+    assert KeyframeEventType.GRIPPER_OPEN in place.events_after
+    assert "pose_subject" not in retreat.metadata
+    assert retreat.metadata["packing_orientation_xyzw"] == eef_q
+
+
+def test_return_tool_place_keeps_eef_semantics() -> None:
+    request = _request()
+    request.task.action_type = "RETURN_TOOL"
+    request.task.tool = "bottle"
+    request.task.goal = MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle")
+    request.world.robot_state.held_tool_id = "bottle"
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_release_batch()),
+    )
+
+    artifact = provider.generate(request)
+
+    for keyframe in artifact.candidates[0].keyframes:
+        assert "pose_subject" not in keyframe.metadata
