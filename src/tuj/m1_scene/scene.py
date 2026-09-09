@@ -59,6 +59,11 @@ def ground_scene(m1: dict, *, backend=None, memory=None, ee_pool: list[dict] = (
         cache[nid] = intr
 
         node.update(intr)                          # geometry, material, mass_kg, mu, ...
+        # 관측 bbox 는 접지 geometry 에 들어 있지 않다. 메모리에 캐시하면 다음
+        # 에피소드에서 옛 위치가 재사용되므로 노드에만 이번 관측값을 얹는다
+        # (M5 기하 정합이 요구하는 center/aabb_size 계약).
+        node["geometry"] = dict(intr["geometry"],
+                                center=node["center_mm"], aabb_size=node["bbox_mm"])
         node["grounding_source"] = how
         node["ee"] = {e["ee_id"]: evaluate_ee(e, intr) for e in ee_pool}
         if reach_mm is not None:
