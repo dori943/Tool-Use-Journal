@@ -27,6 +27,7 @@ from tuj.m5_motion.ee_exchange_entry import (
     is_ee_exchange_entry_request,
 )
 from tuj.m5_motion.geometry import RelativePoseResolver
+from tuj.m5_motion.kinematics import UR5eKinematics
 from tuj.m5_motion.pipeline import (
     CollisionPlanningSetup,
     KeyframeStrategyProvider,
@@ -1255,7 +1256,10 @@ class ToolUseJournalMotionRequestPlanner:
                 registry_root,
                 trajectory_paths=ee_attach_trajectory_paths,
             ),
-            forward_kinematics=kinematics,
+            # Bare attach artifacts store RobotState.eef_pose at the wrist.
+            # TCP IK can include a gripper-site rotation, even for NullGripper;
+            # compare the canonical artifact pose in its original body frame.
+            forward_kinematics=UR5eKinematics.from_robosuite_env(env),
             start_tolerance_rad=ee_attach_start_tolerance_rad,
             joint_position_limits_rad=getattr(
                 kinematics, "joint_limits_rad", None
