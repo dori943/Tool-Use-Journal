@@ -1,41 +1,41 @@
 # -*- coding: utf-8 -*-
-"""통합 실행기 — 한 번의 실행으로 M1~M5를 순서대로 돌린다.
+"""통합 실행기 — 한 번의 실행으로 M1 → M2 → G_k → M4 → M5를 순서대로 돌린다.
 
-모듈별로 run_m1 / run_m2 / run_m3 를 따로 돌리면 robosuite 씬이 매번 새로 로드되며
-배치가 달라져, 모듈마다 다른 장면을 보게 된다. 이 스크립트는 씬을 한 번만 로드하고
-그 산출물(m1.json / m1_points.npz / crops)을 아래 모듈에 그대로 물려준다. --seed 로
-배치 난수를 고정하므로 재실행 시 같은 장면이 재현되고, M5 가 자체적으로 다시 만드는
-환경도 같은 시드로 맞춰진다.
+현재 M1은 기존 Scene Abstraction과 Metric & Physical Grounding 기능을 통합한다.
+따라서 별도의 active M3 stage 없이 M1에서 scene abstraction, geometry grounding,
+physical grounding, Object Knowledge retrieval 및 EE evaluation까지 수행한다.
 
-기존 실행기를 대체하지 않고 그대로 호출한다 — 로직은 각 모듈 실행기에 한 벌만 있고
-이 파일은 순서와 시드, 모듈 간 파일 연결만 책임진다.
+M1에서 생성한 산출물(m1.json / m1_points.npz / crops)을 이후 모듈에 그대로 전달한다.
+--seed 로 배치 난수를 고정하므로 재실행 시 같은 장면이 재현되고,
+M5가 자체적으로 다시 만드는 환경도 같은 시드로 맞춰진다.
 
 사용법:
-  python scripts/run.py c1_1              # output/c1_1/m1.json 있으면 그걸로, 없으면 mock
+  python scripts/run.py c1_1
   python scripts/run.py c2_1
-  python scripts/run.py c1_1 --m1-json path.json   # M1 JSON 경로 직접 지정
-  python scripts/run.py c1_1 --start-from m5       # 앞 단계 산출물 재사용, M5 만 다시
+  python scripts/run.py c2_1 --model gpt-4o
+  python scripts/run.py c1_1 --m1-json path.json
+  python scripts/run.py c1_1 --start-from m5
 
-실행 순서 (--no-roundtrip 이면 3~4 생략):
-  1) M1 씬 추상화            2) M2 서브골 분해(LLM)
-  3) M3 접지 1차             4) M2 재분해 + 측정 반영 + 서브골 분할
-  5) M3 접지 2차(최종)       6) M4 태스크 계획      7) M5 모션 계획
+실행 순서:
+  1) M1  Scene + Physical Grounding
+  2) M2  Subgoal Decomposition
+  3) G_k Subgoal Graph Assembly
+  4) M4  Task Planner
+  5) M5  Motion Planner
 
 산출물 (output/<task>/):
-  m1.json  m1_points.npz  crops/*.png  frame*.png   ← M1 Scene Abstraction
-  m2.json                                           ← M2 Subgoal Decomposition
-  m3.json  gk_<SG>.json  gk_bundle.json
-           m3_intrinsic.json                        ← M3 Metric & Physical Grounding
-  m4.json                                           ← M4 Task Planner
-  m5/  (+ m5.json = m5_summary.json 복사본)          ← M5 Motion Planner
-
-M4 결과 파일은 모듈별 명명을 맞추려고 m4.json 으로 쓴다 —
-run_m4_task_planner.py 를 직접 돌리면 같은 내용이 task_planner.json 으로 나온다.
-
-gk_bundle.json 은 M3 가 서브골별로 남긴 gk_<SG>.json 을 이 스크립트가 모아 만든다
-(M4 입력 형식). 이번 실행에서 M3 가 새로 쓴 파일만 담고, 분할된 부모 서브골과
-detail 이 없는 레코드는 제외한다 — 이전 실행의 잔여 gk 는 번들에 들어가지 않는다.
+  m1.json
+  m1_points.npz
+  crops/*.png
+  frame*.png
+  m2.json
+  gk_<SG>.json
+  gk_bundle.json
+  m4.json
+  m5/
+  m5.json
 """
+
 from __future__ import annotations
 
 import argparse
@@ -46,15 +46,23 @@ import random
 import sys
 from pathlib import Path
 
+
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
+
 sys.path.insert(0, str(ROOT))
 sys.path.insert(0, str(ROOT / "src"))
 
+
+# 현재 active pipeline:
+# M1 → M2 → G_k/M4 → M5
+#
+# --start-from / --stop-after에서는 사용자가 보는 module 이름 기준으로
+# m1, m2, m4, m5를 유지한다.
 STAGES = ("m1", "m2", "m4", "m5")
 
-# 태스크 id <-> 환경 이름은 단일 출처(task_registry)에서 가져온다.
-# (M5 가 환경을 다시 만들 때 등 robosuite import 없이 이름만 필요할 때 쓴다.)
+
+# 태스크 id <-> 환경 이름 단일 출처
 from task_registry import TASK_ENVS as TASK_ENV  # noqa: E402
 
 
@@ -71,30 +79,36 @@ def banner(text):
 
 
 def load_script(name):
-    """scripts/<name>.py 를 모듈로 읽는다 (패키지가 아니라 실행 스크립트라서)."""
+    """scripts/<name>.py 를 모듈로 읽는다."""
     path = SCRIPTS / f"{name}.py"
+
     if not path.exists():
         sys.exit(f"[err] {path} 없음")
-    spec = importlib.util.spec_from_file_location(f"_tuj_{name}", path)
+
+    spec = importlib.util.spec_from_file_location(
+        f"_tuj_{name}",
+        path,
+    )
+
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+
     return module
 
 
 def call_main(module, argv, label):
-    """모듈의 main()을 argv로 호출한다. sys.exit 로 중단되면 파이프라인도 멈춘다.
-
-    run_m1~m3 은 sys.argv 를 직접 읽고, run_m4/m5 는 main(argv) 를 받는다.
-    양쪽 모두 처리한다.
-    """
+    """각 scripts/run_*.py 의 main()을 동일 프로세스에서 호출한다."""
     import inspect
 
     fn = getattr(module, "main", None)
+
     if fn is None:
         sys.exit(f"[err] {label}: main() 이 없습니다")
+
     takes_argv = bool(inspect.signature(fn).parameters)
 
     saved = sys.argv
+
     try:
         if takes_argv:
             sys.argv = [label] + list(argv)
@@ -102,511 +116,1205 @@ def call_main(module, argv, label):
         else:
             sys.argv = [label] + list(argv)
             rc = fn()
-    except SystemExit as exc:                 # sys.exit("메시지") / exit(code)
+
+    except SystemExit as exc:
         code = exc.code
+
         if isinstance(code, str):
             print(code)
-            sys.exit(f"\n[중단] {label} 단계에서 멈췄습니다. 위 메시지를 확인하십시오.")
+            sys.exit(
+                f"\n[중단] {label} 단계에서 멈췄습니다. "
+                "위 메시지를 확인하십시오."
+            )
+
         rc = code or 0
+
     finally:
         sys.argv = saved
 
     if rc:
-        sys.exit(f"\n[중단] {label} 단계가 exit={rc} 로 끝났습니다.")
+        sys.exit(
+            f"\n[중단] {label} 단계가 exit={rc} 로 끝났습니다."
+        )
+
     return rc
 
 
 def seed_everything(seed):
-    """씬 배치 난수 고정 — robosuite 배치 샘플러가 전역 RNG를 쓴다."""
+    """씬 배치 난수 고정."""
     random.seed(seed)
+
     try:
         import numpy as np
+
         np.random.seed(seed)
+
     except ImportError:
         pass
 
 
 def read_json(path):
-    return json.loads(Path(path).read_text(encoding="utf-8"))
+    return json.loads(
+        Path(path).read_text(encoding="utf-8")
+    )
 
 
 # ══════════════════════════════════════════════════════════════════════
-# 각 단계
+# M1
 # ══════════════════════════════════════════════════════════════════════
 
 def stage_m1(task, out, args):
-    """scripts/run_m1.py — 씬 로드 1회, m1.json / m1_points.npz / crops 생성."""
+    """Scene + Physical Grounding.
+
+    scripts/run_m1.py를 호출하여:
+      - scene abstraction
+      - geometry grounding
+      - M0 Object Knowledge retrieval
+      - physical grounding
+      - EE evaluation
+    을 수행한다.
+    """
+
     if args.m1_json:
         src = Path(args.m1_json).resolve()
-        print(f"[M1] {src} 사용 (씬 재로드 없음)")
+
+        print(
+            f"[M1] {src} 사용 "
+            "(씬 재로드 / physical grounding 없음)"
+        )
+
         if src != (out / "m1.json").resolve():
-            out.mkdir(parents=True, exist_ok=True)
+            out.mkdir(
+                parents=True,
+                exist_ok=True,
+            )
+
             (out / "m1.json").write_text(
-                src.read_text(encoding="utf-8"), encoding="utf-8")
+                src.read_text(encoding="utf-8"),
+                encoding="utf-8",
+            )
+
             npz = src.parent / "m1_points.npz"
+
             if npz.exists():
-                (out / "m1_points.npz").write_bytes(npz.read_bytes())
+                (out / "m1_points.npz").write_bytes(
+                    npz.read_bytes()
+                )
             else:
-                print(f"[M1] 경고: {npz} 없음 — M3 접지가 점군을 찾지 못합니다.")
-            source_world = src.parent / "m1_world.json"
-            if source_world.exists():
-                (out / "m1_world.json").write_bytes(source_world.read_bytes())
-            else:
-                print(f"[M1] 경고: {source_world} 없음 — M5가 관측 당시 상태를 복원할 수 없습니다.")
+                print(
+                    f"[M1] 경고: {npz} 없음 — "
+                    "점군 기반 geometry를 재사용할 수 없습니다."
+                )
+
         return
 
     seed_everything(args.seed)
-    module = load_script("run_m1")
-    if task not in TASK_ENV:
-        sys.exit(f"[err] 등록되지 않은 태스크 {task!r}. 등록됨: {list(TASK_ENV)}")
-    argv = [task, "--output-dir", str(out), "--seed", str(args.seed),
-            "--model", args.model, "--backend", args.backend,
-            "--memory", args.memory] + (["--view"] if args.view else [])
-    call_main(module, argv, "run_m1")
 
+    module = load_script("run_m1")
+
+    if task not in TASK_ENV:
+        sys.exit(
+            f"[err] 등록되지 않은 태스크 {task!r}. "
+            f"등록됨: {list(TASK_ENV)}"
+        )
+
+    argv = _stage_m1_argv(
+        task,
+        out,
+        args,
+    )
+
+    call_main(
+        module,
+        argv,
+        "run_m1",
+    )
+
+
+def _stage_m1_argv(task, out, args):
+    """run_m1에 M0 / VLM 관련 설정을 전달한다."""
+
+    argv = [
+        task,
+
+        "--output-dir",
+        str(out),
+
+        "--seed",
+        str(args.seed),
+
+        "--backend",
+        args.backend,
+
+        "--model",
+        args.model,
+
+        "--memory",
+        args.memory,
+
+        "--m0-bbox-threshold",
+        str(args.m0_bbox_threshold),
+
+        "--m0-density-threshold",
+        str(args.m0_density_threshold),
+    ]
+
+    if getattr(args, "view", False):
+        argv.append("--view")
+
+    return argv
+
+
+# ══════════════════════════════════════════════════════════════════════
+# M2
+# ══════════════════════════════════════════════════════════════════════
 
 def stage_m2(task, out, args):
-    """scripts/run_m2.py — 서브골 분해(LLM).
-
-    1차: m3.json 이 없어야 순수 분해가 된다. 2차: m3.json 을 읽어 측정 반영 + 분할.
-    """
-    m3 = out / "m3.json"
-    if False and m3.exists():
-        # 이전 실행의 응답이 남아 있으면 run_m2 가 그것을 이번 분해에 섞거나
-        # 안전장치에 걸려 멈춘다. 1차는 항상 깨끗한 분해여야 한다.
-        backup = out / "m3.prev.json"
-        m3.replace(backup)
-        print(f"[M2] 이전 m3.json 을 {backup.name} 으로 옮기고 새로 분해합니다.")
+    """scripts/run_m2.py — 서브골 분해."""
 
     module = load_script("run_m2")
-    argv = [task, "--output-dir", str(out)]
-    if args.m1_json:
-        argv += ["--m1-json", str(out / "m1.json")]
-    call_main(module, argv, "run_m2")
 
+    argv = [
+        task,
+        "--output-dir",
+        str(out),
+    ]
+
+    if args.m1_json:
+        argv += [
+            "--m1-json",
+            str(out / "m1.json"),
+        ]
+
+    call_main(
+        module,
+        argv,
+        "run_m2",
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# G_k
+# ══════════════════════════════════════════════════════════════════════
 
 def _gk_files(out):
-    return [p for p in sorted(out.glob("gk_*.json")) if p.name != "gk_bundle.json"]
-
-
-def stage_m3(task, out, args, label="M3"):
-    return stage_gk(task, out)
-    """scripts/run_m3.py — 물리/기하 접지, m3.json + gk_<SG>.json 생성.
-
-    반환: 이번 호출에서 새로 쓰인 gk 파일 목록 (이전 실행의 잔여 파일 배제용).
-    """
-    before = {p: p.stat().st_mtime for p in _gk_files(out)}
-    module = load_script("run_m3")
-    argv = [task, "--backend", args.backend, "--model", args.model,
-        "--memory", args.memory,
-        "--output-dir", str(out),
-        "--m0-bbox-threshold", str(args.m0_bbox_threshold),
-        "--m0-density-threshold", str(args.m0_density_threshold),
-        "--retrieval-debug-label", label]
-    call_main(module, argv, "run_m3")
-    fresh = [p for p in _gk_files(out)
-             if p not in before or p.stat().st_mtime > before[p]]
-    stale = [p.name for p in _gk_files(out) if p not in fresh]
-    if stale:
-        print(f"[{label}] 이번 실행에서 갱신되지 않은 gk 파일: {stale}")
-    return fresh
+    return [
+        p
+        for p in sorted(out.glob("gk_*.json"))
+        if p.name != "gk_bundle.json"
+    ]
 
 
 def stage_gk(task, out):
-    """Assemble per-subgoal graphs from M1's integrated grounding and M2 output."""
+    """M1 + M2 결과를 이용하여 subgoal graph를 조립한다."""
+
     module = load_script("assemble_gk")
-    call_main(module, [task], "assemble_gk")
+
+    call_main(
+        module,
+        [task],
+        "assemble_gk",
+    )
+
     return _gk_files(out)
 
 
-def _m2_plan_complete(out):
-    """m2.json이 M4로 넘길 수 있는 상태인지 — 도구가 필요한 서브골은 전부 확정됐는가.
-
-    0831: 왕복을 고정 2회가 아니라 완성될 때까지 반복하기 위한 판정.
-    전략 전환(예: relocate -> 도구 사용)이 일어나면 새 질의의 측정과 확정에
-    한 왕복이 더 필요하다 — 미확정 상태로 M4에 가면 invalid input으로 멈춘다.
-    """
-    try:
-        m2 = json.loads((out / "m2.json").read_text(encoding="utf-8"))
-    except (OSError, json.JSONDecodeError):
-        return False
-    # 0903: 피드백 재분해 직후는 새 질의가 아직 미측정 — 한 왕복 더 필요
-    if m2.get("m2_stats", {}).get("pending_grounding"):
-        return False
-    for s in m2.get("m2_subgoals", []):
-        if s.get("tool_candidate_ids") and not s.get("selected_tool_id"):
-            return False
-    return True
+# Legacy compatibility wrapper.
+#
+# 현재 integrated pipeline에서는 active M3 stage를 사용하지 않는다.
+# 외부 코드가 stage_m3를 호출하는 경우 G_k assembly로 연결한다.
+def stage_m3(task, out, args, label="M3"):
+    return stage_gk(task, out)
 
 
 def build_gk_bundle(out, gk_paths=None):
-    """M3 의 gk_<SG>.json 을 M4 입력 형식(gk_by_subgoal)으로 묶는다.
+    """gk_<SG>.json을 M4 입력 형식으로 묶는다."""
 
-    gk_paths 가 주어지면 그 파일만 후보로 삼는다 (이번 실행이 쓴 것들).
-    분할된 부모 서브골(자식의 split_from 으로 지목된 id)과 detail 이 없는
-    레코드는 제외한다 — 부모까지 넣으면 같은 작업을 두 번 계획하게 된다.
-    """
-    paths = list(gk_paths) if gk_paths is not None else _gk_files(out)
+    paths = (
+        list(gk_paths)
+        if gk_paths is not None
+        else _gk_files(out)
+    )
+
     if not paths:
-        sys.exit("[err] gk_<SG>.json 이 하나도 없습니다 — M3 를 먼저 돌리십시오.")
-    loaded = [(p, read_json(p)) for p in sorted(paths)]
-    split_parents = {r.get("split_from") for _, r in loaded if r.get("split_from")}
+        sys.exit(
+            "[err] gk_<SG>.json 이 하나도 없습니다 — "
+            "G_k assembly를 먼저 수행하십시오."
+        )
 
-    records, dropped = [], []
+    loaded = [
+        (p, read_json(p))
+        for p in sorted(paths)
+    ]
+
+    split_parents = {
+        r.get("split_from")
+        for _, r in loaded
+        if r.get("split_from")
+    }
+
+    records = []
+    dropped = []
+
     for p, r in loaded:
         sid = r.get("subgoal_id")
+
         if sid in split_parents:
-            dropped.append(f"{p.name}(분할된 부모)")
+            dropped.append(
+                f"{p.name}(분할된 부모)"
+            )
+
         elif not r.get("details"):
-            dropped.append(f"{p.name}(detail 0건)")
+            dropped.append(
+                f"{p.name}(detail 0건)"
+            )
+
         else:
             records.append(r)
+
     if dropped:
-        print(f"[M4] 번들에서 제외: {dropped}")
+        print(
+            f"[M4] 번들에서 제외: {dropped}"
+        )
+
     if not records:
-        sys.exit("[err] 번들에 넣을 gk 레코드가 없습니다 — M3 출력을 확인하십시오.")
+        sys.exit(
+            "[err] 번들에 넣을 gk 레코드가 없습니다 — "
+            "G_k 출력을 확인하십시오."
+        )
 
     bundle = out / "gk_bundle.json"
+
     bundle.write_text(
-        json.dumps({"gk_by_subgoal": records}, ensure_ascii=False, indent=2),
-        encoding="utf-8")
-    print(f"[M4] gk_bundle.json 생성: 서브골 "
-          f"{[r['subgoal_id'] for r in records]} -> {bundle}")
+        json.dumps(
+            {
+                "gk_by_subgoal": records,
+            },
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    print(
+        "[M4] gk_bundle.json 생성: 서브골 "
+        f"{[r['subgoal_id'] for r in records]} "
+        f"-> {bundle}"
+    )
+
     return bundle
 
 
-def stage_m4(task, out, args, gk_paths=None):
-    """scripts/run_m4.py — gk_bundle + m2 + m1 → m4.json."""
-    bundle = build_gk_bundle(out, gk_paths)
-    module = load_script("run_m4")
-    argv = ["--gk", str(bundle),
-            "--m2", str(out / "m2.json"),
-            "--m1", str(out / "m1.json"),
-            "--robot-spec", str(args.robot_spec),
-            "--output", str(out / "m4.json")]
-    if args.initial_state:
-        argv += ["--initial-state", str(args.initial_state)]
-    aliases = {}
-    for node in read_json(out / "m1.json").get("nodes", []):
-        canonical_id = node.get("canonical_id")
-        if isinstance(canonical_id, str) and canonical_id:
-            aliases[node["id"]] = canonical_id
-    alias_path = out / "id_aliases.json"
-    alias_path.write_text(json.dumps(aliases, indent=2), encoding="utf-8")
-    argv += ["--id-aliases", str(alias_path)]
-    call_main(module, argv, "run_m4")
+# ══════════════════════════════════════════════════════════════════════
+# M4
+# ══════════════════════════════════════════════════════════════════════
 
+def stage_m4(
+    task,
+    out,
+    args,
+    gk_paths=None,
+):
+    """scripts/run_m4.py — gk_bundle + m2 + m1 → m4.json."""
+
+    bundle = build_gk_bundle(
+        out,
+        gk_paths,
+    )
+
+    module = load_script("run_m4")
+
+    argv = [
+        "--gk",
+        str(bundle),
+
+        "--m2",
+        str(out / "m2.json"),
+
+        "--m1",
+        str(out / "m1.json"),
+
+        "--robot-spec",
+        str(args.robot_spec),
+
+        "--output",
+        str(out / "m4.json"),
+    ]
+
+    if args.initial_state:
+        argv += [
+            "--initial-state",
+            str(args.initial_state),
+        ]
+
+    call_main(
+        module,
+        argv,
+        "run_m4",
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# M5
+# ══════════════════════════════════════════════════════════════════════
 
 def dump_motion_failure(exc, m5_dir):
-    """MotionPlanningPipelineError 가 물고 있는 거절 사유를 펼쳐 보여준다.
+    """MotionPlanningPipelineError의 세부 거절 사유를 출력한다."""
 
-    예외 메시지는 "NO_CONNECTED_SEQUENCE (evaluated 196 branch edges)" 까지만
-    말해준다. 왜 196개가 전부 거절됐는지는 compilation.attempts[].selection
-    .rejected_edges 에 코드와 detail 로 들어 있다.
-    """
     from collections import Counter
 
-    comp = getattr(exc, "compilation", None)
-    print(f"\n[M5] 모션 계획 실패: {exc}")
-    if comp is None or not getattr(comp, "attempts", None):
-        print("[M5] 세부 거절 사유가 예외에 실려 있지 않습니다.")
+    comp = getattr(
+        exc,
+        "compilation",
+        None,
+    )
+
+    print(
+        f"\n[M5] 모션 계획 실패: {exc}"
+    )
+
+    if (
+        comp is None
+        or not getattr(comp, "attempts", None)
+    ):
+        print(
+            "[M5] 세부 거절 사유가 "
+            "예외에 실려 있지 않습니다."
+        )
         return
 
     hint = {
         "COLLISION_MARGIN_VIOLATION":
-            "경로가 물체/랙과 충돌하거나 여유거리를 못 지킴 — detail 의 geom 쌍을 확인",
+            "경로가 물체/랙과 충돌하거나 여유거리를 못 지킴",
+
         "INTERPOLATED_STATE_INVALID":
-            "양 끝은 유효하나 보간 중간 자세가 무효 — 스텝을 줄이거나 경유 keyframe 필요",
-        "NO_IK_BRANCH": "그 포즈에 대한 IK 해가 없음 — 도달 범위 밖이거나 자세가 과함",
-        "KINEMATIC_SINGULARITY": "특이점 부근 — 접근 자세를 바꿔야 함",
-        "JOINT_LIMIT_VIOLATION": "관절 한계 초과",
-        "RRT_CONNECT_EXHAUSTED": "샘플링 계획 반복 소진 — --options 로 반복/시간 상향 여지",
-        "RRT_CONNECT_TIMEOUT": "샘플링 계획 시간 초과 — --options 로 시간 상향 여지",
+            "양 끝은 유효하나 보간 중간 자세가 무효",
+
+        "NO_IK_BRANCH":
+            "해당 pose의 IK 해가 없음",
+
+        "KINEMATIC_SINGULARITY":
+            "특이점 부근",
+
+        "JOINT_LIMIT_VIOLATION":
+            "관절 한계 초과",
+
+        "RRT_CONNECT_EXHAUSTED":
+            "샘플링 계획 반복 소진",
+
+        "RRT_CONNECT_TIMEOUT":
+            "샘플링 계획 시간 초과",
+
         "CARTESIAN_INTERMEDIATE_IK_FAILED":
-            "직선 경로 중간점 IK 실패 — 샘플링 계획으로 우회 필요",
+            "직선 경로 중간점 IK 실패",
     }
 
     report = []
+
     for attempt in comp.attempts:
-        sel = getattr(attempt, "selection", None)
-        edges = list(getattr(sel, "rejected_edges", ()) or ())
-        code = attempt.failure_code or getattr(sel, "failure_code", None) or "?"
-        print(f"\n[M5] strategy {attempt.strategy_id}: {code} — 거절 엣지 {len(edges)}건")
-        counts = Counter(e.failure_code for e in edges)
+        sel = getattr(
+            attempt,
+            "selection",
+            None,
+        )
+
+        edges = list(
+            getattr(
+                sel,
+                "rejected_edges",
+                (),
+            )
+            or ()
+        )
+
+        code = (
+            attempt.failure_code
+            or getattr(
+                sel,
+                "failure_code",
+                None,
+            )
+            or "?"
+        )
+
+        print(
+            f"\n[M5] strategy {attempt.strategy_id}: "
+            f"{code} — 거절 엣지 {len(edges)}건"
+        )
+
+        counts = Counter(
+            e.failure_code
+            for e in edges
+        )
+
         for c, n in counts.most_common(6):
-            ex = next(e for e in edges if e.failure_code == c)
-            print(f"       {c:34s} {n:4d}건  "
-                  f"{ex.source_keyframe_id} -> {ex.target_keyframe_id}")
+            ex = next(
+                e
+                for e in edges
+                if e.failure_code == c
+            )
+
+            print(
+                f"       {c:34s} {n:4d}건  "
+                f"{ex.source_keyframe_id} "
+                f"-> {ex.target_keyframe_id}"
+            )
+
             if ex.detail:
-                print(f"         └ {ex.detail[:300]}")
+                print(
+                    f"         └ {ex.detail[:300]}"
+                )
+
             if c in hint:
-                print(f"         └ {hint[c]}")
+                print(
+                    f"         └ {hint[c]}"
+                )
+
         report.append({
-            "strategy_id": attempt.strategy_id,
-            "failure_code": code,
-            "detail": attempt.detail or getattr(sel, "detail", ""),
-            "rejected_edge_counts": dict(counts),
+            "strategy_id":
+                attempt.strategy_id,
+
+            "failure_code":
+                code,
+
+            "detail":
+                attempt.detail
+                or getattr(
+                    sel,
+                    "detail",
+                    "",
+                ),
+
+            "rejected_edge_counts":
+                dict(counts),
+
             "rejected_edges": [
-                {"from": e.source_keyframe_id, "to": e.target_keyframe_id,
-                 "from_branch": e.source_branch_id, "to_branch": e.target_branch_id,
-                 "failure_code": e.failure_code, "detail": e.detail}
+                {
+                    "from":
+                        e.source_keyframe_id,
+
+                    "to":
+                        e.target_keyframe_id,
+
+                    "from_branch":
+                        e.source_branch_id,
+
+                    "to_branch":
+                        e.target_branch_id,
+
+                    "failure_code":
+                        e.failure_code,
+
+                    "detail":
+                        e.detail,
+                }
                 for e in edges
             ],
         })
 
-    path = m5_dir / "m5_failure.json"
-    path.write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding="utf-8")
-    print(f"\n[M5] 거절 엣지 전체 -> {path}")
+    path = (
+        m5_dir
+        / "m5_failure.json"
+    )
+
+    path.write_text(
+        json.dumps(
+            report,
+            ensure_ascii=False,
+            indent=2,
+        ),
+        encoding="utf-8",
+    )
+
+    print(
+        f"\n[M5] 거절 엣지 전체 -> {path}"
+    )
 
 
-def run_m5_runner(module, argv, label, m5_dir):
-    """M5 러너 호출 — 모션 계획 실패는 사유를 펼친 뒤 파이프라인을 멈춘다."""
+def run_m5_runner(
+    module,
+    argv,
+    label,
+    m5_dir,
+):
+    """M5 러너 호출."""
+
     try:
-        call_main(module, argv, label)
-    except Exception as exc:                      # noqa: BLE001
-        if type(exc).__name__ != "MotionPlanningPipelineError":
+        call_main(
+            module,
+            argv,
+            label,
+        )
+
+    except Exception as exc:  # noqa: BLE001
+        if (
+            type(exc).__name__
+            != "MotionPlanningPipelineError"
+        ):
             raise
-        dump_motion_failure(exc, m5_dir)
-        sys.exit("\n[중단] M5 모션 계획 실패 — 위 거절 사유를 확인하십시오.")
+
+        dump_motion_failure(
+            exc,
+            m5_dir,
+        )
+
+        sys.exit(
+            "\n[중단] M5 모션 계획 실패 — "
+            "위 거절 사유를 확인하십시오."
+        )
 
 
 def stage_m5(task, out, args):
-    """태스크 비의존 M5 모션 계획.
+    """M5 Motion Planning."""
 
-    범용 러너는 --environment 로 환경을 다시 만들어 초기 WorldSnapshot 을 뜬다.
-    같은 프로세스 안에서 M1 과 같은 시드를 다시 심어 배치를 맞춘다.
-    """
     m4 = out / "m4.json"
+
     if not m4.exists():
-        sys.exit(f"[err] {m4} 없음 — M4 를 먼저 돌리십시오.")
+        sys.exit(
+            f"[err] {m4} 없음 — "
+            "M4 를 먼저 돌리십시오."
+        )
+
     result = read_json(m4)
+
     if not result.get("selected_plan"):
-        print("[M5] M4 가 계획을 선택하지 못해 생략합니다.")
+        print(
+            "[M5] M4가 계획을 선택하지 못해 "
+            "M5를 생략합니다."
+        )
         return
 
     m5_dir = out / "m5"
-    m5_dir.mkdir(parents=True, exist_ok=True)
-    env_name = args.m5_environment or TASK_ENV.get(task)
 
-    seed_everything(args.seed)
-    if not env_name:
-        sys.exit(f"[err] {task!r} 의 환경 이름을 모릅니다 — "
-                 f"--m5-environment 로 지정하거나 TASK_ENV 에 등록하십시오.")
-    module = load_script("run_m5")
-    argv = ["--task-planner", str(m4),
-            "--environment", env_name,
-            "--output-dir", str(m5_dir),
-            "--seed", str(args.seed),
-            "--provider", os.environ["TUJ_LLM_PROVIDER"]]
-    m1_world = out / "m1_world.json"
-    if m1_world.exists():
-        argv += ["--initial-world", str(m1_world)]
-    m1_geometry = out / "m1.json"
-    id_aliases = out / "id_aliases.json"
-    if m1_geometry.exists():
-        argv += ["--scene-geometry", str(m1_geometry)]
-    if id_aliases.exists():
-        argv += ["--id-aliases", str(id_aliases)]
-    if args.m5_validate_only:
-        argv.append("--validate-input-only")
-    elif args.m5_simulate:
-        argv += ["--simulate", args.m5_simulate, "--headless"]
-    argv += args.m5_args
-    run_m5_runner(module, argv, "run_m5", m5_dir)
+    m5_dir.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
 
-    summary = m5_dir / "m5_summary.json"
+    env_name = (
+        args.m5_environment
+        or TASK_ENV.get(task)
+    )
+
+    seed_everything(
+        args.seed
+    )
+
+    if args.m5_physical:
+        module = load_script(
+            "run_m5"
+        )
+
+        argv = [
+            task,
+            "--physical",
+
+            "--task-planner",
+            str(m4),
+
+            "--output-dir",
+            str(m5_dir),
+        ]
+
+        if args.m5_validate_only:
+            argv.append(
+                "--validate-input-only"
+            )
+
+        argv += args.m5_args
+
+        run_m5_runner(
+            module,
+            argv,
+            "run_m5(physical)",
+            m5_dir,
+        )
+
+    else:
+        if not env_name:
+            sys.exit(
+                f"[err] {task!r} 의 환경 이름을 모릅니다 — "
+                "--m5-environment 로 지정하거나 "
+                "TASK_ENV 에 등록하십시오."
+            )
+
+        module = load_script(
+            "run_m5"
+        )
+
+        argv = [
+            "--task-planner",
+            str(m4),
+
+            "--environment",
+            env_name,
+
+            "--output-dir",
+            str(m5_dir),
+
+            "--seed",
+            str(args.seed),
+
+            "--provider",
+            os.environ["TUJ_LLM_PROVIDER"],
+        ]
+
+        if args.m5_validate_only:
+            argv.append(
+                "--validate-input-only"
+            )
+
+        elif args.m5_simulate:
+            argv += [
+                "--simulate",
+                args.m5_simulate,
+                "--headless",
+            ]
+
+        argv += args.m5_args
+
+        run_m5_runner(
+            module,
+            argv,
+            "run_m5",
+            m5_dir,
+        )
+
+    summary = (
+        m5_dir
+        / "m5_summary.json"
+    )
+
     if summary.exists():
         (out / "m5.json").write_text(
-            summary.read_text(encoding="utf-8"), encoding="utf-8")
-        print(f"[M5] -> {out}/m5.json (+ {m5_dir}/)")
+            summary.read_text(
+                encoding="utf-8"
+            ),
+            encoding="utf-8",
+        )
+
+        print(
+            f"[M5] -> {out}/m5.json "
+            f"(+ {m5_dir}/)"
+        )
+
     else:
-        print(f"[M5] -> {m5_dir}/ (m5_summary.json 없음 — m5.json 미생성)")
+        print(
+            f"[M5] -> {m5_dir}/ "
+            "(m5_summary.json 없음 — "
+            "m5.json 미생성)"
+        )
 
 
+# ══════════════════════════════════════════════════════════════════════
+# Argument Parser
 # ══════════════════════════════════════════════════════════════════════
 
 def build_parser():
     p = argparse.ArgumentParser(
         prog="run.py",
         formatter_class=argparse.RawDescriptionHelpFormatter,
-        description="M1~M5 통합 실행기 (씬 1회 로드 → 전 모듈 순차 실행)",
-        epilog="예) python scripts/run.py c1_1 --backend mock --m5-validate-only")
-    p.add_argument("task", nargs="?", default="c1_1",
-                   help=f"태스크 id (등록됨: {', '.join(TASK_ENV)})")
-    p.add_argument("--m1-json", default=None,
-                   help="M1 JSON 경로 직접 지정 (지정 시 씬 재로드 없음)")
-    p.add_argument("--seed", type=int, default=0,
-                   help="씬 배치 난수 시드 — M1 과 M5 환경 생성에 동일 적용")
-    p.add_argument("--output-dir", type=Path,
-                   help="별도 M1~M5 실행 폴더 (기본 output/<task>)")
-    p.add_argument("--backend", default="siphy", choices=("siphy", "mock"),
-                   help="M3 물성 백엔드")
-    p.add_argument("--model", default=None,
-                   help="M2·M3 공통 LLM 모델 (미지정 시 provider 기본값). 예: gemini-2.5-flash, gpt-4o")
-    p.add_argument("--provider", choices=("gemini", "openai"), default=None,
-                   help="LLM 제공자 (미지정 시 --model 접두어로 추론, 그래도 없으면 gemini)")
-    p.add_argument("--memory", default=str(ROOT / "output" / "memory.json"),
-                   help="M3 물성 메모리 경로 ('none' 이면 사용 안 함)")
-    p.add_argument("--m0-bbox-threshold", type=float, default=0.25,
-                   help="provisional bbox 최대 축 상대차 threshold")
-    p.add_argument("--m0-density-threshold", type=float, default=0.20,
-                   help="provisional density 상대차 threshold")
-    p.add_argument("--robot-spec", default=str(ROOT / "configs" / "robot_spec.json"),
-                   help="M4 로봇/EE 스펙")
-    p.add_argument("--initial-state", default=None,
-                   help="M4 초기 상태 JSON (미지정 시 robot_spec 에서 유도)")
-    p.add_argument("--no-roundtrip", action="store_true",
-                   help="M3→M2 측정 반영 및 서브골 분할 왕복을 생략")
-    p.add_argument("--start-from", choices=STAGES, default=None,
-                   help="해당 모듈부터 실행 (앞 단계는 기존 산출물 재사용)")
-    p.add_argument("--stop-after", choices=STAGES, default=None,
-                   help="해당 모듈까지만 실행")
-    p.add_argument("--skip-m4", action="store_true")
-    p.add_argument("--skip-m5", action="store_true")
-    p.add_argument("--m5-environment", default=None,
-                   help="M5 초기 world 캡처에 쓸 환경 이름 (기본: 태스크 기본값)")
-    p.add_argument("--m5-validate-only", action="store_true",
-                   help="M5 를 입력 계약 검증만 수행 (OpenAI/MuJoCo 실행 없음)")
-    p.add_argument("--m5-simulate", choices=("kinematic", "controller"),
-                   default=None, help="M5 계획을 MuJoCo 로 헤드리스 재생")
-    p.add_argument("--m5-args", nargs=argparse.REMAINDER, default=[],
-                   help="이 뒤의 인자는 M5 러너로 그대로 전달")
-    p.add_argument("--view", action="store_true", help="M1 단계에서 뷰어 표시")
+        description=(
+            "M1 → M2 → G_k → M4 → M5 통합 실행기"
+        ),
+        epilog=(
+            "예) python scripts/run.py "
+            "c2_1 --model gpt-4o"
+        ),
+    )
+
+    p.add_argument(
+        "task",
+        nargs="?",
+        default="c1_1",
+        help=(
+            "태스크 id "
+            f"(등록됨: {', '.join(TASK_ENV)})"
+        ),
+    )
+
+    p.add_argument(
+        "--m1-json",
+        default=None,
+        help=(
+            "M1 JSON 경로 직접 지정 "
+            "(지정 시 씬 재로드 없음)"
+        ),
+    )
+
+    p.add_argument(
+        "--seed",
+        type=int,
+        default=0,
+        help=(
+            "씬 배치 난수 시드 — "
+            "M1과 M5 환경 생성에 동일 적용"
+        ),
+    )
+
+    p.add_argument(
+        "--output-dir",
+        type=Path,
+        help=(
+            "별도 실행 폴더 "
+            "(기본 output/<task>)"
+        ),
+    )
+
+    p.add_argument(
+        "--backend",
+        default="siphy",
+        choices=(
+            "siphy",
+            "mock",
+        ),
+        help=(
+            "M1 physical grounding backend"
+        ),
+    )
+
+    p.add_argument(
+        "--model",
+        default=None,
+        help=(
+            "M1/M2 공통 LLM 모델. "
+            "예: gemini-2.5-flash, gpt-4o"
+        ),
+    )
+
+    p.add_argument(
+        "--provider",
+        choices=(
+            "gemini",
+            "openai",
+        ),
+        default=None,
+        help=(
+            "LLM 제공자 "
+            "(미지정 시 --model 이름으로 추론)"
+        ),
+    )
+
+    p.add_argument(
+        "--memory",
+        default=str(
+            ROOT
+            / "output"
+            / "memory.json"
+        ),
+        help=(
+            "M0 Memory Region 경로 "
+            "('none' 이면 사용 안 함)"
+        ),
+    )
+
+    # ----------------------------------------------------------
+    # M0 Object Knowledge Retrieval
+    # ----------------------------------------------------------
+
+    p.add_argument(
+        "--m0-bbox-threshold",
+        type=float,
+        default=0.25,
+        help=(
+            "M0 cross-task retrieval의 "
+            "BBox 상대 차이 threshold "
+            "(기본 0.25)"
+        ),
+    )
+
+    p.add_argument(
+        "--m0-density-threshold",
+        type=float,
+        default=0.20,
+        help=(
+            "M0 cross-task retrieval의 "
+            "density 상대 차이 threshold "
+            "(기본 0.20)"
+        ),
+    )
+
+    # ----------------------------------------------------------
+    # M4
+    # ----------------------------------------------------------
+
+    p.add_argument(
+        "--robot-spec",
+        default=str(
+            ROOT
+            / "configs"
+            / "robot_spec.json"
+        ),
+        help="M4 로봇/EE 스펙",
+    )
+
+    p.add_argument(
+        "--initial-state",
+        default=None,
+        help=(
+            "M4 초기 상태 JSON "
+            "(미지정 시 robot_spec에서 유도)"
+        ),
+    )
+
+    # legacy CLI compatibility
+    p.add_argument(
+        "--no-roundtrip",
+        action="store_true",
+        help=(
+            "Legacy compatibility option. "
+            "현재 integrated pipeline에는 "
+            "M2↔M3 round-trip이 없음"
+        ),
+    )
+
+    # ----------------------------------------------------------
+    # Pipeline
+    # ----------------------------------------------------------
+
+    p.add_argument(
+        "--start-from",
+        choices=STAGES,
+        default=None,
+        help=(
+            "해당 모듈부터 실행 "
+            "(앞 단계는 기존 산출물 재사용)"
+        ),
+    )
+
+    p.add_argument(
+        "--stop-after",
+        choices=STAGES,
+        default=None,
+        help="해당 모듈까지만 실행",
+    )
+
+    p.add_argument(
+        "--skip-m4",
+        action="store_true",
+    )
+
+    p.add_argument(
+        "--skip-m5",
+        action="store_true",
+    )
+
+    # ----------------------------------------------------------
+    # M5
+    # ----------------------------------------------------------
+
+    p.add_argument(
+        "--m5-environment",
+        default=None,
+        help=(
+            "M5 초기 world 캡처에 쓸 환경 이름 "
+            "(기본: 태스크 기본값)"
+        ),
+    )
+
+    p.add_argument(
+        "--m5-validate-only",
+        action="store_true",
+        help=(
+            "M5를 입력 계약 검증만 수행"
+        ),
+    )
+
+    p.add_argument(
+        "--m5-simulate",
+        choices=(
+            "kinematic",
+            "controller",
+        ),
+        default=None,
+        help=(
+            "M5 계획을 MuJoCo로 "
+            "헤드리스 재생"
+        ),
+    )
+
+    p.add_argument(
+        "--m5-physical",
+        action="store_true",
+        help="물리 실행 모드",
+    )
+
+    p.add_argument(
+        "--m5-args",
+        nargs=argparse.REMAINDER,
+        default=[],
+        help=(
+            "이 뒤의 인자는 "
+            "M5 러너로 그대로 전달"
+        ),
+    )
+
+    p.add_argument(
+        "--view",
+        action="store_true",
+        help="M1 단계에서 뷰어 표시",
+    )
+
     return p
 
 
+# ══════════════════════════════════════════════════════════════════════
+# LLM provider
+# ══════════════════════════════════════════════════════════════════════
+
 def _infer_provider(model):
-    m = (model or "").lower()
+    m = (
+        model
+        or ""
+    ).lower()
+
     if m.startswith("gemini"):
         return "gemini"
-    if m.startswith(("gpt", "o1", "o3", "o4", "chatgpt", "text-")):
+
+    if m.startswith(
+        (
+            "gpt",
+            "o1",
+            "o3",
+            "o4",
+            "chatgpt",
+            "text-",
+        )
+    ):
         return "openai"
+
     return None
 
 
 def _resolve_llm(args):
-    """--model/--provider 를 M2·M3 양쪽에 일관 적용한다.
+    """M1/M2에서 동일 provider/model을 사용하도록 설정한다."""
 
-    M2(run_m2/LLMRough)는 TUJ_LLM_PROVIDER·TUJ_M2_MODEL 환경변수를, M3(SiPhyBackend)는
-    --model 인자와 TUJ_LLM_PROVIDER 를 읽는다. 여기서 둘의 제공자·모델을 맞춘다.
-    같은 프로세스에서 모듈 main() 을 호출하므로 os.environ 설정이 그대로 전달된다.
+    provider = (
+        args.provider
+        or _infer_provider(args.model)
+        or os.environ.get(
+            "TUJ_LLM_PROVIDER"
+        )
+        or "gemini"
+    )
+
+    os.environ[
+        "TUJ_LLM_PROVIDER"
+    ] = provider
+
+    if args.model:
+        os.environ[
+            "TUJ_M2_MODEL"
+        ] = args.model
+
+    else:
+        args.model = {
+            "gemini":
+                "gemini-2.5-flash",
+
+            "openai":
+                "gpt-4o-mini",
+
+        }[provider]
+
+    print(
+        f"[run] LLM provider={provider} "
+        f"model={args.model}"
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Integrated pipeline
+# ══════════════════════════════════════════════════════════════════════
+
+def _run_integrated(
+    task,
+    out,
+    args,
+    start,
+    stop,
+):
+    """Current integrated pipeline.
+
+    M1
+      ↓
+    M2
+      ↓
+    G_k Assembly
+      ↓
+    M4
+      ↓
+    M5
     """
-    provider = (args.provider or _infer_provider(args.model)
-                or os.environ.get("TUJ_LLM_PROVIDER") or "gemini")
-    os.environ["TUJ_LLM_PROVIDER"] = provider
-    if args.model:                              # 명시 모델 → M2·M3 동일 모델
-        os.environ["TUJ_M2_MODEL"] = args.model
-    else:                                       # 미지정 → 제공자 기본값(M3용), M2 는 자체 기본
-        args.model = {"gemini": "gemini-2.5-flash", "openai": "gpt-4o-mini"}[provider]
-    print(f"[run] LLM provider={provider} model={args.model}")
 
-
-def _run_integrated(task, out, args, start, stop):
-    """M1 owns geometry and physical grounding; no M3 round-trip remains."""
     gk_paths = None
+
+    # ----------------------------------------------------------
+    # M1
+    # ----------------------------------------------------------
+
     if start <= 0:
-        banner("M1  Scene + Physical Grounding")
-        stage_m1(task, out, args)
+        banner(
+            "M1  Scene + Physical Grounding"
+        )
+
+        stage_m1(
+            task,
+            out,
+            args,
+        )
+
     if stop < 1:
         return
+
+    # ----------------------------------------------------------
+    # M2
+    # ----------------------------------------------------------
+
     if start <= 1:
-        banner("M2  Subgoal Decomposition")
-        stage_m2(task, out, args)
+        banner(
+            "M2  Subgoal Decomposition"
+        )
+
+        stage_m2(
+            task,
+            out,
+            args,
+        )
+
     if stop < 2:
         return
+
+    # ----------------------------------------------------------
+    # G_k
+    # ----------------------------------------------------------
+
     if start <= 2:
-        banner("G_k  Subgoal Graph Assembly")
-        gk_paths = stage_gk(task, out)
-    if stop < 2:
-        return
-    if args.skip_m4 or start > 2:
-        print("\n[M4] " + ("skipped" if args.skip_m4 else "using existing m4.json"))
+        banner(
+            "G_k  Subgoal Graph Assembly"
+        )
+
+        gk_paths = stage_gk(
+            task,
+            out,
+        )
+
+    # ----------------------------------------------------------
+    # M4
+    # ----------------------------------------------------------
+
+    if (
+        args.skip_m4
+        or start > 2
+    ):
+        print(
+            "\n[M4] "
+            + (
+                "skipped"
+                if args.skip_m4
+                else "using existing m4.json"
+            )
+        )
+
     else:
-        banner("M4  Task Planner")
-        stage_m4(task, out, args, gk_paths)
+        banner(
+            "M4  Task Planner"
+        )
+
+        stage_m4(
+            task,
+            out,
+            args,
+            gk_paths,
+        )
+
     if stop < 3:
         return
-    if args.skip_m5:
-        print("\n[M5] skipped")
-        return
-    banner("M5  Motion Planner")
-    stage_m5(task, out, args)
 
+    # ----------------------------------------------------------
+    # M5
+    # ----------------------------------------------------------
+
+    if args.skip_m5:
+        print(
+            "\n[M5] skipped"
+        )
+        return
+
+    banner(
+        "M5  Motion Planner"
+    )
+
+    stage_m5(
+        task,
+        out,
+        args,
+    )
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Main
+# ══════════════════════════════════════════════════════════════════════
 
 def main():
-    args = build_parser().parse_args()
+    args = (
+        build_parser()
+        .parse_args()
+    )
+
     _resolve_llm(args)
+
     task = args.task
-    out = args.output_dir.resolve() if args.output_dir else ROOT / "output" / task
-    out.mkdir(parents=True, exist_ok=True)
-    start = STAGES.index(args.start_from) if args.start_from else 0
-    stop = STAGES.index(args.stop_after) if args.stop_after else len(STAGES) - 1
+
+    out = (
+        args.output_dir.resolve()
+        if args.output_dir
+        else ROOT
+        / "output"
+        / task
+    )
+
+    out.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    start = (
+        STAGES.index(args.start_from)
+        if args.start_from
+        else 0
+    )
+
+    stop = (
+        STAGES.index(args.stop_after)
+        if args.stop_after
+        else len(STAGES) - 1
+    )
+
     if start > stop:
-        sys.exit(f"[err] --start-from {STAGES[start]} 이 --stop-after {STAGES[stop]} 보다 뒤입니다.")
-    gk_paths = None
+        sys.exit(
+            f"[err] --start-from {STAGES[start]} 이 "
+            f"--stop-after {STAGES[stop]} 보다 뒤입니다."
+        )
 
-    print(f"[run] task={task} seed={args.seed} out={out}")
-    return _run_integrated(task, out, args, start, stop)
-    print(f"[run] 단계: {' -> '.join(STAGES[start:stop + 1])}"
-          + ("" if not args.no_roundtrip else "  (M2<->M3 왕복 생략)")
-          + ("" if start == 0 else f"  (m1~{STAGES[start - 1]} 는 기존 산출물 재사용)"))
+    print(
+        f"[run] task={task} "
+        f"seed={args.seed} "
+        f"out={out}"
+    )
 
-    if start <= 0:
-        banner("M1  Scene Abstraction")
-        stage_m1(task, out, args)
-    if stop < 1:
-        return
+    print(
+        "[run] pipeline: "
+        "M1 -> M2 -> G_k -> M4 -> M5"
+    )
 
-    if start > 2:
-        pass                                   # M2·M3 는 기존 산출물 사용
-    elif start == 2:
-        banner("M3  Metric & Physical Grounding")
-        gk_paths = stage_m3(task, out, args)
-    elif args.no_roundtrip:
-        banner("M2  Subgoal Decomposition")
-        stage_m2(task, out, args, pass_no=1)
-        if stop < 2:
-            return
-        banner("M3  Metric & Physical Grounding")
-        gk_paths = stage_m3(task, out, args)
-    else:
-        banner("M2  Subgoal Decomposition (1차 — 측정 전 분해)")
-        stage_m2(task, out, args, pass_no=1)
-        if stop < 2:
-            return
-        # 0831: 왕복을 계획 완성까지 반복. 전략 전환(직접 이동 기각 -> 도구 사용)이
-        # 일어나면 새 도구 질의의 측정·확정에 한 왕복이 더 필요하다. 상한은 안전장치.
-        max_rounds = 4
-        for rnd in range(1, max_rounds + 1):
-            banner(f"M3  Metric & Physical Grounding ({rnd}차)")
-            stage_m3(task, out, args, label=f"M3.{rnd}")
-            banner(f"M2  재분해 + 측정 반영 ({rnd + 1}차)")
-            stage_m2(task, out, args, pass_no=2)
-            if _m2_plan_complete(out):
-                break
-            print(f"[run] 계획 미완성(도구 미확정) — 왕복 {rnd + 1}회차 진행")
-        else:
-            print(f"[run] 왕복 상한({max_rounds}회) 도달 — 현재 계획으로 진행")
-        banner("M3  Metric & Physical Grounding (최종 — 서브그래프 조립)")
-        gk_paths = stage_m3(task, out, args, label="M3.final")
-    if stop < 3:
-        return
-
-    if args.skip_m4 or start > 3:
-        print("\n[M4] " + ("--skip-m4 로 생략" if args.skip_m4 else "기존 m4.json 재사용"))
-    else:
-        banner("M4  Task Planner")
-        stage_m4(task, out, args, gk_paths)
-    if stop < 4:
-        return
-
-    if args.skip_m5:
-        print("\n[M5] --skip-m5 로 생략")
-        return
-    banner("M5  Motion Planner")
-    stage_m5(task, out, args)
-
-    banner(f"DONE  -> {out}")
+    return _run_integrated(
+        task,
+        out,
+        args,
+        start,
+        stop,
+    )
 
 
 if __name__ == "__main__":

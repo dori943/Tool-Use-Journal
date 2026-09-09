@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+import numpy as np
 import pytest
 
+from tuj.m1_scene import MockBackend, ground_scene, serialize
 from tuj.m5_motion.geometry_evidence import (
     carry_observation_geometry,
     integrate_m1_geometry,
@@ -80,6 +82,34 @@ def test_m1_bbox_is_normalized_and_bound_to_m5_object():
     assert bounds["source"].endswith("+m1_observation_union")
     assert bounds["aabb_min_m"] == pytest.approx([0.14, 0.05, 0.49])
     assert bounds["aabb_max_m"] == pytest.approx([0.26, 0.15, 0.51])
+
+
+def test_grounded_m1_bbox_remains_valid_for_m5_geometry_contract():
+    m1 = _m1()
+    center = np.asarray(m1["nodes"][0]["center_mm"], dtype=float)
+    offsets = np.asarray(
+        [
+            [x, y, z]
+            for x in (-60.0, 60.0)
+            for y in (-50.0, 50.0)
+            for z in (-10.0, 10.0)
+        ]
+    )
+    m1["nodes"][0]["_points"] = center + offsets
+
+    ground_scene(m1, backend=MockBackend())
+    integrated, report = integrate_m1_geometry(
+        _world(),
+        serialize(m1),
+        required_object_ids={"plate"},
+        separation_tolerance_m=0.01,
+    )
+
+    assert m1["nodes"][0]["geometry"]["center"] == [900.0, 100.0, 500.0]
+    assert m1["nodes"][0]["geometry"]["aabb_size"] == [120.0, 100.0, 20.0]
+    assert report["planning_safe"] is True
+    assert report["records"][0]["status"] == "ALIGNED"
+    assert "observation_geometry" in integrated.objects["plate"]
 
 
 def test_disjoint_required_geometry_stops_planning_contract():

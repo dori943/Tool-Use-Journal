@@ -131,6 +131,68 @@ _EXTRA_ROBOCASA_BODIES = {
 }
 
 
+# 컨테이너의 실제 내부 치수 (env 가 하드코딩으로 알고 있는 값). M1 은 점군에서 외곽 AABB
+# 만 뽑을 수 있어 내부 치수를 스스로 알 수 없다 (벽·바닥 두께가 노이즈로 들어가 자체
+# 상수인 벽 두께 4mm 폴백은 실제 값(10mm) 과 어긋난다). env.get_ep_meta() 가
+# 노출하는 값을 그대로 노드 필드로 실어 M2/M4/M5 가 정확한 내부 치수·벽 두께로
+# fits/담기/드롭 좌표를 계산하도록 한다.
+#
+# 태스크명 -> { body_name: {
+#   "inner_keys": (W_key, D_key, H_key) — get_ep_meta() 의 dict 키. 값 단위는 m.
+#   "wall_mm": 벽 두께(mm) — env 상수 (get_ep_meta 에 없으므로 상수 임포트)
+#   "floor_mm": 바닥 두께(mm) — 선택
+# } }
+def _c4_2_wall_floor():
+    from environments.c4_2_diagonal_fit_packing import BOX_WALL_THICKNESS, BOX_FLOOR_THICKNESS
+    return round(BOX_WALL_THICKNESS * 1000.0, 1), round(BOX_FLOOR_THICKNESS * 1000.0, 1)
+
+
+_CONTAINER_INNER_FIELDS = {
+    "c4_2": {
+        "packing_box": {
+            "inner_keys": ("box_inner_w_m", "box_inner_d_m", "box_inner_h_m"),
+            "wall_floor_fn": _c4_2_wall_floor,
+        },
+    },
+}
+
+
+def _augment_container_dims(env, task_name: str, m1: dict) -> None:
+    """env.get_ep_meta() 에서 컨테이너 내부 치수를 뽑아 매칭되는 노드에 필드 추가.
+
+    노드에 다음을 붙인다 (mm 단위):
+      · inner_bbox_mm: [W, D, H] — 벽 내부 실제 치수 (env 상수 그대로)
+      · wall_mm:  벽 두께 (fits/depth 계산의 wall_mm 파라미터가 이 값을 우선 사용)
+      · floor_mm: 바닥 두께
+    존재하지 않으면 아무것도 하지 않는다 (해당 태스크가 아니거나 env 가 이 필드를
+    노출하지 않는 경우 — c1_1 등 다른 태스크는 그대로 통과)."""
+    fields = _CONTAINER_INNER_FIELDS.get(task_name)
+    if not fields:
+        return
+    try:
+        ep_meta = env.get_ep_meta() if hasattr(env, "get_ep_meta") else {}
+    except Exception as exc:
+        print(f"[M1] 경고: get_ep_meta() 실패 — 컨테이너 내부치수 실을 수 없음: {exc}")
+        return
+    for body_name, cfg in fields.items():
+        w_key, d_key, h_key = cfg["inner_keys"]
+        if not all(k in ep_meta for k in (w_key, d_key, h_key)):
+            continue
+        inner_mm = [round(float(ep_meta[k]) * 1000.0, 1) for k in (w_key, d_key, h_key)]
+        wall_mm, floor_mm = cfg["wall_floor_fn"]()
+        # body_name 은 M1 노드 id 의 name 부분과 매칭 (obj_<cls>_<name>)
+        matched = 0
+        for node in m1["nodes"]:
+            if node["id"].endswith(f"_{body_name}"):
+                node["inner_bbox_mm"] = inner_mm
+                node["wall_mm"] = wall_mm
+                node["floor_mm"] = floor_mm
+                matched += 1
+        if matched:
+            print(f"[M1] 컨테이너 내부치수 실음: {body_name} inner={inner_mm}mm "
+                  f"wall={wall_mm}mm floor={floor_mm}mm (노드 {matched}개)")
+
+
 def _robocasa_tracked_models(env, spec):
     """(이름, 모델) 목록 — env.objects 와 spec['extra_bodies'] 고정 바디를 합친다.
 
@@ -665,6 +727,8 @@ def main():
     backend_name = _argument("--backend", "siphy")
     model = _argument("--model", "gpt-4o-mini")
     memory_path = _argument("--memory", str(ROOT / "output" / "memory.json"))
+    bbox_threshold = float(_argument("--m0-bbox-threshold", "0.25"))
+    density_threshold = float(_argument("--m0-density-threshold", "0.20"))
     if backend_name not in ("siphy", "mock"):
         sys.exit(f"[err] unsupported backend {backend_name!r}; use siphy or mock")
     if name not in TASK_ENVS:
@@ -888,26 +952,9 @@ def main():
     for o in objects:
         print(f"     {o['name']:24s} points={len(o['points'])}")
     m1 = build_m1(objects)
-    m1["geometry_metadata"] = {
-        "schema": "M1_GEOMETRY_V2",
-        "length_unit": "mm",
-        "meters_per_unit": 0.001,
-        "bbox_kind": "WORLD_AXIS_ALIGNED_OBSERVED_ENVELOPE",
-        "coordinate_frame": {
-            "frame_id": "m1_observation_frame",
-            "axes": "world_aligned",
-            "transform_to_world": {
-                "translation_m": [float(value) / 1000.0 for value in base_off],
-                "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
-            },
-        },
-        "source": "DEPTH_INSTANCE_SEGMENTATION",
-        "completeness": "OBSERVED_SURFACES_ONLY",
-    }
-    from tuj.m5_motion.tool_use_journal import ToolUseJournalEnvironmentAdapter
-
-    m1_world = ToolUseJournalEnvironmentAdapter(env).world_snapshot()
-    m1_world.metadata["geometry_observation_artifact"] = str(OUT / "m1.json")
+    # env 가 아는 컨테이너 실제 내부치수를 노드에 실는다 (c4_2 packing_box 등).
+    # 점군 AABB 로는 벽까지 포함된 외곽만 나오므로 M5 담기 좌표가 부정확해진다.
+    _augment_container_dims(env, name, m1)
 
     OUT.mkdir(parents=True, exist_ok=True)
     if rgb is None:
@@ -924,7 +971,22 @@ def main():
     ee_pool, reach_mm = _ee_pool()
     backend = (SiPhyBackend(model=model, repo_root=ROOT, verbose=True)
                if backend_name == "siphy" else MockBackend())
-    memory = None if memory_path == "none" else PropertyMemory(memory_path, task_id=name)
+    memory = None if memory_path == "none" else PropertyMemory(
+        memory_path, task_id=name,
+        bbox_relative_threshold=bbox_threshold,
+        density_relative_threshold=density_threshold)
+    retrieval_debug: dict = {}
+    density_infer = None
+    if memory is not None:
+        if backend_name == "siphy":
+            from tuj.m0_memory import DensityOnlyBackend
+            density_backend = DensityOnlyBackend(
+                model=backend.model, client=backend.client, repo_root=ROOT)
+            density_infer = density_backend.infer
+        else:
+            from tuj.m0_memory import DensityOnlyResult
+            density_infer = lambda _crop: DensityOnlyResult(
+                None, False, error="mock backend: C3 density disabled")
     stats = ground_scene(
         m1,
         backend=backend,
@@ -934,12 +996,16 @@ def main():
         crops_dir=OUT / "crops",
         logger=lambda **event: print("  [M1]", event),
         source=backend_name,
+        density_infer=density_infer,
+        retrieval_debug=retrieval_debug,
     )
+    if memory is not None:
+        (OUT / "m0_retrieval.json").write_text(
+            json.dumps({"round": "m1", "objects": retrieval_debug},
+                       ensure_ascii=False, indent=2),
+            encoding="utf-8")
     (OUT / "m1.json").write_text(
         json.dumps(serialize(m1), ensure_ascii=False, indent=2), encoding="utf-8")
-    (OUT / "m1_world.json").write_text(
-        m1_world.model_dump_json(indent=2), encoding="utf-8"
-    )
     np.savez_compressed(OUT / "m1_points.npz",
                         **{n["id"]: n["_points"] for n in m1["nodes"]})
     print("[M1] grounding: "
@@ -949,11 +1015,12 @@ def main():
         update = stats["memory_update"]
         print(f"[M1] memory update: new={update['new']} upgraded={update['upgraded']} "
               f"kept={update['kept']} -> {memory_path}")
+        print(f"[M1] m0_retrieval -> {OUT / 'm0_retrieval.json'}")
     print(f"[M1] nodes={len(m1['nodes'])} edges={len(m1['edges'])} "
           f"crops={len(list((OUT / 'crops').glob('*.png')))}")
     for e in m1["edges"]:
         print(f"     {e['type']:9s} {e['from']} -> {e['to']}")
-    print(f"[{name}] -> {OUT}/m1.json, {OUT}/m1_world.json, {OUT}/m1_points.npz")
+    print(f"[{name}] -> {OUT}/m1.json, {OUT}/m1_points.npz")
 
     if view:
         import time

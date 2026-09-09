@@ -21,10 +21,38 @@ def _props_stage(props: dict) -> int:
 
 def _finite_positive(value):
     try:
+        if hasattr(value, "item") and not isinstance(value, (bytes, str)):
+            try:
+                value = value.item()
+            except (ValueError, AttributeError):
+                pass
         value = float(value)
+        if value != value or value in (float("inf"), float("-inf")):
+            return None
         return value if value > 0 else None
     except (TypeError, ValueError):
         return None
+
+
+def _as_size3(value):
+    """Normalize bbox/extents to plain list[float] of length 3 (numpy-safe)."""
+    if value is None:
+        return None
+    try:
+        if hasattr(value, "tolist"):
+            value = value.tolist()
+        seq = list(value)
+    except TypeError:
+        return None
+    if len(seq) != 3:
+        return None
+    out = []
+    for x in seq:
+        f = _finite_positive(x)
+        if f is None:
+            return None
+        out.append(f)
+    return out
 
 
 def _memory_key(task_id: str, object_id: str) -> str:
@@ -157,11 +185,9 @@ class ObjectKnowledgeManager:
 
     @staticmethod
     def _bbox_difference(query_bbox, memory_extents):
-        if not query_bbox or not memory_extents or len(query_bbox) != 3 or len(memory_extents) != 3:
-            return None
-        q = [_finite_positive(x) for x in query_bbox]
-        m = [_finite_positive(x) for x in memory_extents]
-        if any(x is None for x in q + m):
+        q = _as_size3(query_bbox)
+        m = _as_size3(memory_extents)
+        if q is None or m is None:
             return None          # 비정상 extents 항목은 후보에서 제외 (sorted 전에 걸러야 함)
         q, m = sorted(q), sorted(m)
         axis_diffs = [abs(a - b) / max(abs(b), 1e-9) for a, b in zip(q, m)]
@@ -201,25 +227,28 @@ class ObjectKnowledgeManager:
         return (ranked[0] if ranked else None), ranked
 
     def lookup_or_retrieve(self, task_id, object_id, bbox_mm, crop_rgb, density_infer):
+        query_bbox = _as_size3(bbox_mm)
         debug = {"query_task": task_id, "query_object_id": object_id,
                  "bbox_threshold": self.bbox_relative_threshold,
                  "density_threshold": self.density_relative_threshold,
                  "threshold_status": "provisional", "c3_llm_called": False,
                  "c3_token_usage": None, "full_m3_called": False,
-                 "full_m3_skipped": False}
+                 "full_m3_skipped": False,
+                 "memory_entry_count": len(self.objects),
+                 "query_bbox_mm": query_bbox}
         exact, key, exact_reason = self.lookup_exact(task_id, object_id)
         if exact is not None:
             return entry_to_props(exact), debug | {"lookup_type": "intra_task_exact",
                 "best_match": {"memory_entry_key": key, "source_task": task_id,
                                "object_id": object_id}, "result": "HIT", "full_m3_skipped": True}
-        candidates = self.filter_bbox(task_id, bbox_mm)
+        candidates = self.filter_bbox(task_id, query_bbox)
         debug |= {"lookup_type": "cross_task", "bbox_candidates": candidates}
         if not candidates:
             stale_bbox_match = any(
                 entry.get("metadata", {}).get("source_task") != task_id
                 and entry.get("metadata", {}).get("stale")
                 and (diff := self._bbox_difference(
-                    bbox_mm, entry.get("geometry", {}).get("extents_mm"))) is not None
+                    query_bbox, entry.get("geometry", {}).get("extents_mm"))) is not None
                 and diff[0] <= self.bbox_relative_threshold
                 for entry in self.objects.values())
             reason = exact_reason or ("STALE_MEMORY" if stale_bbox_match else "NO_BBOX_CANDIDATE")
@@ -233,7 +262,10 @@ class ObjectKnowledgeManager:
                 "density_error": str(exc)}
         debug |= {"c3_llm_called": density_result.llm_called,
                   "c3_token_usage": density_result.token_usage,
-                  "query_density_kgm3": density_result.density_kgm3}
+                  "query_density_kgm3": density_result.density_kgm3,
+                  "c3_materials_topk": getattr(density_result, "materials_topk", None),
+                  "c3_material_committed": getattr(density_result, "material_committed", None),
+                  "c3_top1_gap": getattr(density_result, "top1_gap", None)}
         if density_result.density_kgm3 is None:
             return None, debug | {"density_candidates": [], "best_match": None,
                 "result": "MISS", "miss_reason": "DENSITY_INFERENCE_FAILED",
