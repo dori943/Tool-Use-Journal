@@ -19,6 +19,12 @@ from typing import Any, Literal, Mapping, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from tuj.m5_motion.attachment_retarget import (
+    ATTACHED_OBJECT_POSE_SUBJECT,
+    POSE_SUBJECT_KEY,
+    POSE_SUBJECT_OBJECT_ID_KEY,
+    held_pose_subject,
+)
 from tuj.m5_motion.geometry import GeometryResolutionError, RelativePoseResolver
 from tuj.m5_motion.schema import (
     AttachedObjectTransform,
@@ -369,6 +375,65 @@ def _frame_catalog(request: MotionPlanRequest) -> list[dict[str, Any]]:
     return catalog
 
 
+_Quaternion = tuple[float, float, float, float]
+
+
+@dataclass(frozen=True, slots=True)
+class _HeldGoalSubject:
+    """Which keyframes of a held-object subgoal describe the object's pose."""
+
+    object_id: str
+    object_keyframe_types: frozenset[KeyframeType]
+    object_orientation_xyzw: _Quaternion | None
+    eef_orientation_xyzw: _Quaternion | None
+
+
+def _quaternion(goal: Any, key: str) -> _Quaternion | None:
+    if not isinstance(goal, dict) or not goal.get("preserve_grasp_orientation", False):
+        return None
+    raw = goal.get(key)
+    if isinstance(raw, (list, tuple)) and len(raw) == 4:
+        return tuple(float(value) for value in raw)
+    return None
+
+
+def _held_goal_subject(request: MotionPlanRequest) -> _HeldGoalSubject | None:
+    """Describe pose-subject retargeting for a held TRANSPORT/MOVE or region PLACE.
+
+    Only subgoals that carry an attached or contact-friction held object are
+    retargeted.  Held transport treats every TRANSFER keyframe as the object's
+    pose; a region PLACE treats TRANSFER/PRE_PLACE/PLACE as the object's pose
+    and RETREAT as an EEF motion.  Contact tasks and RETURN_TOOL keep their
+    existing EEF-pose semantics.  Orientations come from the grounded
+    ``held_transport_goal`` / ``held_place_goal`` when present and are
+    otherwise left to the model's axis/roll proposal.
+    """
+
+    operation = task_operation(request.task)
+    if operation in {"TRANSPORT", "MOVE"}:
+        goal_key = "held_transport_goal"
+        kinds = frozenset({KeyframeType.TRANSFER})
+    elif operation in {"PLACE", "RELEASE"} or operation.startswith("PLACE_"):
+        if not request.task.goal.target_region_id:
+            return None
+        goal_key = "held_place_goal"
+        kinds = frozenset(
+            {KeyframeType.TRANSFER, KeyframeType.PRE_PLACE, KeyframeType.PLACE}
+        )
+    else:
+        return None
+    object_id = held_pose_subject(request)
+    if object_id is None:
+        return None
+    goal = request.task.metadata.get(goal_key)
+    return _HeldGoalSubject(
+        object_id=object_id,
+        object_keyframe_types=kinds,
+        object_orientation_xyzw=_quaternion(goal, "object_orientation_xyzw"),
+        eef_orientation_xyzw=_quaternion(goal, "eef_orientation_xyzw"),
+    )
+
+
 def _prompt_payload(request: MotionPlanRequest, candidate_count: int) -> dict[str, Any]:
     from tuj.m5_motion.scene_context import spatial_record
 
@@ -438,6 +503,15 @@ Hard rules:
   both in the supplied frame_ref with zero offset and the supplied orientation.
 - PICK strategies must include a GRASP keyframe followed by LIFT or RETREAT.
 - PLACE strategies must include a PLACE keyframe followed by RETREAT.
+- For a PLACE of a held object into target_region_id, TRANSFER, PRE_PLACE and
+  PLACE keyframes describe the HELD OBJECT's pose (same rule as transport);
+  only RETREAT is a gripper motion. When held_place_goal is supplied, its
+  anchor is the object's resting destination on the region's interior floor
+  (release clearance included): put the PLACE keyframe exactly at that
+  frame_ref/anchor with zero offset and the supplied orientation, put
+  PRE_PLACE at the same anchor with a positive offset_along_approach_m, and
+  RETREAT at the same anchor with a larger positive offset. Never lower the
+  object below that anchor and never target the region's center or bottom.
 - PICK_TOOL strategies use GRASP then LIFT/RETREAT; RETURN_TOOL strategies use
   PLACE then RETREAT.
 - Use CARTESIAN for straight approach/contact/retreat intent, SAMPLING_BASED for
@@ -600,6 +674,40 @@ class OpenAIKeyframeProvider:
                         }
                     if event_parameters:
                         metadata["event_parameters"] = event_parameters
+                    if (
+                        releases_resource
+                        and item.keyframe_type is KeyframeType.PLACE
+                        and held_pose_subject(request) is not None
+                    ):
+                        # Opening the gripper leaves the fingertips wrapped
+                        # around the just-released object; the first withdrawal
+                        # edge must permit that gripper<->object contact or the
+                        # release always reads as a collision.  The scripted and
+                        # packing paths set this the same way.
+                        metadata["allow_release_contact"] = True
+                    if held_goal is not None:
+                        if item.keyframe_type in held_goal.object_keyframe_types:
+                            # These keyframes describe the held object's pose;
+                            # the compiler retargets them to the EEF through the
+                            # measured grasp transform.  Pin the orientation the
+                            # grounded goal established so no candidate can
+                            # drift the grasp posture through rounded axis/roll.
+                            metadata[POSE_SUBJECT_KEY] = ATTACHED_OBJECT_POSE_SUBJECT
+                            metadata[POSE_SUBJECT_OBJECT_ID_KEY] = held_goal.object_id
+                            if held_goal.object_orientation_xyzw is not None:
+                                metadata["packing_orientation_xyzw"] = list(
+                                    held_goal.object_orientation_xyzw
+                                )
+                        elif (
+                            item.keyframe_type is KeyframeType.RETREAT
+                            and held_goal.eef_orientation_xyzw is not None
+                        ):
+                            # RETREAT after a release is an EEF motion: keep the
+                            # wrist where the grasp left it instead of letting a
+                            # proposed roll twist the open gripper on the way up.
+                            metadata["packing_orientation_xyzw"] = list(
+                                held_goal.eef_orientation_xyzw
+                            )
                     keyframe = RelativeKeyframeSpec(
                         keyframe_id=(
                             f"{strategy_id}:{keyframe_index}:{item.keyframe_id}"
@@ -757,8 +865,13 @@ class OpenAIKeyframeProvider:
         except OpenAIKeyframeProviderError:
             raise
         except Exception as error:  # noqa: BLE001 - SDK error surface varies
+            # Surface the API's own reason (e.g. an unsupported parameter for a
+            # given model) so a 400 is diagnosable; the SDK message carries the
+            # error body, not the request payload.  Cap length defensively.
+            detail = str(error).replace("\n", " ")[:600]
             raise OpenAIKeyframeProviderError(
-                f"{self.provider_name} keyframe request failed ({type(error).__name__})"
+                f"{self.provider_name} keyframe request failed "
+                f"({type(error).__name__}): {detail}"
             ) from None
 
         parsed = getattr(response, "output_parsed", None)

@@ -35,30 +35,40 @@
           181.2,
           181.2
         ],
-        "height_mm": 10.7
+        "height_mm": 10.7,
+        "center": [
+          639.3,
+          -0.6,
+          816.6
+        ],
+        "aabb_size": [
+          181.2,
+          181.2,
+          10.7
+        ]
       },
       "material": "plastic",
-      "density_kgm3": 1100.0,
-      "mass_kg": 0.156,
-      "youngs_gpa": 3.0,
+      "density_kgm3": 3001.9,
+      "mass_kg": 0.354,
+      "youngs_gpa": 71.69,
       "mu": {
         "mu": 0.338,
         "stage": 0,
         "material": "plastic",
         "rms_mm": 0.29
       },
-      "confidence": 0.444,
+      "confidence": 0.308,
       "mass_range_kg": [
-        0.038,
-        0.274
+        0.103,
+        0.605
       ],
       "materials_topk": [
         {
           "name": "plastic",
-          "prob": 0.444,
+          "prob": 0.308,
           "density_kgm3": [
-            900.0,
-            1300.0
+            800.0,
+            1500.0
           ],
           "thickness_cm": [
             0.2,
@@ -66,55 +76,55 @@
           ]
         },
         {
-          "name": "ceramic",
-          "prob": 0.222,
-          "density_kgm3": [
-            2000.0,
-            3000.0
-          ],
-          "thickness_cm": [
-            0.5,
-            2.0
-          ]
-        },
-        {
-          "name": "metal",
-          "prob": 0.167,
+          "name": "aluminum",
+          "prob": 0.231,
           "density_kgm3": [
             2700.0,
-            8000.0
+            2700.0
           ],
           "thickness_cm": [
-            0.5,
-            1.5
+            0.1,
+            0.5
           ]
         },
         {
           "name": "glass",
-          "prob": 0.111,
+          "prob": 0.192,
           "density_kgm3": [
-            2500.0,
-            3000.0
+            2400.0,
+            2800.0
+          ],
+          "thickness_cm": [
+            0.2,
+            1.0
+          ]
+        },
+        {
+          "name": "steel",
+          "prob": 0.154,
+          "density_kgm3": [
+            7850.0,
+            7850.0
+          ],
+          "thickness_cm": [
+            0.1,
+            0.5
+          ]
+        },
+        {
+          "name": "ceramic",
+          "prob": 0.115,
+          "density_kgm3": [
+            2000.0,
+            3500.0
           ],
           "thickness_cm": [
             0.3,
             1.0
           ]
-        },
-        {
-          "name": "rubber",
-          "prob": 0.056,
-          "density_kgm3": [
-            600.0,
-            1200.0
-          ],
-          "thickness_cm": [
-            0.2,
-            0.5
-          ]
         }
       ],
-      "caption": "Round flat object",
+      "caption": "Round wall or ceiling light fixture.",
       "grounding_source": "memory",
       "ee": {
         "2F": {
@@ -131,13 +141,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.156,
+              "value": 0.354,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 2.264,
+              "value": 5.137,
               "limit": 235.0,
               "pass": true
             }
@@ -157,13 +167,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.156,
+              "value": 0.354,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 2.264,
+              "value": 5.137,
               "limit": 60.0,
               "pass": true
             }
@@ -171,9 +181,9 @@
         },
         "vac": {
           "feasible": true,
-          "margin": 0.344,
+          "margin": 0.146,
           "margin_unit": "kg",
-          "reason": "질량 0.156 vs 페이로드 0.5kg",
+          "reason": "질량 0.354 vs 페이로드 0.5kg",
           "checks": [
             {
               "rule": "flatness",
@@ -183,7 +193,7 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.156,
+              "value": 0.354,
               "limit": 0.5,
               "pass": true
             },
@@ -261,86 +271,96 @@
           307.7,
           435.3
         ],
-        "height_mm": 25.0
+        "height_mm": 25.0,
+        "center": [
+          206.6,
+          203.9,
+          812.5
+        ],
+        "aabb_size": [
+          307.7,
+          435.3,
+          25.0
+        ]
       },
-      "material": "glass",
-      "density_kgm3": 2368.0,
-      "mass_kg": 3.381,
-      "youngs_gpa": 57.98,
+      "material": "ceramic",
+      "density_kgm3": 3286.7,
+      "mass_kg": 4.52,
+      "youngs_gpa": 90.24,
       "mu": {
-        "mu": 0.397,
+        "mu": 0.447,
         "stage": 0,
-        "material": "glass",
+        "material": "ceramic",
         "rms_mm": 0.86
       },
-      "confidence": 0.28,
+      "confidence": 0.267,
       "mass_range_kg": [
-        1.697,
-        5.065
+        2.078,
+        6.963
       ],
       "materials_topk": [
         {
-          "name": "glass",
-          "prob": 0.28,
+          "name": "ceramic",
+          "prob": 0.267,
           "density_kgm3": [
             2200.0,
-            2500.0
+            2700.0
           ],
           "thickness_cm": [
             0.5,
-            0.8
+            1.5
           ]
         },
         {
-          "name": "ceramic",
-          "prob": 0.24,
+          "name": "glass",
+          "prob": 0.233,
           "density_kgm3": [
-            1800.0,
-            2500.0
+            2400.0,
+            2800.0
           ],
           "thickness_cm": [
             0.5,
-            1.0
+            1.5
           ]
         },
         {
-          "name": "plastic",
+          "name": "stainless steel",
+          "prob": 0.167,
+          "density_kgm3": [
+            7750.0,
+            8050.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.5
+          ]
+        },
+        {
+          "name": "aluminum",
           "prob": 0.2,
           "density_kgm3": [
-            900.0,
-            1200.0
+            2600.0,
+            2700.0
           ],
           "thickness_cm": [
-            0.3,
-            1.0
-          ]
-        },
-        {
-          "name": "metal",
-          "prob": 0.16,
-          "density_kgm3": [
-            2700.0,
-            7800.0
-          ],
-          "thickness_cm": [
-            0.2,
-            0.5
+            0.5,
+            1.5
           ]
         },
         {
           "name": "silicone",
-          "prob": 0.12,
+          "prob": 0.133,
           "density_kgm3": [
             1100.0,
-            1300.0
+            1600.0
           ],
           "thickness_cm": [
             0.5,
-            1.0
+            1.5
           ]
         }
       ],
-      "caption": "Blue baking dish",
+      "caption": "Rectangular baking dish.",
       "grounding_source": "memory",
       "ee": {
         "2F": {
@@ -357,13 +377,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 3.381,
+              "value": 4.52,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 41.773,
+              "value": 49.599,
               "limit": 235.0,
               "pass": true
             }
@@ -373,7 +393,7 @@
           "feasible": false,
           "margin": -167.7,
           "margin_unit": "mm",
-          "reason": "치수 308 vs 개구 140mm; 질량 3.381 vs 페이로드 2.5kg",
+          "reason": "치수 308 vs 개구 140mm; 질량 4.52 vs 페이로드 2.5kg",
           "checks": [
             {
               "rule": "dim_lt_stroke",
@@ -383,13 +403,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 3.381,
+              "value": 4.52,
               "limit": 2.5,
               "pass": false
             },
             {
               "rule": "grip_slip",
-              "value": 41.773,
+              "value": 49.599,
               "limit": 60.0,
               "pass": true
             }
@@ -397,9 +417,9 @@
         },
         "vac": {
           "feasible": false,
-          "margin": -2.881,
+          "margin": -4.02,
           "margin_unit": "kg",
-          "reason": "질량 3.381 vs 페이로드 0.5kg",
+          "reason": "질량 4.52 vs 페이로드 0.5kg",
           "checks": [
             {
               "rule": "flatness",
@@ -409,7 +429,7 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 3.381,
+              "value": 4.52,
               "limit": 0.5,
               "pass": false
             },
@@ -474,10 +494,12 @@
       "binding": {
         "?o": "obj_plate_plate"
       },
+      "group_id": "G_SG1_s2",
       "pre": [
         {
           "id": "SG1_s2_d1_p0",
           "expr": "reachable(obj_plate_plate)",
+          "head": "reachable",
           "eval_by": "m3",
           "status": "sat",
           "evidence": [
@@ -491,6 +513,7 @@
         {
           "id": "SG1_s2_d1_p1",
           "expr": "top_exposed(obj_plate_plate)",
+          "head": "top_exposed",
           "eval_by": "m3",
           "status": "sat",
           "evidence": [
@@ -504,6 +527,7 @@
         {
           "id": "SG1_s2_d1_p2",
           "expr": "ee_usable(?EE, obj_plate_plate)",
+          "head": "ee_usable",
           "eval_by": "m3",
           "status": "sat",
           "evidence": [
@@ -517,7 +541,28 @@
         },
         {
           "id": "SG1_s2_d1_p3",
+          "expr": "graspable_on_support(?EE, obj_plate_plate)",
+          "head": "graspable_on_support",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_plate_plate",
+              "graspable_on_support": true,
+              "graspable_ees": [
+                "2F",
+                "3F",
+                "vac"
+              ],
+              "supports": [],
+              "height_mm": 10.7
+            }
+          ]
+        },
+        {
+          "id": "SG1_s2_d1_p4",
           "expr": "batch_feasible(?EE, obj_plate_plate)",
+          "head": "batch_feasible",
           "eval_by": "m3",
           "status": "sat",
           "evidence": [
@@ -536,13 +581,15 @@
           ]
         },
         {
-          "id": "SG1_s2_d1_p4",
+          "id": "SG1_s2_d1_p5",
           "expr": "hand_empty",
+          "head": "hand_empty",
           "eval_by": "m2"
         },
         {
-          "id": "SG1_s2_d1_p5",
+          "id": "SG1_s2_d1_p6",
           "expr": "in(obj_spoon_spoon, obj_tray_blue_tray)",
+          "head": "in",
           "eval_by": "m2"
         }
       ],
@@ -560,20 +607,24 @@
         "?o": "obj_plate_plate",
         "?r": "obj_tray_blue_tray"
       },
+      "group_id": "G_SG1_s2",
       "pre": [
         {
           "id": "SG1_s2_d2_p0",
           "expr": "holding(obj_plate_plate)",
+          "head": "holding",
           "eval_by": "m2"
         },
         {
           "id": "SG1_s2_d2_p1",
           "expr": "act_space_clear(?EE, obj_plate_plate, obj_tray_blue_tray)",
+          "head": "act_space_clear",
           "eval_by": "motion"
         },
         {
           "id": "SG1_s2_d2_p2",
           "expr": "path_clear(obj_plate_plate, obj_tray_blue_tray)",
+          "head": "path_clear",
           "eval_by": "motion"
         }
       ],
@@ -589,20 +640,24 @@
         "?o": "obj_plate_plate",
         "?r": "obj_tray_blue_tray"
       },
+      "group_id": "G_SG1_s2",
       "pre": [
         {
           "id": "SG1_s2_d3_p0",
           "expr": "holding(obj_plate_plate)",
+          "head": "holding",
           "eval_by": "m2"
         },
         {
           "id": "SG1_s2_d3_p1",
           "expr": "above(obj_plate_plate, obj_tray_blue_tray)",
+          "head": "above",
           "eval_by": "m2"
         },
         {
           "id": "SG1_s2_d3_p2",
           "expr": "fits(obj_plate_plate, obj_tray_blue_tray)",
+          "head": "fits",
           "eval_by": "m3",
           "status": "sat",
           "evidence": [
@@ -617,6 +672,7 @@
         {
           "id": "SG1_s2_d3_p3",
           "expr": "clear(obj_tray_blue_tray)",
+          "head": "clear",
           "eval_by": "m3",
           "status": "sat",
           "evidence": [
@@ -695,20 +751,30 @@
           181.2,
           181.2
         ],
-        "height_mm": 10.7
+        "height_mm": 10.7,
+        "center": [
+          639.3,
+          -0.6,
+          816.6
+        ],
+        "aabb_size": [
+          181.2,
+          181.2,
+          10.7
+        ]
       },
       "material": "plastic",
-      "density_kgm3": 1100.0,
-      "mass_kg": 0.156,
-      "youngs_gpa": 3.0,
+      "density_kgm3": 3001.9,
+      "mass_kg": 0.354,
+      "youngs_gpa": 71.69,
       "mu": {
         "mu": 0.338,
         "stage": 0,
         "material": "plastic",
         "rms_mm": 0.29
       },
-      "confidence": 0.444,
-      "caption": "Round flat object",
+      "confidence": 0.308,
+      "caption": "Round wall or ceiling light fixture.",
       "ee": {
         "2F": {
           "feasible": false,
@@ -724,13 +790,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.156,
+              "value": 0.354,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 2.264,
+              "value": 5.137,
               "limit": 235.0,
               "pass": true
             }
@@ -750,13 +816,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.156,
+              "value": 0.354,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 2.264,
+              "value": 5.137,
               "limit": 60.0,
               "pass": true
             }
@@ -764,9 +830,9 @@
         },
         "vac": {
           "feasible": true,
-          "margin": 0.344,
+          "margin": 0.146,
           "margin_unit": "kg",
-          "reason": "질량 0.156 vs 페이로드 0.5kg",
+          "reason": "질량 0.354 vs 페이로드 0.5kg",
           "checks": [
             {
               "rule": "flatness",
@@ -776,7 +842,7 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.156,
+              "value": 0.354,
               "limit": 0.5,
               "pass": true
             },
@@ -831,20 +897,30 @@
           181.2,
           181.2
         ],
-        "height_mm": 10.7
+        "height_mm": 10.7,
+        "center": [
+          639.3,
+          -0.6,
+          816.6
+        ],
+        "aabb_size": [
+          181.2,
+          181.2,
+          10.7
+        ]
       },
       "material": "plastic",
-      "density_kgm3": 1100.0,
-      "mass_kg": 0.156,
-      "youngs_gpa": 3.0,
+      "density_kgm3": 3001.9,
+      "mass_kg": 0.354,
+      "youngs_gpa": 71.69,
       "mu": {
         "mu": 0.338,
         "stage": 0,
         "material": "plastic",
         "rms_mm": 0.29
       },
-      "confidence": 0.444,
-      "caption": "Round flat object",
+      "confidence": 0.308,
+      "caption": "Round wall or ceiling light fixture.",
       "ee": {
         "2F": {
           "feasible": false,
@@ -860,13 +936,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.156,
+              "value": 0.354,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 2.264,
+              "value": 5.137,
               "limit": 235.0,
               "pass": true
             }
@@ -886,13 +962,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.156,
+              "value": 0.354,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 2.264,
+              "value": 5.137,
               "limit": 60.0,
               "pass": true
             }
@@ -900,9 +976,9 @@
         },
         "vac": {
           "feasible": true,
-          "margin": 0.344,
+          "margin": 0.146,
           "margin_unit": "kg",
-          "reason": "질량 0.156 vs 페이로드 0.5kg",
+          "reason": "질량 0.354 vs 페이로드 0.5kg",
           "checks": [
             {
               "rule": "flatness",
@@ -912,7 +988,7 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 0.156,
+              "value": 0.354,
               "limit": 0.5,
               "pass": true
             },
@@ -941,6 +1017,48 @@
     {
       "subgoal_id": "SG1_s2",
       "queried_by": "SG1_s2_d1_p3",
+      "node_id": "obj_plate_plate",
+      "type": "graspable_on_support",
+      "value": true,
+      "pass": true,
+      "graspable_ees": [
+        "2F",
+        "3F",
+        "vac"
+      ],
+      "per_ee": {
+        "2F": {
+          "type": "graspable_on_support",
+          "ee_id": "2F",
+          "supports": [],
+          "height_mm": 10.7,
+          "value": true,
+          "pass": true,
+          "check": "no_support_node"
+        },
+        "3F": {
+          "type": "graspable_on_support",
+          "ee_id": "3F",
+          "supports": [],
+          "height_mm": 10.7,
+          "value": true,
+          "pass": true,
+          "check": "no_support_node"
+        },
+        "vac": {
+          "type": "graspable_on_support",
+          "ee_id": "vac",
+          "supports": [],
+          "height_mm": 10.7,
+          "value": true,
+          "pass": true,
+          "check": "no_support_node"
+        }
+      }
+    },
+    {
+      "subgoal_id": "SG1_s2",
+      "queried_by": "SG1_s2_d1_p4",
       "kind": "batch",
       "actor": {
         "type": "ee_pool"
@@ -985,7 +1103,7 @@
         {
           "type": "clearance",
           "value_mm": 118.5,
-          "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_181.2) & no_tip(h_10.7<=3.0x181.2)",
+          "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_181.2) & walled(container_25.0>=h/2_5.3)",
           "pass": true
         }
       ],
