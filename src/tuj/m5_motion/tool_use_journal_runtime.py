@@ -1175,11 +1175,15 @@ class ToolUseJournalEERuntime:
                 f"{self._active_ee!r}"
             )
         normalized = self._normalized_command(command, engaged=engaged)
-        if engaged and normalized < 0.0:
+        if suction and engaged != (normalized > -1.0):
+            raise ToolUseJournalRuntimeError(
+                "suction-off requires -1; suction-on requires a command greater than -1"
+            )
+        if not suction and engaged and normalized < 0.0:
             raise ToolUseJournalRuntimeError(
                 "close / suction-on command must be non-negative"
             )
-        if not engaged and normalized >= 0.0:
+        if not suction and not engaged and normalized >= 0.0:
             raise ToolUseJournalRuntimeError(
                 "open / suction-off command must be less than zero"
             )
@@ -1840,7 +1844,8 @@ class ToolUseJournalEERuntime:
                 "cannot restore logical state while an object is attached"
             )
         command = self._normalized_command(gripper_command, engaged=grasp_engaged)
-        if grasp_engaged != (command >= 0.0):
+        command_engaged = command > -1.0 if self._active_ee == "vac" else command >= 0.0
+        if grasp_engaged != command_engaged:
             raise ToolUseJournalRuntimeError(
                 "checkpoint gripper command disagrees with grasp state"
             )
@@ -3148,7 +3153,10 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 action[gripper_start:gripper_end] = 0.0
                 return action
             command = float(self.runtime.gripper_command)
-            if command == 0.0:
+            if getattr(robot.gripper["right"], "action_is_absolute", False):
+                self._gripper_rate_credit = 0.0
+                gripper_action = command
+            elif command == 0.0:
                 self._gripper_rate_credit = 0.0
                 gripper_action = 0.0
             elif abs(command) >= 1.0:
