@@ -24,6 +24,10 @@ from tuj.m5_motion.schema import (
     Pose,
     WorldSnapshot,
 )
+from tuj.m5_motion.physical_grasp import (
+    GraspExecutionMode,
+    normalized_grasp_execution_mode,
+)
 from tuj.m5_motion.task_semantics import is_acquire_action
 
 
@@ -57,7 +61,13 @@ _EXECUTION_METADATA_KEYS = (
     "grasp_clearance_requirements",
     "grasp_preshape_aperture_m",
     "grasp_preshape_tolerance_m",
+    "support_collision_selectors",
+    "support_contact_tolerance_m",
+    "support_min_horizontal_overlap_ratio",
+    "support_penetration_tolerance_m",
 )
+
+_DEFAULT_SUPPORT_MIN_HORIZONTAL_OVERLAP_RATIO = 0.5
 
 
 def _canonical_json(value: Any) -> str:
@@ -203,6 +213,92 @@ def _execution_metadata(parameters: Mapping[str, Any]) -> dict[str, Any]:
         key: parameters[key]
         for key in _EXECUTION_METADATA_KEYS
         if key in parameters
+    }
+
+
+def _support_contact_tolerance_m(
+    metadata: Mapping[str, Any],
+    *,
+    collision_margin_m: float,
+) -> float:
+    raw = metadata.get("support_contact_tolerance_m", collision_margin_m)
+    if (
+        isinstance(raw, bool)
+        or not isinstance(raw, (int, float))
+        or not math.isfinite(float(raw))
+        or float(raw) < 0.0
+    ):
+        raise SelectedPlanAdapterError(
+            "support_contact_tolerance_m must be finite and non-negative"
+        )
+    return float(raw)
+
+
+def _support_min_horizontal_overlap_ratio(
+    metadata: Mapping[str, Any],
+) -> float:
+    raw = metadata.get(
+        "support_min_horizontal_overlap_ratio",
+        _DEFAULT_SUPPORT_MIN_HORIZONTAL_OVERLAP_RATIO,
+    )
+    if (
+        isinstance(raw, bool)
+        or not isinstance(raw, (int, float))
+        or not math.isfinite(float(raw))
+        or not 0.0 <= float(raw) <= 1.0
+    ):
+        raise SelectedPlanAdapterError(
+            "support_min_horizontal_overlap_ratio must be finite and within [0, 1]"
+        )
+    return float(raw)
+
+
+def _inferred_support_collision_metadata(
+    world: WorldSnapshot,
+    *,
+    target_id: str | None,
+    collision_margin_m: float,
+    metadata: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Ground an initial target-support relation without object-name policy."""
+
+    if target_id is None or "support_collision_selectors" in metadata:
+        return {}
+    tolerance_m = _support_contact_tolerance_m(
+        metadata,
+        collision_margin_m=collision_margin_m,
+    )
+    minimum_overlap_ratio = _support_min_horizontal_overlap_ratio(metadata)
+    record = world.objects.get(target_id)
+    if record is None:
+        return {}
+    from tuj.m5_motion.grasp_geometry import support_clearance_context_from_world
+
+    support = support_clearance_context_from_world(
+        record,
+        world,
+        target_id,
+        tolerance_m=tolerance_m,
+        minimum_horizontal_overlap_ratio=minimum_overlap_ratio,
+    )
+    if (
+        support is None
+        or support.support_id == target_id
+        or abs(support.under_clearance_m) > tolerance_m + 1e-9
+        or (
+            support.source in {"world.obstacles.aabb", "world.objects.obb"}
+            and support.horizontal_overlap_ratio + 1e-9
+            < minimum_overlap_ratio
+        )
+    ):
+        return {}
+    return {
+        "support_collision_selectors": [support.support_id],
+        "support_collision_policy": "AUTO_INITIAL_SUPPORT_V1",
+        "support_collision_detection_source": support.source,
+        "support_initial_clearance_m": support.under_clearance_m,
+        "support_horizontal_overlap_ratio": support.horizontal_overlap_ratio,
+        "support_min_horizontal_overlap_ratio": minimum_overlap_ratio,
     }
 
 
@@ -512,11 +608,11 @@ class SelectedPlanMotionRequestAdapter:
             execution_metadata["ee_capabilities"] = ee_capabilities
             explicit_execution_metadata = _execution_metadata(action_parameters)
             execution_metadata.update(explicit_execution_metadata)
-            if (
-                is_acquire_action(action_type)
-                and str(execution_metadata.get("grasp_execution_mode", "")).upper()
-                == "AUTO"
-            ):
+            is_contact_friction_mode = False
+            raw_grasp_mode = str(
+                execution_metadata.get("grasp_execution_mode", "KINEMATIC")
+            ).strip().replace("-", "_").upper()
+            if is_acquire_action(action_type) and raw_grasp_mode == "AUTO":
                 if not ee_capabilities:
                     raise SelectedPlanAdapterError(
                         f"subgoal {subgoal_id!r} cannot resolve AUTO grasp mode "
@@ -528,15 +624,45 @@ class SelectedPlanMotionRequestAdapter:
                     else "KINEMATIC"
                 )
             if is_acquire_action(action_type):
+                try:
+                    grasp_mode = normalized_grasp_execution_mode(
+                        execution_metadata.get("grasp_execution_mode")
+                    )
+                except ValueError as error:
+                    raise SelectedPlanAdapterError(
+                        "grasp_execution_mode must be AUTO, KINEMATIC, or "
+                        "CONTACT_FRICTION"
+                    ) from error
+                execution_metadata["grasp_execution_mode"] = grasp_mode.value
+                is_contact_friction_mode = (
+                    grasp_mode is GraspExecutionMode.CONTACT_FRICTION
+                )
+            if (
+                is_acquire_action(action_type)
+                and not is_contact_friction_mode
+            ):
+                support_target = (
+                    goal.target_object_id
+                    or assignment.tool
+                    or next(iter(target_ids), None)
+                )
+                execution_metadata.update(
+                    _inferred_support_collision_metadata(
+                        world,
+                        target_id=support_target,
+                        collision_margin_m=(
+                            selected_constraints.collision_margin_m
+                        ),
+                        metadata=execution_metadata,
+                    )
+                )
+            if is_acquire_action(action_type):
                 execution_metadata.setdefault("operation", action_type.upper())
                 execution_metadata.setdefault("attach_target", True)
             if (
                 is_acquire_action(action_type)
                 and "opposed_finger_contact" in ee_capabilities
-                and str(
-                    execution_metadata.get("grasp_execution_mode", "")
-                ).upper()
-                == "CONTACT_FRICTION"
+                and is_contact_friction_mode
                 and "grasp_geometry_provider" not in execution_metadata
             ):
                 from tuj.m5_motion.grasp_geometry import (

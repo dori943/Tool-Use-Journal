@@ -135,6 +135,107 @@ def test_context_acm_allows_only_the_declared_pair() -> None:
     assert all(contact.allowed for contact in result.contacts)
 
 
+def test_bounded_collision_allowance_rejects_excess_penetration() -> None:
+    touch = CollisionContext(
+        context_id="bounded-touch",
+        allowed_collision_pairs=[("robot", "wall")],
+        collision_model_version="test-v1",
+        metadata={
+            "bounded_collision_allowances": [
+                {
+                    "selectors": ["robot", "wall"],
+                    "minimum_distance_m": -0.01,
+                }
+            ]
+        },
+    )
+    validator = _validator(contexts={touch.context_id: touch})
+
+    touching = validator.check((0.3,), context=touch)
+    penetrating = validator.check((0.32,), context=touch)
+
+    assert touching.valid
+    assert not penetrating.valid
+    assert penetrating.failure_code == "BOUNDED_COLLISION_VIOLATION"
+    assert "below required -0.010000 m" in penetrating.detail
+    assert any(not contact.allowed for contact in penetrating.contacts)
+
+
+def test_bounded_collision_allowance_rejects_unbounded_policy() -> None:
+    unsafe = CollisionContext(
+        context_id="unsafe-bounded-touch",
+        allowed_collision_pairs=[("robot", "wall")],
+        collision_model_version="test-v1",
+        metadata={
+            "bounded_collision_allowances": [
+                {
+                    "selectors": ["robot", "wall"],
+                    "minimum_distance_m": -100.0,
+                }
+            ]
+        },
+    )
+    validator = _validator(contexts={unsafe.context_id: unsafe})
+
+    result = validator.check((0.0,), context=unsafe)
+
+    assert not result.valid
+    assert result.failure_code == "COLLISION_CONTEXT_POLICY_INVALID"
+    assert "within +/- collision_margin_m" in result.detail
+
+
+def test_bounded_collision_allowance_requires_exact_known_selectors() -> None:
+    for support_selector in ("*", "missing-scene-entity"):
+        unsafe = CollisionContext(
+            context_id=f"unsafe-selector:{support_selector}",
+            allowed_collision_pairs=[("robot", support_selector)],
+            collision_model_version="test-v1",
+            metadata={
+                "bounded_collision_allowances": [
+                    {
+                        "selectors": ["robot", support_selector],
+                        "minimum_distance_m": -0.01,
+                    }
+                ]
+            },
+        )
+        validator = _validator(contexts={unsafe.context_id: unsafe})
+
+        result = validator.check((0.0,), context=unsafe)
+
+        assert not result.valid
+        assert result.failure_code == "COLLISION_CONTEXT_POLICY_INVALID"
+        assert "resolve exactly" in result.detail
+
+
+def test_release_segment_endpoint_is_rechecked_in_strict_context() -> None:
+    strict = CollisionContext(
+        context_id="strict",
+        collision_model_version="test-v1",
+    )
+    release = CollisionContext(
+        context_id="release",
+        allowed_collision_pairs=[("robot", "wall")],
+        collision_model_version="test-v1",
+        metadata={"post_segment_validation_context_id": strict.context_id},
+    )
+    validator = _validator(
+        contexts={strict.context_id: strict, release.context_id: release}
+    )
+    waypoints = (
+        TrajectoryWaypoint(time_from_start_s=0.0, joint_positions_rad=[0.0]),
+        TrajectoryWaypoint(time_from_start_s=1.0, joint_positions_rad=[0.3]),
+    )
+
+    report = validator.check_waypoints(waypoints, release)
+
+    assert not report.valid
+    assert report.failure_code == "COLLISION_MARGIN_VIOLATION"
+    assert report.failed_state_index == 1
+    assert report.checked_states == 3
+    assert "post-segment endpoint in 'strict'" in report.detail
+
+
 def test_unknown_collision_context_fails_closed() -> None:
     result = _validator().check((0.0,), _keyframe("not-registered"))
 
