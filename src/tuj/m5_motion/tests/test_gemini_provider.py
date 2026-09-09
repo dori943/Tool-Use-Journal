@@ -44,7 +44,7 @@ def test_gemini_structured_output_validates_and_caches_without_secrets(tmp_path)
     assert '"additionalProperties":false' in chat.calls[0]["messages"][0]["content"]
     assert "must-not-leave-the-process" not in str(chat.calls)
     assert first.provenance.metadata["provider"] == "gemini"
-    assert first.candidates[0].provenance.generator_id == "GEMINI_KEYFRAME_STRATEGY_JSON_V2"
+    assert first.candidates[0].provenance.generator_id == "GEMINI_KEYFRAME_STRATEGY_JSON_V4"
     assert first.candidates[0].provenance.provider_request_id == "gemini-request-1"
 
 
