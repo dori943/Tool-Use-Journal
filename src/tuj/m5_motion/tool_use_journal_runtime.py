@@ -2216,6 +2216,15 @@ class ToolUseJournalKinematicTrajectoryPlayer:
         self.runtime = runtime
         self._collision_probe = collision_probe
 
+    def _check_collision(self, joint_config, *, context):
+        probe = self._collision_probe
+        if isinstance(probe, MuJoCoCollisionModelRegistry):
+            return probe.check(
+                joint_config, context=context,
+                runtime_state=_raw_model_data(self.runtime.env),
+            )
+        return probe.check(joint_config, context=context)
+
     @staticmethod
     def _arm_joint_addresses(
         env: object, joint_names: Sequence[str]
@@ -2715,7 +2724,7 @@ class ToolUseJournalKinematicTrajectoryPlayer:
                         self._collision_probe is not None
                         and segment.collision_context_before is not None
                     ):
-                        collision = self._collision_probe.check(
+                        collision = self._check_collision(
                             waypoint.joint_positions_rad,
                             context=segment.collision_context_before,
                         )
@@ -3950,7 +3959,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     and check_collision_now
                 ):
                     collision_check_count += 1
-                    collision = self._collision_probe.check(
+                    collision = self._check_collision(
                         actual,
                         context=segment.collision_context_before,
                     )
