@@ -189,6 +189,56 @@ class _CollisionRejectingValidator:
         )
 
 
+class _RepairAwareCollisionValidator:
+    @staticmethod
+    def _valid(keyframe) -> bool:
+        return "repaired" in keyframe.keyframe_id
+
+    def __call__(self, qpos, keyframe):
+        del qpos
+        return self._valid(keyframe)
+
+    def check(self, qpos, keyframe):
+        del qpos
+        valid = self._valid(keyframe)
+        return SimpleNamespace(
+            valid=valid,
+            failure_code=None if valid else "COLLISION_MARGIN_VIOLATION",
+            detail=(
+                ""
+                if valid
+                else "fixture_geom_a <-> fixture_geom_b clearance 0.001000 m "
+                "is below required 0.005000 m"
+            ),
+        )
+
+
+class _FeedbackAwareProvider:
+    supports_collision_feedback = True
+
+    def __init__(self, *, repair_on_attempt: int | None = 1) -> None:
+        self.calls = []
+        self.repair_on_attempt = repair_on_attempt
+        self.delegate = OpenAIKeyframeProvider(
+            OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+            client=_FakeClient(),
+        )
+
+    def generate(self, request):
+        feedback = request.task.metadata.get("collision_repair_feedback")
+        self.calls.append(feedback)
+        artifact = self.delegate.generate(request)
+        if feedback is None or self.repair_on_attempt is None:
+            return artifact
+        if int(feedback["repair_attempt"]) < self.repair_on_attempt:
+            return artifact
+        repaired = artifact.model_copy(deep=True)
+        for candidate in repaired.candidates:
+            for keyframe in candidate.keyframes:
+                keyframe.keyframe_id = f"repaired:{keyframe.keyframe_id}"
+        return repaired
+
+
 def test_openai_candidates_are_robot_filtered_and_finalized() -> None:
     provider = OpenAIKeyframeProvider(
         OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
@@ -284,6 +334,116 @@ def test_pipeline_distinguishes_collision_filtered_ik_branches() -> None:
     assert attempt.failure_code == "COLLISION_FILTERED_ALL"
     assert attempt.ik_diagnostics[0].raw_ik_count == 1
     assert attempt.ik_diagnostics[0].valid_ik_count == 0
+
+
+def test_pipeline_uses_structured_collision_feedback_repair_batch() -> None:
+    provider = _FeedbackAwareProvider()
+    original = _request()
+    pipeline = MotionPlanningPipeline(provider, _FakeKinematics())
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    result = pipeline.plan(
+        original,
+        state_validator=_RepairAwareCollisionValidator(),
+        collision_contexts={context.context_id: context},
+        initial_collision_context_id=context.context_id,
+        final_segment_validator=lambda waypoints, selected_context: True,
+    )
+
+    assert len(provider.calls) == 2
+    assert provider.calls[0] is None
+    feedback = provider.calls[1]
+    assert feedback["contract_version"] == "COLLISION_REPAIR_V1"
+    assert feedback["repair_attempt"] == 1
+    assert feedback["maximum_repair_attempts"] == 2
+    assert feedback["required_collision_margin_m"] == pytest.approx(0.005)
+    assert feedback["failed_strategies"]
+    observation = feedback["failed_strategies"][0][
+        "collision_observations"
+    ][0]
+    assert observation == {
+        "geometry_a": "fixture_geom_a",
+        "geometry_b": "fixture_geom_b",
+        "measured_clearance_m": pytest.approx(0.001),
+        "required_clearance_m": pytest.approx(0.005),
+    }
+    assert feedback["failed_strategies"][0]["source_repair_attempt"] == 0
+    assert "collision_repair_feedback" not in original.task.metadata
+    assert result.compilation.connected is not None
+    assert len(result.compilation.attempts) == 3
+    assert all(
+        attempt.failure_code == "COLLISION_FILTERED_ALL"
+        for attempt in result.compilation.attempts[:2]
+    )
+    assert result.keyframe_artifact.candidates[0].provenance.attempt_index == 2
+
+
+def test_pipeline_second_repair_uses_bounded_cumulative_feedback() -> None:
+    provider = _FeedbackAwareProvider(repair_on_attempt=2)
+    original = _request()
+    original_copy = original.model_copy(deep=True)
+    pipeline = MotionPlanningPipeline(provider, _FakeKinematics())
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    result = pipeline.plan(
+        original,
+        state_validator=_RepairAwareCollisionValidator(),
+        collision_contexts={context.context_id: context},
+        initial_collision_context_id=context.context_id,
+        final_segment_validator=lambda waypoints, selected_context: True,
+    )
+
+    assert len(provider.calls) == 3
+    second_feedback = provider.calls[2]
+    assert second_feedback["repair_attempt"] == 2
+    assert second_feedback["maximum_repair_attempts"] == 2
+    assert len(second_feedback["failed_strategies"]) == 4
+    assert {
+        strategy["source_repair_attempt"]
+        for strategy in second_feedback["failed_strategies"]
+    } == {0, 1}
+    assert len(second_feedback["failed_strategies"]) <= 8
+    assert original == original_copy
+    assert "collision_repair_feedback" not in original.task.metadata
+    assert result.keyframe_artifact.candidates[0].provenance.attempt_index == 3
+
+
+def test_pipeline_collision_feedback_retry_exhaustion_combines_batches() -> None:
+    provider = _FeedbackAwareProvider(repair_on_attempt=None)
+    pipeline = MotionPlanningPipeline(provider, _FakeKinematics())
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    with pytest.raises(
+        MotionPlanningPipelineError,
+        match="collision-feedback repair exhausted after 2 additional batch",
+    ) as caught:
+        pipeline.plan(
+            _request(),
+            state_validator=_RepairAwareCollisionValidator(),
+            collision_contexts={context.context_id: context},
+            initial_collision_context_id=context.context_id,
+            final_segment_validator=lambda waypoints, selected_context: True,
+        )
+
+    assert len(provider.calls) == 3
+    assert caught.value.compilation is not None
+    assert len(caught.value.compilation.attempts) == 6
+    assert all(
+        attempt.failure_code == "COLLISION_FILTERED_ALL"
+        for attempt in caught.value.compilation.attempts
+    )
 
 
 def test_pipeline_retries_after_connected_strategy_fails_final_validation() -> None:
