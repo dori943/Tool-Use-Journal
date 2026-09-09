@@ -180,7 +180,7 @@ def aggregate_density_kgm3(materials, gap_threshold: float = TOP1_GAP) -> dict:
 # Gemini 는 OpenAI 호환 엔드포인트를 제공 → OPENAI_API_KEY 없고 GEMINI_API_KEY 만
 # 있어도 동일 client 로 돌아가게 한다.
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-_DEFAULT_GEMINI_MODEL = "gemini-2.5-flash"
+_DEFAULT_GEMINI_MODEL = "gemini-3.6-flash"
 
 
 class SiPhyBackend(PropertyBackend):
