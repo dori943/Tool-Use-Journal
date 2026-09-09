@@ -3733,6 +3733,16 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     target_plan_time = min(
                         plan_time + plan_time_step_s, plan.duration_s
                     )
+                    if settle_config is not None and not bool(
+                        settle_state["settled"]
+                    ):
+                        # Land on the convergence boundary exactly.  A control
+                        # tick may otherwise skip a non-grid endpoint, leaving
+                        # its event group blocked after playback has entered the
+                        # following segment.
+                        target_plan_time = min(
+                            target_plan_time, motion_end_time
+                        )
                     desired = self._desired_joint_position(
                         timeline, target_plan_time
                     )
