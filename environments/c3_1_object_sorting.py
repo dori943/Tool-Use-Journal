@@ -29,6 +29,7 @@ from robosuite.utils.placement_samplers import (
 )
 
 from environments.ee_rack import add_ee_rack
+from environments.task_camera import add_standard_task_camera
 from environments.objects import (
     AppleObject,
     BreadObject,
@@ -443,6 +444,15 @@ class C3_1_ObjectSorting(ManipulationEnv):
             mujoco_objects=(
                 all_objects
             ),
+        )
+
+        # 0909: 이 태스크만 공용 촬영 카메라를 설치하지 않아 robosuite 기본
+        # agentview(테이블에 바짝 붙은 카메라)로 녹화됐고, 테이블 양옆이 잘렸다.
+        self._standard_camera = add_standard_task_camera(
+            self.model,
+            robot_base_xy=(ROBOT_BASE_X, 0.0),
+            robot_base_yaw_rad=0.0,
+            surface_z=float(self.table_offset[2]),
         )
 
 
