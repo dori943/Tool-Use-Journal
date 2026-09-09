@@ -194,6 +194,15 @@ def adapt_gk_m2_output(
                 raise ValueError(f"duplicate upstream detail_id {detail_id!r}")
             detail_ids.add(detail_id)
             group_id = str(detail.get("group_id") or f"G_{rough_id}")
+            # 0909: EE 후보를 서브골 단위가 아니라 이 detail 이 실제로 다루는 대상
+            # 기준으로 좁힌다. 서브골 단위로 계산하면 쌓기처럼 한 서브골이 여러
+            # 물체를 다룰 때 물체별 차이가 사라져, 얇은 재료에도 두꺼운 빵 기준의
+            # EE 가 배정된다 (c2_2).
+            detail_owners = [
+                _canonical_id(item, aliases, raw_to_canonical)
+                for item in _string_list(list(_mapping(detail.get("binding")).values()))
+                if isinstance(item, str) and not item.startswith("?")
+            ]
             raw_action = str(detail.get("action_type") or "") or None
             action_type, mode = _split_action_type(raw_action)
             binding = _normalize_binding(
@@ -261,7 +270,16 @@ def adapt_gk_m2_output(
                     postconditions=establish,
                     establish=establish,
                     destroy=destroy,
-                    feasible_ee=feasible_ee,
+                    feasible_ee=(
+                        _feasible_ees_for_group(
+                            [tool_id] if tool_id is not None else [],
+                            detail_owners,
+                            nodes,
+                            feasible_ee,
+                        )
+                        if detail_owners or tool_id is not None
+                        else feasible_ee
+                    ),
                     tool_required=tool_id is not None,
                     tool_selection_source=(
                         "upstream_fixed" if tool_id is not None else "not_required"
@@ -838,11 +856,19 @@ def _feasible_ees_for_group(
     fallback: list[str],
 ) -> list[str]:
     owners = tools or targets
-    feasible: set[str] = set()
+    # 0909: 합집합에서 교집합으로. 그룹에는 EE 를 하나만 배정하므로 그룹의 모든
+    # 대상이 그 EE 로 처리 가능해야 한다. 합집합이면 그룹에 잡을 수 있는 물체가
+    # 하나라도 있으면 그 EE 가 후보로 남아, 나머지가 불가한 EE 가 배정된다
+    # (c2_2 에서 빵이 2F 가능하다는 이유로 두께 1.6mm 치즈에도 2F 가 배정됐음).
+    feasible: set[str] | None = None
     for owner in owners:
-        for ee, record in _mapping(_mapping(nodes.get(owner)).get("ee")).items():
-            if isinstance(ee, str) and _is_feasible(record):
-                feasible.add(ee)
+        supported = {
+            ee for ee, record in _mapping(_mapping(nodes.get(owner)).get("ee")).items()
+            if isinstance(ee, str) and _is_feasible(record)
+        }
+        if not _mapping(_mapping(nodes.get(owner)).get("ee")):
+            continue                       # 접지값이 없는 대상은 제약으로 세지 않는다
+        feasible = supported if feasible is None else (feasible & supported)
     return sorted(feasible) if feasible else list(fallback)
 
 
