@@ -57,6 +57,16 @@ def _read_json(path: Path) -> Any:
         ) from error
 
 
+def _write_json_atomic(path: Path, payload: Mapping[str, Any]) -> None:
+    path.parent.mkdir(parents=True, exist_ok=True)
+    temporary = path.with_suffix(path.suffix + ".tmp")
+    temporary.write_text(
+        json.dumps(dict(payload), ensure_ascii=False, indent=2) + "\n",
+        encoding="utf-8",
+    )
+    temporary.replace(path)
+
+
 def load_selected_plan(path: Path) -> tuple[SelectedPlan, dict[str, Any]]:
     """Accept a complete PlanningResult envelope or a bare SelectedPlan."""
 
@@ -1132,9 +1142,7 @@ def main(
                 + ", ".join(geometry_report["unsafe_required_object_ids"])
             ),
         }
-        (output_dir / "m5_summary.json").write_text(
-            json.dumps(summary, ensure_ascii=False, indent=2), encoding="utf-8"
-        )
+        _write_json_atomic(output_dir / "m5_summary.json", summary)
         print("[M5] geometry mismatch: planning was not started")
         return 2
     if args.validate_input_only or args.dry_run:
@@ -1144,9 +1152,8 @@ def main(
             "planning_status": "NOT_STARTED",
             "simulation_successful": None,
         }
-        (output_dir / "m5_summary.json").write_text(
-            json.dumps(validation_summary, ensure_ascii=False, indent=2),
-            encoding="utf-8",
+        _write_json_atomic(
+            output_dir / "m5_summary.json", validation_summary
         )
         return 0
     if args.grasp_provider == "object-function":
@@ -1215,8 +1222,23 @@ def main(
         planner_pool_options["provider"] = RetargetedAcquireKeyframeProvider(
             pick_keyframes
         )
-    planners = ToolUseJournalPlannerPool(repository_path, **planner_pool_options)
+    summary_path = output_dir / "m5_summary.json"
+    planning_started_at_unix_s = time.time()
+    _write_json_atomic(
+        summary_path,
+        {
+            **report,
+            "status": "PLANNING",
+            "planning_status": "IN_PROGRESS",
+            "simulation_successful": None,
+            "planning_started_at_unix_s": planning_started_at_unix_s,
+        },
+    )
+    planners = None
     try:
+        planners = ToolUseJournalPlannerPool(
+            repository_path, **planner_pool_options
+        )
         result = SelectedPlanMotionOrchestrator(
             planners,
             store=MotionPlanStore(output_dir),
@@ -1230,8 +1252,24 @@ def main(
             options=options,
             selected_plan_artifact_id=artifact_id,
         )
+    except Exception as error:
+        _write_json_atomic(
+            summary_path,
+            {
+                **report,
+                "status": "PLANNING_FAILED",
+                "planning_status": "FAILED",
+                "simulation_successful": False,
+                "planning_started_at_unix_s": planning_started_at_unix_s,
+                "planning_failed_at_unix_s": time.time(),
+                "failure_type": type(error).__name__,
+                "detail": str(error),
+            },
+        )
+        raise
     finally:
-        planners.close()
+        if planners is not None:
+            planners.close()
 
     summary = {
         **report,
@@ -1308,11 +1346,7 @@ def main(
                 summary["simulation_detail"] = execution.detail
                 summary["simulation_failed_index"] = execution.failed_index
                 exit_code = 2
-    summary_path = output_dir / "m5_summary.json"
-    summary_path.write_text(
-        json.dumps(summary, ensure_ascii=False, indent=2),
-        encoding="utf-8",
-    )
+    _write_json_atomic(summary_path, summary)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     print(f"[M5] output: {output_dir}")
     return exit_code

@@ -425,6 +425,63 @@ def test_generic_cli_plans_with_request_backend_and_writes_manifest(
     assert (output_dir / "motion-plan-manifest.json").is_file()
 
 
+def test_generic_cli_replaces_stale_summary_when_planning_fails(
+    tmp_path, monkeypatch
+) -> None:
+    task_path = tmp_path / "failing_task.json"
+    task_path.write_text(
+        json.dumps(
+            {
+                "status": "SUCCESS",
+                "selected_plan": _selected().model_dump(mode="json"),
+            }
+        ),
+        encoding="utf-8",
+    )
+    world_path = tmp_path / "world.json"
+    world_path.write_text(_world().model_dump_json(), encoding="utf-8")
+    output_dir = tmp_path / "motion"
+    output_dir.mkdir()
+    (output_dir / "m5_summary.json").write_text(
+        json.dumps({"status": "SUCCESS", "stale": True}),
+        encoding="utf-8",
+    )
+
+    class FailingPlannerPool(_FakePlannerPool):
+        def __call__(self, request):
+            del request
+            raise RuntimeError("expected planner failure")
+
+    monkeypatch.setattr(
+        generic_runner,
+        "ToolUseJournalPlannerPool",
+        FailingPlannerPool,
+    )
+    monkeypatch.setenv("OPENAI_API_KEY", "test-only-key")
+
+    with pytest.raises(RuntimeError, match="expected planner failure"):
+        main(
+            [
+                "--task-planner",
+                str(task_path),
+                "--initial-world",
+                str(world_path),
+                "--output-dir",
+                str(output_dir),
+            ]
+        )
+
+    summary = json.loads(
+        (output_dir / "m5_summary.json").read_text(encoding="utf-8")
+    )
+    assert summary["status"] == "PLANNING_FAILED"
+    assert summary["planning_status"] == "FAILED"
+    assert summary["failure_type"] == "RuntimeError"
+    assert summary["detail"] == "expected planner failure"
+    assert "stale" not in summary
+    assert len(list((output_dir / "requests").glob("*.json"))) == 1
+
+
 def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
     tmp_path, monkeypatch
 ) -> None:
