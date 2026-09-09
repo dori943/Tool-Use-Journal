@@ -172,6 +172,12 @@ def test_plan_builder_applies_event_scoped_collision_state() -> None:
         "attachment_mode": "BREAKABLE_WELD",
         "max_weld_force_n": 55.0,
     }
+    assert plan.segments[0].metadata["tracking_settle"] == {
+        "eef_tolerance_m": 0.005,
+        "eef_orientation_tolerance_rad": 0.05,
+        "max_wait_s": 2.0,
+        "required_consecutive_ticks": 3,
+    }
     assert plan.segments[0].collision_context_after == attached
     assert plan.segments[1].collision_context_before == attached
     assert plan.expected_final_state.attached_object_id == "obj1"

@@ -28,6 +28,8 @@ from typing import Any, Protocol
 import mujoco
 import numpy as np
 
+from tuj.m5_motion.event_semantics import requires_endpoint_convergence
+from tuj.m5_motion.geometry import quaternion_matrix_xyzw
 from tuj.m5_motion.mujoco_collision import MuJoCoCollisionModelRegistry
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
@@ -2278,6 +2280,11 @@ class ToolUseJournalKinematicTrajectoryPlayer:
         _, _, position, _ = ToolUseJournalEERuntime._grasp_reference(env)
         return position
 
+    @staticmethod
+    def _eef_rotation(env: object) -> np.ndarray:
+        _, _, _, rotation = ToolUseJournalEERuntime._grasp_reference(env)
+        return rotation
+
     def _execute_event(self, event: TrajectoryEvent) -> str:
         target = event.target_id
         if event.event_type is EventType.GRIPPER_OPEN:
@@ -2969,7 +2976,11 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 f"segment {segment.segment_id!r} tracking_settle must be a mapping"
             )
         config: dict[str, float | int] = {}
-        for name in ("joint_tolerance_rad", "eef_tolerance_m"):
+        for name in (
+            "joint_tolerance_rad",
+            "eef_tolerance_m",
+            "eef_orientation_tolerance_rad",
+        ):
             value = raw.get(name)
             if value is None:
                 continue
@@ -3010,6 +3021,65 @@ class ToolUseJournalControllerTrajectoryPlayer(
         config["max_wait_s"] = float(max_wait)
         config["required_consecutive_ticks"] = required_ticks
         return config
+
+    @staticmethod
+    def _eef_orientation_error_rad(
+        desired_orientation_xyzw: Sequence[float],
+        actual_rotation: np.ndarray,
+    ) -> float:
+        desired_rotation = quaternion_matrix_xyzw(desired_orientation_xyzw)
+        return float(
+            np.linalg.norm(
+                ToolUseJournalEERuntime._rotation_error_vector(
+                    desired_rotation, actual_rotation
+                )
+            )
+        )
+
+    @classmethod
+    def _event_settle_segment(
+        cls,
+        plan: MotionPlan,
+        event: TrajectoryEvent,
+    ) -> TrajectorySegment | None:
+        if not requires_endpoint_convergence(event.event_type):
+            return None
+        for segment in plan.segments:
+            if "tracking_settle" not in segment.metadata:
+                continue
+            motion_end_time = float(
+                segment.metadata.get("motion_end_time_s", segment.end_time_s)
+            )
+            if (
+                motion_end_time - cls._TIME_TOLERANCE_S
+                <= event.time_from_start_s
+                <= segment.end_time_s + cls._TIME_TOLERANCE_S
+            ):
+                return segment
+        return None
+
+    @classmethod
+    def _event_group_waits_for_settle(
+        cls,
+        plan: MotionPlan,
+        events: Sequence[TrajectoryEvent],
+        first_event_index: int,
+        settle_states: Mapping[str, Mapping[str, Any]],
+    ) -> bool:
+        event_time = events[first_event_index].time_from_start_s
+        for event in events[first_event_index:]:
+            if not math.isclose(
+                event.time_from_start_s,
+                event_time,
+                abs_tol=cls._TIME_TOLERANCE_S,
+            ):
+                break
+            segment = cls._event_settle_segment(plan, event)
+            if segment is not None and not bool(
+                settle_states.get(segment.segment_id, {}).get("settled", False)
+            ):
+                return True
+        return False
 
     @staticmethod
     def _segment_at_time(
@@ -3465,6 +3535,13 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     and sorted_events[next_event_index].time_from_start_s
                     <= plan_time + self._TIME_TOLERANCE_S
                 ):
+                    if self._event_group_waits_for_settle(
+                        plan,
+                        sorted_events,
+                        next_event_index,
+                        settle_states,
+                    ):
+                        break
                     event = sorted_events[next_event_index]
                     try:
                         message = self._execute_event(event)
@@ -3514,6 +3591,15 @@ class ToolUseJournalControllerTrajectoryPlayer(
                         and completed_segment.end_time_s
                         <= plan_time + self._TIME_TOLERANCE_S
                     ):
+                        completed_settle_config = self._tracking_settle_config(
+                            completed_segment
+                        )
+                        if completed_settle_config is not None and not bool(
+                            settle_states.get(
+                                completed_segment.segment_id, {}
+                            ).get("settled", False)
+                        ):
+                            continue
                         self._verify_runtime_context(
                             completed_segment.collision_context_after,
                             label=(
@@ -3536,6 +3622,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
                             )
                         )
                         eef_error_at_end: float | None = None
+                        eef_orientation_error_at_end: float | None = None
                         if target_waypoint.eef_pose is not None:
                             eef_error_at_end = float(
                                 np.linalg.norm(
@@ -3544,6 +3631,12 @@ class ToolUseJournalControllerTrajectoryPlayer(
                                         target_waypoint.eef_pose.position_m,
                                         dtype=float,
                                     )
+                                )
+                            )
+                            eef_orientation_error_at_end = (
+                                self._eef_orientation_error_rad(
+                                    target_waypoint.eef_pose.orientation_xyzw,
+                                    self._eef_rotation(self.runtime.env),
                                 )
                             )
                         settle_state = settle_states.get(
@@ -3562,6 +3655,9 @@ class ToolUseJournalControllerTrajectoryPlayer(
                                 "actual_execution_time_s": executed_time,
                                 "max_joint_error_rad": joint_error_at_end,
                                 "eef_position_error_m": eef_error_at_end,
+                                "eef_orientation_error_rad": (
+                                    eef_orientation_error_at_end
+                                ),
                                 "adaptive_settle_requested": (
                                     "tracking_settle" in completed_segment.metadata
                                 ),
@@ -3580,11 +3676,22 @@ class ToolUseJournalControllerTrajectoryPlayer(
                             completed_segment.segment_id
                         )
 
-                if plan_time >= plan.duration_s - self._TIME_TOLERANCE_S:
-                    break
                 segment = self._segment_at_time(plan, plan_time)
+                final_settle_config = self._tracking_settle_config(segment)
+                if (
+                    plan_time >= plan.duration_s - self._TIME_TOLERANCE_S
+                    and (
+                        final_settle_config is None
+                        or bool(
+                            settle_states.get(segment.segment_id, {}).get(
+                                "settled", False
+                            )
+                        )
+                    )
+                ):
+                    break
                 self._active_segment = segment
-                settle_config = self._tracking_settle_config(segment)
+                settle_config = final_settle_config
                 settle_state = settle_states.setdefault(
                     segment.segment_id,
                     {
@@ -3661,6 +3768,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 if settling:
                     target_waypoint = segment.waypoints[-1]
                     target_eef_error: float | None = None
+                    target_eef_orientation_error: float | None = None
                     if target_waypoint.eef_pose is not None:
                         target_eef_error = float(
                             np.linalg.norm(
@@ -3676,6 +3784,12 @@ class ToolUseJournalControllerTrajectoryPlayer(
                             if max_eef_error is None
                             else max(max_eef_error, target_eef_error)
                         )
+                        target_eef_orientation_error = (
+                            self._eef_orientation_error_rad(
+                                target_waypoint.eef_pose.orientation_xyzw,
+                                self._eef_rotation(self.runtime.env),
+                            )
+                        )
                     joint_ok = (
                         "joint_tolerance_rad" not in settle_config
                         or step_joint_error
@@ -3689,6 +3803,18 @@ class ToolUseJournalControllerTrajectoryPlayer(
                             <= float(settle_config["eef_tolerance_m"])
                         )
                     )
+                    eef_orientation_ok = (
+                        "eef_orientation_tolerance_rad" not in settle_config
+                        or (
+                            target_eef_orientation_error is not None
+                            and target_eef_orientation_error
+                            <= float(
+                                settle_config[
+                                    "eef_orientation_tolerance_rad"
+                                ]
+                            )
+                        )
+                    )
                     custom_settle = self._custom_settle_evaluation(
                         segment=segment,
                         settle_config=settle_config,
@@ -3696,12 +3822,15 @@ class ToolUseJournalControllerTrajectoryPlayer(
                         eef_position_error_m=target_eef_error,
                     )
                     settle_ok = (
-                        joint_ok and eef_ok
+                        joint_ok and eef_ok and eef_orientation_ok
                         if custom_settle is None
                         else bool(custom_settle.get("succeeded", False))
                     )
                     settle_state["last_joint_error_rad"] = step_joint_error
                     settle_state["last_eef_error_m"] = target_eef_error
+                    settle_state["last_eef_orientation_error_rad"] = (
+                        target_eef_orientation_error
+                    )
                     if custom_settle is not None:
                         settle_state["custom_settle"] = dict(custom_settle)
                     if settle_ok:
@@ -3731,6 +3860,9 @@ class ToolUseJournalControllerTrajectoryPlayer(
                                 "actual_execution_time_s": executed_time,
                                 "max_joint_error_rad": step_joint_error,
                                 "eef_position_error_m": target_eef_error,
+                                "eef_orientation_error_rad": (
+                                    target_eef_orientation_error
+                                ),
                                 "custom_settle": settle_state.get(
                                     "custom_settle"
                                 ),
@@ -3749,6 +3881,9 @@ class ToolUseJournalControllerTrajectoryPlayer(
                             observed={
                                 "joint_error_rad": step_joint_error,
                                 "eef_position_error_m": target_eef_error,
+                                "eef_orientation_error_rad": (
+                                    target_eef_orientation_error
+                                ),
                                 "settle_config": dict(settle_config),
                                 "wait_duration_s": wait_duration,
                                 "custom_settle": settle_state.get(

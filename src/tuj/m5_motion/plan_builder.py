@@ -5,6 +5,7 @@ from __future__ import annotations
 import math
 from collections.abc import Callable, Mapping, Sequence
 
+from tuj.m5_motion.event_semantics import requires_endpoint_convergence
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
     CollisionContext,
@@ -616,6 +617,16 @@ class MotionPlanBuilder:
                 node.keyframe.metadata
             )
             raw_tracking_settle = node.keyframe.metadata.get("tracking_settle")
+            if raw_tracking_settle is None and any(
+                requires_endpoint_convergence(event_type)
+                for event_type in node.keyframe.events_after
+            ):
+                raw_tracking_settle = {
+                    "eef_tolerance_m": request.constraints.position_tolerance_m,
+                    "eef_orientation_tolerance_rad": (
+                        request.constraints.orientation_tolerance_rad
+                    ),
+                }
             tracking_settle: dict[str, float | int] | None = None
             if raw_tracking_settle is not None:
                 if not isinstance(raw_tracking_settle, Mapping):
@@ -625,6 +636,7 @@ class MotionPlanBuilder:
                 allowed_settle_fields = {
                     "joint_tolerance_rad",
                     "eef_tolerance_m",
+                    "eef_orientation_tolerance_rad",
                     "max_wait_s",
                     "required_consecutive_ticks",
                 }
@@ -637,7 +649,11 @@ class MotionPlanBuilder:
                         f"{sorted(str(value) for value in unknown_settle_fields)}"
                     )
                 tracking_settle = {}
-                for name in ("joint_tolerance_rad", "eef_tolerance_m"):
+                for name in (
+                    "joint_tolerance_rad",
+                    "eef_tolerance_m",
+                    "eef_orientation_tolerance_rad",
+                ):
                     raw_value = raw_tracking_settle.get(name)
                     if raw_value is None:
                         continue
@@ -653,7 +669,11 @@ class MotionPlanBuilder:
                     tracking_settle[name] = float(raw_value)
                 if not any(
                     name in tracking_settle
-                    for name in ("joint_tolerance_rad", "eef_tolerance_m")
+                    for name in (
+                        "joint_tolerance_rad",
+                        "eef_tolerance_m",
+                        "eef_orientation_tolerance_rad",
+                    )
                 ):
                     raise MotionPlanBuildError(
                         "tracking_settle requires a joint or EEF tolerance"
