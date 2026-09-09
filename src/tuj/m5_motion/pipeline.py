@@ -149,21 +149,72 @@ def _provider_supports_collision_feedback(provider: object) -> bool:
     return False
 
 
-def _collision_repair_eligible(compilation: StrategyCompilationResult) -> bool:
-    """Retry only when every terminal candidate failed for collision reasons."""
-
-    if not compilation.attempts:
-        return False
-    for attempt in compilation.attempts:
-        if attempt.failure_code == "COLLISION_FILTERED_ALL":
-            continue
-        if (
+def _is_collision_terminal(attempt: StrategyAttempt) -> bool:
+    return bool(
+        attempt.failure_code == "COLLISION_FILTERED_ALL"
+        or (
             attempt.failure_code == "FINAL_VALIDATION_FAILED"
             and "COLLISION" in attempt.detail.upper()
-        ):
-            continue
-        return False
-    return True
+        )
+    )
+
+
+def _structured_collision_observations(
+    attempt: StrategyAttempt,
+) -> list[dict[str, object]]:
+    """Extract only bounded numeric observations owned by the validator."""
+
+    if not _is_collision_terminal(attempt):
+        return []
+    details = [attempt.detail]
+    details.extend(
+        diagnostic.validity_detail
+        for diagnostic in attempt.ik_diagnostics[:12]
+    )
+    observations: list[dict[str, object]] = []
+    observed: set[tuple[str, str, float, float]] = set()
+    for detail in details:
+        for match in _COLLISION_OBSERVATION.finditer(detail):
+            try:
+                clearance = float(match.group("clearance"))
+                required = float(match.group("required"))
+            except ValueError:
+                continue
+            if (
+                not math.isfinite(clearance)
+                or not math.isfinite(required)
+                or required < 0.0
+            ):
+                continue
+            item = (
+                _safe_collision_label(match.group("geometry_a")),
+                _safe_collision_label(match.group("geometry_b")),
+                clearance,
+                required,
+            )
+            if item in observed:
+                continue
+            observed.add(item)
+            observations.append(
+                {
+                    "geometry_a": item[0],
+                    "geometry_b": item[1],
+                    "measured_clearance_m": item[2],
+                    "required_clearance_m": item[3],
+                }
+            )
+            if len(observations) >= 8:
+                return observations
+    return observations
+
+
+def _collision_repair_eligible(compilation: StrategyCompilationResult) -> bool:
+    """Retry when at least one terminal candidate has structured collision data."""
+
+    return any(
+        _structured_collision_observations(attempt)
+        for attempt in compilation.attempts
+    )
 
 
 def _bounded_prior_collision_strategy(
@@ -230,6 +281,8 @@ def _bounded_prior_collision_strategy(
                     "required_clearance_m": required,
                 }
             )
+    if not observations:
+        return None
     return {
         "source_repair_attempt": source_attempt,
         "strategy_id": _safe_collision_label(
@@ -274,9 +327,13 @@ def _collision_repair_feedback(
                 )
                 if prior is not None:
                     strategies.append(prior)
-    for attempt in compilation.attempts[:_MAX_COLLISION_STRATEGIES_PER_BATCH]:
+    collision_attempts = [
+        attempt
+        for attempt in compilation.attempts
+        if _structured_collision_observations(attempt)
+    ][:_MAX_COLLISION_STRATEGIES_PER_BATCH]
+    for attempt in collision_attempts:
         diagnostics: list[dict[str, object]] = []
-        details = [attempt.detail]
         for diagnostic in attempt.ik_diagnostics[:12]:
             if diagnostic.valid_ik_count >= diagnostic.raw_ik_count:
                 continue
@@ -287,44 +344,15 @@ def _collision_repair_feedback(
                     "valid_ik_branch_count": int(diagnostic.valid_ik_count),
                 }
             )
-            details.append(diagnostic.validity_detail)
-        observations: list[dict[str, object]] = []
-        observed: set[tuple[str, str, float, float]] = set()
-        for detail in details:
-            for match in _COLLISION_OBSERVATION.finditer(detail):
-                try:
-                    clearance = float(match.group("clearance"))
-                    required = float(match.group("required"))
-                except ValueError:
-                    continue
-                item = (
-                    _safe_collision_label(match.group("geometry_a")),
-                    _safe_collision_label(match.group("geometry_b")),
-                    clearance,
-                    required,
-                )
-                if item in observed:
-                    continue
-                observed.add(item)
-                observations.append(
-                    {
-                        "geometry_a": item[0],
-                        "geometry_b": item[1],
-                        "measured_clearance_m": item[2],
-                        "required_clearance_m": item[3],
-                    }
-                )
-                if len(observations) >= 8:
-                    break
-            if len(observations) >= 8:
-                break
         strategies.append(
             {
                 "source_repair_attempt": source_repair_attempt,
                 "strategy_id": _safe_collision_label(attempt.strategy_id),
                 "failure_code": str(attempt.failure_code),
                 "ik_diagnostics": diagnostics,
-                "collision_observations": observations,
+                "collision_observations": _structured_collision_observations(
+                    attempt
+                ),
             }
         )
     return {
