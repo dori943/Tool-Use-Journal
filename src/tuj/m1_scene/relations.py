@@ -60,12 +60,19 @@ def depth_clearance(target: dict, container: dict, wall_mm: float | None = None,
     h = target["bbox_mm"][2]
     floor_margin = min(open_w, open_d) - base
     tip_margin = tip_ratio * base - h
-    v = min(floor_margin, tip_margin)
+    # 0909: 벽이 무게중심보다 높으면 기울어도 벽에 기대므로 전도 검사를 면제한다.
+    # 종전 규칙은 컨테이너 높이를 보지 않아, 깊은 상자에 세워 넣는 우유갑(41.5 바닥에
+    # 137.6 높이)이 얕은 트레이와 똑같이 탈락했다 (c4_2).
+    walled = container["bbox_mm"][2] >= h / 2.0
+    ok = bool(floor_margin > 0 and (tip_margin > 0 or walled))
+    v = floor_margin if walled else min(floor_margin, tip_margin)
     return {"type": "clearance", "value_mm": round(float(v), 1),
             "check": (f"floor_fit(open_{round(min(open_w, open_d), 1)}[{src}]"
                       f"-base_{round(base, 1)})"
-                      f" & no_tip(h_{round(h, 1)}<={tip_ratio}x{round(base, 1)})"),
-            "pass": bool(floor_margin > 0 and tip_margin > 0)}
+                      + (f" & walled(container_{round(container['bbox_mm'][2], 1)}"
+                         f">=h/2_{round(h / 2.0, 1)})" if walled else
+                         f" & no_tip(h_{round(h, 1)}<={tip_ratio}x{round(base, 1)})")),
+            "pass": ok}
 
 
 def gap(node_a: dict, node_b: dict, max_pts: int = 1500) -> dict:
@@ -207,6 +214,40 @@ def flat_face(geometry: dict, rms_tol_mm: float = 2.0, min_face_mm: float = 40.0
     return {"type": "flat_face", "value": ok, "pass": ok, "face_mm": round(face, 1),
             "check": (f"rms_{rms}<={rms_tol_mm} & patch_{patch}<={patch_tol_mm}"
                       f" & face_{round(face, 1)}>={min_face_mm}")}
+
+
+def graspable_on_support(node: dict, ee: dict, edges: list[dict],
+                         min_grasp_height_mm: float = 10.0) -> dict:
+    """graspable_on_support(?EE, ?o): 지지면에 놓인 상태로 이 EE 가 접근 가능한가.
+
+    ee_usable 은 물체를 고립시켜 치수와 하중만 EE 사양과 대조한다. 그래서 지지면에
+    붙어 있어 손가락이 들어갈 자리가 없는 물체도 통과한다 (두께 1.6mm 치즈가 접시
+    위에서 2F 가능으로 판정된 사례). 이 술어는 그 누락분만 본다.
+
+    손가락형은 물체를 옆에서 감싸야 하므로 지지면 위 높이가 필요하고, 흡착은 위에서
+    닿으므로 높이와 무관하다. 판정 기준 높이는 인자로 받는다 (현재는 모션 계획의
+    충돌 여유에서 유도한 값, EE 사양에 최소 파지 높이가 들어오면 그 값으로 교체).
+
+    지지면은 on/inside 간선으로 찾는다. 노드인 지지면이 없으면(작업대 위 등) 판정
+    대상이 아니므로 통과시킨다.
+    """
+    node_id = node.get("id")
+    supports = [e["to"] for e in edges
+                if e.get("from") == node_id and e.get("type") in ("on", "inside")]
+    caps = set(ee.get("capabilities") or ())
+    height_mm = float((node.get("bbox_mm") or [0.0, 0.0, 0.0])[2])
+    base = {"type": "graspable_on_support", "ee_id": ee.get("ee_id"),
+            "supports": supports, "height_mm": round(height_mm, 1)}
+
+    if not supports:
+        return base | {"value": True, "pass": True,
+                       "check": "no_support_node"}
+    if "suction" in caps:
+        return base | {"value": True, "pass": True,
+                       "check": "suction_approaches_from_above"}
+    ok = height_mm >= min_grasp_height_mm
+    return base | {"value": ok, "pass": ok,
+                   "check": f"height_{round(height_mm, 1)}>={min_grasp_height_mm}"}
 
 
 # ── 집합 술어 (구 materialize.query_batch / query_swept_space) ────────────────

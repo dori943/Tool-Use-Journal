@@ -3,7 +3,7 @@
 Independent KitchenBase environment.
 
 Task:
-    긴 물건들을 상자에 담고 뚜껑을 덮어라.
+    테이블 위 물건을 모두 상자에 담고 뚜껑을 덮어라.
 
 C4-T2 does NOT inherit from C4-T1.
 Robot, pedestal, Island, and EE-rack construction are implemented
@@ -442,7 +442,7 @@ class C4_2_DiagonalFitPacking(KitchenBase):
         ep_meta.update(
             {
                 "lang": (
-                    "긴 물건들을 상자에 담고 "
+                    "테이블 위 물건을 모두 상자에 담고 "
                     "뚜껑을 덮어라."
                 ),
                 "box_inner_w_m": BOX_INNER_W,

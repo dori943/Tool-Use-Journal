@@ -25,12 +25,12 @@ class MissingGeminiAPIKeyError(OpenAIKeyframeProviderError):
 
 @dataclass(frozen=True, slots=True)
 class GeminiKeyframeProviderConfig(OpenAIKeyframeProviderConfig):
-    model: str = "gemini-3.8-flash"
+    model: str = "gemini-3.6-flash"
     reasoning_effort: Literal["default", "none", "low", "medium", "high"] = "default"
 
     @classmethod
     def from_environment(cls, **overrides: Any):
-        values = {"model": os.environ.get("GEMINI_KEYFRAME_MODEL", "gemini-3.8-flash")}
+        values = {"model": os.environ.get("GEMINI_KEYFRAME_MODEL", "gemini-3.6-flash")}
         if cache := os.environ.get("MOTION_PLANNER_KEYFRAME_CACHE"):
             values["cache_dir"] = Path(cache)
         if effort := os.environ.get("GEMINI_KEYFRAME_REASONING_EFFORT"):
@@ -45,7 +45,7 @@ class GeminiKeyframeProviderConfig(OpenAIKeyframeProviderConfig):
 
 class GeminiKeyframeProvider(OpenAIKeyframeProvider):
     provider_name = "Gemini"
-    prompt_version = "GEMINI_KEYFRAME_STRATEGY_JSON_V2"
+    prompt_version = "GEMINI_KEYFRAME_STRATEGY_JSON_V5"
 
     def __init__(self, config=None, *, client=None):
         super().__init__(config or GeminiKeyframeProviderConfig.from_environment(), client=client)

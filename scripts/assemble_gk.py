@@ -15,6 +15,7 @@ M4 는 nodes[].ee / mass_kg / geometry, roles.selected_tool, details, mutex, par
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -26,12 +27,50 @@ def _read(p):
     return json.loads(Path(p).read_text(encoding="utf-8"))
 
 
+def _graspable_ees(subgoal: dict) -> dict[str, list[str]]:
+    """서브골의 graspable_on_support 판정에서 노드별 접근 가능 EE 목록을 모은다."""
+    found: dict[str, list[str]] = {}
+    for d in subgoal.get("details", []):
+        for cond in d.get("pre", []):
+            if cond.get("head") != "graspable_on_support":
+                continue
+            for e in cond.get("evidence") or []:
+                node_id = e.get("node")
+                if node_id is None or e.get("graspable_on_support") is None:
+                    continue
+                found[node_id] = list(e.get("graspable_ees") or [])
+    return found
+
+
+def _narrow_ee(node: dict, usable: list[str]) -> dict:
+    """지지면 위에서 접근할 수 없는 EE 를 노드에서 내린다.
+
+    m1.json 의 ee 는 물체를 고립시켜 본 판정이라, 지지면에 붙어 있어 손가락이 들어갈
+    자리가 없는 물체도 feasible 로 남는다. M4 는 이 필드로 EE 를 고르므로, 여기서
+    좁히지 않으면 M2 가 판정한 결과가 하류에 전달되지 않는다 (c2_2 에서 두께 1.6mm
+    치즈에 2F 가 배정되어 M5 파지가 전부 막혔음).
+    """
+    ee = node.get("ee")
+    if not ee:
+        return node
+    narrowed = {}
+    for ee_id, spec in ee.items():
+        if ee_id in usable or not spec.get("feasible"):
+            narrowed[ee_id] = spec
+            continue
+        narrowed[ee_id] = dict(spec, feasible=False,
+                               reason="지지면 위에서 이 EE 로 접근할 수 없음"
+                                      " (graspable_on_support)")
+    return dict(node, ee=narrowed)
+
+
 def assemble(m1: dict, m2: dict) -> list[dict]:
     nodes = {n["id"]: n for n in m1["nodes"]}
     edges = m1.get("edges", [])
     gks = []
     for s in m2.get("m2_subgoals", []):
         sid = s["subgoal_id"]
+        graspable = _graspable_ees(s)
         want = set(s.get("object_ids", [])) | set(s.get("target_ids", [])) \
             | set(s.get("tool_candidate_ids", []))
         for k in ("container_id", "selected_tool_id"):
@@ -42,7 +81,9 @@ def assemble(m1: dict, m2: dict) -> list[dict]:
             "task": m2.get("task"),
             "goal": s.get("goal"),
             "subgoal_kind": s.get("kind"),
-            "nodes": {i: dict(nodes[i]) for i in sorted(want) if i in nodes},
+            "nodes": {i: (_narrow_ee(nodes[i], graspable[i])
+                          if i in graspable else dict(nodes[i]))
+                      for i in sorted(want) if i in nodes},
             "edges": [e for e in edges if e.get("from") in want and e.get("to") in want],
             "roles": {"target": s.get("target_ids", []),
                       "container": s.get("container_id"),
@@ -51,8 +92,9 @@ def assemble(m1: dict, m2: dict) -> list[dict]:
                       "selection_evidence": s.get("selection_evidence")},
             "details": [
                 {"detail_id": d["detail_id"], "action_type": d["action_type"],
-                 "binding": d.get("binding"),
-                 "pre": [{k: p[k] for k in ("id", "expr", "eval_by", "status", "evidence")
+                 "binding": d.get("binding"), "group_id": d.get("group_id"),
+                 "pre": [{k: p[k] for k in ("id", "expr", "head", "eval_by",
+                                            "status", "evidence")
                           if k in p} for p in d.get("pre", [])],
                  "establish": [p["expr"] for p in d.get("establish", [])],
                  "destroy": [p["expr"] for p in d.get("destroy", [])]}
@@ -94,10 +136,25 @@ def write_gks(out: Path, gks: list[dict]) -> list[Path]:
     return paths
 
 
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("task", nargs="?", default="c1_1")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="directory containing m1.json/m2.json and receiving gk_*.json",
+    )
+    return parser
+
+
 def main(argv=None):
-    argv = list(sys.argv[1:] if argv is None else argv)
-    name = argv[0] if argv and not argv[0].startswith("-") else "c1_1"
-    out = ROOT / "output" / name
+    args = _parser().parse_args(sys.argv[1:] if argv is None else argv)
+    name = args.task
+    out = (
+        args.output_dir.expanduser().resolve()
+        if args.output_dir is not None
+        else ROOT / "output" / name
+    )
     for f in ("m1.json", "m2.json"):
         if not (out / f).exists():
             sys.exit(f"[err] {out / f} 없음")

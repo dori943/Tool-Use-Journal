@@ -312,7 +312,11 @@ def stage_gk(task, out):
 
     call_main(
         module,
-        [task],
+        [
+            task,
+            "--output-dir",
+            str(out),
+        ],
         "assemble_gk",
     )
 
@@ -757,6 +761,9 @@ def stage_m5(task, out, args):
 
             "--provider",
             os.environ["TUJ_LLM_PROVIDER"],
+
+            "--model",
+            args.model,
         ]
 
         if args.m5_validate_only:
@@ -878,7 +885,7 @@ def build_parser():
         default=None,
         help=(
             "M1/M2 공통 LLM 모델. "
-            "예: gemini-2.5-flash, gpt-4o"
+            "예: gemini-3.6-flash, gpt-4o"
         ),
     )
 
@@ -1110,12 +1117,16 @@ def _resolve_llm(args):
     else:
         args.model = {
             "gemini":
-                "gemini-2.5-flash",
+                "gemini-3.6-flash",
 
             "openai":
                 "gpt-4o-mini",
 
         }[provider]
+
+    os.environ[
+        "TUJ_M2_MODEL"
+    ] = args.model
 
     print(
         f"[run] LLM provider={provider} "

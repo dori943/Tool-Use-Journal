@@ -30,6 +30,7 @@ from tuj.m5_motion.schema import (
 )
 from tuj.m5_motion.ee_exchange import EEExchangeKeyframeProvider
 from tuj.m5_motion.tool_use_journal_planning import (
+    ToolUseJournalCollisionBindingError,
     ToolUseJournalCollisionContextFactory,
     WorkcellMotionRequestRouter,
     attached_object_transform_from_state,
@@ -250,7 +251,7 @@ def test_pick_binds_contact_then_candidate_specific_attachment_context() -> None
         MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle"),
         action_type="PICK",
     )
-    request.task.metadata["support_collision_selectors"] = ["table*"]
+    request.task.metadata["support_collision_selectors"] = ["table_collision"]
     source = _artifact(
         (
             _keyframe("pre", KeyframeType.PRE_GRASP),
@@ -279,8 +280,19 @@ def test_pick_binds_contact_then_candidate_specific_attachment_context() -> None
     assert lift.collision_context_id.startswith("object-attached-release:bottle:")
     assert transfer.collision_context_id.startswith("object-attached:bottle:")
     assert lift.collision_context_id == grasp.collision_context_after_events_id
+    assert lift.collision_context_after_events_id == transfer.collision_context_id
+    assert lift.metadata["validate_endpoint_after_context"] is True
     release = setup.collision_contexts[lift.collision_context_id]
-    assert ("bottle", "table*") in release.allowed_collision_pairs
+    assert ("bottle", "table_collision") in release.allowed_collision_pairs
+    assert release.metadata["post_segment_validation_context_id"] == (
+        transfer.collision_context_id
+    )
+    assert release.metadata["bounded_collision_allowances"] == [
+        {
+            "selectors": ["bottle", "table_collision"],
+            "minimum_distance_m": -0.001,
+        }
+    ]
     attached = setup.collision_contexts[transfer.collision_context_id]
     assert attached.attached_object_ids == ["bottle"]
     assert attached.attached_object_transforms[0].reference_name == (
@@ -294,12 +306,200 @@ def test_pick_binds_contact_then_candidate_specific_attachment_context() -> None
     ]
 
 
-def test_contact_friction_pick_keeps_target_free_after_gripper_close() -> None:
+def test_pick_infers_exact_initial_support_for_only_the_separation_edge() -> None:
     request = _request(
         MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle"),
         action_type="PICK",
     )
-    request.task.metadata["grasp_execution_mode"] = "CONTACT_FRICTION"
+    request.world.obstacles = [
+        {
+            "obstacle_id": "fixture_surface",
+            "aabb_min_m": [0.0, -0.5, 0.0],
+            "aabb_max_m": [1.0, 0.5, 0.1],
+            "collision_enabled": True,
+        }
+    ]
+    source = _artifact(
+        (
+            _keyframe("pre", KeyframeType.PRE_GRASP),
+            _keyframe(
+                "grasp",
+                KeyframeType.GRASP,
+                events=(KeyframeEventType.ATTACH_OBJECT,),
+            ),
+            _keyframe("retreat", KeyframeType.RETREAT),
+            _keyframe("transfer", KeyframeType.TRANSFER),
+        )
+    )
+
+    setup = _factory().prepare(request, source)
+    _, grasp, retreat, transfer = setup.keyframe_artifact.candidates[0].keyframes
+
+    assert "support_collision_selectors" not in request.task.metadata
+    assert retreat.collision_context_id.startswith(
+        "object-attached-release:bottle:"
+    )
+    release = setup.collision_contexts[retreat.collision_context_id]
+    assert release.allowed_collision_pairs == [("bottle", "fixture_surface")]
+    assert release.metadata["support_separation"] == {
+        "policy": "AUTO_INITIAL_SUPPORT_V1",
+        "detection_source": "world.obstacles.aabb",
+        "support_initial_clearance_m": pytest.approx(0.0),
+        "support_horizontal_overlap_ratio": pytest.approx(1.0),
+        "support_min_horizontal_overlap_ratio": pytest.approx(0.5),
+        "maximum_penetration_m": pytest.approx(0.001),
+        "target_selector": "bottle",
+        "support_selectors": ["fixture_surface"],
+    }
+    assert grasp.collision_context_after_events_id == retreat.collision_context_id
+    assert retreat.collision_context_after_events_id == transfer.collision_context_id
+    assert transfer.collision_context_id.startswith("object-attached:bottle:")
+
+
+def test_pick_does_not_infer_support_from_a_sliver_overlap() -> None:
+    request = _request(
+        MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle"),
+        action_type="PICK",
+    )
+    request.world.obstacles = [
+        {
+            "obstacle_id": "neighbor-edge",
+            "aabb_min_m": [0.424, -0.025, 0.0],
+            "aabb_max_m": [0.6, 0.025, 0.1],
+            "collision_enabled": True,
+        }
+    ]
+    source = _artifact(
+        (
+            _keyframe(
+                "grasp",
+                KeyframeType.GRASP,
+                events=(KeyframeEventType.ATTACH_OBJECT,),
+            ),
+            _keyframe("lift", KeyframeType.LIFT),
+        )
+    )
+
+    setup = _factory().prepare(request, source)
+    grasp, lift = setup.keyframe_artifact.candidates[0].keyframes
+
+    assert grasp.collision_context_after_events_id.startswith(
+        "object-attached:bottle:"
+    )
+    assert lift.collision_context_id == grasp.collision_context_after_events_id
+    assert not any(
+        context_id.startswith("object-attached-release:bottle:")
+        for context_id in setup.collision_contexts
+    )
+
+
+def test_pick_rejects_pattern_support_selectors() -> None:
+    request = _request(
+        MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle"),
+        action_type="PICK",
+    )
+    request.task.metadata["support_collision_selectors"] = ["table*"]
+    source = _artifact(
+        (
+            _keyframe(
+                "grasp",
+                KeyframeType.GRASP,
+                events=(KeyframeEventType.ATTACH_OBJECT,),
+            ),
+            _keyframe("lift", KeyframeType.LIFT),
+        )
+    )
+
+    with pytest.raises(
+        ToolUseJournalCollisionBindingError,
+        match="must use exact selectors",
+    ):
+        _factory().prepare(request, source)
+
+
+def test_pick_rejects_initial_support_penetration_over_one_millimeter() -> None:
+    request = _request(
+        MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle"),
+        action_type="PICK",
+    )
+    request.world.obstacles = [
+        {
+            "obstacle_id": "badly-overlapping-support",
+            "aabb_min_m": [0.0, -0.5, 0.0],
+            "aabb_max_m": [1.0, 0.5, 0.1015],
+            "collision_enabled": True,
+        }
+    ]
+    source = _artifact(
+        (
+            _keyframe(
+                "grasp",
+                KeyframeType.GRASP,
+                events=(KeyframeEventType.ATTACH_OBJECT,),
+            ),
+            _keyframe("lift", KeyframeType.LIFT),
+        )
+    )
+
+    with pytest.raises(
+        ToolUseJournalCollisionBindingError,
+        match="initial support penetration exceeds the 1 mm hard limit",
+    ):
+        _factory().prepare(request, source)
+
+
+def test_explicit_empty_pick_support_policy_disables_inference() -> None:
+    request = _request(
+        MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle"),
+        action_type="PICK",
+    )
+    request.task.metadata["support_collision_selectors"] = []
+    request.world.obstacles = [
+        {
+            "obstacle_id": "fixture_surface",
+            "aabb_min_m": [0.0, -0.5, 0.0],
+            "aabb_max_m": [1.0, 0.5, 0.1],
+            "collision_enabled": True,
+        }
+    ]
+    source = _artifact(
+        (
+            _keyframe(
+                "grasp",
+                KeyframeType.GRASP,
+                events=(KeyframeEventType.ATTACH_OBJECT,),
+            ),
+            _keyframe("lift", KeyframeType.LIFT),
+        )
+    )
+
+    setup = _factory().prepare(request, source)
+    grasp, lift = setup.keyframe_artifact.candidates[0].keyframes
+
+    assert grasp.collision_context_after_events_id.startswith(
+        "object-attached:bottle:"
+    )
+    assert lift.collision_context_id == grasp.collision_context_after_events_id
+    assert lift.collision_context_after_events_id is None
+    assert all(
+        not context.allowed_collision_pairs
+        for context_id, context in setup.collision_contexts.items()
+        if context_id.startswith("object-attached:")
+    )
+
+
+@pytest.mark.parametrize(
+    "grasp_mode",
+    ["CONTACT_FRICTION", "contact_friction", "contact-friction"],
+)
+def test_contact_friction_pick_keeps_target_free_after_gripper_close(
+    grasp_mode,
+) -> None:
+    request = _request(
+        MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle"),
+        action_type="PICK",
+    )
+    request.task.metadata["grasp_execution_mode"] = grasp_mode
     source = _artifact(
         (
             _keyframe("pre", KeyframeType.PRE_GRASP),

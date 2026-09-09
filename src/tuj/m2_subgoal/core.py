@@ -29,7 +29,11 @@ import json
 
 # action_type 템플릿: (사전조건, establish, destroy). ?o=대상, ?r=목적지, ?t=도구
 TEMPLATES = {
+    # 0909: graspable_on_support 추가. ee_usable 은 물체를 고립시켜 치수와 하중만
+    # 보므로, 지지면에 붙어 있어 손가락이 들어갈 자리가 없는 물체도 통과한다
+    # (두께 1.6mm 치즈가 접시 위에서 2F 가능으로 판정되어 M5 파지에서 막혔음).
     "acquire": (["reachable(?o)", "top_exposed(?o)", "ee_usable(?EE, ?o)",
+                 "graspable_on_support(?EE, ?o)",
                  "batch_feasible(?EE, ?o)", "hand_empty"],
                 ["holding(?o)"], ["hand_empty"]),
     "transport": (["holding(?o)", "act_space_clear(?EE, ?o, ?r)", "path_clear(?o, ?r)"],
@@ -63,6 +67,7 @@ TEMPLATES = {
 EVAL_BY = {"hand_empty": "m2", "holding": "m2", "above": "m2", "in": "m2",
            "reachable": "m3", "top_exposed": "m3", "fits": "m3", "clear": "m3",
            "ee_usable": "m3", "batch_feasible": "m3",
+           "graspable_on_support": "m3",
            "path_clear": "motion", "act_space_clear": "motion",
            # 0901 확장분. flat_face(도구에 평평한 작업면이 있는가)와
            # gap_accessible(도구가 틈에 진입 가능한가)은 M3 신규 질의 — 도희 협의 필요.
@@ -153,16 +158,22 @@ def decompose(subgoal: dict) -> list[dict]:
         base = subgoal.get("container_id")
         if base is None:
             base, ts = ts[0], ts[1:]
-        g = f"G_{sid}"
+        # 0909: 층마다 별도 그룹. group_id 는 손의 점유 흐름을 나타내는데 stack 은
+        # 층마다 쥐었다 놓으므로 층이 한 사이클이다. 서브골 전체를 한 그룹으로 두면
+        # M4 가 그룹당 EE 하나를 배정하는 구조상 EE 교체가 원천적으로 나올 수 없다
+        # (c2_2 에서 빵과 얇은 속재료가 같은 EE 로 묶였음). 층 순서는 아래의
+        # causal link 가 잡으므로 그룹을 나눠도 순서는 유지된다.
         out, prev = [], None                        # prev = (직전에 올린 물체, 그 받침)
         for i, o in enumerate(ts, 1):
+            g = f"G_{sid}_L{i}"
             d1 = _detail(f"{sid}_s{i}a", "acquire", {"?o": o}, g, f"{o} 확보")
             if prev:
                 # 아래층이 완성된 뒤에만 다음 층 확보 — sweep의 d2b와 같은 수법.
                 # 이 조건이 직전 place_on의 establish(on)와 causal link를 만들어
                 # 층 순서(아래→위)를 하드 엣지로 못 박는다.
                 d1["pre"].append({"id": f"{sid}_s{i}a_p{len(d1['pre'])}",
-                                  "expr": f"on({prev[0]}, {prev[1]})", "head": "on", "eval_by": "m2"})
+                                  "expr": f"on({prev[0]}, {prev[1]})", "head": "on",
+                                  "eval_by": "m2", "auto": "stack_layer_order"})
             out += [
                 d1,
                 _detail(f"{sid}_s{i}b", "transport", {"?o": o, "?r": base}, g, f"{o}를 {base} 위로 운반"),
@@ -417,10 +428,13 @@ def partial_order(details: list[dict]) -> tuple[list[dict], list[dict]]:
             # 가로지르는 물리 제약이라 그룹이 달라도 하드 엣지로 둔다.
             # 예외(0908): 지시문 순서(auto=instruction_order, VLM이 정한 relocate 처리 순서)도 동일.
             # 예외(0908): 받침 도착(auto=base_arrival, 접시가 트레이에 담긴 뒤에야 그 위에 쌓기)도 동일.
+            # 예외(0909): 쌓기 층 순서(auto=stack_layer_order). 층마다 그룹을 나눈 뒤로
+            # 아래층 완성 조건이 그룹을 가로지르는데, 이것은 아래층 위에만 다음 층을
+            # 올릴 수 있다는 물리 제약이므로 그룹이 달라도 하드 엣지로 둔다.
             for a in producers:
                 if a["group_id"] == b["group_id"] or p.get("auto") in (
                         "container_seal", "container_packing_sequence",
-                        "instruction_order", "base_arrival"):
+                        "instruction_order", "base_arrival", "stack_layer_order"):
                     edges.append({"from": a["detail_id"], "to": b["detail_id"],
                                   "why": f"causal_link: {p['expr']}"})
             # 그룹 밖 생산자만 있으면(예: hand_empty) 배타 자원 — mutex
@@ -570,6 +584,12 @@ def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None)
                 for t in targets:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
                               "call": {"kind": "ee", "node_id": t}})
+            elif head == "graspable_on_support":
+                oid = b.get("?o")
+                targets = tool_ids if oid == "?tool" else _set_members(oid)
+                for t in targets:
+                    q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
+                              "call": {"kind": "graspable_on_support", "node_id": t}})
             elif head == "fits":
                 oid, rid = b.get("?o"), b.get("?r")
                 if oid in (None, "?tool") or rid in (None, "tool_rest"):

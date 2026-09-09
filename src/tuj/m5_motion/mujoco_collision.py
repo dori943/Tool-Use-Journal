@@ -63,7 +63,29 @@ class PathCollisionCheckResult:
     failed_state_index: int | None = None
 
 
+@dataclass(frozen=True, slots=True)
+class _BoundedCollisionAllowance:
+    selectors: tuple[str, str]
+    minimum_distance_m: float
+    left_geom_ids: frozenset[int]
+    right_geom_ids: frozenset[int]
+
+
 GeomSelector = str | int
+_POST_SEGMENT_VALIDATION_CONTEXT_KEY = "post_segment_validation_context_id"
+
+
+def _post_segment_validation_context_id(
+    context: CollisionContext,
+) -> tuple[str | None, str | None]:
+    raw = context.metadata.get(_POST_SEGMENT_VALIDATION_CONTEXT_KEY)
+    if raw is None:
+        return None, None
+    if not isinstance(raw, str) or not raw:
+        return None, (
+            f"{_POST_SEGMENT_VALIDATION_CONTEXT_KEY} must be a non-empty string"
+        )
+    return raw, None
 
 
 class SceneCollisionValidator(Protocol):
@@ -581,6 +603,126 @@ class MuJoCoCollisionValidator:
     def _selector_matches(selector: str, labels: frozenset[str]) -> bool:
         return any(fnmatch.fnmatchcase(label, selector) for label in labels)
 
+    def _bounded_collision_allowances(
+        self,
+        context: CollisionContext | None,
+    ) -> tuple[
+        tuple[_BoundedCollisionAllowance, ...],
+        CollisionCheckResult | None,
+    ]:
+        if context is None:
+            return (), None
+        raw = context.metadata.get("bounded_collision_allowances", ())
+        if not isinstance(raw, Sequence) or isinstance(raw, (str, bytes)):
+            return (), CollisionCheckResult(
+                valid=False,
+                failure_code="COLLISION_CONTEXT_POLICY_INVALID",
+                detail="bounded_collision_allowances must be a list",
+            )
+        allowances: list[_BoundedCollisionAllowance] = []
+        seen: set[tuple[str, str]] = set()
+        for index, item in enumerate(raw):
+            if not isinstance(item, Mapping):
+                return (), CollisionCheckResult(
+                    valid=False,
+                    failure_code="COLLISION_CONTEXT_POLICY_INVALID",
+                    detail=(
+                        f"bounded collision allowance {index} must be a mapping"
+                    ),
+                )
+            selectors = item.get("selectors")
+            minimum = item.get("minimum_distance_m")
+            if (
+                not isinstance(selectors, Sequence)
+                or isinstance(selectors, (str, bytes))
+                or len(selectors) != 2
+                or not all(
+                    isinstance(selector, str) and selector
+                    for selector in selectors
+                )
+                or isinstance(minimum, bool)
+                or not isinstance(minimum, (int, float))
+                or not math.isfinite(float(minimum))
+                or float(minimum)
+                < -self.collision_margin_m - self._DISTANCE_TOLERANCE_M
+                or float(minimum)
+                > self.collision_margin_m + self._DISTANCE_TOLERANCE_M
+            ):
+                return (), CollisionCheckResult(
+                    valid=False,
+                    failure_code="COLLISION_CONTEXT_POLICY_INVALID",
+                    detail=(
+                        f"bounded collision allowance {index} requires two "
+                        "non-empty selectors and a finite minimum_distance_m "
+                        "within +/- collision_margin_m"
+                    ),
+                )
+            selector_pair = (str(selectors[0]), str(selectors[1]))
+            pair = self._canonical_pair(selector_pair)
+            if pair in seen:
+                return (), CollisionCheckResult(
+                    valid=False,
+                    failure_code="COLLISION_CONTEXT_POLICY_INVALID",
+                    detail=f"duplicate bounded collision allowance {pair}",
+                )
+            seen.add(pair)
+            resolved = tuple(
+                frozenset(
+                    geom_id
+                    for geom_id in range(self.model.ngeom)
+                    if _collision_enabled(self.model, geom_id)
+                    and selector in self._labels(geom_id)
+                )
+                for selector in selector_pair
+            )
+            if not resolved[0] or not resolved[1]:
+                return (), CollisionCheckResult(
+                    valid=False,
+                    failure_code="COLLISION_CONTEXT_POLICY_INVALID",
+                    detail=(
+                        f"bounded collision allowance {index} selectors must "
+                        "each resolve exactly to collision geometry"
+                    ),
+                )
+            if resolved[0] & resolved[1]:
+                return (), CollisionCheckResult(
+                    valid=False,
+                    failure_code="COLLISION_CONTEXT_POLICY_INVALID",
+                    detail=(
+                        f"bounded collision allowance {index} selectors must "
+                        "resolve to disjoint geometry"
+                    ),
+                )
+            allowances.append(
+                _BoundedCollisionAllowance(
+                    selectors=selector_pair,
+                    minimum_distance_m=float(minimum),
+                    left_geom_ids=resolved[0],
+                    right_geom_ids=resolved[1],
+                )
+            )
+        return tuple(allowances), None
+
+    def _bounded_minimum_distance(
+        self,
+        geom_a: int,
+        geom_b: int,
+        allowances: Sequence[_BoundedCollisionAllowance],
+    ) -> float | None:
+        matches = [
+            allowance.minimum_distance_m
+            for allowance in allowances
+            if (
+                geom_a in allowance.left_geom_ids
+                and geom_b in allowance.right_geom_ids
+            )
+            or (
+                geom_b in allowance.left_geom_ids
+                and geom_a in allowance.right_geom_ids
+            )
+        ]
+        return max(matches) if matches else None
+
     def _is_allowed(
         self,
         geom_a: int,
@@ -664,6 +806,11 @@ class MuJoCoCollisionValidator:
         moving_geoms, entity_failure = self._moving_geoms(selected_context)
         if entity_failure is not None:
             return entity_failure
+        bounded_allowances, policy_failure = self._bounded_collision_allowances(
+            selected_context
+        )
+        if policy_failure is not None:
+            return policy_failure
 
         with self._lock:
             self.data.qpos[:] = self._baseline_qpos
@@ -688,7 +835,7 @@ class MuJoCoCollisionValidator:
 
             contacts: list[CollisionContact] = []
             disallowed_distances: list[float] = []
-            violations: list[CollisionContact] = []
+            violations: list[tuple[CollisionContact, float, str]] = []
             for contact_index in range(self.data.ncon):
                 contact = self.data.contact[contact_index]
                 geom_a = int(contact.geom1)
@@ -706,6 +853,17 @@ class MuJoCoCollisionValidator:
                 )
                 body_a_id = int(self.model.geom_bodyid[geom_a])
                 body_b_id = int(self.model.geom_bodyid[geom_b])
+                bounded_minimum = self._bounded_minimum_distance(
+                    geom_a,
+                    geom_b,
+                    bounded_allowances,
+                )
+                bounded_violation = (
+                    allowed
+                    and bounded_minimum is not None
+                    and float(contact.dist)
+                    < bounded_minimum - self._DISTANCE_TOLERANCE_M
+                )
                 record = CollisionContact(
                     geom_a=_name(
                         self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_a
@@ -720,17 +878,31 @@ class MuJoCoCollisionValidator:
                         self.model, mujoco.mjtObj.mjOBJ_BODY, body_b_id
                     ),
                     distance_m=float(contact.dist),
-                    allowed=allowed,
+                    allowed=allowed and not bounded_violation,
                 )
                 contacts.append(record)
-                if allowed:
+                if allowed and not bounded_violation:
                     continue
                 disallowed_distances.append(record.distance_m)
-                if (
+                if bounded_violation:
+                    violations.append(
+                        (
+                            record,
+                            float(bounded_minimum),
+                            "BOUNDED_COLLISION_VIOLATION",
+                        )
+                    )
+                elif (
                     record.distance_m
                     < self.collision_margin_m - self._DISTANCE_TOLERANCE_M
                 ):
-                    violations.append(record)
+                    violations.append(
+                        (
+                            record,
+                            self.collision_margin_m,
+                            "COLLISION_MARGIN_VIOLATION",
+                        )
+                    )
 
             if disallowed_distances:
                 min_clearance = min(disallowed_distances)
@@ -739,14 +911,16 @@ class MuJoCoCollisionValidator:
                 min_clearance = self.collision_margin_m
                 lower_bound = True
             if violations:
-                first = min(violations, key=lambda item: item.distance_m)
+                first, required_distance, failure_code = min(
+                    violations, key=lambda item: item[0].distance_m
+                )
                 return CollisionCheckResult(
                     valid=False,
-                    failure_code="COLLISION_MARGIN_VIOLATION",
+                    failure_code=failure_code,
                     detail=(
                         f"{first.geom_a} <-> {first.geom_b} clearance "
                         f"{first.distance_m:.6f} m is below required "
-                        f"{self.collision_margin_m:.6f} m"
+                        f"{required_distance:.6f} m"
                     ),
                     min_clearance_m=min_clearance,
                     clearance_is_lower_bound=False,
@@ -791,9 +965,53 @@ class MuJoCoCollisionValidator:
                     min_clearance_m=minimum,
                     failed_state_index=index,
                 )
+        post_context_id, policy_error = _post_segment_validation_context_id(
+            context
+        )
+        if policy_error is not None:
+            return PathCollisionCheckResult(
+                valid=False,
+                checked_states=len(waypoints),
+                failure_code="COLLISION_CONTEXT_POLICY_INVALID",
+                detail=policy_error,
+                min_clearance_m=minimum,
+            )
+        if post_context_id is not None:
+            if not waypoints:
+                return PathCollisionCheckResult(
+                    valid=False,
+                    checked_states=0,
+                    failure_code="COLLISION_CONTEXT_POLICY_INVALID",
+                    detail="post-segment validation requires a final waypoint",
+                    min_clearance_m=minimum,
+                )
+            endpoint = self.check(
+                waypoints[-1].joint_positions_rad,
+                context_id=post_context_id,
+            )
+            if endpoint.min_clearance_m is not None:
+                minimum = (
+                    endpoint.min_clearance_m
+                    if minimum is None
+                    else min(minimum, endpoint.min_clearance_m)
+                )
+            if not endpoint.valid:
+                return PathCollisionCheckResult(
+                    valid=False,
+                    checked_states=len(waypoints) + 1,
+                    failure_code=endpoint.failure_code,
+                    detail=(
+                        f"post-segment endpoint in {post_context_id!r}: "
+                        f"{endpoint.detail}"
+                    ),
+                    min_clearance_m=minimum,
+                    failed_state_index=len(waypoints) - 1,
+                )
         return PathCollisionCheckResult(
             valid=True,
-            checked_states=len(waypoints),
+            checked_states=(
+                len(waypoints) + (1 if post_context_id is not None else 0)
+            ),
             min_clearance_m=minimum,
         )
 
@@ -931,9 +1149,53 @@ class MuJoCoCollisionModelRegistry:
                     min_clearance_m=minimum,
                     failed_state_index=index,
                 )
+        post_context_id, policy_error = _post_segment_validation_context_id(
+            context
+        )
+        if policy_error is not None:
+            return PathCollisionCheckResult(
+                valid=False,
+                checked_states=len(waypoints),
+                failure_code="COLLISION_CONTEXT_POLICY_INVALID",
+                detail=policy_error,
+                min_clearance_m=minimum,
+            )
+        if post_context_id is not None:
+            if not waypoints:
+                return PathCollisionCheckResult(
+                    valid=False,
+                    checked_states=0,
+                    failure_code="COLLISION_CONTEXT_POLICY_INVALID",
+                    detail="post-segment validation requires a final waypoint",
+                    min_clearance_m=minimum,
+                )
+            endpoint = self.check(
+                waypoints[-1].joint_positions_rad,
+                context_id=post_context_id,
+            )
+            if endpoint.min_clearance_m is not None:
+                minimum = (
+                    endpoint.min_clearance_m
+                    if minimum is None
+                    else min(minimum, endpoint.min_clearance_m)
+                )
+            if not endpoint.valid:
+                return PathCollisionCheckResult(
+                    valid=False,
+                    checked_states=len(waypoints) + 1,
+                    failure_code=endpoint.failure_code,
+                    detail=(
+                        f"post-segment endpoint in {post_context_id!r}: "
+                        f"{endpoint.detail}"
+                    ),
+                    min_clearance_m=minimum,
+                    failed_state_index=len(waypoints) - 1,
+                )
         return PathCollisionCheckResult(
             valid=True,
-            checked_states=len(waypoints),
+            checked_states=(
+                len(waypoints) + (1 if post_context_id is not None else 0)
+            ),
             min_clearance_m=minimum,
         )
 

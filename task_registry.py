@@ -83,7 +83,7 @@ TASKS = {
         "c4_2_diagonal_fit_packing",
         "C4_2_DiagonalFitPacking",
         robocasa=True,
-        instruction="긴 물건들을 상자에 담고 뚜껑을 덮어라",
+        instruction="테이블 위 물건을 모두 상자에 담고 뚜껑을 덮어라",
     ),
 }
 

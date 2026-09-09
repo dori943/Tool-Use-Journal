@@ -223,6 +223,188 @@ def test_promotes_physical_grasp_metadata_for_two_finger_acquire() -> None:
     assert metadata["attach_target"] is True
 
 
+def test_promotes_explicit_pick_support_collision_policy() -> None:
+    selected = _selected_plan()
+    selected.candidate_assignments[1].action_parameters = {
+        "support_collision_selectors": ["fixture-top"],
+        "support_contact_tolerance_m": 0.002,
+        "support_penetration_tolerance_m": 0.0005,
+    }
+
+    request = SelectedPlanMotionRequestAdapter().convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": _world("scene:pick", [0.2, 0.3]),
+        },
+        constraints=MotionConstraints(),
+    )[1]
+
+    assert request.task.metadata["support_collision_selectors"] == [
+        "fixture-top"
+    ]
+    assert request.task.metadata["support_contact_tolerance_m"] == pytest.approx(
+        0.002
+    )
+    assert request.task.metadata[
+        "support_penetration_tolerance_m"
+    ] == pytest.approx(0.0005)
+
+
+def test_infers_pick_support_from_grounded_geometry_without_name_policy() -> None:
+    selected = _selected_plan()
+    pick_world = _world("scene:pick", [0.2, 0.3])
+    pick_world.objects["part"] = {
+        "pose": {
+            "frame_id": "world",
+            "position_m": [0.4, 0.1, 0.05],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.2, 0.1, 0.1],
+        "anchors": {"center": [0.0, 0.0, 0.0]},
+    }
+    pick_world.obstacles = [
+        {
+            "obstacle_id": "fixture-top",
+            "aabb_min_m": [0.0, -0.5, -0.1],
+            "aabb_max_m": [1.0, 0.5, 0.0],
+            "collision_enabled": True,
+        }
+    ]
+
+    request = SelectedPlanMotionRequestAdapter().convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": pick_world,
+        },
+        constraints=MotionConstraints(collision_margin_m=0.005),
+    )[1]
+
+    metadata = request.task.metadata
+    assert metadata["support_collision_selectors"] == ["fixture-top"]
+    assert metadata["support_collision_policy"] == "AUTO_INITIAL_SUPPORT_V1"
+    assert metadata["support_collision_detection_source"] == (
+        "world.obstacles.aabb"
+    )
+    assert metadata["support_initial_clearance_m"] == pytest.approx(0.0)
+    assert metadata["support_horizontal_overlap_ratio"] == pytest.approx(1.0)
+    assert metadata["support_min_horizontal_overlap_ratio"] == pytest.approx(
+        0.5
+    )
+
+
+def test_does_not_infer_support_from_a_sliver_aabb_overlap() -> None:
+    selected = _selected_plan()
+    pick_world = _world("scene:pick", [0.2, 0.3])
+    pick_world.objects["part"] = {
+        "pose": {
+            "frame_id": "world",
+            "position_m": [0.4, 0.1, 0.05],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.2, 0.1, 0.1],
+    }
+    pick_world.obstacles = [
+        {
+            "obstacle_id": "neighbor-edge",
+            "aabb_min_m": [0.49, 0.05, -0.1],
+            "aabb_max_m": [0.7, 0.15, 0.0],
+            "collision_enabled": True,
+        }
+    ]
+
+    request = SelectedPlanMotionRequestAdapter().convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": pick_world,
+        },
+        constraints=MotionConstraints(collision_margin_m=0.005),
+    )[1]
+
+    assert "support_collision_selectors" not in request.task.metadata
+
+
+def test_inference_skips_sliver_and_selects_valid_support_candidate() -> None:
+    selected = _selected_plan()
+    pick_world = _world("scene:pick", [0.2, 0.3])
+    pick_world.objects["part"] = {
+        "pose": {
+            "frame_id": "world",
+            "position_m": [0.4, 0.1, 0.05],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.2, 0.1, 0.1],
+    }
+    pick_world.obstacles = [
+        {
+            "obstacle_id": "neighbor-edge",
+            "aabb_min_m": [0.49, 0.05, -0.1],
+            "aabb_max_m": [0.7, 0.15, 0.0],
+            "collision_enabled": True,
+        },
+        {
+            "obstacle_id": "real-support",
+            "aabb_min_m": [0.0, -0.5, -0.1],
+            "aabb_max_m": [1.0, 0.5, -0.0005],
+            "collision_enabled": True,
+        },
+    ]
+
+    request = SelectedPlanMotionRequestAdapter().convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": pick_world,
+        },
+        constraints=MotionConstraints(collision_margin_m=0.005),
+    )[1]
+
+    assert request.task.metadata["support_collision_selectors"] == [
+        "real-support"
+    ]
+    assert request.task.metadata["support_initial_clearance_m"] == pytest.approx(
+        0.0005
+    )
+
+
+def test_normalizes_contact_friction_mode_before_support_inference() -> None:
+    selected = _selected_plan()
+    selected.candidate_assignments[1].action_parameters = {
+        "grasp_execution_mode": " contact-friction ",
+    }
+    pick_world = _world("scene:pick", [0.2, 0.3])
+    pick_world.objects["part"] = {
+        "pose": {
+            "frame_id": "world",
+            "position_m": [0.4, 0.1, 0.05],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.2, 0.1, 0.1],
+    }
+    pick_world.obstacles = [
+        {
+            "obstacle_id": "fixture-top",
+            "aabb_min_m": [0.0, -0.5, -0.1],
+            "aabb_max_m": [1.0, 0.5, 0.0],
+            "collision_enabled": True,
+        }
+    ]
+
+    request = SelectedPlanMotionRequestAdapter().convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": pick_world,
+        },
+        constraints=MotionConstraints(),
+    )[1]
+
+    assert request.task.metadata["grasp_execution_mode"] == "CONTACT_FRICTION"
+    assert "support_collision_selectors" not in request.task.metadata
+
+
 def test_acquire_execution_metadata_changes_request_identity() -> None:
     selected = _selected_plan()
     selected.candidate_assignments[1].ee = "2F"
