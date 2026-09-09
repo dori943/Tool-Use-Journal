@@ -762,6 +762,130 @@ def test_controller_endpoint_event_group_waits_for_settle() -> None:
     )
 
 
+def test_controller_does_not_step_past_unsettled_endpoint_event() -> None:
+    env = _fake_env("2F")
+    env.control_timestep = 0.02
+    env.model_timestep = 0.002
+    runtime = ToolUseJournalEERuntime(env, _fake_env)
+    state = ToolUseJournalEnvironmentAdapter(env).world_snapshot().robot_state
+    q = list(state.joint_positions_rad)
+    boundary_s = 0.031
+    duration_s = 0.051
+
+    class _DeterministicBoundaryPlayer(ToolUseJournalControllerTrajectoryPlayer):
+        def _controller_action(self, plan, desired_joint_positions):
+            del plan, desired_joint_positions
+            return np.zeros(1, dtype=float)
+
+        def _advance_controller(self, action):
+            del action
+            data = self.runtime.env.sim.data._data
+            data.time += self.runtime.env.control_timestep
+            return float(data.time)
+
+        def _execute_event(self, event):
+            return f"executed {event.event_id}"
+
+    plan = MotionPlan(
+        plan_id="non-grid-settle-plan",
+        request_id="non-grid-settle-request",
+        provenance=_provenance(
+            "non-grid-settle-plan-artifact",
+            "MotionPlan",
+            ModuleName.MOTION_PLANNER,
+        ),
+        scene_signature="non-grid-settle-scene",
+        robot_id=state.robot_id,
+        joint_names=list(state.joint_names),
+        duration_s=duration_s,
+        segments=[
+            TrajectorySegment(
+                segment_id="non-grid-grasp",
+                segment_type=SegmentType.GRASP,
+                start_time_s=0.0,
+                end_time_s=boundary_s,
+                collision_checked=False,
+                waypoints=[
+                    TrajectoryWaypoint(
+                        time_from_start_s=0.0,
+                        joint_positions_rad=q,
+                    ),
+                    TrajectoryWaypoint(
+                        time_from_start_s=boundary_s,
+                        joint_positions_rad=q,
+                    ),
+                ],
+                metadata={
+                    "motion_end_time_s": boundary_s,
+                    "tracking_settle": {
+                        "joint_tolerance_rad": 0.001,
+                        "max_wait_s": 0.1,
+                        "required_consecutive_ticks": 3,
+                    },
+                },
+            ),
+            TrajectorySegment(
+                segment_id="non-grid-retreat",
+                segment_type=SegmentType.RETREAT,
+                start_time_s=boundary_s,
+                end_time_s=duration_s,
+                collision_checked=False,
+                waypoints=[
+                    TrajectoryWaypoint(
+                        time_from_start_s=boundary_s,
+                        joint_positions_rad=q,
+                    ),
+                    TrajectoryWaypoint(
+                        time_from_start_s=duration_s,
+                        joint_positions_rad=q,
+                    ),
+                ],
+            ),
+        ],
+        events=[
+            TrajectoryEvent(
+                event_id="attach-at-non-grid-endpoint",
+                time_from_start_s=boundary_s,
+                event_type=EventType.ATTACH_OBJECT,
+                target_id="apple",
+            )
+        ],
+        expected_final_state=state.model_copy(
+            update={"joint_velocities_rad_s": [0.0] * len(q)}
+        ),
+    )
+    run = SimulationRun(
+        run_id="non-grid-settle-run",
+        provenance=_provenance(
+            "non-grid-settle-run-artifact",
+            "SimulationRun",
+            ModuleName.SIMULATOR,
+        ),
+        plan=plan,
+        config=SimulationConfig(
+            physics_timestep_s=env.model_timestep,
+            control_timestep_s=env.control_timestep,
+            max_duration_s=0.2,
+        ),
+    )
+
+    try:
+        report = _DeterministicBoundaryPlayer(runtime).execute(run)
+    finally:
+        runtime.close()
+
+    assert report.status is ExecutionStatus.SUCCESS
+    assert [event.event_id for event in report.executed_events] == [
+        "attach-at-non-grid-endpoint"
+    ]
+    assert report.metadata["segment_tracking"][0]["segment_id"] == (
+        "non-grid-grasp"
+    )
+    assert report.metadata["segment_tracking"][0][
+        "adaptive_settle_succeeded"
+    ] is True
+
+
 def test_controller_settle_validates_orientation_tolerance() -> None:
     run = _ee_exchange_simulation_run()
     segment = run.plan.segments[0]
