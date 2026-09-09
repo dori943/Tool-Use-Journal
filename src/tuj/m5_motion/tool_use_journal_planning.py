@@ -635,6 +635,9 @@ class ToolUseJournalCollisionContextFactory:
         if not target:
             raise ToolUseJournalCollisionBindingError("PICK has no target object")
         _free_joint_name(request.world, target)
+        from tuj.m5_motion.support_distance import refine_support_request
+
+        request = refine_support_request(request, self.compiler)
         if request.task.metadata.get("grasp_execution_mode") == "CONTACT_FRICTION":
             return self._bind_contact_friction_pick(
                 request,

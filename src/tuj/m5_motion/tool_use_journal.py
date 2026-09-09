@@ -1370,6 +1370,19 @@ class ToolUseJournalCollisionModelCompiler:
             reference_active_ee=reference_adapter.physical_active_ee,
         )
 
+    def initial_object_clearance(self, objects, first: str, second: str) -> float | None:
+        """Measure selected support geometry at request poses without live mutation."""
+        from tuj.m5_motion.support_distance import object_pair_clearance
+
+        capture = self._captures[self.reference_active_ee]
+        if first not in capture.object_body_names or second not in capture.object_body_names:
+            return None
+        compiled = self.compile(self.reference_active_ee)
+        return object_pair_clearance(
+            compiled.model, compiled.baseline_qpos, capture.object_body_names,
+            objects, first, second,
+        )
+
     def build_ee_exchange_contexts(
         self, *, from_ee: str | None, to_ee: str
     ) -> dict[str, CollisionContext]:
