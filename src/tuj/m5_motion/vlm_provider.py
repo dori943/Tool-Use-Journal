@@ -674,6 +674,17 @@ class OpenAIKeyframeProvider:
                         }
                     if event_parameters:
                         metadata["event_parameters"] = event_parameters
+                    if (
+                        releases_resource
+                        and item.keyframe_type is KeyframeType.PLACE
+                        and held_pose_subject(request) is not None
+                    ):
+                        # Opening the gripper leaves the fingertips wrapped
+                        # around the just-released object; the first withdrawal
+                        # edge must permit that gripper<->object contact or the
+                        # release always reads as a collision.  The scripted and
+                        # packing paths set this the same way.
+                        metadata["allow_release_contact"] = True
                     if held_goal is not None:
                         if item.keyframe_type in held_goal.object_keyframe_types:
                             # These keyframes describe the held object's pose;
@@ -854,8 +865,13 @@ class OpenAIKeyframeProvider:
         except OpenAIKeyframeProviderError:
             raise
         except Exception as error:  # noqa: BLE001 - SDK error surface varies
+            # Surface the API's own reason (e.g. an unsupported parameter for a
+            # given model) so a 400 is diagnosable; the SDK message carries the
+            # error body, not the request payload.  Cap length defensively.
+            detail = str(error).replace("\n", " ")[:600]
             raise OpenAIKeyframeProviderError(
-                f"{self.provider_name} keyframe request failed ({type(error).__name__})"
+                f"{self.provider_name} keyframe request failed "
+                f"({type(error).__name__}): {detail}"
             ) from None
 
         parsed = getattr(response, "output_parsed", None)

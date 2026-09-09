@@ -1435,6 +1435,24 @@ class ToolUseJournalMotionRequestPlanner:
                 kinematics, adapter.data.qpos[adapter.robot._ref_joint_pos_indexes]
             )
         pipeline = MotionPlanningPipeline(execution_provider, kinematics)
+        # Portable (cross-environment) EE-path validation compares a template's
+        # stored canonical EEF pose against current-model forward kinematics.
+        # Every portable template records that pose in the bare-flange frame
+        # (it is commissioned with the no-gripper kinematics), so validation
+        # must evaluate the flange too.  ``kinematics`` above targets the
+        # mounted EE's grip site when one is mounted (needed for IK), which for
+        # a return/exchange template would offset the check by the whole
+        # gripper mount (~0.14 m) and reject a geometrically identical rack.
+        # Build a dedicated EE-independent flange FK for validation only; it is
+        # never used for IK or planning.
+        from tuj.m5_motion.kinematics import UR5eKinematics
+
+        try:
+            portable_validation_kinematics: Any = UR5eKinematics.from_robosuite_env(
+                env
+            )
+        except Exception:  # noqa: BLE001 - fall back to the planning kinematics
+            portable_validation_kinematics = kinematics
         factory = ToolUseJournalCollisionContextFactory(
             compiler,
             attachment_reference_name=(
@@ -1468,7 +1486,7 @@ class ToolUseJournalMotionRequestPlanner:
                 registry_root,
                 trajectory_paths=ee_attach_trajectory_paths,
             ),
-            forward_kinematics=kinematics,
+            forward_kinematics=portable_validation_kinematics,
             start_tolerance_rad=ee_attach_start_tolerance_rad,
             joint_position_limits_rad=getattr(
                 kinematics, "joint_limits_rad", None

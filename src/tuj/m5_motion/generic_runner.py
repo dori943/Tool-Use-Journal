@@ -1234,6 +1234,13 @@ def main(
             "planning_started_at_unix_s": planning_started_at_unix_s,
         },
     )
+    # The generic (non-scripted) planning path plans against the predicted
+    # world; it does not drive a live simulation session.  ``live_session`` is
+    # referenced below (as plan_executor and in the summary), and the
+    # ``if live_session is not None`` guard already treats absence as valid, so
+    # bind it to None here.  The scripted path returns earlier via
+    # execute_selected_plan_live and never reaches this block.
+    live_session = None
     planners = None
     try:
         planners = ToolUseJournalPlannerPool(

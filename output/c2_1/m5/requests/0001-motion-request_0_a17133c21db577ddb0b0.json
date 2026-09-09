@@ -1,22 +1,24 @@
 {
   "schema_version": "3.2.0",
-  "request_id": "motion-request:transition:4bffd84be89bfb55f039",
+  "request_id": "motion-request:0:a17133c21db577ddb0b0",
   "provenance": {
-    "artifact_id": "motion-request-artifact:4bffd84be89bfb55f039084d",
+    "artifact_id": "motion-request-artifact:a17133c21db577ddb0b053bb",
     "artifact_type": "MotionPlanRequest",
     "produced_by": "TASK_PLANNER",
-    "invocation_id": "task-planner:selected-plan:transition",
+    "invocation_id": "task-planner:selected-plan",
     "input_artifact_ids": [
       "task-planner:selected-plan:f33f7293258b40b6b2a754ac"
     ],
     "attempt": 1,
     "metadata": {
-      "parent_subgoal_id": "SG1_s1_d1"
+      "selected_plan_hash": "5fe770ec69655f273ffb79c3c1829a28312f15996838b1873e9bbe10d167847f",
+      "selected_plan_index": 0,
+      "candidate_id": "SG1_s1_d1-auto-2F-notool"
     }
   },
   "world": {
     "scene": {
-      "signature": "tool-use-journal:43bd6fd06070047c62ad8185eea30e3dfd10d628c5c8e66dbdbff4216188cc1d",
+      "signature": "predicted:b80cb888b100cd13d7511e0d81b2f41e46e9a6b599d35d1b6cda9bba7f641ed6",
       "completed_subgoals": [],
       "facts": []
     },
@@ -31,33 +33,33 @@
         "robot0_wrist_3_joint"
       ],
       "joint_positions_rad": [
-        -0.47,
-        -1.735,
-        2.48,
-        -2.275,
-        -1.59,
-        -1.991
+        -0.7162403697494955,
+        -1.0113641751740472,
+        1.4102680459469095,
+        -1.9697488512525638,
+        -1.570792755542656,
+        -0.7162453783763607
       ],
       "joint_velocities_rad_s": [
         0.0,
+        -0.0,
+        -0.0,
         0.0,
-        0.0,
-        0.0,
-        0.0,
+        -0.0,
         0.0
       ],
       "eef_pose": {
         "frame_id": "world",
         "position_m": [
-          -0.339676616248854,
-          -0.024686429172585827,
-          1.1265394026911992
+          -0.07399951001551441,
+          -0.3498324076416082,
+          1.1849602890998572
         ],
         "orientation_xyzw": [
-          -0.9994408881282514,
-          0.024693481922264955,
-          0.022541725481938703,
-          0.00011704812589508064
+          0.9999999996993723,
+          2.5043568701622997e-6,
+          0.000019521559833208208,
+          0.000014625061486517813
         ]
       },
       "gripper": {
@@ -187996,8 +187998,8 @@
       "environment_name": "C2_1_ObjectSorting",
       "source_revision": "113f84686d94203dbd90f1836187e351aa0b246d",
       "source_mjcf_sha256": "d0cfc56afe81b2a479a8e44536ac1cdf9d5bdc483b0f763eed0c6929e242ac42",
-      "physical_active_ee": null,
-      "declared_active_ee": null,
+      "physical_active_ee": "2F",
+      "declared_active_ee": "2F",
       "ee_metadata_matches_physics": true,
       "rack_collision_policy": "PROMOTE_IN_PLANNER_COPY",
       "robot_base_world_m": [
@@ -188011,13 +188013,13 @@
     }
   },
   "task": {
-    "task_id": "SG1_s1_d1:transition:0",
-    "subgoal_id": "SG1_s1_d1:transition:0",
-    "action_type": "EE_ATTACH",
+    "task_id": "SG1_s1_d1:SG1_s1_d1-auto-2F-notool",
+    "subgoal_id": "SG1_s1_d1",
+    "action_type": "acquire",
     "ee": "2F",
     "tool": null,
     "target_ids": [
-      "2F"
+      "spoon"
     ],
     "grasp": null,
     "goal": {
@@ -188025,30 +188027,51 @@
       "target_pose": {
         "frame_id": "world",
         "position_m": [
-          -0.073782,
-          -0.35,
-          1.0350000000000001
+          -0.04176918529313048,
+          -0.17978939495934088,
+          0.8062067098790318
         ],
         "orientation_xyzw": [
-          1.0,
-          0.0,
-          0.0,
-          0.0
+          0.049245897659559654,
+          -0.05839422771464553,
+          -0.7054357392011269,
+          0.7046455659344448
         ]
       },
       "target_joint_positions_rad": null,
-      "target_object_id": "2F",
+      "target_object_id": "spoon",
       "target_region_id": null,
       "approach_direction": null,
       "approach_distance_m": null,
       "retreat_distance_m": null
     },
     "contact": null,
-    "allowed_touch_objects": [],
+    "allowed_touch_objects": [
+      "spoon"
+    ],
     "metadata": {
-      "from_ee": null,
-      "to_ee": "2F",
+      "selected_plan_index": 0,
+      "candidate_id": "SG1_s1_d1-auto-2F-notool",
+      "description": "obj_spoon_spoon 확보",
+      "mode": null,
+      "source_binding": {
+        "?o": "spoon"
+      },
       "task_planner_steps": [
+        {
+          "step_index": 0,
+          "kind": "transition",
+          "action": "MOVE_TO_EE_RACK",
+          "parameters": {},
+          "subgoal_id": "SG1_s1_d1",
+          "candidate_id": "SG1_s1_d1-auto-2F-notool",
+          "preconditions": [],
+          "postconditions": [],
+          "cost_delta": {
+            "motion_cost": 3
+          },
+          "verification_required": false
+        },
         {
           "step_index": 1,
           "kind": "transition",
@@ -188066,8 +188089,290 @@
           ],
           "cost_delta": {},
           "verification_required": false
+        },
+        {
+          "step_index": 2,
+          "kind": "transition",
+          "action": "VERIFY_ATTACHMENT",
+          "parameters": {
+            "ee": "2F"
+          },
+          "subgoal_id": "SG1_s1_d1",
+          "candidate_id": "SG1_s1_d1-auto-2F-notool",
+          "preconditions": [],
+          "postconditions": [],
+          "cost_delta": {},
+          "verification_required": true
+        },
+        {
+          "step_index": 3,
+          "kind": "transition",
+          "action": "MOVE_TO_WORKSPACE",
+          "parameters": {
+            "subgoal": "SG1_s1_d1"
+          },
+          "subgoal_id": "SG1_s1_d1",
+          "candidate_id": "SG1_s1_d1-auto-2F-notool",
+          "preconditions": [],
+          "postconditions": [],
+          "cost_delta": {
+            "motion_cost": 1
+          },
+          "verification_required": false
+        },
+        {
+          "step_index": 4,
+          "kind": "subgoal",
+          "action": "EXECUTE_SUBGOAL",
+          "parameters": {
+            "action_parameters": {
+              "suitability": {
+                "overall_suitability": 0.9974067424695792,
+                "known_min_score": 0.9974067424695792,
+                "applicable_component_count": 1,
+                "known_component_count": 1,
+                "unknown_component_count": 0,
+                "unknown_components": [],
+                "aggregation": "minimum_applicable_margin",
+                "components": {
+                  "payload": {
+                    "status": "PASS",
+                    "score": 0.9974067424695792,
+                    "required": 0.013,
+                    "capacity": 5.0,
+                    "margin": 4.987,
+                    "unit": "kg"
+                  },
+                  "wrench": {
+                    "status": "NOT_APPLICABLE",
+                    "details": {
+                      "reason": "subgoal has no wrench requirement"
+                    }
+                  }
+                }
+              }
+            },
+            "candidate": "SG1_s1_d1-auto-2F-notool",
+            "ee": "2F",
+            "subgoal": "SG1_s1_d1",
+            "tool": null
+          },
+          "subgoal_id": "SG1_s1_d1",
+          "candidate_id": "SG1_s1_d1-auto-2F-notool",
+          "preconditions": [
+            {
+              "cond_id": "SG1_s1_d1_p0",
+              "type": "reachable",
+              "args": [
+                "spoon"
+              ],
+              "value": null,
+              "limit": null,
+              "check": null,
+              "pass": true,
+              "eval_by": "m3",
+              "depends_on": null,
+              "needs_observation": false,
+              "nl": "reachable(obj_spoon_spoon)",
+              "negated": false,
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_spoon_spoon",
+                  "reachable": true,
+                  "margin_mm": 154.9
+                }
+              ]
+            },
+            {
+              "cond_id": "SG1_s1_d1_p1",
+              "type": "top_exposed",
+              "args": [
+                "spoon"
+              ],
+              "value": null,
+              "limit": null,
+              "check": null,
+              "pass": true,
+              "eval_by": "m3",
+              "depends_on": null,
+              "needs_observation": false,
+              "nl": "top_exposed(obj_spoon_spoon)",
+              "negated": false,
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_spoon_spoon",
+                  "top_exposed": true,
+                  "blockers": []
+                }
+              ]
+            },
+            {
+              "cond_id": "SG1_s1_d1_p2",
+              "type": "ee_usable",
+              "args": [
+                "?EE",
+                "spoon"
+              ],
+              "value": null,
+              "limit": null,
+              "check": null,
+              "pass": true,
+              "eval_by": "m3",
+              "depends_on": null,
+              "needs_observation": false,
+              "nl": "ee_usable(?EE, obj_spoon_spoon)",
+              "negated": false,
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_spoon_spoon",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                }
+              ]
+            },
+            {
+              "cond_id": "SG1_s1_d1_p3",
+              "type": "graspable_on_support",
+              "args": [
+                "?EE",
+                "spoon"
+              ],
+              "value": null,
+              "limit": null,
+              "check": null,
+              "pass": true,
+              "eval_by": "m3",
+              "depends_on": null,
+              "needs_observation": false,
+              "nl": "graspable_on_support(?EE, obj_spoon_spoon)",
+              "negated": false,
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_spoon_spoon",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 28.1
+                }
+              ]
+            },
+            {
+              "cond_id": "SG1_s1_d1_p4",
+              "type": "batch_feasible",
+              "args": [
+                "?EE",
+                "spoon"
+              ],
+              "value": null,
+              "limit": null,
+              "check": null,
+              "pass": true,
+              "eval_by": "m3",
+              "depends_on": null,
+              "needs_observation": false,
+              "nl": "batch_feasible(?EE, obj_spoon_spoon)",
+              "negated": false,
+              "status": "sat",
+              "evidence": [
+                {
+                  "actor": {
+                    "type": "ee_pool"
+                  },
+                  "feasible": true,
+                  "binding_check": "ee_pool_one_per_grasp",
+                  "partition": [
+                    [
+                      "obj_spoon_spoon"
+                    ]
+                  ]
+                }
+              ]
+            },
+            {
+              "cond_id": "SG1_s1_d1_p5",
+              "type": "hand_empty",
+              "args": [],
+              "value": null,
+              "limit": null,
+              "check": null,
+              "pass": null,
+              "eval_by": "m2",
+              "depends_on": null,
+              "needs_observation": false,
+              "nl": "hand_empty",
+              "negated": false,
+              "status": null,
+              "evidence": []
+            }
+          ],
+          "postconditions": [
+            {
+              "cond_id": "SG1_s1_d1_e0",
+              "type": "holding",
+              "args": [
+                "spoon"
+              ],
+              "value": null,
+              "limit": null,
+              "check": null,
+              "pass": null,
+              "eval_by": "m2",
+              "depends_on": null,
+              "needs_observation": false,
+              "nl": "holding(obj_spoon_spoon)",
+              "negated": false,
+              "status": null,
+              "evidence": []
+            }
+          ],
+          "cost_delta": {},
+          "verification_required": false
         }
-      ]
+      ],
+      "action_parameters": {
+        "suitability": {
+          "overall_suitability": 0.9974067424695792,
+          "known_min_score": 0.9974067424695792,
+          "applicable_component_count": 1,
+          "known_component_count": 1,
+          "unknown_component_count": 0,
+          "unknown_components": [],
+          "aggregation": "minimum_applicable_margin",
+          "components": {
+            "payload": {
+              "status": "PASS",
+              "score": 0.9974067424695792,
+              "required": 0.013,
+              "capacity": 5.0,
+              "margin": 4.987,
+              "unit": "kg"
+            },
+            "wrench": {
+              "status": "NOT_APPLICABLE",
+              "details": {
+                "reason": "subgoal has no wrench requirement"
+              }
+            }
+          }
+        }
+      },
+      "grasp_execution_mode": "CONTACT_FRICTION",
+      "ee_capabilities": [
+        "contact_friction",
+        "opposed_finger_contact"
+      ],
+      "operation": "ACQUIRE",
+      "attach_target": true
     }
   },
   "constraints": {
