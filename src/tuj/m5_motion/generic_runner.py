@@ -363,7 +363,6 @@ class ToolUseJournalPlannerPool:
                 self.repository,
                 seed=self.seed,
                 ee_attach_registry_root=self.ee_attach_registry_root,
-                **({"provider": self.provider} if self.provider is not None else {}),
                 ee_attach_trajectory_paths=self.ee_attach_trajectory_paths,
                 ee_return_trajectory_paths=self.ee_return_trajectory_paths,
                 ee_attach_policy=self.ee_attach_policy,
