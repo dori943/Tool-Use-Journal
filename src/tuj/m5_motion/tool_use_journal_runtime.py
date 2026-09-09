@@ -2342,7 +2342,10 @@ class ToolUseJournalKinematicTrajectoryPlayer:
                     "require_grasp_command must be boolean"
                 )
             attachment_mode = event.parameters.get(
-                "attachment_mode", AttachmentMode.KINEMATIC.value
+                "attachment_mode",
+                AttachmentMode.BREAKABLE_WELD.value
+                if self._CONTROLLER_TRACKING
+                else AttachmentMode.KINEMATIC.value,
             )
             try:
                 mode = (
