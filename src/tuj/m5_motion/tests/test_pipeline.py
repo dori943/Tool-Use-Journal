@@ -175,6 +175,17 @@ class _OutsideReachKinematics:
         )
 
 
+class _MixedFailureKinematics(_FakeKinematics):
+    def solve_all_ik(self, position, orientation, **kwargs):
+        if float(position[0]) > 0.44:
+            return IKSolutionSet(
+                attempted_seeds=8,
+                failure_code="IK_NUMERICAL_NON_CONVERGENCE",
+                detail="no full-pose IK solution converged from deterministic seeds",
+            )
+        return super().solve_all_ik(position, orientation, **kwargs)
+
+
 class _CollisionRejectingValidator:
     def __call__(self, qpos, keyframe):
         del qpos, keyframe
@@ -210,6 +221,20 @@ class _RepairAwareCollisionValidator:
                 else "fixture_geom_a <-> fixture_geom_b clearance 0.001000 m "
                 "is below required 0.005000 m"
             ),
+        )
+
+
+class _UnstructuredCollisionValidator:
+    def __call__(self, qpos, keyframe):
+        del qpos, keyframe
+        return False
+
+    def check(self, qpos, keyframe):
+        del qpos, keyframe
+        return SimpleNamespace(
+            valid=False,
+            failure_code="COLLISION_MARGIN_VIOLATION",
+            detail="collision validator returned no numeric observation",
         )
 
 
@@ -380,6 +405,61 @@ def test_pipeline_uses_structured_collision_feedback_repair_batch() -> None:
         for attempt in result.compilation.attempts[:2]
     )
     assert result.keyframe_artifact.candidates[0].provenance.attempt_index == 2
+
+
+def test_pipeline_repairs_collision_candidates_in_mixed_failure_batch() -> None:
+    provider = _FeedbackAwareProvider()
+    pipeline = MotionPlanningPipeline(provider, _MixedFailureKinematics())
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    result = pipeline.plan(
+        _request(),
+        state_validator=_RepairAwareCollisionValidator(),
+        collision_contexts={context.context_id: context},
+        initial_collision_context_id=context.context_id,
+        final_segment_validator=lambda waypoints, selected_context: True,
+    )
+
+    assert len(provider.calls) == 2
+    feedback = provider.calls[1]
+    assert feedback is not None
+    assert [
+        item["strategy_id"] for item in feedback["failed_strategies"]
+    ] == ["sg-1:blocked"]
+    assert feedback["failed_strategies"][0]["collision_observations"]
+    assert all(
+        "connected" not in item["strategy_id"]
+        for item in feedback["failed_strategies"]
+    )
+    assert [
+        attempt.failure_code for attempt in result.compilation.attempts[:2]
+    ] == ["COLLISION_FILTERED_ALL", "IK_SEARCH_EXHAUSTED"]
+    assert result.compilation.connected is not None
+
+
+def test_pipeline_does_not_repair_without_numeric_collision_observation() -> None:
+    provider = _FeedbackAwareProvider()
+    pipeline = MotionPlanningPipeline(provider, _FakeKinematics())
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    with pytest.raises(MotionPlanningPipelineError):
+        pipeline.plan(
+            _request(),
+            state_validator=_UnstructuredCollisionValidator(),
+            collision_contexts={context.context_id: context},
+            initial_collision_context_id=context.context_id,
+            final_segment_validator=lambda waypoints, selected_context: True,
+        )
+
+    assert provider.calls == [None]
 
 
 def test_pipeline_second_repair_uses_bounded_cumulative_feedback() -> None:
