@@ -15,6 +15,7 @@ M4 는 nodes[].ee / mass_kg / geometry, roles.selected_tool, details, mutex, par
 """
 from __future__ import annotations
 
+import argparse
 import json
 import sys
 from pathlib import Path
@@ -135,10 +136,25 @@ def write_gks(out: Path, gks: list[dict]) -> list[Path]:
     return paths
 
 
+def _parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("task", nargs="?", default="c1_1")
+    parser.add_argument(
+        "--output-dir",
+        type=Path,
+        help="directory containing m1.json/m2.json and receiving gk_*.json",
+    )
+    return parser
+
+
 def main(argv=None):
-    argv = list(sys.argv[1:] if argv is None else argv)
-    name = argv[0] if argv and not argv[0].startswith("-") else "c1_1"
-    out = ROOT / "output" / name
+    args = _parser().parse_args(sys.argv[1:] if argv is None else argv)
+    name = args.task
+    out = (
+        args.output_dir.expanduser().resolve()
+        if args.output_dir is not None
+        else ROOT / "output" / name
+    )
     for f in ("m1.json", "m2.json"):
         if not (out / f).exists():
             sys.exit(f"[err] {out / f} 없음")

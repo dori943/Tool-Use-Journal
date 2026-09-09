@@ -312,7 +312,11 @@ def stage_gk(task, out):
 
     call_main(
         module,
-        [task],
+        [
+            task,
+            "--output-dir",
+            str(out),
+        ],
         "assemble_gk",
     )
 
