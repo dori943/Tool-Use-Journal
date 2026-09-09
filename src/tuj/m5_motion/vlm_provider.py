@@ -156,6 +156,20 @@ def _sha256(value: Any) -> str:
     return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
 
 
+def _model_supports_reasoning_effort(model: str) -> bool:
+    """Whether the Responses API accepts ``reasoning.effort`` for this model.
+
+    Reasoning models (o-series, gpt-5*) accept it; classic chat models such as
+    gpt-4o / gpt-4.1 reject it with a 400.  Conservative prefix allowlist so an
+    unknown reasoning model is not silently stripped of its effort setting.
+    """
+
+    name = str(model).strip().lower()
+    if "reasoning" in name:
+        return True
+    return name.startswith(("o1", "o3", "o4", "gpt-5"))
+
+
 def _without_sensitive_values(value: Any) -> Any:
     """Drop likely credential fields before any request is sent off-host."""
 
@@ -501,7 +515,9 @@ Hard rules:
   make every candidate add a high standoff that can exceed the arm's reach.
   The direct strategy's two TRANSFER keyframes are start_anchor then anchor,
   both in the supplied frame_ref with zero offset and the supplied orientation.
-- PICK strategies must include a GRASP keyframe followed by LIFT or RETREAT.
+- PICK strategies (grasping a scene object) must include a GRASP keyframe
+  followed by a LIFT keyframe that raises the grasped object clear of its
+  support; a RETREAT alone is not sufficient for an object pick.
 - PLACE strategies must include a PLACE keyframe followed by RETREAT.
 - For a PLACE of a held object into target_region_id, TRANSFER, PRE_PLACE and
   PLACE keyframes describe the HELD OBJECT's pose (same rule as transport);
@@ -608,6 +624,11 @@ class OpenAIKeyframeProvider:
             if collision_feedback is not None
             else 1
         )
+        # Which keyframes (if any) of this subgoal describe a held object's
+        # pose rather than the EEF pose; used below to tag TRANSFER/PLACE
+        # keyframes for grasp-offset retargeting.  Must be resolved before the
+        # per-candidate loop that references it.
+        held_goal = _held_goal_subject(request)
         strategies: list[KeyframePlanCandidate] = []
         strategy_ids: set[str] = set()
         rejected_candidates: list[str] = []
@@ -743,13 +764,27 @@ class OpenAIKeyframeProvider:
             picks_resource = is_acquire_task(request.task)
             releases_resource = is_release_task(request.task)
             if picks_resource:
+                # A contact-friction object pick (with_contact_friction_grasp)
+                # requires a LIFT keyframe specifically; a RETREAT does not
+                # count.  PICK_TOOL uses rack attach, not contact friction, so
+                # it still accepts LIFT or RETREAT.
+                is_tool_pick = task_operation(request.task) == "PICK_TOOL"
+                allowed_followers = (
+                    {KeyframeType.LIFT, KeyframeType.RETREAT}
+                    if is_tool_pick
+                    else {KeyframeType.LIFT}
+                )
+                followers = (
+                    kinds[kinds.index(KeyframeType.GRASP) + 1 :]
+                    if KeyframeType.GRASP in kinds
+                    else []
+                )
                 if KeyframeType.GRASP not in kinds or not any(
-                    kind in {KeyframeType.LIFT, KeyframeType.RETREAT}
-                    for kind in kinds[kinds.index(KeyframeType.GRASP) + 1 :]
+                    kind in allowed_followers for kind in followers
                 ):
                     rejected_candidates.append(
                         f"{strategy_id}: PICK requires GRASP followed by "
-                        "LIFT or RETREAT"
+                        + ("LIFT or RETREAT" if is_tool_pick else "a LIFT")
                     )
                     continue
             if releases_resource:
@@ -817,16 +852,22 @@ class OpenAIKeyframeProvider:
         )
 
     def _request_response(self, instructions: str, payload: dict[str, Any]) -> Any:
-        return self._openai_client().responses.parse(
+        request_kwargs: dict[str, Any] = dict(
             model=self.config.model,
             instructions=instructions,
             input=_canonical_json(payload),
             text_format=GeneratedKeyframeBatch,
-            reasoning={"effort": self.config.reasoning_effort},
             max_output_tokens=self.config.max_output_tokens,
             store=False,
             timeout=self.config.timeout_s,
         )
+        # ``reasoning.effort`` is only valid for reasoning models (o-series,
+        # gpt-5*).  Classic chat models such as gpt-4o reject it with a 400
+        # "Unsupported parameter: 'reasoning.effort'".  Send it only when the
+        # target model supports it so an explicit --model gpt-4o still works.
+        if _model_supports_reasoning_effort(self.config.model):
+            request_kwargs["reasoning"] = {"effort": self.config.reasoning_effort}
+        return self._openai_client().responses.parse(**request_kwargs)
 
     def generate(self, request: MotionPlanRequest) -> KeyframePlanArtifact:
         payload = _prompt_payload(request, self.config.candidate_count)
@@ -866,9 +907,21 @@ class OpenAIKeyframeProvider:
             raise
         except Exception as error:  # noqa: BLE001 - SDK error surface varies
             # Surface the API's own reason (e.g. an unsupported parameter for a
-            # given model) so a 400 is diagnosable; the SDK message carries the
-            # error body, not the request payload.  Cap length defensively.
-            detail = str(error).replace("\n", " ")[:600]
+            # given model) so a 400 is diagnosable.  The openai SDK carries the
+            # human message in .message/.body/.response, not always in str();
+            # try each.  These hold the API error body, not the request payload.
+            detail = ""
+            for source in (
+                getattr(error, "message", None),
+                getattr(error, "body", None),
+                getattr(getattr(error, "response", None), "text", None),
+                str(error),
+                repr(error),
+            ):
+                if source:
+                    detail = str(source)
+                    break
+            detail = detail.replace("\n", " ")[:800]
             raise OpenAIKeyframeProviderError(
                 f"{self.provider_name} keyframe request failed "
                 f"({type(error).__name__}): {detail}"
