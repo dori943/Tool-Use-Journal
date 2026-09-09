@@ -93,6 +93,10 @@ def assemble(m1: dict, m2: dict) -> list[dict]:
             "details": [
                 {"detail_id": d["detail_id"], "action_type": d["action_type"],
                  "binding": d.get("binding"), "group_id": d.get("group_id"),
+                 # 0909: M2 가 정한 실행 매개변수(예: 컨테이너 안 배치 자리).
+                 # 없으면 키 자체를 빼 gk 를 부풀리지 않는다.
+                 **({"action_parameters": d["action_parameters"]}
+                    if d.get("action_parameters") else {}),
                  "pre": [{k: p[k] for k in ("id", "expr", "head", "eval_by",
                                             "status", "evidence")
                           if k in p} for p in d.get("pre", [])],

@@ -232,3 +232,54 @@ def test_return_tool_is_not_grounded_as_a_region_place():
     before=request.model_dump()
     ground_held_region_goal(request)
     assert request.model_dump()==before
+
+
+def _plate_in_tray(request,half_xy=(.06,.06),thickness=.01):
+    """A plate resting at the tray center, the spot every place aims at."""
+    plate_center=REGION@np.array([.02,0,0])+REGION_POSITION
+    request.world.objects['plate']={'pose':{'frame_id':'world',
+        'position_m':plate_center.tolist(),'orientation_xyzw':[0.,0.,0.,1.]},
+        'dimensions_m':[half_xy[0]*2,half_xy[1]*2,thickness],'anchors':{'center':[0.,0.,0.]}}
+    return plate_center
+
+
+def test_place_uses_the_slot_the_plan_assigned_inside_the_region():
+    """M2 divides a shared container; the place must honour its own slot."""
+    from tuj.m5_motion.scripted_grasps.transport import ground_held_place
+    request=_tray_request(.005)
+    request.task.action_type='place'
+    request.world.objects['tray']['dimensions_m']=[.6,.4,.1]
+    _generic_held(request,ENTRIES[4].object_id)
+    request.task.metadata['action_parameters']={'placement_slot':{
+        'region':'obj_tray_tray','uv':[.5,-.5],'source':'m2_container_layout'}}
+    ground_held_place(request)
+    hint=request.task.metadata['held_place_goal']
+    destination=REGION@request.world.objects['tray']['anchors'][hint['anchor']]+REGION_POSITION
+    carried_center=destination+BODY[:3,:3]@CENTER_IN_BODY
+    tray_half=np.abs(REGION[:2,:])@np.array([.6,.4,.1])/2.
+    region_center=(REGION@np.array([.02,0,0])+REGION_POSITION)[:2]
+    expected=region_center+np.array([.5,-.5])*(tray_half-.02)
+    np.testing.assert_allclose(carried_center[:2],expected,atol=1e-9)
+
+
+def test_a_full_region_stacks_squarely_instead_of_being_driven_into_the_occupant():
+    """No free spot left: rest on the occupant's top, fully supported."""
+    from tuj.m5_motion.scripted_grasps.transport import ground_held_place
+    request=_tray_request(.005)
+    request.task.action_type='place'
+    _generic_held(request,ENTRIES[4].object_id)
+    # A plate that covers the whole tray interior — nothing can land beside it.
+    plate_center=_plate_in_tray(request,half_xy=(.14,.09),thickness=.01)
+    ground_held_place(request)
+    hint=request.task.metadata['held_place_goal']
+    destination=REGION@request.world.objects['tray']['anchors'][hint['anchor']]+REGION_POSITION
+    carried_center=destination+BODY[:3,:3]@CENTER_IN_BODY
+    my_half=np.abs(BODY[:2,:3])@LOCAL_SIZE/2.
+    # Fully on the plate, not hanging off its rim.
+    assert np.all(np.abs(carried_center[:2]-plate_center[:2])+my_half
+                  <=np.array([.14,.09])+1e-9)
+    # Released above the plate's top, not the tray floor, and clear of the margin.
+    half_height=float(np.abs(BODY[2,:3])@LOCAL_SIZE/2.)
+    plate_top=plate_center[2]+.005
+    assert carried_center[2]-half_height>=plate_top+.005-1e-9
+    assert hint['release_clearance_m']>=.01-1e-12

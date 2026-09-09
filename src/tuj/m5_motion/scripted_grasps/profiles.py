@@ -4,6 +4,39 @@ from copy import deepcopy
 from .catalog_timing import timing_xml
 
 
+def _preserve_offscreen_buffer(env):
+    """Restore the offscreen framebuffer size after the model is rebuilt.
+
+    robosuite sizes ``visual/global`` from the requested camera dimensions when
+    it first builds the environment; reloading the model here discards that and
+    leaves MuJoCo's 640x480 default. Rendering a larger frame out of a smaller
+    buffer reads past the rows that exist, which is what turned recorded video
+    into vertical-striped noise between otherwise correct frames (c3_1 at
+    960x540).
+    """
+    import xml.etree.ElementTree as ET
+
+    def largest(value, fallback):
+        if isinstance(value, (list, tuple)):
+            values = [int(item) for item in value if item]
+            return max(values) if values else fallback
+        return int(value) if value else fallback
+
+    width = largest(getattr(env, "camera_widths", None), 640)
+    height = largest(getattr(env, "camera_heights", None), 480)
+    root = getattr(getattr(env, "model", None), "root", None)
+    if root is None:
+        return
+    visual = root.find("visual")
+    if visual is None:
+        visual = ET.SubElement(root, "visual")
+    global_element = visual.find("global")
+    if global_element is None:
+        global_element = ET.SubElement(visual, "global")
+    global_element.set("offwidth", str(max(width, 640)))
+    global_element.set("offheight", str(max(height, 480)))
+
+
 def configure_environment(env, environment, ee):
     """Install the lab's numerical hand corrections before the first reset."""
     from .spoon_hand_model import repair_spoon_hand_xml, repair_spoon_parallel_2f_xml
@@ -17,10 +50,16 @@ def configure_environment(env, environment, ee):
         env.scripted_grasp_profile = {"environment": environment, "ee": ee,
             "correction": {"policy": "NATIVE_HAND", "source_assets_changed": False}}
         return env
-    if kitchen:
+    if kitchen and ee is not None:
+        # Only a run that already carries an EE may start from the scripted
+        # kitchen home. A bare start fetches its EE from the rack, and every
+        # commissioned rack path begins at TOOL_USE_JOURNAL_BARE_HOME_QPOS --
+        # overriding it here put the arm 1.99 rad from that seam and no cached
+        # path could start (c3_1: START_STATE_MISMATCH on bare->vac).
         env.robot_configs[0]["initial_qpos"] = [0., -1.8, 1.2, -.97, -1.57, 0.]
     corrected = not (environment == "C1_2_DoughFlatten" and ee == "3F")
     env._load_model()
+    _preserve_offscreen_buffer(env)
     correction = {"policy": "NATIVE_HAND", "source_assets_changed": False}
     if corrected and ee in {"2F", "3F"}:
         prefix = env.robots[0].gripper["right"].naming_prefix

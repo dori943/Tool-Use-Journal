@@ -777,6 +777,13 @@ def stage_m5(task, out, args):
                 args.m5_simulate,
                 "--headless",
             ]
+            # 재생은 계획과 같이 한 번만 돈다 — 리플레이 경로가 없으므로 영상을
+            # 그때 안 남기면 보려고 전체를 다시 돌려야 한다. 그래서 기본으로 남긴다.
+            if "--video" not in args.m5_args:
+                argv += [
+                    "--video",
+                    str(m5_dir / f"{task}.mp4"),
+                ]
 
         argv += args.m5_args
 
@@ -1035,8 +1042,10 @@ def build_parser():
         ),
         default=None,
         help=(
-            "M5 계획을 MuJoCo로 "
-            "헤드리스 재생"
+            "M5 계획을 MuJoCo로 헤드리스 재생하고 "
+            "영상을 <출력>/m5/<태스크>.mp4 로 저장. "
+            "기본은 계획만 — 재생을 켜면 계획이 실행 상태를 "
+            "따라가므로 계획만 돌릴 때와 결과가 달라진다"
         ),
     )
 
