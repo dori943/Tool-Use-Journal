@@ -29,6 +29,12 @@ def provider(batch, **config):
                                   client=client), chat
 
 
+def test_default_model_matches_supported_repository_gemini_model(monkeypatch):
+    monkeypatch.delenv("GEMINI_KEYFRAME_MODEL", raising=False)
+    assert GeminiKeyframeProviderConfig().model == "gemini-3.6-flash"
+    assert GeminiKeyframeProviderConfig.from_environment().model == "gemini-3.6-flash"
+
+
 def test_gemini_structured_output_validates_and_caches_without_secrets(tmp_path):
     p, chat = provider(_batch(), cache_dir=tmp_path)
     first = p.generate(_request())

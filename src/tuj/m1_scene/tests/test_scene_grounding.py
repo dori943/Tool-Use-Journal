@@ -707,3 +707,72 @@ def test_geometry_is_current_rejects_non_finite_ee_fields():
     del missing["surface_rms_mm"]
 
     assert not geometry_is_current(missing)
+
+
+def test_integrated_runner_propagates_supported_default_gemini_model(monkeypatch):
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[4]
+    path = root / "scripts" / "run.py"
+    spec = importlib.util.spec_from_file_location("tuj_scripts_run_model", path)
+    run_mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(run_mod)
+
+    monkeypatch.delenv("TUJ_LLM_PROVIDER", raising=False)
+    monkeypatch.delenv("TUJ_M2_MODEL", raising=False)
+    args = SimpleNamespace(provider=None, model=None)
+    run_mod._resolve_llm(args)
+
+    assert args.model == "gemini-3.6-flash"
+    assert run_mod.os.environ["TUJ_LLM_PROVIDER"] == "gemini"
+    assert run_mod.os.environ["TUJ_M2_MODEL"] == "gemini-3.6-flash"
+
+
+def test_integrated_runner_passes_resolved_model_to_m5(monkeypatch, tmp_path):
+    import importlib.util
+
+    root = Path(__file__).resolve().parents[4]
+    path = root / "scripts" / "run.py"
+    spec = importlib.util.spec_from_file_location("tuj_scripts_run_m5_model", path)
+    run_mod = importlib.util.module_from_spec(spec)
+    assert spec.loader is not None
+    spec.loader.exec_module(run_mod)
+
+    (tmp_path / "m4.json").write_text(
+        json.dumps({"selected_plan": {"plan_id": "test"}}),
+        encoding="utf-8",
+    )
+    captured = {}
+    monkeypatch.setenv("TUJ_LLM_PROVIDER", "gemini")
+    monkeypatch.setattr(run_mod, "load_script", lambda name: object())
+    monkeypatch.setattr(
+        run_mod,
+        "run_m5_runner",
+        lambda module, argv, label, m5_dir: captured.update(argv=argv),
+    )
+    args = SimpleNamespace(
+        m5_environment=None,
+        m5_physical=False,
+        seed=0,
+        m5_validate_only=False,
+        m5_simulate=None,
+        m5_args=[],
+        model="gemini-3.6-flash",
+    )
+
+    run_mod.stage_m5("c2_1", tmp_path, args)
+
+    argv = captured["argv"]
+    assert argv[argv.index("--model") + 1] == "gemini-3.6-flash"
+
+
+def test_direct_module_gemini_defaults_are_consistent(monkeypatch):
+    from tuj.m1_scene import siphy_backend
+    from tuj.m2_subgoal import rough
+
+    monkeypatch.setenv("TUJ_LLM_PROVIDER", "gemini")
+    monkeypatch.delenv("TUJ_M2_MODEL", raising=False)
+
+    assert siphy_backend._DEFAULT_GEMINI_MODEL == "gemini-3.6-flash"
+    assert rough.default_model() == "gemini-3.6-flash"
