@@ -11,6 +11,7 @@ import hashlib
 import json
 import math
 from collections.abc import Mapping, Sequence
+from glob import has_magic
 from pathlib import Path
 from typing import Any, Protocol
 
@@ -77,6 +78,10 @@ from tuj.m5_motion.vlm_provider import OpenAIKeyframeProvider
 
 _ATTACHMENT_METADATA_KEY = "attached_object_transforms"
 _CONTACT_FRICTION_HELD_METADATA_KEY = "contact_friction_held_objects"
+_BOUNDED_COLLISION_ALLOWANCES_KEY = "bounded_collision_allowances"
+_POST_SEGMENT_VALIDATION_CONTEXT_KEY = "post_segment_validation_context_id"
+_MAX_SUPPORT_PENETRATION_TOLERANCE_M = 0.001
+_DEFAULT_SUPPORT_MIN_HORIZONTAL_OVERLAP_RATIO = 0.5
 
 
 class ToolUseJournalCollisionBindingError(RuntimeError):
@@ -570,6 +575,173 @@ class ToolUseJournalCollisionContextFactory:
             f"task metadata {key!r} must be a string or list of strings"
         )
 
+    @staticmethod
+    def _metadata_nonnegative_distance(
+        request: MotionPlanRequest,
+        key: str,
+        *,
+        default: float,
+    ) -> float:
+        raw = request.task.metadata.get(key, default)
+        if (
+            isinstance(raw, bool)
+            or not isinstance(raw, (int, float))
+            or not math.isfinite(float(raw))
+            or float(raw) < 0.0
+        ):
+            raise ToolUseJournalCollisionBindingError(
+                f"task metadata {key!r} must be finite and non-negative"
+            )
+        return float(raw)
+
+    @staticmethod
+    def _metadata_unit_interval(
+        request: MotionPlanRequest,
+        key: str,
+        *,
+        default: float,
+    ) -> float:
+        raw = request.task.metadata.get(key, default)
+        if (
+            isinstance(raw, bool)
+            or not isinstance(raw, (int, float))
+            or not math.isfinite(float(raw))
+            or not 0.0 <= float(raw) <= 1.0
+        ):
+            raise ToolUseJournalCollisionBindingError(
+                f"task metadata {key!r} must be finite and within [0, 1]"
+            )
+        return float(raw)
+
+    def _pick_support_policy(
+        self,
+        request: MotionPlanRequest,
+        target: str,
+    ) -> tuple[list[str], dict[str, Any], float]:
+        """Resolve a narrowly scoped initial support contact for any PICK."""
+
+        metadata = request.task.metadata
+        minimum_overlap_ratio = self._metadata_unit_interval(
+            request,
+            "support_min_horizontal_overlap_ratio",
+            default=_DEFAULT_SUPPORT_MIN_HORIZONTAL_OVERLAP_RATIO,
+        )
+        if "support_collision_selectors" in metadata:
+            selectors = self._metadata_selectors(
+                request, "support_collision_selectors"
+            )
+            evidence: dict[str, Any] = {
+                "policy": str(
+                    metadata.get(
+                        "support_collision_policy", "EXPLICIT_TASK_METADATA"
+                    )
+                ),
+                "detection_source": str(
+                    metadata.get(
+                        "support_collision_detection_source",
+                        "task.metadata.support_collision_selectors",
+                    )
+                ),
+            }
+            for key in (
+                "support_initial_clearance_m",
+                "support_horizontal_overlap_ratio",
+                "support_min_horizontal_overlap_ratio",
+            ):
+                if key in metadata:
+                    evidence[key] = metadata[key]
+        else:
+            tolerance_m = self._metadata_nonnegative_distance(
+                request,
+                "support_contact_tolerance_m",
+                default=request.constraints.collision_margin_m,
+            )
+            from tuj.m5_motion.grasp_geometry import (
+                support_clearance_context_from_world,
+            )
+
+            support = support_clearance_context_from_world(
+                request.world.objects.get(target),
+                request.world,
+                target,
+                tolerance_m=tolerance_m,
+                minimum_horizontal_overlap_ratio=minimum_overlap_ratio,
+            )
+            if (
+                support is None
+                or support.support_id == target
+                or abs(support.under_clearance_m) > tolerance_m + 1e-9
+                or (
+                    support.source
+                    in {"world.obstacles.aabb", "world.objects.obb"}
+                    and support.horizontal_overlap_ratio + 1e-9
+                    < minimum_overlap_ratio
+                )
+            ):
+                return [], {}, 0.0
+            selectors = [support.support_id]
+            evidence = {
+                "policy": "AUTO_INITIAL_SUPPORT_V1",
+                "detection_source": support.source,
+                "support_initial_clearance_m": support.under_clearance_m,
+                "support_horizontal_overlap_ratio": (
+                    support.horizontal_overlap_ratio
+                ),
+                "support_min_horizontal_overlap_ratio": (
+                    minimum_overlap_ratio
+                ),
+            }
+
+        if not selectors:
+            return [], evidence, 0.0
+        if any(has_magic(selector) for selector in selectors):
+            raise ToolUseJournalCollisionBindingError(
+                "support_collision_selectors must use exact selectors, not patterns"
+            )
+        if target in selectors:
+            raise ToolUseJournalCollisionBindingError(
+                "support_collision_selectors cannot contain the PICK target"
+            )
+        if evidence.get("policy") == "AUTO_INITIAL_SUPPORT_V1":
+            raw_overlap = evidence.get("support_horizontal_overlap_ratio")
+            if (
+                isinstance(raw_overlap, bool)
+                or not isinstance(raw_overlap, (int, float))
+                or not math.isfinite(float(raw_overlap))
+                or float(raw_overlap) + 1e-9 < minimum_overlap_ratio
+            ):
+                raise ToolUseJournalCollisionBindingError(
+                    "automatically inferred PICK support has insufficient "
+                    "horizontal overlap"
+                )
+        maximum_penetration_m = min(
+            _MAX_SUPPORT_PENETRATION_TOLERANCE_M,
+            request.constraints.collision_margin_m,
+        )
+        raw_initial_clearance = evidence.get("support_initial_clearance_m")
+        if (
+            isinstance(raw_initial_clearance, (int, float))
+            and not isinstance(raw_initial_clearance, bool)
+            and math.isfinite(float(raw_initial_clearance))
+        ):
+            initial_penetration_m = max(0.0, -float(raw_initial_clearance))
+            if initial_penetration_m > maximum_penetration_m + 1e-9:
+                raise ToolUseJournalCollisionBindingError(
+                    "initial support penetration exceeds the 1 mm hard limit"
+                )
+        penetration_tolerance_m = self._metadata_nonnegative_distance(
+            request,
+            "support_penetration_tolerance_m",
+            default=maximum_penetration_m,
+        )
+        if penetration_tolerance_m > maximum_penetration_m + 1e-9:
+            raise ToolUseJournalCollisionBindingError(
+                "support_penetration_tolerance_m cannot exceed the smaller of "
+                "1 mm and collision_margin_m"
+            )
+        evidence["maximum_penetration_m"] = penetration_tolerance_m
+        return selectors, evidence, penetration_tolerance_m
+
     def _bind_generic_touch_policy(
         self,
         request: MotionPlanRequest,
@@ -634,7 +806,9 @@ class ToolUseJournalCollisionContextFactory:
         if not target:
             raise ToolUseJournalCollisionBindingError("PICK has no target object")
         _free_joint_name(request.world, target)
-        if request.task.metadata.get("grasp_execution_mode") == "CONTACT_FRICTION":
+        from tuj.m5_motion.physical_grasp import uses_contact_friction
+
+        if uses_contact_friction(request):
             return self._bind_contact_friction_pick(
                 request,
                 artifact,
@@ -646,12 +820,34 @@ class ToolUseJournalCollisionContextFactory:
         bound = artifact.model_copy(deep=True)
         contexts: dict[str, CollisionContext] = {base.context_id: base}
         touch_selectors = [target, *request.task.allowed_touch_objects]
+        (
+            support_selectors,
+            support_evidence,
+            support_penetration_tolerance_m,
+        ) = self._pick_support_policy(request, target)
         for candidate in bound.candidates:
             grasp = self._event_keyframe(
                 candidate,
                 KeyframeEventType.ATTACH_OBJECT,
                 KeyframeType.GRASP,
             )
+            grasp_index = candidate.keyframes.index(grasp)
+            release_index = grasp_index + 1
+            if support_selectors:
+                if release_index >= len(candidate.keyframes):
+                    raise ToolUseJournalCollisionBindingError(
+                        f"strategy {candidate.strategy_id!r} declares PICK support "
+                        "contact but has no post-grasp separation keyframe"
+                    )
+                release_keyframe = candidate.keyframes[release_index]
+                if release_keyframe.keyframe_type not in {
+                    KeyframeType.LIFT,
+                    KeyframeType.RETREAT,
+                }:
+                    raise ToolUseJournalCollisionBindingError(
+                        f"strategy {candidate.strategy_id!r} must use LIFT or "
+                        "RETREAT immediately after a supported GRASP"
+                    )
             token = _short_digest((candidate.strategy_id, grasp.keyframe_id))
             contact_id = f"grasp-contact:{target}:{token}"
             attached_id = f"object-attached:{target}:{token}"
@@ -685,9 +881,6 @@ class ToolUseJournalCollisionContextFactory:
             )
             contexts[contact_id] = contact
             contexts[attached_id] = attached
-            support_selectors = self._metadata_selectors(
-                request, "support_collision_selectors"
-            )
             if support_selectors:
                 release = attached.model_copy(
                     update={
@@ -695,24 +888,44 @@ class ToolUseJournalCollisionContextFactory:
                         "allowed_collision_pairs": self._contact_pairs(
                             target, support_selectors
                         ),
+                        "metadata": {
+                            "support_separation": {
+                                **support_evidence,
+                                "target_selector": target,
+                                "support_selectors": list(support_selectors),
+                            },
+                            _BOUNDED_COLLISION_ALLOWANCES_KEY: [
+                                {
+                                    "selectors": [target, selector],
+                                    "minimum_distance_m": (
+                                        -support_penetration_tolerance_m
+                                    ),
+                                }
+                                for selector in support_selectors
+                            ],
+                            _POST_SEGMENT_VALIDATION_CONTEXT_KEY: attached_id,
+                        },
                     }
                 )
                 contexts[release_id] = release
             else:
                 release_id = attached_id
-            current_id = base.context_id
-            first_post_grasp = True
-            for keyframe in candidate.keyframes:
+            for keyframe_index, keyframe in enumerate(candidate.keyframes):
                 keyframe.collision_context_after_events_id = None
-                if keyframe is grasp:
+                if keyframe_index < grasp_index:
+                    keyframe.collision_context_id = base.context_id
+                elif keyframe_index == grasp_index:
                     keyframe.collision_context_id = contact_id
                     keyframe.collision_context_after_events_id = release_id
-                    current_id = release_id
+                elif support_selectors and keyframe_index == release_index:
+                    keyframe.collision_context_id = release_id
+                    keyframe.collision_context_after_events_id = attached_id
+                    keyframe.metadata = {
+                        **keyframe.metadata,
+                        "validate_endpoint_after_context": True,
+                    }
                 else:
-                    keyframe.collision_context_id = current_id
-                    if current_id == release_id and first_post_grasp:
-                        first_post_grasp = False
-                        current_id = attached_id
+                    keyframe.collision_context_id = attached_id
         return _stamp_bound_artifact(request, source, bound), contexts
 
     def _bind_contact_friction_pick(

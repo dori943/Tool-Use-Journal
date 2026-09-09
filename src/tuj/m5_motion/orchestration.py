@@ -727,15 +727,21 @@ class SelectedPlanMotionOrchestrator:
                         )
                     )
                 return
+            pending_request_path: Path | None = None
+            if self._store is not None:
+                pending_request_path = self._store.save_request(
+                    request,
+                    index=len(step_request_ids),
+                )
             plan = _unwrap_plan(self._request_planner(request), request)
             requests.append(request)
             plans.append(plan)
             step_request_ids.append(request.request_id)
             if self._store is not None:
                 step_index = len(step_request_ids) - 1
-                request_paths.append(
-                    self._store.save_request(request, index=step_index)
-                )
+                if pending_request_path is None:
+                    raise RuntimeError("planned request path was not persisted")
+                request_paths.append(pending_request_path)
                 paths.append(self._store.save_plan(plan, index=step_index))
             if self._plan_executor is not None:
                 current_world = observed_completion(
