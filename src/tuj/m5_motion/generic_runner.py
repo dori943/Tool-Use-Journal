@@ -1215,14 +1215,42 @@ def main(
         planner_pool_options["provider"] = RetargetedAcquireKeyframeProvider(
             pick_keyframes
         )
+    show_viewer = not args.headless and args.video is None
+    realtime_factor = (
+        args.realtime_factor
+        if args.realtime_factor is not None
+        else (1.0 if show_viewer else 0.0)
+    )
+    video_path = (
+        args.video.expanduser().resolve() if args.video is not None else None
+    )
     planners = ToolUseJournalPlannerPool(repository_path, **planner_pool_options)
+    live_session = None
     try:
+        if simulation_mode is not None:
+            from tuj.m5_motion.live_execution import LivePlanExecutionSession
+
+            live_session = LivePlanExecutionSession.from_repository(
+                repository_path,
+                world,
+                output_dir / "simulation",
+                mode=simulation_mode,
+                seed=args.seed,
+                show_viewer=show_viewer,
+                realtime_factor=realtime_factor,
+                video=video_path,
+                camera=args.camera,
+                width=args.width,
+                height=args.height,
+                video_fps=args.video_fps,
+            )
         result = SelectedPlanMotionOrchestrator(
             planners,
             store=MotionPlanStore(output_dir),
             adapter=SelectedPlanMotionRequestAdapter(
                 acquire_task_metadata=acquire_task_metadata
             ),
+            plan_executor=live_session,
         ).plan(
             selected,
             initial_world=world,
@@ -1230,8 +1258,19 @@ def main(
             options=options,
             selected_plan_artifact_id=artifact_id,
         )
+        if live_session is not None:
+            live_session.complete(
+                video_hold_seconds=args.video_hold_seconds,
+                viewer_hold_seconds=args.hold_seconds,
+            )
+    except Exception as error:
+        if live_session is not None:
+            live_session.mark_failure(error)
+        raise
     finally:
         planners.close()
+        if live_session is not None:
+            live_session.close()
 
     summary = {
         **report,
@@ -1243,71 +1282,20 @@ def main(
         "final_scene_signature": result.final_world.scene.signature,
     }
     exit_code = 0
-    if simulation_mode is not None:
-        show_viewer = not args.headless and args.video is None
-        realtime_factor = (
-            args.realtime_factor
-            if args.realtime_factor is not None
-            else (1.0 if show_viewer else 0.0)
+    if live_session is not None:
+        summary.update(
+            {
+                "simulation_status": live_session.status,
+                "simulation_successful": live_session.status == "SUCCESS",
+                "simulation_mode": simulation_mode,
+                "simulation_run_count": live_session.run_count,
+                "simulation_report_count": live_session.report_count,
+                "simulation_manifest": str(
+                    live_session.manifest_path.resolve()
+                ),
+                "video": str(video_path) if video_path is not None else None,
+            }
         )
-        video_path = (
-            args.video.expanduser().resolve() if args.video is not None else None
-        )
-        try:
-            execution = execute_planning_result(
-                result,
-                repository=repository_path,
-                initial_world=world,
-                output_dir=output_dir,
-                mode=simulation_mode,
-                seed=args.seed,
-                show_viewer=show_viewer,
-                realtime_factor=realtime_factor,
-                hold_seconds=args.hold_seconds,
-                video=video_path,
-                camera=args.camera,
-                width=args.width,
-                height=args.height,
-                video_fps=args.video_fps,
-                video_hold_seconds=args.video_hold_seconds,
-            )
-        except GenericMotionRunnerError as error:
-            summary.update(
-                {
-                    "status": "SIMULATION_SETUP_FAILED",
-                    "simulation_status": "SIMULATION_SETUP_FAILED",
-                    "simulation_successful": False,
-                    "simulation_mode": simulation_mode,
-                    "simulation_detail": str(error),
-                    "video": str(video_path) if video_path is not None else None,
-                }
-            )
-            exit_code = 2
-        else:
-            summary.update(
-                {
-                    "status": (
-                        "SUCCESS"
-                        if execution.successful
-                        else execution.status.value
-                    ),
-                    "simulation_status": execution.status.value,
-                    "simulation_successful": execution.successful,
-                    "simulation_mode": simulation_mode,
-                    "simulation_run_count": len(execution.runs),
-                    "simulation_report_count": len(execution.reports),
-                    "simulation_manifest": (
-                        str(execution.manifest_path)
-                        if execution.manifest_path is not None
-                        else None
-                    ),
-                    "video": str(video_path) if video_path is not None else None,
-                }
-            )
-            if not execution.successful:
-                summary["simulation_detail"] = execution.detail
-                summary["simulation_failed_index"] = execution.failed_index
-                exit_code = 2
     summary_path = output_dir / "m5_summary.json"
     summary_path.write_text(
         json.dumps(summary, ensure_ascii=False, indent=2),
