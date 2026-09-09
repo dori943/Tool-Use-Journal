@@ -730,6 +730,68 @@ def test_controller_collision_check_stride_must_be_positive() -> None:
         )
 
 
+def test_controller_endpoint_event_group_waits_for_settle() -> None:
+    run = _ee_exchange_simulation_run()
+    segment = run.plan.segments[0]
+    segment.metadata["motion_end_time_s"] = segment.end_time_s
+    segment.metadata["tracking_settle"] = {
+        "eef_tolerance_m": 0.005,
+        "eef_orientation_tolerance_rad": 0.05,
+    }
+    events = [
+        TrajectoryEvent(
+            event_id="diagnostic-first",
+            time_from_start_s=segment.end_time_s,
+            event_type=EventType.WAIT,
+        ),
+        TrajectoryEvent(
+            event_id="grip-second",
+            time_from_start_s=segment.end_time_s,
+            event_type=EventType.GRIPPER_CLOSE,
+        ),
+    ]
+
+    assert ToolUseJournalControllerTrajectoryPlayer._event_group_waits_for_settle(
+        run.plan, events, 0, {}
+    )
+    assert not ToolUseJournalControllerTrajectoryPlayer._event_group_waits_for_settle(
+        run.plan,
+        events,
+        0,
+        {segment.segment_id: {"settled": True}},
+    )
+
+
+def test_controller_settle_validates_orientation_tolerance() -> None:
+    run = _ee_exchange_simulation_run()
+    segment = run.plan.segments[0]
+    segment.metadata["tracking_settle"] = {
+        "eef_orientation_tolerance_rad": 0.05,
+    }
+
+    assert ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+        segment
+    ) == {
+        "eef_orientation_tolerance_rad": 0.05,
+        "max_wait_s": 2.0,
+        "required_consecutive_ticks": 3,
+    }
+    assert ToolUseJournalControllerTrajectoryPlayer._eef_orientation_error_rad(
+        (0.0, 0.0, 0.0, 1.0), np.eye(3)
+    ) == pytest.approx(0.0)
+    angle = 0.1
+    actual = np.asarray(
+        [
+            [np.cos(angle), -np.sin(angle), 0.0],
+            [np.sin(angle), np.cos(angle), 0.0],
+            [0.0, 0.0, 1.0],
+        ]
+    )
+    assert ToolUseJournalControllerTrajectoryPlayer._eef_orientation_error_rad(
+        (0.0, 0.0, 0.0, 1.0), actual
+    ) == pytest.approx(angle)
+
+
 def test_live_joint_controller_gains_can_be_retuned_between_phases() -> None:
     runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
     controller = SimpleNamespace(name="JOINT_POSITION", control_dim=6)
