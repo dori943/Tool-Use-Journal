@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import hashlib
+import math
+import re
 from dataclasses import dataclass, replace
 from typing import Mapping, Protocol
 
@@ -91,6 +93,277 @@ class MotionPlanningResult:
     keyframe_artifact: KeyframePlanArtifact
     compilation: StrategyCompilationResult
     plan: MotionPlan
+
+
+_COLLISION_REPAIR_FEEDBACK_KEY = "collision_repair_feedback"
+_COLLISION_REPAIR_CONTRACT = "COLLISION_REPAIR_V1"
+_MAX_COLLISION_REPAIR_BATCHES = 2
+_MAX_COLLISION_STRATEGIES_PER_BATCH = 4
+_MAX_COLLISION_HISTORY_STRATEGIES = 8
+_COLLISION_OBSERVATION = re.compile(
+    r"COLLISION_MARGIN_VIOLATION:\s*"
+    r"(?P<geometry_a>.+?)\s*<->\s*(?P<geometry_b>.+?)\s*"
+    r"clearance\s+(?P<clearance>[-+0-9.eE]+)\s*m\s*"
+    r"is below required\s+(?P<required>[-+0-9.eE]+)\s*m"
+)
+
+
+def _safe_collision_label(value: object, *, limit: int = 160) -> str:
+    """Keep validator identifiers as inert labels in the repair payload."""
+
+    rendered = str(value)[:limit]
+    if re.fullmatch(r"[A-Za-z0-9_.:+/\\-]+", rendered):
+        return rendered
+    digest = hashlib.sha256(rendered.encode("utf-8")).hexdigest()[:16]
+    return f"label_{digest}"
+
+
+def _collision_repair_attempt(request: MotionPlanRequest) -> int:
+    raw = request.task.metadata.get(_COLLISION_REPAIR_FEEDBACK_KEY)
+    if not isinstance(raw, Mapping):
+        return 0
+    try:
+        attempt = int(raw.get("repair_attempt", 0))
+    except (TypeError, ValueError):
+        return 0
+    return max(0, attempt)
+
+
+def _provider_supports_collision_feedback(provider: object) -> bool:
+    """Follow the small provider-decorator chain used by the production runner."""
+
+    pending = [provider]
+    seen: set[int] = set()
+    while pending:
+        current = pending.pop()
+        identity = id(current)
+        if identity in seen:
+            continue
+        seen.add(identity)
+        if bool(getattr(current, "supports_collision_feedback", False)):
+            return True
+        for attribute in ("_provider", "_default", "provider", "default_provider"):
+            nested = getattr(current, attribute, None)
+            if nested is not None:
+                pending.append(nested)
+    return False
+
+
+def _is_collision_terminal(attempt: StrategyAttempt) -> bool:
+    return bool(
+        attempt.failure_code == "COLLISION_FILTERED_ALL"
+        or (
+            attempt.failure_code == "FINAL_VALIDATION_FAILED"
+            and "COLLISION" in attempt.detail.upper()
+        )
+    )
+
+
+def _structured_collision_observations(
+    attempt: StrategyAttempt,
+) -> list[dict[str, object]]:
+    """Extract only bounded numeric observations owned by the validator."""
+
+    if not _is_collision_terminal(attempt):
+        return []
+    details = [attempt.detail]
+    details.extend(
+        diagnostic.validity_detail
+        for diagnostic in attempt.ik_diagnostics[:12]
+    )
+    observations: list[dict[str, object]] = []
+    observed: set[tuple[str, str, float, float]] = set()
+    for detail in details:
+        for match in _COLLISION_OBSERVATION.finditer(detail):
+            try:
+                clearance = float(match.group("clearance"))
+                required = float(match.group("required"))
+            except ValueError:
+                continue
+            if (
+                not math.isfinite(clearance)
+                or not math.isfinite(required)
+                or required < 0.0
+            ):
+                continue
+            item = (
+                _safe_collision_label(match.group("geometry_a")),
+                _safe_collision_label(match.group("geometry_b")),
+                clearance,
+                required,
+            )
+            if item in observed:
+                continue
+            observed.add(item)
+            observations.append(
+                {
+                    "geometry_a": item[0],
+                    "geometry_b": item[1],
+                    "measured_clearance_m": item[2],
+                    "required_clearance_m": item[3],
+                }
+            )
+            if len(observations) >= 8:
+                return observations
+    return observations
+
+
+def _collision_repair_eligible(compilation: StrategyCompilationResult) -> bool:
+    """Retry when at least one terminal candidate has structured collision data."""
+
+    return any(
+        _structured_collision_observations(attempt)
+        for attempt in compilation.attempts
+    )
+
+
+def _bounded_prior_collision_strategy(
+    source: Mapping[object, object],
+    *,
+    current_repair_attempt: int,
+) -> dict[str, object] | None:
+    """Revalidate one earlier internal record before cumulative reuse."""
+
+    try:
+        source_attempt = int(source.get("source_repair_attempt", -1))
+    except (TypeError, ValueError):
+        return None
+    if source_attempt < 0 or source_attempt >= current_repair_attempt:
+        return None
+    diagnostics: list[dict[str, object]] = []
+    raw_diagnostics = source.get("ik_diagnostics", [])
+    if isinstance(raw_diagnostics, list):
+        for diagnostic in raw_diagnostics[:12]:
+            if not isinstance(diagnostic, Mapping):
+                continue
+            try:
+                raw_count = int(diagnostic.get("raw_ik_branch_count", -1))
+                valid_count = int(diagnostic.get("valid_ik_branch_count", -1))
+            except (TypeError, ValueError):
+                continue
+            if raw_count < 0 or valid_count < 0 or valid_count > raw_count:
+                continue
+            diagnostics.append(
+                {
+                    "keyframe_id": _safe_collision_label(
+                        diagnostic.get("keyframe_id", "unknown")
+                    ),
+                    "raw_ik_branch_count": raw_count,
+                    "valid_ik_branch_count": valid_count,
+                }
+            )
+    observations: list[dict[str, object]] = []
+    raw_observations = source.get("collision_observations", [])
+    if isinstance(raw_observations, list):
+        for observation in raw_observations[:8]:
+            if not isinstance(observation, Mapping):
+                continue
+            try:
+                clearance = float(observation.get("measured_clearance_m"))
+                required = float(observation.get("required_clearance_m"))
+            except (TypeError, ValueError):
+                continue
+            if (
+                not math.isfinite(clearance)
+                or not math.isfinite(required)
+                or required < 0.0
+            ):
+                continue
+            observations.append(
+                {
+                    "geometry_a": _safe_collision_label(
+                        observation.get("geometry_a", "unknown")
+                    ),
+                    "geometry_b": _safe_collision_label(
+                        observation.get("geometry_b", "unknown")
+                    ),
+                    "measured_clearance_m": clearance,
+                    "required_clearance_m": required,
+                }
+            )
+    if not observations:
+        return None
+    return {
+        "source_repair_attempt": source_attempt,
+        "strategy_id": _safe_collision_label(
+            source.get("strategy_id", "unknown")
+        ),
+        "failure_code": _safe_collision_label(
+            source.get("failure_code", "unknown")
+        ),
+        "ik_diagnostics": diagnostics,
+        "collision_observations": observations,
+    }
+
+
+def _collision_repair_feedback(
+    request: MotionPlanRequest,
+    compilation: StrategyCompilationResult,
+) -> dict[str, object]:
+    """Build bounded, validator-owned data for one new proposal batch.
+
+    Free-form diagnostic text is deliberately not returned to the model. Only
+    parsed collision measurements and fixed-shape IK counts cross the boundary.
+    """
+
+    source_repair_attempt = _collision_repair_attempt(request)
+    strategies: list[dict[str, object]] = []
+    previous_feedback = request.task.metadata.get(_COLLISION_REPAIR_FEEDBACK_KEY)
+    if (
+        isinstance(previous_feedback, Mapping)
+        and previous_feedback.get("contract_version")
+        == _COLLISION_REPAIR_CONTRACT
+    ):
+        previous_strategies = previous_feedback.get("failed_strategies")
+        if isinstance(previous_strategies, list):
+            for source in previous_strategies[
+                :_MAX_COLLISION_STRATEGIES_PER_BATCH
+            ]:
+                if not isinstance(source, Mapping):
+                    continue
+                prior = _bounded_prior_collision_strategy(
+                    source,
+                    current_repair_attempt=source_repair_attempt,
+                )
+                if prior is not None:
+                    strategies.append(prior)
+    collision_attempts = [
+        attempt
+        for attempt in compilation.attempts
+        if _structured_collision_observations(attempt)
+    ][:_MAX_COLLISION_STRATEGIES_PER_BATCH]
+    for attempt in collision_attempts:
+        diagnostics: list[dict[str, object]] = []
+        for diagnostic in attempt.ik_diagnostics[:12]:
+            if diagnostic.valid_ik_count >= diagnostic.raw_ik_count:
+                continue
+            diagnostics.append(
+                {
+                    "keyframe_id": _safe_collision_label(diagnostic.keyframe_id),
+                    "raw_ik_branch_count": int(diagnostic.raw_ik_count),
+                    "valid_ik_branch_count": int(diagnostic.valid_ik_count),
+                }
+            )
+        strategies.append(
+            {
+                "source_repair_attempt": source_repair_attempt,
+                "strategy_id": _safe_collision_label(attempt.strategy_id),
+                "failure_code": str(attempt.failure_code),
+                "ik_diagnostics": diagnostics,
+                "collision_observations": _structured_collision_observations(
+                    attempt
+                ),
+            }
+        )
+    return {
+        "contract_version": _COLLISION_REPAIR_CONTRACT,
+        "repair_attempt": _collision_repair_attempt(request) + 1,
+        "maximum_repair_attempts": _MAX_COLLISION_REPAIR_BATCHES,
+        "required_collision_margin_m": float(
+            request.constraints.collision_margin_m
+        ),
+        "failed_strategies": strategies[:_MAX_COLLISION_HISTORY_STRATEGIES],
+    }
 
 
 class MotionPlanningPipeline:
@@ -434,6 +707,67 @@ class MotionPlanningPipeline:
             f"{message}: {failures}",
             compilation=compilation,
         )
+        repair_attempt = _collision_repair_attempt(request)
+        if (
+            repair_attempt < _MAX_COLLISION_REPAIR_BATCHES
+            and _provider_supports_collision_feedback(self._provider)
+            and _collision_repair_eligible(compilation)
+        ):
+            retry_request = request.model_copy(deep=True)
+            retry_request.task.metadata = {
+                **retry_request.task.metadata,
+                _COLLISION_REPAIR_FEEDBACK_KEY: _collision_repair_feedback(
+                    request,
+                    compilation,
+                ),
+            }
+            retry_arguments = {
+                "edge_planner": edge_planner,
+            }
+            if collision_context_factory is not None:
+                retry_arguments["collision_context_factory"] = (
+                    collision_context_factory
+                )
+            else:
+                retry_arguments.update(
+                    {
+                        "state_validator": state_validator,
+                        "collision_contexts": collision_contexts,
+                        "initial_collision_context_id": (
+                            initial_collision_context_id
+                        ),
+                        "final_segment_validator": final_segment_validator,
+                    }
+                )
+            try:
+                repaired = self.plan(retry_request, **retry_arguments)
+            except MotionPlanningPipelineError as repair_error:
+                repair_compilation = repair_error.compilation
+                combined_attempts = compilation.attempts + (
+                    repair_compilation.attempts
+                    if repair_compilation is not None
+                    else ()
+                )
+                raise MotionPlanningPipelineError(
+                    "collision-feedback repair exhausted after "
+                    f"{_MAX_COLLISION_REPAIR_BATCHES} additional batch: "
+                    f"{repair_error}",
+                    compilation=StrategyCompilationResult(
+                        connected=None,
+                        attempts=combined_attempts,
+                    ),
+                ) from repair_error
+            return MotionPlanningResult(
+                keyframe_artifact=repaired.keyframe_artifact,
+                compilation=StrategyCompilationResult(
+                    connected=repaired.compilation.connected,
+                    attempts=(
+                        compilation.attempts
+                        + repaired.compilation.attempts
+                    ),
+                ),
+                plan=repaired.plan,
+            )
         if last_build_error is not None:
             raise error from last_build_error
         raise error

@@ -1245,6 +1245,7 @@ def main(
             adapter=SelectedPlanMotionRequestAdapter(
                 acquire_task_metadata=acquire_task_metadata
             ),
+            plan_executor=live_session,
         ).plan(
             selected,
             initial_world=world,
@@ -1281,15 +1282,19 @@ def main(
         "final_scene_signature": result.final_world.scene.signature,
     }
     exit_code = 0
-    if simulation_mode is not None:
-        show_viewer = not args.headless and args.video is None
-        realtime_factor = (
-            args.realtime_factor
-            if args.realtime_factor is not None
-            else (1.0 if show_viewer else 0.0)
-        )
-        video_path = (
-            args.video.expanduser().resolve() if args.video is not None else None
+    if live_session is not None:
+        summary.update(
+            {
+                "simulation_status": live_session.status,
+                "simulation_successful": live_session.status == "SUCCESS",
+                "simulation_mode": simulation_mode,
+                "simulation_run_count": live_session.run_count,
+                "simulation_report_count": live_session.report_count,
+                "simulation_manifest": str(
+                    live_session.manifest_path.resolve()
+                ),
+                "video": str(video_path) if video_path is not None else None,
+            }
         )
         try:
             execution = execute_planning_result(

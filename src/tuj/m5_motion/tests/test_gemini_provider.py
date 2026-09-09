@@ -29,6 +29,12 @@ def provider(batch, **config):
                                   client=client), chat
 
 
+def test_default_model_matches_supported_repository_gemini_model(monkeypatch):
+    monkeypatch.delenv("GEMINI_KEYFRAME_MODEL", raising=False)
+    assert GeminiKeyframeProviderConfig().model == "gemini-3.6-flash"
+    assert GeminiKeyframeProviderConfig.from_environment().model == "gemini-3.6-flash"
+
+
 def test_gemini_structured_output_validates_and_caches_without_secrets(tmp_path):
     p, chat = provider(_batch(), cache_dir=tmp_path)
     first = p.generate(_request())
@@ -38,7 +44,7 @@ def test_gemini_structured_output_validates_and_caches_without_secrets(tmp_path)
     assert '"additionalProperties":false' in chat.calls[0]["messages"][0]["content"]
     assert "must-not-leave-the-process" not in str(chat.calls)
     assert first.provenance.metadata["provider"] == "gemini"
-    assert first.candidates[0].provenance.generator_id == "GEMINI_KEYFRAME_STRATEGY_JSON_V2"
+    assert first.candidates[0].provenance.generator_id == "GEMINI_KEYFRAME_STRATEGY_JSON_V5"
     assert first.candidates[0].provenance.provider_request_id == "gemini-request-1"
 
 

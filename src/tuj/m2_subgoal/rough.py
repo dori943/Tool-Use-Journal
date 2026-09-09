@@ -355,7 +355,7 @@ def validate_selection(sel: list[dict], subgoals: list[dict], ids: list[str]) ->
 #   TUJ_M2_MODEL     = 모델 id 강제 지정 (미지정 시 제공자별 기본값)
 #   GEMINI_API_KEY / OPENAI_API_KEY
 _GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
-_DEFAULT_MODEL = {"gemini": "gemini-3.8-flash", "openai": "gpt-4o"}
+_DEFAULT_MODEL = {"gemini": "gemini-3.6-flash", "openai": "gpt-4o"}
 
 
 def llm_provider() -> str:
