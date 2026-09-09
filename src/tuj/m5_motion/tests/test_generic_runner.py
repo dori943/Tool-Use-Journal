@@ -428,6 +428,8 @@ def test_generic_cli_plans_with_request_backend_and_writes_manifest(
 def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
     tmp_path, monkeypatch
 ) -> None:
+    from tuj.m5_motion import live_execution
+
     task_path = tmp_path / "video_task.json"
     task_path.write_text(
         json.dumps(
@@ -444,18 +446,36 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
     video_path = tmp_path / "run.mp4"
     observed: dict[str, object] = {}
 
-    def fake_execute(planning, **kwargs):
-        observed["planning"] = planning
+    class FakeLiveSession:
+        status = "IN_PROGRESS"
+        run_count = 0
+        report_count = 0
+        manifest_path = output_dir / "simulation" / "live-execution-manifest.json"
+
+        def __call__(self, request, plan):
+            self.run_count += 1
+            self.report_count += 1
+            world = request.world.model_copy(deep=True)
+            world.robot_state = plan.expected_final_state.model_copy(deep=True)
+            return world
+
+        def complete(self, **kwargs):
+            observed["complete"] = kwargs
+            self.status = "SUCCESS"
+
+        def mark_failure(self, error):
+            observed["failure"] = error
+            self.status = "FAILED"
+
+        def close(self):
+            observed["closed"] = True
+
+    def fake_from_repository(repository, initial_world, session_output, **kwargs):
         observed.update(kwargs)
-        return SimpleNamespace(
-            successful=True,
-            status=SimpleNamespace(value="SUCCESS"),
-            runs=(object(), object()),
-            reports=(object(), object()),
-            manifest_path=output_dir / "simulation" / "simulation-manifest.json",
-            detail="ok",
-            failed_index=None,
-        )
+        observed["repository"] = repository
+        observed["initial_world"] = initial_world
+        observed["output_dir"] = session_output
+        return FakeLiveSession()
 
     monkeypatch.setattr(
         generic_runner,
@@ -463,9 +483,9 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
         _FakePlannerPool,
     )
     monkeypatch.setattr(
-        generic_runner,
-        "execute_planning_result",
-        fake_execute,
+        live_execution.LivePlanExecutionSession,
+        "from_repository",
+        fake_from_repository,
     )
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-key")
 
@@ -486,6 +506,7 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
     assert observed["mode"] == "controller"
     assert observed["show_viewer"] is False
     assert observed["video"] == video_path.resolve()
+    assert observed["closed"] is True
     summary = json.loads(
         (output_dir / "m5_summary.json").read_text(encoding="utf-8")
     )
