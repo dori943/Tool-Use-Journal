@@ -21,6 +21,7 @@ from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
 from tuj.m5_motion.geometry import GeometryResolutionError, RelativePoseResolver
 from tuj.m5_motion.schema import (
+    AttachedObjectTransform,
     ArtifactProvenance,
     KeyframePlanArtifact,
     KeyframePlanCandidate,
@@ -42,7 +43,7 @@ from tuj.m5_motion.task_semantics import (
 )
 
 
-_PROMPT_VERSION = "OPENAI_KEYFRAME_STRATEGY_V4"
+_PROMPT_VERSION = "OPENAI_KEYFRAME_STRATEGY_V5"
 _SENSITIVE_KEYS = {
     "api_key",
     "apikey",
@@ -178,6 +179,59 @@ def _finite_feedback_number(value: object) -> float | None:
     except (TypeError, ValueError):
         return None
     return number if math.isfinite(number) else None
+
+
+_ATTACHMENT_TRANSFORM_FIELDS = (
+    "object_id",
+    "free_joint_name",
+    "reference_kind",
+    "reference_name",
+    "position_in_reference_m",
+    "orientation_in_reference_xyzw",
+)
+
+
+def _matching_attachment_transform(
+    source: object,
+    object_id: str,
+) -> dict[str, Any] | None:
+    if not isinstance(source, Mapping):
+        return None
+    raw = source.get(object_id)
+    if not isinstance(raw, Mapping):
+        return None
+    whitelisted = {
+        field: raw.get(field)
+        for field in _ATTACHMENT_TRANSFORM_FIELDS
+        if field in raw
+    }
+    try:
+        transform = AttachedObjectTransform.model_validate(whitelisted)
+    except (TypeError, ValueError):
+        return None
+    if transform.object_id != object_id:
+        return None
+    return transform.model_dump(mode="json")
+
+
+def _held_object_grasp_payload(request: MotionPlanRequest) -> dict[str, Any]:
+    state = request.world.robot_state
+    metadata = request.world.metadata
+    if state.attached_object_id is not None:
+        object_id = state.attached_object_id
+        sources = (
+            metadata.get("attached_object_transforms"),
+            metadata.get("contact_friction_held_objects"),
+        )
+    elif state.held_tool_id is not None:
+        object_id = state.held_tool_id
+        sources = (metadata.get("contact_friction_held_objects"),)
+    else:
+        return {}
+    for source in sources:
+        if transform := _matching_attachment_transform(source, object_id):
+            return transform
+    return {}
 
 
 def _collision_repair_feedback_payload(
@@ -330,7 +384,7 @@ def _prompt_payload(request: MotionPlanRequest, candidate_count: int) -> dict[st
         "candidate_count": candidate_count,
         "task": task,
         "world": world,
-        "held_object_grasp": request.world.metadata.get("contact_friction_held_objects", {}),
+        "held_object_grasp": _held_object_grasp_payload(request),
         "held_transport_goal": request.task.metadata.get("held_transport_goal"),
         "allowed_frames_and_anchors": _frame_catalog(request),
         "constraints": {
@@ -368,6 +422,10 @@ Hard rules:
   regrasp its current center. Route the held object to target_region_id.
   This subgoal ONLY transports: use TRANSFER keyframes, keep holding, and stop
   at the destination. PLACE, PRE_PLACE and RETREAT belong to later subgoals.
+- Every generated keyframe denotes the EEF/TCP pose. When held_object_grasp is
+  present, the deterministic validator projects the held tool from that EEF by
+  the supplied reference transform. Account for the entire held-tool envelope
+  around obstacles; do not reinterpret keyframes as held-object-center poses.
 - When held_transport_goal is supplied, its anchor is the measured grasp-offset
   corrected EEF destination above that region. End every strategy at exactly
   that frame_ref/anchor with zero offset. Preserve its approach axis, tool axis,

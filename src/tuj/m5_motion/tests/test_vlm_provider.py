@@ -251,6 +251,17 @@ class _FakeClient:
         self.responses = _FakeResponses(parsed)
 
 
+def _attachment_transform(object_id: str, *, x_m: float) -> dict[str, object]:
+    return {
+        "object_id": object_id,
+        "free_joint_name": f"{object_id}_joint",
+        "reference_kind": "site",
+        "reference_name": "grip_site",
+        "position_in_reference_m": [x_m, 0.0, 0.0],
+        "orientation_in_reference_xyzw": [0.0, 0.0, 0.0, 1.0],
+    }
+
+
 def test_structured_openai_response_becomes_validated_artifact(tmp_path) -> None:
     client = _FakeClient(_batch())
     provider = OpenAIKeyframeProvider(
@@ -273,6 +284,87 @@ def test_structured_openai_response_becomes_validated_artifact(tmp_path) -> None
     assert call["text_format"] is GeneratedKeyframeBatch
     assert call["store"] is False
     assert "must-not-leave-the-process" not in call["input"]
+
+
+def test_payload_prefers_matching_rigid_attachment_transform() -> None:
+    request = _request()
+    request.world.robot_state.attached_object_id = "bottle"
+    request.world.robot_state.held_tool_id = "bottle"
+    rigid = _attachment_transform("bottle", x_m=0.01)
+    rigid["api_key"] = "must-not-cross-provider-boundary"
+    request.world.metadata = {
+        "attached_object_transforms": {"bottle": rigid},
+        "contact_friction_held_objects": {
+            "bottle": _attachment_transform("bottle", x_m=0.02)
+        },
+    }
+    client = _FakeClient(_batch())
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=client,
+    )
+
+    provider.generate(request)
+
+    call = client.responses.calls[0]
+    payload = json.loads(call["input"])
+    assert payload["held_object_grasp"]["position_in_reference_m"] == [
+        0.01,
+        0.0,
+        0.0,
+    ]
+    assert "must-not-cross-provider-boundary" not in call["input"]
+    assert "Every generated keyframe denotes the EEF/TCP pose" in call[
+        "instructions"
+    ]
+
+
+def test_payload_falls_back_to_matching_contact_friction_transform() -> None:
+    request = _request()
+    request.world.robot_state.attached_object_id = "bottle"
+    request.world.robot_state.held_tool_id = "bottle"
+    request.world.metadata = {
+        "attached_object_transforms": {},
+        "contact_friction_held_objects": {
+            "bottle": _attachment_transform("bottle", x_m=0.02)
+        },
+    }
+    client = _FakeClient(_batch())
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=client,
+    )
+
+    provider.generate(request)
+
+    payload = json.loads(client.responses.calls[0]["input"])
+    assert payload["held_object_grasp"]["position_in_reference_m"] == [
+        0.02,
+        0.0,
+        0.0,
+    ]
+
+
+def test_payload_omits_mismatched_attachment_transform() -> None:
+    request = _request()
+    request.world.robot_state.attached_object_id = "bottle"
+    request.world.robot_state.held_tool_id = "bottle"
+    request.world.metadata = {
+        "attached_object_transforms": {
+            "bottle": _attachment_transform("other", x_m=0.01),
+            "other": _attachment_transform("other", x_m=0.02),
+        }
+    }
+    client = _FakeClient(_batch())
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=client,
+    )
+
+    provider.generate(request)
+
+    payload = json.loads(client.responses.calls[0]["input"])
+    assert payload["held_object_grasp"] == {}
 
 
 def test_identical_request_reuses_frozen_artifact_cache(tmp_path) -> None:
