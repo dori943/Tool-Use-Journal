@@ -1234,6 +1234,40 @@ def main(
             "planning_started_at_unix_s": planning_started_at_unix_s,
         },
     )
+    # 0909: live_session 생성이 누락되어 있었다. 계획 중 각 플랜을 실행하는
+    # plan_executor 로 넘기며, 시뮬레이션을 요청하지 않으면 None 이다.
+    video_path = (
+        args.video.expanduser().resolve() if args.video is not None else None
+    )
+    show_viewer = (
+        simulation_mode is not None
+        and not args.headless
+        and video_path is None
+    )
+    realtime_factor = (
+        args.realtime_factor
+        if args.realtime_factor is not None
+        else (1.0 if show_viewer else 0.0)
+    )
+    live_session = None
+    if simulation_mode is not None:
+        from tuj.m5_motion.live_execution import LivePlanExecutionSession
+
+        live_session = LivePlanExecutionSession.from_repository(
+            repository_path,
+            world,
+            output_dir / "simulation",
+            mode=simulation_mode,
+            seed=args.seed,
+            show_viewer=show_viewer,
+            realtime_factor=realtime_factor,
+            video=video_path,
+            camera=args.camera,
+            width=args.width,
+            height=args.height,
+            video_fps=args.video_fps,
+        )
+
     planners = None
     try:
         planners = ToolUseJournalPlannerPool(
@@ -1267,6 +1301,8 @@ def main(
                 "detail": str(error),
             },
         )
+        if live_session is not None:
+            live_session.mark_failure(error)
         raise
     finally:
         if planners is not None:
@@ -1281,44 +1317,22 @@ def main(
         "manifest": str(result.manifest_path) if result.manifest_path else None,
         "final_scene_signature": result.final_world.scene.signature,
     }
+    from tuj.m5_motion.live_execution import LivePlanExecutionError
+
     exit_code = 0
     if live_session is not None:
-        summary.update(
-            {
-                "simulation_status": live_session.status,
-                "simulation_successful": live_session.status == "SUCCESS",
-                "simulation_mode": simulation_mode,
-                "simulation_run_count": live_session.run_count,
-                "simulation_report_count": live_session.report_count,
-                "simulation_manifest": str(
-                    live_session.manifest_path.resolve()
-                ),
-                "video": str(video_path) if video_path is not None else None,
-            }
-        )
+        # 계획 단계에서 plan_executor 로 이미 실행했으므로 여기서는 마무리만 한다.
+        # 종전에는 execute_planning_result 로 한 번 더 실행하는 블록이 남아 있었다.
         try:
-            execution = execute_planning_result(
-                result,
-                repository=repository_path,
-                initial_world=world,
-                output_dir=output_dir,
-                mode=simulation_mode,
-                seed=args.seed,
-                show_viewer=show_viewer,
-                realtime_factor=realtime_factor,
-                hold_seconds=args.hold_seconds,
-                video=video_path,
-                camera=args.camera,
-                width=args.width,
-                height=args.height,
-                video_fps=args.video_fps,
+            live_session.complete(
                 video_hold_seconds=args.video_hold_seconds,
+                viewer_hold_seconds=args.hold_seconds,
             )
-        except GenericMotionRunnerError as error:
+        except (GenericMotionRunnerError, LivePlanExecutionError) as error:
             summary.update(
                 {
                     "status": "SIMULATION_SETUP_FAILED",
-                    "simulation_status": "SIMULATION_SETUP_FAILED",
+                    "simulation_status": live_session.status,
                     "simulation_successful": False,
                     "simulation_mode": simulation_mode,
                     "simulation_detail": str(error),
@@ -1331,26 +1345,26 @@ def main(
                 {
                     "status": (
                         "SUCCESS"
-                        if execution.successful
-                        else execution.status.value
+                        if live_session.status == "SUCCESS"
+                        else live_session.status
                     ),
-                    "simulation_status": execution.status.value,
-                    "simulation_successful": execution.successful,
+                    "simulation_status": live_session.status,
+                    "simulation_successful": live_session.status == "SUCCESS",
                     "simulation_mode": simulation_mode,
-                    "simulation_run_count": len(execution.runs),
-                    "simulation_report_count": len(execution.reports),
-                    "simulation_manifest": (
-                        str(execution.manifest_path)
-                        if execution.manifest_path is not None
-                        else None
+                    "simulation_run_count": live_session.run_count,
+                    "simulation_report_count": live_session.report_count,
+                    "simulation_manifest": str(
+                        live_session.manifest_path.resolve()
                     ),
                     "video": str(video_path) if video_path is not None else None,
                 }
             )
-            if not execution.successful:
-                summary["simulation_detail"] = execution.detail
-                summary["simulation_failed_index"] = execution.failed_index
+            if live_session.status != "SUCCESS":
+                summary["simulation_detail"] = live_session.failure
                 exit_code = 2
+        finally:
+            live_session.close()
+
     _write_json_atomic(summary_path, summary)
     print(json.dumps(summary, ensure_ascii=False, indent=2))
     print(f"[M5] output: {output_dir}")
