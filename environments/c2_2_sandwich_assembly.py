@@ -91,6 +91,29 @@ _CHEESE_THICKNESS = 0.004
 # Bread | Knife | Spatula | Spoon | Ladle | Serving
 # ------------------------------------------------------------
 
+# 서빙 접시 위 스택 채점에 쓰는 값. 반경은 접시 지름의 절반 수준으로 잡아
+# 접시를 벗어난 재료는 스택에서 제외한다.
+_SANDWICH_STACK_XY_TOL_M = 0.09
+
+_SANDWICH_ITEMS = (
+    "bread_a",
+    "bread_b",
+    "turkey_1",
+    "turkey_2",
+    "turkey_3",
+    "cheese_1",
+    "cheese_2",
+    "cheese_3",
+    "tomato_slice",
+)
+
+_SANDWICH_FILLING_PREFIXES = (
+    "turkey",
+    "cheese",
+    "tomato",
+)
+
+
 _XY_OFFSETS = {
     "turkey_plate": (0.0, 0.32),
     "cheese_plate": (0.0, 0.10),
@@ -1365,7 +1388,73 @@ class C2_2_SandwichAssembly(KitchenBase):
     def _check_success(
         self,
     ):
-        return False
+        """서빙 접시 위에 샌드위치가 완성되었는가.
+
+        빵으로 시작해 빵으로 끝나고 그 사이에 칠면조, 치즈, 토마토가
+        각각 한 장 이상 있으면 성공으로 본다. 속재료 사이의 순서는
+        물리적 제약이 없으므로 채점하지 않는다.
+        """
+        stack = self._sandwich_stack()
+
+        if len(stack) < 5:
+            return False
+
+        if not (
+            stack[0].startswith("bread")
+            and stack[-1].startswith("bread")
+            and stack[0] != stack[-1]
+        ):
+            return False
+
+        filling = stack[1:-1]
+
+        return all(
+            any(
+                name.startswith(prefix)
+                for name in filling
+            )
+            for prefix in _SANDWICH_FILLING_PREFIXES
+        )
+
+    def _sandwich_stack(
+        self,
+    ):
+        """서빙 접시 위에 올라온 재료를 아래에서 위 순서로 반환한다."""
+        plate_pos = np.asarray(
+            self.sim.data.body_xpos[
+                self.obj_body_id["serving_plate"]
+            ],
+            dtype=float,
+        )
+
+        stacked = []
+
+        for name in _SANDWICH_ITEMS:
+            body_id = self.obj_body_id.get(name)
+
+            if body_id is None:
+                continue
+
+            pos = np.asarray(
+                self.sim.data.body_xpos[body_id],
+                dtype=float,
+            )
+
+            if float(
+                np.linalg.norm(pos[:2] - plate_pos[:2])
+            ) > _SANDWICH_STACK_XY_TOL_M:
+                continue
+
+            if float(pos[2]) <= float(plate_pos[2]):
+                continue
+
+            stacked.append(
+                (float(pos[2]), name)
+            )
+
+        stacked.sort()
+
+        return [name for _, name in stacked]
 
     def get_evaluation_material_gt(self):
         """Evaluation-only GT; never used by observation, M3, or tool metadata."""
