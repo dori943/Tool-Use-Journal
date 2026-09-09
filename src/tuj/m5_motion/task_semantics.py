@@ -85,11 +85,18 @@ def detaches_target(task: Any) -> bool:
     metadata = getattr(task, "metadata", {})
     if isinstance(metadata, Mapping) and "detach_target" in metadata:
         return bool(metadata["detach_target"])
-    return is_release_task(task) and task_operation(task) in {
-        "PLACE",
-        "RETURN_TOOL",
-        "TERMINAL_RETURN_TOOL",
-    }
+    operation = task_operation(task)
+    # PLACE_ON 등 접두어 형태도 is_release_action 과 같은 규칙으로 인정한다.
+    # 한쪽만 좁게 보면 release 로 계획된 요청에 DETACH_OBJECT 가 붙지 않는다.
+    return is_release_task(task) and (
+        operation
+        in {
+            "PLACE",
+            "RETURN_TOOL",
+            "TERMINAL_RETURN_TOOL",
+        }
+        or operation.startswith("PLACE_")
+    )
 
 
 __all__ = [
