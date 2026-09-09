@@ -74,6 +74,14 @@ def flat_face(geometry: dict) -> dict:
     return _flat_face(geometry)
 
 
+def container_layout(members: list[dict], container: dict) -> dict | None:
+    """컨테이너 내부 배치 (0909). 구버전 관계 모듈이면 None — 배치 배정을 건너뛴다."""
+    fn = getattr(_rel, "container_layout", None)
+    if fn is None:
+        return None
+    return _call(fn, members, container)
+
+
 _EE_POOL_CACHE: list[dict] | None = None
 
 

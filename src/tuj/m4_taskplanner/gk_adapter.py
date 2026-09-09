@@ -266,6 +266,9 @@ def adapt_gk_m2_output(
                     target_ids=target_ids,
                     goal_region_id=goal_region_id,
                     tool_id=tool_id,
+                    action_parameters=dict(
+                        _mapping(detail.get("action_parameters"))
+                    ),
                     preconditions=preconditions,
                     postconditions=establish,
                     establish=establish,

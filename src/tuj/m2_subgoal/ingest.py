@@ -570,6 +570,61 @@ def evaluate(m2_out: dict, m1: dict) -> list[tuple[dict, dict]]:
     return out
 
 
+def assign_container_slots(m2_out: dict, m1: dict) -> list[str]:
+    """같은 컨테이너로 가는 분할 형제들에게 서로 다른 목표 자리를 준다 (0909).
+
+    분할까지는 "각자 하나씩 트레이로 옮긴다"만 정해질 뿐 어디에 놓을지는 아무도
+    정하지 않는다. 실행계는 매번 영역 중심을 고르므로 먼저 놓인 것 위로 내려온다
+    (c3_1: 접시 위 머그 관통, 놓기 전략 8개 전부 COLLISION_FILTERED_ALL).
+    어느 물체를 어디에 놓을지는 계획이 아는 사실이니 여기서 배치를 잡는다.
+
+    자리는 컨테이너 내부 반치수 기준 정규화 좌표로 싣는다 — M1 점군 치수와 실행계
+    치수가 어긋나도 비율은 옮겨 가고, 실행계가 실제 점유 상황으로 다시 검증한다.
+    """
+    from . import ground
+
+    nodes = {n["id"]: n for n in m1["nodes"]}
+    groups: dict[tuple[str, str], list[dict]] = {}
+    for s in m2_out["m2_subgoals"]:
+        parent, container = s.get("split_from"), s.get("container_id")
+        if not parent or not container or s.get("kind") != "relocate":
+            continue
+        groups.setdefault((parent, container), []).append(s)
+
+    logs: list[str] = []
+    for (parent, container), sibs in groups.items():
+        if len(sibs) < 2 or container not in nodes:
+            continue
+        members = [nodes[t] for s in sibs for t in s.get("target_ids", [])
+                   if t in nodes and "bbox_mm" in nodes[t]]
+        if len(members) < 2:
+            continue
+        layout = ground.container_layout(members, nodes[container])
+        if not layout or not layout.get("slots"):
+            continue
+        slots = layout["slots"]
+        placed = 0
+        for s in sibs:
+            mine = [t for t in s.get("target_ids", []) if t in slots]
+            if not mine:
+                continue
+            slot = slots[mine[0]]
+            for d in s.get("details", []):
+                if (d.get("binding") or {}).get("?r") != container:
+                    continue
+                d.setdefault("action_parameters", {})["placement_slot"] = {
+                    "region": container, "target": mine[0], "uv": list(slot["uv"]),
+                    "offset_mm": list(slot["offset_mm"]), "row": slot["row"],
+                    "source": "m2_container_layout"}
+                placed += 1
+            s["placement_slot"] = {"region": container, "uv": list(slot["uv"]),
+                                   "row": slot["row"]}
+        note = "" if layout.get("pass") else f", 한 층 초과 {layout.get('overflow')}"
+        logs.append(f"  [배치] {parent} -> {container}: {len(slots)}자리 / "
+                    f"{layout.get('rows')}줄, 상세 {placed}건에 부여{note}")
+    return logs
+
+
 def apply_grounding(m2_out: dict, m1: dict) -> list[str]:
     """M1 접지값으로 m3 술어를 판정하고 도구를 확정한다. (m2_out은 제자리 수정)
 
