@@ -19,6 +19,7 @@ from robosuite.models.objects import MujocoXMLObject
 
 from environments.ee_rack import add_ee_rack
 from environments.kitchen_base import KitchenBase
+from environments.task_camera import add_standard_task_camera
 from environments.objects import (
     AppleObject,
     BreadObject,
@@ -631,12 +632,14 @@ class C3_2_BreakfastTrayPreparation(KitchenBase):
             ]
         )
 
-        robot.set_base_ori(
-            [
-                0.0,
-                0.0,
-                0.0,
-            ]
+        base_orientation = np.zeros(3)
+        robot.set_base_ori(base_orientation)
+
+        self._standard_camera = add_standard_task_camera(
+            self.model,
+            robot_base_xy=self._robot_base_xy,
+            robot_base_yaw_rad=float(base_orientation[2]),
+            surface_z=self._island_surface_z,
         )
 
         self._remove_existing_ee_rack()
