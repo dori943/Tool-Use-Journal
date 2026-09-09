@@ -76,6 +76,19 @@ def _judge(head: str, nodes: list[str], view: dict, rels: list[dict],
             v = any(x.get("feasible") for x in ee.values()) if ee else None
             ev.append({"node": n,
                        "feasible_ees": [k for k, x in (ee or {}).items() if x.get("feasible")]})
+        elif head == "graspable_on_support":
+            # 지지면 위 접근 가능성 {type, node_id, value, graspable_ees, per_ee}
+            r = next((x for x in rels
+                      if x.get("type") == "graspable_on_support"
+                      and x.get("node_id") == n), None)
+            v = r.get("value") if r else None
+            ev.append({"node": n, "graspable_on_support": v,
+                       "graspable_ees": (r or {}).get("graspable_ees", []),
+                       "supports": sorted({s for e in ((r or {}).get("per_ee") or {}).values()
+                                           for s in (e.get("supports") or [])}),
+                       "height_mm": next((e.get("height_mm")
+                                          for e in ((r or {}).get("per_ee") or {}).values()
+                                          if e.get("height_mm") is not None), None)})
         elif head == "flat_face":
             # M3 query_flat_face 응답 {type: flat_face, node_id, value, pass, check}
             r = next((x for x in rels
@@ -406,6 +419,20 @@ def measurement_feedback(m2_out: dict) -> str | None:
                         f"{', '.join(str(x) for x in bad if x)}). 이 대상만 다른 목적지/받침으로 "
                         "바꾸거나 별도 서브골로 분리할 것")
                     continue
+                if head == "graspable_on_support":
+                    # 0909: 어떤 EE 로도 지지면 위에서 접근할 수 없다는 뜻이다. EE 하나라도
+                    # 가능하면 sat 이 되고 그 선택은 M4 몫이므로, 여기 오는 것은 맨손 자체가
+                    # 불가한 경우뿐이다. 해법은 넣지 않고 관측 사실만 적는다.
+                    bad = [e for e in ev if e.get("graspable_on_support") is False]
+                    for e in bad:
+                        where = ", ".join(e.get("supports") or []) or "지지면"
+                        kind_lines.append(
+                            f"- {p['expr']} -> 불충족: {e.get('node')}"
+                            + (f"(높이 {e['height_mm']}mm)"
+                               if e.get("height_mm") is not None else "")
+                            + f"가 {where} 위에 놓여 있어 어떤 EE 로도 직접 접근할 수 없음")
+                    if bad:
+                        continue
                 if head in ("flat_face", "gap_accessible"):
                     bad = [e.get("node") for e in ev if e.get(head) is False]
                     tool_lines.append(
@@ -502,6 +529,10 @@ def evaluate(m2_out: dict, m1: dict) -> list[tuple[dict, dict]]:
                             ok = bool(r.get("value")) and not unfit
                             r |= {"value": ok, "pass": ok, "depth_clearance": holds,
                                   "unfit_members": unfit}
+                elif kind == "graspable_on_support":
+                    n = nodes[c["node_id"]]
+                    r |= {"node_id": n["id"]}
+                    r |= ground.graspable_on_support(n, m1.get("edges", []))
                 elif kind == "flat_face":
                     n = nodes[c["node_id"]]
                     pred = (n.get("predicates") or {}).get("flat_face") or {}

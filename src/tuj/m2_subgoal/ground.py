@@ -74,6 +74,53 @@ def flat_face(geometry: dict) -> dict:
     return _flat_face(geometry)
 
 
+_EE_POOL_CACHE: list[dict] | None = None
+
+
+def _ee_pool() -> list[dict]:
+    """robot_spec 의 EE 사양. 접근 가능성 판정에 capabilities 가 필요하다."""
+    global _EE_POOL_CACHE
+    if _EE_POOL_CACHE is None:
+        path = Path(os.environ.get(
+            "TUJ_ROBOT_SPEC",
+            Path(__file__).resolve().parents[3] / "configs" / "robot_spec.json"))
+        try:
+            _EE_POOL_CACHE = json.loads(path.read_text(encoding="utf-8"))["ee_pool"]
+        except (OSError, KeyError, ValueError):
+            _EE_POOL_CACHE = []
+    return _EE_POOL_CACHE
+
+
+def graspable_on_support(node: dict, edges: list[dict]) -> dict:
+    """지지면에 놓인 상태에서 접근 가능한 EE 가 하나라도 있는가.
+
+    ee_usable 이 물체 고유 사양만 보는 데 비해 이 술어는 물체가 놓인 자리를 본다.
+    EE 별 판정은 관계 함수에 맡기고 여기서는 EE 풀을 돌며 모은다. 결과의
+    graspable_ees 는 gk 조립에서 노드의 EE 후보를 좁히는 데 쓰인다.
+    """
+    fn = getattr(_rel, "graspable_on_support", None)
+    per_ee: dict[str, dict] = {}
+    for ee in _ee_pool():
+        ee_id = ee.get("ee_id")
+        if fn is not None:
+            per_ee[ee_id] = _call(fn, node, ee, edges)
+            continue
+        supports = [e["to"] for e in edges
+                    if e.get("from") == node.get("id")
+                    and e.get("type") in ("on", "inside")]
+        height_mm = float((node.get("bbox_mm") or [0.0, 0.0, 0.0])[2])
+        ok = (not supports
+              or "suction" in set(ee.get("capabilities") or ())
+              or height_mm >= 10.0)
+        per_ee[ee_id] = {"type": "graspable_on_support", "ee_id": ee_id,
+                         "supports": supports, "height_mm": round(height_mm, 1),
+                         "value": ok, "pass": ok}
+    usable = [k for k, v in per_ee.items() if v.get("value")]
+    ok = bool(usable) if per_ee else None
+    return {"type": "graspable_on_support", "node_id": node.get("id"),
+            "value": ok, "pass": ok, "graspable_ees": usable, "per_ee": per_ee}
+
+
 def batch_partition(members: list[dict], tool: dict | None = None) -> dict:
     """한 액션으로 집합을 동시에 처리할 수 있는가 + 안 되면 그룹 구성.
 
