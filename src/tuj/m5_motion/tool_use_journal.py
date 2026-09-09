@@ -1370,6 +1370,17 @@ class ToolUseJournalCollisionModelCompiler:
             reference_active_ee=reference_adapter.physical_active_ee,
         )
 
+    def initial_static_support_contacts(self, world, target, primary):
+        """Measure only current upward contacts on coplanar fixed surfaces."""
+        from tuj.m5_motion.static_support import coplanar_static_support_contacts
+
+        capture = self._captures[self.reference_active_ee]
+        compiled = self.compile(self.reference_active_ee)
+        return coplanar_static_support_contacts(
+            compiled.model, compiled.baseline_qpos, capture.object_body_names,
+            world, target, primary,
+        )
+
     def initial_object_clearance(self, objects, first: str, second: str) -> float | None:
         """Measure selected support geometry at request poses without live mutation."""
         from tuj.m5_motion.support_distance import object_pair_clearance
