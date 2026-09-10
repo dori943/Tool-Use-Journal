@@ -8,7 +8,7 @@ planning without pretending that an already-held object is a new grasp.
 from __future__ import annotations
 
 import copy
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields, replace
 import hashlib
 import json
 import math
@@ -16,6 +16,7 @@ from pathlib import Path
 from typing import Any, Mapping
 
 import mujoco
+import numpy as np
 
 from tuj.m5_motion.tool_use_journal import _name, _raw_model_data
 from tuj.m5_motion.tool_use_journal_runtime import (
@@ -118,8 +119,12 @@ def _attachment_from_payload(raw: object) -> AttachedObjectState | None:
         raise RuntimeCheckpointError("checkpoint attachment must be an object")
     try:
         weld_raw = raw.get("breakable_weld")
+        if isinstance(weld_raw, Mapping) and set(weld_raw) - {
+            field.name for field in fields(BreakableWeldConfig)
+        }:
+            raise ValueError("unknown checkpoint weld configuration field")
         weld = (
-            BreakableWeldConfig(**dict(weld_raw))
+            BreakableWeldConfig.from_parameters(weld_raw)
             if isinstance(weld_raw, Mapping)
             else None
         )
@@ -159,6 +164,33 @@ def capture_runtime_checkpoint(
         runtime.synchronize_attached_object()
     state = _capture_runtime_state(runtime.env)
     captured = runtime.captured_gripper_action
+    observation = None
+    breakable_state = None
+    attachment = runtime.attachment
+    if attachment is not None and attachment.mode is AttachmentMode.BREAKABLE_WELD:
+        # The spring rest transform is not the observed pose of an elastic grasp.
+        # Compute the latter in scratch data so checkpointing cannot step or
+        # otherwise change the live simulation's derived dynamics state.
+        model, live_data = _raw_model_data(runtime.env)
+        data = mujoco.MjData(model)
+        data.qpos[:] = live_data.qpos
+        mujoco.mj_forward(model, data)
+        body, _, _ = runtime._object_free_joint(runtime.env, attachment.object_id)
+        kind = mujoco.mjtObj.mjOBJ_SITE if attachment.reference_kind == "site" else mujoco.mjtObj.mjOBJ_BODY
+        ref = mujoco.mj_name2id(model, kind, attachment.reference_name)
+        if ref < 0:
+            raise RuntimeCheckpointError("checkpoint attachment reference is absent")
+        position = data.site_xpos[ref] if attachment.reference_kind == "site" else data.xpos[ref]
+        rotation = (data.site_xmat[ref] if attachment.reference_kind == "site" else data.xmat[ref]).reshape(3, 3)
+        observation = {
+            "position_in_reference_m": (rotation.T @ (data.xpos[body] - position)).tolist(),
+            "rotation_in_reference": (rotation.T @ data.xmat[body].reshape(3, 3)).tolist(),
+        }
+        if runtime._breakable_runtime is None:
+            raise RuntimeCheckpointError("elastic attachment runtime state is absent")
+        breakable_state = {name: getattr(runtime._breakable_runtime, name) for name in (
+            "step_count", "violation_steps", "contact_loss_steps",
+        )}
     return {
         "format": CHECKPOINT_FORMAT,
         "version": CHECKPOINT_VERSION,
@@ -179,6 +211,8 @@ def capture_runtime_checkpoint(
                 list(captured) if captured is not None else None
             ),
             "attachment": _attachment_payload(runtime.attachment),
+            "attachment_observation": observation,
+            "breakable_runtime": breakable_state,
             "held_tool_id": runtime.held_tool_id,
         },
         "progress": dict(progress or {}),
@@ -254,6 +288,35 @@ def restore_runtime_checkpoint(
             simulation_time_s=float(physical["simulation_time_s"]),
         )
         attachment = _attachment_from_payload(logical.get("attachment"))
+        observed_attachment = None
+        breakable_state = logical.get("breakable_runtime")
+        observation = logical.get("attachment_observation")
+        if observation is not None or breakable_state is not None:
+            if attachment is None or attachment.mode is not AttachmentMode.BREAKABLE_WELD:
+                raise ValueError("elastic checkpoint data requires a breakable attachment")
+            if not isinstance(observation, Mapping) or not isinstance(breakable_state, Mapping):
+                raise ValueError("elastic checkpoint requires observed pose and counters")
+            position = np.asarray(observation["position_in_reference_m"], dtype=float)
+            rotation = np.asarray(observation["rotation_in_reference"], dtype=float)
+            if position.shape != (3,) or rotation.shape != (3, 3) or not (
+                np.all(np.isfinite(position)) and np.all(np.isfinite(rotation))
+                and np.allclose(rotation.T @ rotation, np.eye(3), atol=1e-6, rtol=0)
+                and np.isclose(np.linalg.det(rotation), 1.0, atol=1e-6, rtol=0)
+            ):
+                raise ValueError("invalid checkpoint observed attachment pose")
+            expected_counters = {"step_count", "violation_steps", "contact_loss_steps"}
+            if set(breakable_state) != expected_counters or any(
+                isinstance(value, bool) or not isinstance(value, int) or value < 0
+                for value in breakable_state.values()
+            ):
+                raise ValueError("invalid checkpoint attachment counters")
+            if any(breakable_state[name] > breakable_state["step_count"] for name in (
+                "violation_steps", "contact_loss_steps",
+            )):
+                raise ValueError("checkpoint violation count exceeds elapsed steps")
+            observed_attachment = replace(attachment,
+                position_in_reference_m=tuple(position),
+                rotation_in_reference=tuple(tuple(row) for row in rotation))
         captured = logical.get("captured_gripper_action")
         captured_values = (
             tuple(float(value) for value in captured)
@@ -340,6 +403,7 @@ def restore_runtime_checkpoint(
             grasp_engaged=bool(logical.get("grasp_engaged", False)),
             captured_gripper_action=captured_values,
             attachment=attachment,
+            attachment_observation=observed_attachment,
             held_tool_id=(
                 str(logical["held_tool_id"])
                 if logical.get("held_tool_id") is not None
@@ -348,6 +412,9 @@ def restore_runtime_checkpoint(
             attachment_position_tolerance_m=attachment_position_tolerance_m,
             attachment_orientation_tolerance_rad=attachment_orientation_tolerance_rad,
         )
+        if breakable_state is not None:
+            for name, value in breakable_state.items():
+                setattr(runtime._breakable_runtime, name, value)
     except Exception as error:
         try:
             _restore_runtime_state(runtime.env, current_state)

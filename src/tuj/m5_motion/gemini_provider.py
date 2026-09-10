@@ -37,8 +37,13 @@ class GeminiKeyframeProviderConfig(OpenAIKeyframeProviderConfig):
             if effort not in {"default", "none", "low", "medium", "high"}:
                 raise ValueError("Invalid GEMINI_KEYFRAME_REASONING_EFFORT")
             values["reasoning_effort"] = effort
-        if budget := os.environ.get("GEMINI_KEYFRAME_MAX_OUTPUT_TOKENS"):
-            values["max_output_tokens"] = int(budget)
+        # Gemini flash reasons before emitting the JSON batch, and for dense
+        # multi-object scenes the thinking plus the batch overruns the inherited
+        # 16k ceiling (finish_reason=length -> no parsed output).  Default to a
+        # larger budget; GEMINI_KEYFRAME_MAX_OUTPUT_TOKENS still overrides it.
+        values["max_output_tokens"] = int(
+            os.environ.get("GEMINI_KEYFRAME_MAX_OUTPUT_TOKENS", "32768")
+        )
         values.update(overrides)
         return cls(**values)
 

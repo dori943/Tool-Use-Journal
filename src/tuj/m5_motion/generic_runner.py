@@ -332,10 +332,12 @@ class ToolUseJournalPlannerPool:
         ee_attach_policy: EEAttachPolicy | str = EEAttachPolicy.PRECOMPUTED_REQUIRED,
         ee_attach_start_tolerance_rad: float = 0.01,
         provider: Any | None = None,
+        final_plan_validator: Any | None = None,
     ) -> None:
         self.repository = repository
         self.seed = seed
         self.provider = provider
+        self.final_plan_validator = final_plan_validator
         self.ee_attach_registry_root = ee_attach_registry_root
         self.ee_attach_trajectory_paths = tuple(ee_attach_trajectory_paths)
         self.ee_return_trajectory_paths = tuple(ee_return_trajectory_paths)
@@ -382,6 +384,8 @@ class ToolUseJournalPlannerPool:
                 provider=self.provider,
             )
             self._planners[key] = planner
+        if self.final_plan_validator is not None:
+            return planner(request, final_plan_validator=self.final_plan_validator)
         return planner(request)
 
     def close(self) -> None:
@@ -1269,10 +1273,34 @@ def main(
         )
 
     planners = None
+    live_session = None
     try:
         planners = ToolUseJournalPlannerPool(
             repository_path, **planner_pool_options
         )
+        if simulation_mode is not None:
+            from tuj.m5_motion.live_execution import LivePlanExecutionSession
+
+            live_session = LivePlanExecutionSession.from_repository(
+                repository_path,
+                world,
+                output_dir / "simulation",
+                mode=simulation_mode,
+                seed=args.seed,
+                show_viewer=show_viewer,
+                realtime_factor=realtime_factor,
+                video=video_path,
+                camera=args.camera,
+                width=args.width,
+                height=args.height,
+                video_fps=args.video_fps,
+            )
+            if simulation_mode == "controller":
+                from tuj.m5_motion.controller_preview import ControllerPlanPreview
+
+                planners.final_plan_validator = ControllerPlanPreview(
+                    live_session, output_dir / "controller_previews"
+                )
         result = SelectedPlanMotionOrchestrator(
             planners,
             store=MotionPlanStore(output_dir),
@@ -1287,18 +1315,38 @@ def main(
             options=options,
             selected_plan_artifact_id=artifact_id,
         )
+        if live_session is not None:
+            live_session.complete(
+                video_hold_seconds=args.video_hold_seconds,
+                viewer_hold_seconds=args.hold_seconds,
+            )
     except Exception as error:
+        if live_session is not None:
+            live_session.mark_failure(error)
+        execution_failed = (
+            live_session is not None and live_session.records
+            and live_session.records[-1].get("status") == "FAILED"
+        )
         _write_json_atomic(
             summary_path,
             {
                 **report,
-                "status": "PLANNING_FAILED",
-                "planning_status": "FAILED",
+                "status": (
+                    "SIMULATION_FAILED" if execution_failed else "PLANNING_FAILED"
+                ),
+                "planning_status": (
+                    "PARTIAL" if execution_failed else "FAILED"
+                ),
                 "simulation_successful": False,
                 "planning_started_at_unix_s": planning_started_at_unix_s,
                 "planning_failed_at_unix_s": time.time(),
                 "failure_type": type(error).__name__,
                 "detail": str(error),
+                "simulation_manifest": (
+                    str(live_session.manifest_path.resolve())
+                    if live_session is not None
+                    else None
+                ),
             },
         )
         if live_session is not None:
@@ -1307,6 +1355,8 @@ def main(
     finally:
         if planners is not None:
             planners.close()
+        if live_session is not None:
+            live_session.close()
 
     summary = {
         **report,
