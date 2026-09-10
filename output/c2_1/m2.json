@@ -15,30 +15,33 @@
         "obj_spoon_spoon",
         "obj_tray_blue_tray"
       ],
-      "selection_reason": "대상 물체들을 파란 트레이로 옮기는 작업이므로, 대상 물체들과 트레이를 선택해야 한다.",
+      "selection_reason": "왼쪽부터 순서대로 옮겨야 하므로 이동 대상 물체들과 최종 받침인 파란 트레이를 선택했다.",
       "confidence": {
         "before": {
-          "decomposition": 0.8,
-          "object_selection": 0.7,
+          "decomposition": 0.78,
+          "object_selection": 0.93,
           "uncertain_about": [
-            "물체들이 트레이에 잘 들어갈지 여부"
+            "장면에 실제 좌우 배치 정보가 명시되지 않아 대상 순서가 정확히 왼쪽부터인지",
+            "물체들이 서로 겹치거나 가려져 있어 개별 집기 가능성이 있는지"
           ]
         },
         "after": {
-          "decomposition": 0.8,
-          "object_selection": 0.7,
-          "uncertain_about": [],
-          "reason": "모든 조건이 충족되었고, 불확실했던 물체들이 트레이에 잘 들어갈지 여부도 확인되었기 때문에 신뢰도를 유지합니다.",
+          "decomposition": 0.86,
+          "object_selection": 0.97,
+          "uncertain_about": [
+            "물체들의 정확한 좌우 순서가 실제로는 측정되지 않아 '왼쪽부터'의 절대적 순서는 아직 완전히 확정되지 않음"
+          ],
+          "reason": "대상 물체들의 도달 가능성, 상부 노출, 집기 가능성, 트레이 적재 가능성이 실측으로 확인되어 서브골과 객체 선택 신뢰도는 상승했지만, 좌우 순서 자체는 직접 검증되지 않았고 일괄 처리 불가로 분할 절차가 필요하다.",
           "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
         },
         "delta": {
-          "decomposition": 0.0,
-          "object_selection": 0.0
+          "decomposition": 0.08,
+          "object_selection": 0.04
         }
       },
       "target_order": {
         "source": "vlm",
-        "reason": "이미지에서 왼쪽부터 오른쪽 순서대로 정렬했습니다."
+        "reason": "이미지에서 물체의 왼쪽 위치부터 오른쪽 위치 순서대로 정렬했다."
       },
       "measurements": [
         {
@@ -61,26 +64,36 @@
               103.0,
               53.0
             ],
-            "height_mm": 28.1
+            "height_mm": 28.1,
+            "center": [
+              671.3,
+              -180.3,
+              825.3
+            ],
+            "aabb_size": [
+              103.0,
+              53.0,
+              28.1
+            ]
           },
           "material": "wood",
-          "density_kgm3": 1431.0,
-          "mass_kg": 0.008,
-          "youngs_gpa": 30.64,
+          "density_kgm3": 3960.0,
+          "mass_kg": 0.013,
+          "youngs_gpa": 80.53,
           "mu": {
             "mu": 0.488,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.53
           },
-          "confidence": 0.429,
-          "caption": "Wooden ladle",
+          "confidence": 0.257,
+          "caption": "Wooden handle ladle with metal scoop",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.992,
+              "margin": 4.987,
               "margin_unit": "kg",
-              "reason": "질량 0.008 vs 페이로드 5.0kg",
+              "reason": "질량 0.013 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -90,13 +103,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.008,
+                  "value": 0.013,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.08,
+                  "value": 0.131,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -104,9 +117,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.492,
+              "margin": 2.487,
               "margin_unit": "kg",
-              "reason": "질량 0.008 vs 페이로드 2.5kg",
+              "reason": "질량 0.013 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -116,13 +129,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.008,
+                  "value": 0.013,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.08,
+                  "value": 0.131,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -142,7 +155,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.008,
+                  "value": 0.013,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -197,26 +210,36 @@
               103.0,
               53.0
             ],
-            "height_mm": 28.1
+            "height_mm": 28.1,
+            "center": [
+              671.3,
+              -180.3,
+              825.3
+            ],
+            "aabb_size": [
+              103.0,
+              53.0,
+              28.1
+            ]
           },
           "material": "wood",
-          "density_kgm3": 1431.0,
-          "mass_kg": 0.008,
-          "youngs_gpa": 30.64,
+          "density_kgm3": 3960.0,
+          "mass_kg": 0.013,
+          "youngs_gpa": 80.53,
           "mu": {
             "mu": 0.488,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.53
           },
-          "confidence": 0.429,
-          "caption": "Wooden ladle",
+          "confidence": 0.257,
+          "caption": "Wooden handle ladle with metal scoop",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.992,
+              "margin": 4.987,
               "margin_unit": "kg",
-              "reason": "질량 0.008 vs 페이로드 5.0kg",
+              "reason": "질량 0.013 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -226,13 +249,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.008,
+                  "value": 0.013,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.08,
+                  "value": 0.131,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -240,9 +263,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.492,
+              "margin": 2.487,
               "margin_unit": "kg",
-              "reason": "질량 0.008 vs 페이로드 2.5kg",
+              "reason": "질량 0.013 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -252,13 +275,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.008,
+                  "value": 0.013,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.08,
+                  "value": 0.131,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -278,7 +301,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.008,
+                  "value": 0.013,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -307,6 +330,48 @@
         {
           "subgoal_id": "SG1_s1",
           "queried_by": "SG1_s1_d1_p3",
+          "node_id": "obj_spoon_spoon",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 28.1,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 28.1,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 28.1,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG1_s1",
+          "queried_by": "SG1_s1_d1_p4",
           "kind": "batch",
           "actor": {
             "type": "ee_pool"
@@ -350,8 +415,8 @@
           "depth_clearance": [
             {
               "type": "clearance",
-              "value_mm": 130.9,
-              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_53.0) & no_tip(h_28.1<=3.0x53.0)",
+              "value_mm": 246.7,
+              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_53.0) & walled(container_25.0>=h/2_14.1)",
               "pass": true
             }
           ],
@@ -416,6 +481,26 @@
             },
             {
               "id": "SG1_s1_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_spoon_spoon)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_spoon_spoon",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 28.1
+                }
+              ]
+            },
+            {
+              "id": "SG1_s1_d1_p4",
               "expr": "batch_feasible(?EE, obj_spoon_spoon)",
               "head": "batch_feasible",
               "eval_by": "m3",
@@ -436,7 +521,7 @@
               ]
             },
             {
-              "id": "SG1_s1_d1_p4",
+              "id": "SG1_s1_d1_p5",
               "expr": "hand_empty",
               "head": "hand_empty",
               "eval_by": "m2"
@@ -602,30 +687,33 @@
         "obj_plate_plate",
         "obj_tray_blue_tray"
       ],
-      "selection_reason": "대상 물체들을 파란 트레이로 옮기는 작업이므로, 대상 물체들과 트레이를 선택해야 한다.",
+      "selection_reason": "왼쪽부터 순서대로 옮겨야 하므로 이동 대상 물체들과 최종 받침인 파란 트레이를 선택했다.",
       "confidence": {
         "before": {
-          "decomposition": 0.8,
-          "object_selection": 0.7,
+          "decomposition": 0.78,
+          "object_selection": 0.93,
           "uncertain_about": [
-            "물체들이 트레이에 잘 들어갈지 여부"
+            "장면에 실제 좌우 배치 정보가 명시되지 않아 대상 순서가 정확히 왼쪽부터인지",
+            "물체들이 서로 겹치거나 가려져 있어 개별 집기 가능성이 있는지"
           ]
         },
         "after": {
-          "decomposition": 0.8,
-          "object_selection": 0.7,
-          "uncertain_about": [],
-          "reason": "모든 조건이 충족되었고, 불확실했던 물체들이 트레이에 잘 들어갈지 여부도 확인되었기 때문에 신뢰도를 유지합니다.",
+          "decomposition": 0.86,
+          "object_selection": 0.97,
+          "uncertain_about": [
+            "물체들의 정확한 좌우 순서가 실제로는 측정되지 않아 '왼쪽부터'의 절대적 순서는 아직 완전히 확정되지 않음"
+          ],
+          "reason": "대상 물체들의 도달 가능성, 상부 노출, 집기 가능성, 트레이 적재 가능성이 실측으로 확인되어 서브골과 객체 선택 신뢰도는 상승했지만, 좌우 순서 자체는 직접 검증되지 않았고 일괄 처리 불가로 분할 절차가 필요하다.",
           "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
         },
         "delta": {
-          "decomposition": 0.0,
-          "object_selection": 0.0
+          "decomposition": 0.08,
+          "object_selection": 0.04
         }
       },
       "target_order": {
         "source": "vlm",
-        "reason": "이미지에서 왼쪽부터 오른쪽 순서대로 정렬했습니다."
+        "reason": "이미지에서 물체의 왼쪽 위치부터 오른쪽 위치 순서대로 정렬했다."
       },
       "measurements": [
         {
@@ -648,20 +736,30 @@
               181.2,
               181.2
             ],
-            "height_mm": 10.7
+            "height_mm": 10.7,
+            "center": [
+              639.3,
+              -0.6,
+              816.6
+            ],
+            "aabb_size": [
+              181.2,
+              181.2,
+              10.7
+            ]
           },
           "material": "plastic",
-          "density_kgm3": 1100.0,
-          "mass_kg": 0.156,
-          "youngs_gpa": 3.0,
+          "density_kgm3": 3001.9,
+          "mass_kg": 0.354,
+          "youngs_gpa": 71.69,
           "mu": {
             "mu": 0.338,
             "stage": 0,
             "material": "plastic",
             "rms_mm": 0.29
           },
-          "confidence": 0.444,
-          "caption": "Round flat object",
+          "confidence": 0.308,
+          "caption": "Round wall or ceiling light fixture.",
           "ee": {
             "2F": {
               "feasible": false,
@@ -677,13 +775,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.156,
+                  "value": 0.354,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 2.264,
+                  "value": 5.137,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -703,13 +801,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.156,
+                  "value": 0.354,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 2.264,
+                  "value": 5.137,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -717,9 +815,9 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.344,
+              "margin": 0.146,
               "margin_unit": "kg",
-              "reason": "질량 0.156 vs 페이로드 0.5kg",
+              "reason": "질량 0.354 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
@@ -729,7 +827,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.156,
+                  "value": 0.354,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -784,20 +882,30 @@
               181.2,
               181.2
             ],
-            "height_mm": 10.7
+            "height_mm": 10.7,
+            "center": [
+              639.3,
+              -0.6,
+              816.6
+            ],
+            "aabb_size": [
+              181.2,
+              181.2,
+              10.7
+            ]
           },
           "material": "plastic",
-          "density_kgm3": 1100.0,
-          "mass_kg": 0.156,
-          "youngs_gpa": 3.0,
+          "density_kgm3": 3001.9,
+          "mass_kg": 0.354,
+          "youngs_gpa": 71.69,
           "mu": {
             "mu": 0.338,
             "stage": 0,
             "material": "plastic",
             "rms_mm": 0.29
           },
-          "confidence": 0.444,
-          "caption": "Round flat object",
+          "confidence": 0.308,
+          "caption": "Round wall or ceiling light fixture.",
           "ee": {
             "2F": {
               "feasible": false,
@@ -813,13 +921,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.156,
+                  "value": 0.354,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 2.264,
+                  "value": 5.137,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -839,13 +947,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.156,
+                  "value": 0.354,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 2.264,
+                  "value": 5.137,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -853,9 +961,9 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.344,
+              "margin": 0.146,
               "margin_unit": "kg",
-              "reason": "질량 0.156 vs 페이로드 0.5kg",
+              "reason": "질량 0.354 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
@@ -865,7 +973,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.156,
+                  "value": 0.354,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -894,6 +1002,48 @@
         {
           "subgoal_id": "SG1_s2",
           "queried_by": "SG1_s2_d1_p3",
+          "node_id": "obj_plate_plate",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 10.7,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 10.7,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 10.7,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG1_s2",
+          "queried_by": "SG1_s2_d1_p4",
           "kind": "batch",
           "actor": {
             "type": "ee_pool"
@@ -938,7 +1088,7 @@
             {
               "type": "clearance",
               "value_mm": 118.5,
-              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_181.2) & no_tip(h_10.7<=3.0x181.2)",
+              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_181.2) & walled(container_25.0>=h/2_5.3)",
               "pass": true
             }
           ],
@@ -1002,6 +1152,26 @@
             },
             {
               "id": "SG1_s2_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_plate_plate)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_plate_plate",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 10.7
+                }
+              ]
+            },
+            {
+              "id": "SG1_s2_d1_p4",
               "expr": "batch_feasible(?EE, obj_plate_plate)",
               "head": "batch_feasible",
               "eval_by": "m3",
@@ -1022,13 +1192,13 @@
               ]
             },
             {
-              "id": "SG1_s2_d1_p4",
+              "id": "SG1_s2_d1_p5",
               "expr": "hand_empty",
               "head": "hand_empty",
               "eval_by": "m2"
             },
             {
-              "id": "SG1_s2_d1_p5",
+              "id": "SG1_s2_d1_p6",
               "expr": "in(obj_spoon_spoon, obj_tray_blue_tray)",
               "head": "in",
               "eval_by": "m2",
@@ -1195,30 +1365,33 @@
         "obj_bread_bread",
         "obj_tray_blue_tray"
       ],
-      "selection_reason": "대상 물체들을 파란 트레이로 옮기는 작업이므로, 대상 물체들과 트레이를 선택해야 한다.",
+      "selection_reason": "왼쪽부터 순서대로 옮겨야 하므로 이동 대상 물체들과 최종 받침인 파란 트레이를 선택했다.",
       "confidence": {
         "before": {
-          "decomposition": 0.8,
-          "object_selection": 0.7,
+          "decomposition": 0.78,
+          "object_selection": 0.93,
           "uncertain_about": [
-            "물체들이 트레이에 잘 들어갈지 여부"
+            "장면에 실제 좌우 배치 정보가 명시되지 않아 대상 순서가 정확히 왼쪽부터인지",
+            "물체들이 서로 겹치거나 가려져 있어 개별 집기 가능성이 있는지"
           ]
         },
         "after": {
-          "decomposition": 0.8,
-          "object_selection": 0.7,
-          "uncertain_about": [],
-          "reason": "모든 조건이 충족되었고, 불확실했던 물체들이 트레이에 잘 들어갈지 여부도 확인되었기 때문에 신뢰도를 유지합니다.",
+          "decomposition": 0.86,
+          "object_selection": 0.97,
+          "uncertain_about": [
+            "물체들의 정확한 좌우 순서가 실제로는 측정되지 않아 '왼쪽부터'의 절대적 순서는 아직 완전히 확정되지 않음"
+          ],
+          "reason": "대상 물체들의 도달 가능성, 상부 노출, 집기 가능성, 트레이 적재 가능성이 실측으로 확인되어 서브골과 객체 선택 신뢰도는 상승했지만, 좌우 순서 자체는 직접 검증되지 않았고 일괄 처리 불가로 분할 절차가 필요하다.",
           "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
         },
         "delta": {
-          "decomposition": 0.0,
-          "object_selection": 0.0
+          "decomposition": 0.08,
+          "object_selection": 0.04
         }
       },
       "target_order": {
         "source": "vlm",
-        "reason": "이미지에서 왼쪽부터 오른쪽 순서대로 정렬했습니다."
+        "reason": "이미지에서 물체의 왼쪽 위치부터 오른쪽 위치 순서대로 정렬했다."
       },
       "measurements": [
         {
@@ -1241,20 +1414,30 @@
               83.2,
               124.7
             ],
-            "height_mm": 43.3
+            "height_mm": 43.3,
+            "center": [
+              639.1,
+              188.7,
+              857.5
+            ],
+            "aabb_size": [
+              83.2,
+              124.7,
+              43.3
+            ]
           },
-          "material": "flour",
-          "density_kgm3": 781.0,
-          "mass_kg": 0.084,
-          "youngs_gpa": 2.58,
+          "material": "bread",
+          "density_kgm3": 325.0,
+          "mass_kg": 0.076,
+          "youngs_gpa": 0.03,
           "mu": {
             "mu": 0.457,
             "stage": 0,
-            "material": "flour",
+            "material": "bread",
             "rms_mm": 1.3
           },
-          "confidence": 0.267,
-          "caption": "loaf of bread",
+          "confidence": 0.769,
+          "caption": "Round loaf of bread.",
           "ee": {
             "2F": {
               "feasible": true,
@@ -1270,13 +1453,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.084,
+                  "value": 0.076,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.902,
+                  "value": 0.816,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -1284,9 +1467,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.416,
+              "margin": 2.424,
               "margin_unit": "kg",
-              "reason": "질량 0.084 vs 페이로드 2.5kg",
+              "reason": "질량 0.076 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -1296,13 +1479,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.084,
+                  "value": 0.076,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.902,
+                  "value": 0.816,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -1322,7 +1505,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.084,
+                  "value": 0.076,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -1377,20 +1560,30 @@
               83.2,
               124.7
             ],
-            "height_mm": 43.3
+            "height_mm": 43.3,
+            "center": [
+              639.1,
+              188.7,
+              857.5
+            ],
+            "aabb_size": [
+              83.2,
+              124.7,
+              43.3
+            ]
           },
-          "material": "flour",
-          "density_kgm3": 781.0,
-          "mass_kg": 0.084,
-          "youngs_gpa": 2.58,
+          "material": "bread",
+          "density_kgm3": 325.0,
+          "mass_kg": 0.076,
+          "youngs_gpa": 0.03,
           "mu": {
             "mu": 0.457,
             "stage": 0,
-            "material": "flour",
+            "material": "bread",
             "rms_mm": 1.3
           },
-          "confidence": 0.267,
-          "caption": "loaf of bread",
+          "confidence": 0.769,
+          "caption": "Round loaf of bread.",
           "ee": {
             "2F": {
               "feasible": true,
@@ -1406,13 +1599,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.084,
+                  "value": 0.076,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.902,
+                  "value": 0.816,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -1420,9 +1613,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.416,
+              "margin": 2.424,
               "margin_unit": "kg",
-              "reason": "질량 0.084 vs 페이로드 2.5kg",
+              "reason": "질량 0.076 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -1432,13 +1625,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.084,
+                  "value": 0.076,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.902,
+                  "value": 0.816,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -1458,7 +1651,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.084,
+                  "value": 0.076,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -1487,6 +1680,48 @@
         {
           "subgoal_id": "SG1_s3",
           "queried_by": "SG1_s3_d1_p3",
+          "node_id": "obj_bread_bread",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 43.3,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 43.3,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 43.3,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG1_s3",
+          "queried_by": "SG1_s3_d1_p4",
           "kind": "batch",
           "actor": {
             "type": "ee_pool"
@@ -1530,8 +1765,8 @@
           "depth_clearance": [
             {
               "type": "clearance",
-              "value_mm": 206.3,
-              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_83.2) & no_tip(h_43.3<=3.0x83.2)",
+              "value_mm": 216.5,
+              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_83.2) & walled(container_25.0>=h/2_21.6)",
               "pass": true
             }
           ],
@@ -1597,6 +1832,26 @@
             },
             {
               "id": "SG1_s3_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_bread_bread)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_bread_bread",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 43.3
+                }
+              ]
+            },
+            {
+              "id": "SG1_s3_d1_p4",
               "expr": "batch_feasible(?EE, obj_bread_bread)",
               "head": "batch_feasible",
               "eval_by": "m3",
@@ -1617,13 +1872,13 @@
               ]
             },
             {
-              "id": "SG1_s3_d1_p4",
+              "id": "SG1_s3_d1_p5",
               "expr": "hand_empty",
               "head": "hand_empty",
               "eval_by": "m2"
             },
             {
-              "id": "SG1_s3_d1_p5",
+              "id": "SG1_s3_d1_p6",
               "expr": "in(obj_plate_plate, obj_tray_blue_tray)",
               "head": "in",
               "eval_by": "m2",
@@ -1790,30 +2045,33 @@
         "obj_apple_apple",
         "obj_tray_blue_tray"
       ],
-      "selection_reason": "대상 물체들을 파란 트레이로 옮기는 작업이므로, 대상 물체들과 트레이를 선택해야 한다.",
+      "selection_reason": "왼쪽부터 순서대로 옮겨야 하므로 이동 대상 물체들과 최종 받침인 파란 트레이를 선택했다.",
       "confidence": {
         "before": {
-          "decomposition": 0.8,
-          "object_selection": 0.7,
+          "decomposition": 0.78,
+          "object_selection": 0.93,
           "uncertain_about": [
-            "물체들이 트레이에 잘 들어갈지 여부"
+            "장면에 실제 좌우 배치 정보가 명시되지 않아 대상 순서가 정확히 왼쪽부터인지",
+            "물체들이 서로 겹치거나 가려져 있어 개별 집기 가능성이 있는지"
           ]
         },
         "after": {
-          "decomposition": 0.8,
-          "object_selection": 0.7,
-          "uncertain_about": [],
-          "reason": "모든 조건이 충족되었고, 불확실했던 물체들이 트레이에 잘 들어갈지 여부도 확인되었기 때문에 신뢰도를 유지합니다.",
+          "decomposition": 0.86,
+          "object_selection": 0.97,
+          "uncertain_about": [
+            "물체들의 정확한 좌우 순서가 실제로는 측정되지 않아 '왼쪽부터'의 절대적 순서는 아직 완전히 확정되지 않음"
+          ],
+          "reason": "대상 물체들의 도달 가능성, 상부 노출, 집기 가능성, 트레이 적재 가능성이 실측으로 확인되어 서브골과 객체 선택 신뢰도는 상승했지만, 좌우 순서 자체는 직접 검증되지 않았고 일괄 처리 불가로 분할 절차가 필요하다.",
           "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
         },
         "delta": {
-          "decomposition": 0.0,
-          "object_selection": 0.0
+          "decomposition": 0.08,
+          "object_selection": 0.04
         }
       },
       "target_order": {
         "source": "vlm",
-        "reason": "이미지에서 왼쪽부터 오른쪽 순서대로 정렬했습니다."
+        "reason": "이미지에서 물체의 왼쪽 위치부터 오른쪽 위치 순서대로 정렬했다."
       },
       "measurements": [
         {
@@ -1836,26 +2094,36 @@
               74.8,
               67.8
             ],
-            "height_mm": 41.4
+            "height_mm": 41.4,
+            "center": [
+              639.0,
+              336.2,
+              865.3
+            ],
+            "aabb_size": [
+              74.8,
+              67.8,
+              41.4
+            ]
           },
-          "material": "fiber",
-          "density_kgm3": 908.1,
-          "mass_kg": 0.01,
-          "youngs_gpa": 1.05,
+          "material": "natural organic material",
+          "density_kgm3": 900.0,
+          "mass_kg": 0.094,
+          "youngs_gpa": 0.02,
           "mu": {
             "mu": 0.45,
             "stage": 0,
-            "material": "fiber",
-            "rms_mm": NaN
+            "material": "natural organic material",
+            "rms_mm": null
           },
-          "confidence": 0.25,
-          "caption": "apple",
+          "confidence": 0.625,
+          "caption": "Red apple with stem.",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.99,
+              "margin": 4.906,
               "margin_unit": "kg",
-              "reason": "질량 0.01 vs 페이로드 5.0kg",
+              "reason": "질량 0.094 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -1865,13 +2133,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.01,
+                  "value": 0.094,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.109,
+                  "value": 1.025,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -1879,9 +2147,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.49,
+              "margin": 2.406,
               "margin_unit": "kg",
-              "reason": "질량 0.01 vs 페이로드 2.5kg",
+              "reason": "질량 0.094 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -1891,13 +2159,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.01,
+                  "value": 0.094,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.109,
+                  "value": 1.025,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -1917,7 +2185,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.01,
+                  "value": 0.094,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -1972,26 +2240,36 @@
               74.8,
               67.8
             ],
-            "height_mm": 41.4
+            "height_mm": 41.4,
+            "center": [
+              639.0,
+              336.2,
+              865.3
+            ],
+            "aabb_size": [
+              74.8,
+              67.8,
+              41.4
+            ]
           },
-          "material": "fiber",
-          "density_kgm3": 908.1,
-          "mass_kg": 0.01,
-          "youngs_gpa": 1.05,
+          "material": "natural organic material",
+          "density_kgm3": 900.0,
+          "mass_kg": 0.094,
+          "youngs_gpa": 0.02,
           "mu": {
             "mu": 0.45,
             "stage": 0,
-            "material": "fiber",
-            "rms_mm": NaN
+            "material": "natural organic material",
+            "rms_mm": null
           },
-          "confidence": 0.25,
-          "caption": "apple",
+          "confidence": 0.625,
+          "caption": "Red apple with stem.",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.99,
+              "margin": 4.906,
               "margin_unit": "kg",
-              "reason": "질량 0.01 vs 페이로드 5.0kg",
+              "reason": "질량 0.094 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -2001,13 +2279,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.01,
+                  "value": 0.094,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.109,
+                  "value": 1.025,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -2015,9 +2293,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.49,
+              "margin": 2.406,
               "margin_unit": "kg",
-              "reason": "질량 0.01 vs 페이로드 2.5kg",
+              "reason": "질량 0.094 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -2027,13 +2305,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.01,
+                  "value": 0.094,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.109,
+                  "value": 1.025,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -2053,7 +2331,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.01,
+                  "value": 0.094,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -2082,6 +2360,48 @@
         {
           "subgoal_id": "SG1_s4",
           "queried_by": "SG1_s4_d1_p3",
+          "node_id": "obj_apple_apple",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 41.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 41.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 41.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG1_s4",
+          "queried_by": "SG1_s4_d1_p4",
           "kind": "batch",
           "actor": {
             "type": "ee_pool"
@@ -2125,8 +2445,8 @@
           "depth_clearance": [
             {
               "type": "clearance",
-              "value_mm": 162.0,
-              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_67.8) & no_tip(h_41.4<=3.0x67.8)",
+              "value_mm": 231.9,
+              "check": "floor_fit(open_299.7[bbox-2*wall(4.0)]-base_67.8) & walled(container_25.0>=h/2_20.7)",
               "pass": true
             }
           ],
@@ -2191,6 +2511,26 @@
             },
             {
               "id": "SG1_s4_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_apple_apple)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_apple_apple",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 41.4
+                }
+              ]
+            },
+            {
+              "id": "SG1_s4_d1_p4",
               "expr": "batch_feasible(?EE, obj_apple_apple)",
               "head": "batch_feasible",
               "eval_by": "m3",
@@ -2211,13 +2551,13 @@
               ]
             },
             {
-              "id": "SG1_s4_d1_p4",
+              "id": "SG1_s4_d1_p5",
               "expr": "hand_empty",
               "head": "hand_empty",
               "eval_by": "m2"
             },
             {
-              "id": "SG1_s4_d1_p5",
+              "id": "SG1_s4_d1_p6",
               "expr": "in(obj_bread_bread, obj_tray_blue_tray)",
               "head": "in",
               "eval_by": "m2",
@@ -2384,30 +2724,33 @@
         "obj_mug_mug",
         "obj_tray_blue_tray"
       ],
-      "selection_reason": "대상 물체들을 파란 트레이로 옮기는 작업이므로, 대상 물체들과 트레이를 선택해야 한다.",
+      "selection_reason": "왼쪽부터 순서대로 옮겨야 하므로 이동 대상 물체들과 최종 받침인 파란 트레이를 선택했다.",
       "confidence": {
         "before": {
-          "decomposition": 0.8,
-          "object_selection": 0.7,
+          "decomposition": 0.78,
+          "object_selection": 0.93,
           "uncertain_about": [
-            "물체들이 트레이에 잘 들어갈지 여부"
+            "장면에 실제 좌우 배치 정보가 명시되지 않아 대상 순서가 정확히 왼쪽부터인지",
+            "물체들이 서로 겹치거나 가려져 있어 개별 집기 가능성이 있는지"
           ]
         },
         "after": {
-          "decomposition": 0.8,
-          "object_selection": 0.7,
-          "uncertain_about": [],
-          "reason": "모든 조건이 충족되었고, 불확실했던 물체들이 트레이에 잘 들어갈지 여부도 확인되었기 때문에 신뢰도를 유지합니다.",
+          "decomposition": 0.86,
+          "object_selection": 0.97,
+          "uncertain_about": [
+            "물체들의 정확한 좌우 순서가 실제로는 측정되지 않아 '왼쪽부터'의 절대적 순서는 아직 완전히 확정되지 않음"
+          ],
+          "reason": "대상 물체들의 도달 가능성, 상부 노출, 집기 가능성, 트레이 적재 가능성이 실측으로 확인되어 서브골과 객체 선택 신뢰도는 상승했지만, 좌우 순서 자체는 직접 검증되지 않았고 일괄 처리 불가로 분할 절차가 필요하다.",
           "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
         },
         "delta": {
-          "decomposition": 0.0,
-          "object_selection": 0.0
+          "decomposition": 0.08,
+          "object_selection": 0.04
         }
       },
       "target_order": {
         "source": "vlm",
-        "reason": "이미지에서 왼쪽부터 오른쪽 순서대로 정렬했습니다."
+        "reason": "이미지에서 물체의 왼쪽 위치부터 오른쪽 위치 순서대로 정렬했다."
       },
       "measurements": [
         {
@@ -2430,26 +2773,36 @@
               72.8,
               100.0
             ],
-            "height_mm": 78.4
+            "height_mm": 78.4,
+            "center": [
+              638.8,
+              470.7,
+              852.2
+            ],
+            "aabb_size": [
+              72.8,
+              100.0,
+              78.4
+            ]
           },
           "material": "ceramic",
-          "density_kgm3": 2000.0,
-          "mass_kg": 0.242,
-          "youngs_gpa": 35.0,
+          "density_kgm3": 3101.7,
+          "mass_kg": 0.147,
+          "youngs_gpa": 88.87,
           "mu": {
             "mu": 0.492,
             "stage": 0,
             "material": "ceramic",
             "rms_mm": 2.84
           },
-          "confidence": 0.533,
+          "confidence": 0.333,
           "caption": "Ceramic coffee mug",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.758,
+              "margin": 4.853,
               "margin_unit": "kg",
-              "reason": "질량 0.242 vs 페이로드 5.0kg",
+              "reason": "질량 0.147 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -2459,13 +2812,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.242,
+                  "value": 0.147,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 2.413,
+                  "value": 1.466,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -2473,9 +2826,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.258,
+              "margin": 2.353,
               "margin_unit": "kg",
-              "reason": "질량 0.242 vs 페이로드 2.5kg",
+              "reason": "질량 0.147 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -2485,13 +2838,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.242,
+                  "value": 0.147,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 2.413,
+                  "value": 1.466,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -2511,7 +2864,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.242,
+                  "value": 0.147,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -2566,26 +2919,36 @@
               72.8,
               100.0
             ],
-            "height_mm": 78.4
+            "height_mm": 78.4,
+            "center": [
+              638.8,
+              470.7,
+              852.2
+            ],
+            "aabb_size": [
+              72.8,
+              100.0,
+              78.4
+            ]
           },
           "material": "ceramic",
-          "density_kgm3": 2000.0,
-          "mass_kg": 0.242,
-          "youngs_gpa": 35.0,
+          "density_kgm3": 3101.7,
+          "mass_kg": 0.147,
+          "youngs_gpa": 88.87,
           "mu": {
             "mu": 0.492,
             "stage": 0,
             "material": "ceramic",
             "rms_mm": 2.84
           },
-          "confidence": 0.533,
+          "confidence": 0.333,
           "caption": "Ceramic coffee mug",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.758,
+              "margin": 4.853,
               "margin_unit": "kg",
-              "reason": "질량 0.242 vs 페이로드 5.0kg",
+              "reason": "질량 0.147 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -2595,13 +2958,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.242,
+                  "value": 0.147,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 2.413,
+                  "value": 1.466,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -2609,9 +2972,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.258,
+              "margin": 2.353,
               "margin_unit": "kg",
-              "reason": "질량 0.242 vs 페이로드 2.5kg",
+              "reason": "질량 0.147 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -2621,13 +2984,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.242,
+                  "value": 0.147,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 2.413,
+                  "value": 1.466,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -2647,7 +3010,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.242,
+                  "value": 0.147,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -2676,6 +3039,48 @@
         {
           "subgoal_id": "SG1_s5",
           "queried_by": "SG1_s5_d1_p3",
+          "node_id": "obj_mug_mug",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 78.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 78.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 78.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG1_s5",
+          "queried_by": "SG1_s5_d1_p4",
           "kind": "batch",
           "actor": {
             "type": "ee_pool"
@@ -2785,6 +3190,26 @@
             },
             {
               "id": "SG1_s5_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_mug_mug)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_mug_mug",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 78.4
+                }
+              ]
+            },
+            {
+              "id": "SG1_s5_d1_p4",
               "expr": "batch_feasible(?EE, obj_mug_mug)",
               "head": "batch_feasible",
               "eval_by": "m3",
@@ -2805,13 +3230,13 @@
               ]
             },
             {
-              "id": "SG1_s5_d1_p4",
+              "id": "SG1_s5_d1_p5",
               "expr": "hand_empty",
               "head": "hand_empty",
               "eval_by": "m2"
             },
             {
-              "id": "SG1_s5_d1_p5",
+              "id": "SG1_s5_d1_p6",
               "expr": "in(obj_apple_apple, obj_tray_blue_tray)",
               "head": "in",
               "eval_by": "m2",
@@ -3179,36 +3604,36 @@
     "llm_usage": {
       "서브골 분해": {
         "calls": 1,
-        "prompt_tokens": 979,
-        "completion_tokens": 122,
-        "tokens": 1101,
-        "seconds": 2.69
+        "prompt_tokens": 978,
+        "completion_tokens": 94,
+        "tokens": 1072,
+        "seconds": 1.75
       },
       "객체 선택": {
         "calls": 1,
-        "prompt_tokens": 715,
-        "completion_tokens": 110,
-        "tokens": 825,
+        "prompt_tokens": 714,
+        "completion_tokens": 147,
+        "tokens": 861,
         "seconds": 1.83
       },
       "순서(VLM)": {
         "calls": 1,
-        "prompt_tokens": 475,
-        "completion_tokens": 61,
-        "tokens": 536,
-        "seconds": 1.59
+        "prompt_tokens": 526,
+        "completion_tokens": 59,
+        "tokens": 585,
+        "seconds": 1.22
       },
       "confidence_update": {
         "calls": 1,
-        "prompt_tokens": 817,
-        "completion_tokens": 70,
-        "tokens": 887,
-        "seconds": 1.11
+        "prompt_tokens": 917,
+        "completion_tokens": 161,
+        "tokens": 1078,
+        "seconds": 2.55
       }
     },
-    "n_evaluations": 30,
+    "n_evaluations": 35,
     "m3_predicates": {
-      "sat": 30,
+      "sat": 35,
       "unsat": 0,
       "unknown": 0,
       "not_queried": 0

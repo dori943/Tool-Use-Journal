@@ -5,7 +5,15 @@ from .catalog_timing import timing_xml
 
 
 def _preserve_offscreen_buffer(env):
-    """Restore the requested offscreen framebuffer after rebuilding the model."""
+    """Restore the offscreen framebuffer size after the model is rebuilt.
+
+    robosuite sizes ``visual/global`` from the requested camera dimensions when
+    it first builds the environment; reloading the model here discards that and
+    leaves MuJoCo's 640x480 default. Rendering a larger frame out of a smaller
+    buffer reads past the rows that exist, which is what turned recorded video
+    into vertical-striped noise between otherwise correct frames (c3_1 at
+    960x540).
+    """
     import xml.etree.ElementTree as ET
 
     def largest(value, fallback):
@@ -31,7 +39,8 @@ def _preserve_offscreen_buffer(env):
 
 def configure_environment(env, environment, ee):
     """Install the lab's numerical hand corrections before the first reset."""
-    from .spoon_hand_model import repair_spoon_hand_xml, repair_spoon_parallel_2f_xml
+    from .spoon_hand_model import (exclude_parallel_2f_linkage_selfcontact,
+        repair_spoon_hand_xml, repair_spoon_parallel_2f_xml)
     from tuj.m5_motion.tool_use_journal_runtime import tool_use_journal_joint_position_controller_config
 
     kitchen = environment != "C1_1_LegoSweep"
@@ -43,8 +52,11 @@ def configure_environment(env, environment, ee):
             "correction": {"policy": "NATIVE_HAND", "source_assets_changed": False}}
         return env
     if kitchen and ee is not None:
-        # Commissioned rack paths start from the canonical bare home. Preserve
-        # that pose until an EE has actually been mounted.
+        # Only a run that already carries an EE may start from the scripted
+        # kitchen home. A bare start fetches its EE from the rack, and every
+        # commissioned rack path begins at TOOL_USE_JOURNAL_BARE_HOME_QPOS --
+        # overriding it here put the arm 1.99 rad from that seam and no cached
+        # path could start (c3_1: START_STATE_MISMATCH on bare->vac).
         env.robot_configs[0]["initial_qpos"] = [0., -1.8, 1.2, -.97, -1.57, 0.]
     corrected = not (environment == "C1_2_DoughFlatten" and ee == "3F")
     env._load_model()
@@ -54,6 +66,9 @@ def configure_environment(env, environment, ee):
         prefix = env.robots[0].gripper["right"].naming_prefix
         repair = repair_spoon_parallel_2f_xml if ee == "2F" else repair_spoon_hand_xml
         correction = repair(env.model.root, prefix)
+        if ee == "2F":
+            correction["excluded_linkage_contacts"] = (
+                exclude_parallel_2f_linkage_selfcontact(env.model.root, prefix))
     env.set_xml_processor(lambda xml: timing_xml(xml, .001, "implicitfast"))
     env._initialize_sim()
     env.hard_reset = False

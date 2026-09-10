@@ -19,6 +19,12 @@ from typing import Any, Literal, Mapping, Protocol
 
 from pydantic import BaseModel, ConfigDict, Field, ValidationError
 
+from tuj.m5_motion.attachment_retarget import (
+    ATTACHED_OBJECT_POSE_SUBJECT,
+    POSE_SUBJECT_KEY,
+    POSE_SUBJECT_OBJECT_ID_KEY,
+    held_pose_subject,
+)
 from tuj.m5_motion.geometry import GeometryResolutionError, RelativePoseResolver
 from tuj.m5_motion.schema import (
     AttachedObjectTransform,
@@ -62,6 +68,20 @@ class OpenAIKeyframeProviderError(RuntimeError):
 
 class MissingOpenAIAPIKeyError(OpenAIKeyframeProviderError):
     """OPENAI_API_KEY is not available to the process."""
+
+
+class NoValidKeyframeCandidatesError(OpenAIKeyframeProviderError):
+    """The model returned a batch, but no strategy satisfied the keyframe contract.
+
+    Sampling is non-deterministic, so a fresh generation usually complies; this
+    distinct type lets ``generate`` re-sample a bounded number of times instead
+    of failing the whole plan on one non-compliant response.
+    """
+
+
+# The model occasionally omits a required keyframe (e.g. the RETREAT after a
+# PLACE).  Re-sample a few times before surfacing the failure.
+_MAX_GENERATION_ATTEMPTS = 3
 
 
 class _StrictModel(BaseModel):
@@ -148,6 +168,20 @@ def _canonical_json(value: Any) -> str:
 
 def _sha256(value: Any) -> str:
     return hashlib.sha256(_canonical_json(value).encode("utf-8")).hexdigest()
+
+
+def _model_supports_reasoning_effort(model: str) -> bool:
+    """Whether the Responses API accepts ``reasoning.effort`` for this model.
+
+    Reasoning models (o-series, gpt-5*) accept it; classic chat models such as
+    gpt-4o / gpt-4.1 reject it with a 400.  Conservative prefix allowlist so an
+    unknown reasoning model is not silently stripped of its effort setting.
+    """
+
+    name = str(model).strip().lower()
+    if "reasoning" in name:
+        return True
+    return name.startswith(("o1", "o3", "o4", "gpt-5"))
 
 
 def _without_sensitive_values(value: Any) -> Any:
@@ -369,6 +403,65 @@ def _frame_catalog(request: MotionPlanRequest) -> list[dict[str, Any]]:
     return catalog
 
 
+_Quaternion = tuple[float, float, float, float]
+
+
+@dataclass(frozen=True, slots=True)
+class _HeldGoalSubject:
+    """Which keyframes of a held-object subgoal describe the object's pose."""
+
+    object_id: str
+    object_keyframe_types: frozenset[KeyframeType]
+    object_orientation_xyzw: _Quaternion | None
+    eef_orientation_xyzw: _Quaternion | None
+
+
+def _quaternion(goal: Any, key: str) -> _Quaternion | None:
+    if not isinstance(goal, dict) or not goal.get("preserve_grasp_orientation", False):
+        return None
+    raw = goal.get(key)
+    if isinstance(raw, (list, tuple)) and len(raw) == 4:
+        return tuple(float(value) for value in raw)
+    return None
+
+
+def _held_goal_subject(request: MotionPlanRequest) -> _HeldGoalSubject | None:
+    """Describe pose-subject retargeting for a held TRANSPORT/MOVE or region PLACE.
+
+    Only subgoals that carry an attached or contact-friction held object are
+    retargeted.  Held transport treats every TRANSFER keyframe as the object's
+    pose; a region PLACE treats TRANSFER/PRE_PLACE/PLACE as the object's pose
+    and RETREAT as an EEF motion.  Contact tasks and RETURN_TOOL keep their
+    existing EEF-pose semantics.  Orientations come from the grounded
+    ``held_transport_goal`` / ``held_place_goal`` when present and are
+    otherwise left to the model's axis/roll proposal.
+    """
+
+    operation = task_operation(request.task)
+    if operation in {"TRANSPORT", "MOVE"}:
+        goal_key = "held_transport_goal"
+        kinds = frozenset({KeyframeType.TRANSFER})
+    elif operation in {"PLACE", "RELEASE"} or operation.startswith("PLACE_"):
+        if not request.task.goal.target_region_id:
+            return None
+        goal_key = "held_place_goal"
+        kinds = frozenset(
+            {KeyframeType.TRANSFER, KeyframeType.PRE_PLACE, KeyframeType.PLACE}
+        )
+    else:
+        return None
+    object_id = held_pose_subject(request)
+    if object_id is None:
+        return None
+    goal = request.task.metadata.get(goal_key)
+    return _HeldGoalSubject(
+        object_id=object_id,
+        object_keyframe_types=kinds,
+        object_orientation_xyzw=_quaternion(goal, "object_orientation_xyzw"),
+        eef_orientation_xyzw=_quaternion(goal, "eef_orientation_xyzw"),
+    )
+
+
 def _prompt_payload(request: MotionPlanRequest, candidate_count: int) -> dict[str, Any]:
     from tuj.m5_motion.scene_context import spatial_record
 
@@ -436,8 +529,19 @@ Hard rules:
   make every candidate add a high standoff that can exceed the arm's reach.
   The direct strategy's two TRANSFER keyframes are start_anchor then anchor,
   both in the supplied frame_ref with zero offset and the supplied orientation.
-- PICK strategies must include a GRASP keyframe followed by LIFT or RETREAT.
+- PICK strategies (grasping a scene object) must include a GRASP keyframe
+  followed by a LIFT keyframe that raises the grasped object clear of its
+  support; a RETREAT alone is not sufficient for an object pick.
 - PLACE strategies must include a PLACE keyframe followed by RETREAT.
+- For a PLACE of a held object into target_region_id, TRANSFER, PRE_PLACE and
+  PLACE keyframes describe the HELD OBJECT's pose (same rule as transport);
+  only RETREAT is a gripper motion. When held_place_goal is supplied, its
+  anchor is the object's resting destination on the region's interior floor
+  (release clearance included): put the PLACE keyframe exactly at that
+  frame_ref/anchor with zero offset and the supplied orientation, put
+  PRE_PLACE at the same anchor with a positive offset_along_approach_m, and
+  RETREAT at the same anchor with a larger positive offset. Never lower the
+  object below that anchor and never target the region's center or bottom.
 - PICK_TOOL strategies use GRASP then LIFT/RETREAT; RETURN_TOOL strategies use
   PLACE then RETREAT.
 - Use CARTESIAN for straight approach/contact/retreat intent, SAMPLING_BASED for
@@ -534,6 +638,11 @@ class OpenAIKeyframeProvider:
             if collision_feedback is not None
             else 1
         )
+        # Which keyframes (if any) of this subgoal describe a held object's
+        # pose rather than the EEF pose; used below to tag TRANSFER/PLACE
+        # keyframes for grasp-offset retargeting.  Must be resolved before the
+        # per-candidate loop that references it.
+        held_goal = _held_goal_subject(request)
         strategies: list[KeyframePlanCandidate] = []
         strategy_ids: set[str] = set()
         rejected_candidates: list[str] = []
@@ -600,6 +709,40 @@ class OpenAIKeyframeProvider:
                         }
                     if event_parameters:
                         metadata["event_parameters"] = event_parameters
+                    if (
+                        releases_resource
+                        and item.keyframe_type is KeyframeType.PLACE
+                        and held_pose_subject(request) is not None
+                    ):
+                        # Opening the gripper leaves the fingertips wrapped
+                        # around the just-released object; the first withdrawal
+                        # edge must permit that gripper<->object contact or the
+                        # release always reads as a collision.  The scripted and
+                        # packing paths set this the same way.
+                        metadata["allow_release_contact"] = True
+                    if held_goal is not None:
+                        if item.keyframe_type in held_goal.object_keyframe_types:
+                            # These keyframes describe the held object's pose;
+                            # the compiler retargets them to the EEF through the
+                            # measured grasp transform.  Pin the orientation the
+                            # grounded goal established so no candidate can
+                            # drift the grasp posture through rounded axis/roll.
+                            metadata[POSE_SUBJECT_KEY] = ATTACHED_OBJECT_POSE_SUBJECT
+                            metadata[POSE_SUBJECT_OBJECT_ID_KEY] = held_goal.object_id
+                            if held_goal.object_orientation_xyzw is not None:
+                                metadata["packing_orientation_xyzw"] = list(
+                                    held_goal.object_orientation_xyzw
+                                )
+                        elif (
+                            item.keyframe_type is KeyframeType.RETREAT
+                            and held_goal.eef_orientation_xyzw is not None
+                        ):
+                            # RETREAT after a release is an EEF motion: keep the
+                            # wrist where the grasp left it instead of letting a
+                            # proposed roll twist the open gripper on the way up.
+                            metadata["packing_orientation_xyzw"] = list(
+                                held_goal.eef_orientation_xyzw
+                            )
                     keyframe = RelativeKeyframeSpec(
                         keyframe_id=(
                             f"{strategy_id}:{keyframe_index}:{item.keyframe_id}"
@@ -635,15 +778,50 @@ class OpenAIKeyframeProvider:
             picks_resource = is_acquire_task(request.task)
             releases_resource = is_release_task(request.task)
             if picks_resource:
-                if KeyframeType.GRASP not in kinds or not any(
-                    kind in {KeyframeType.LIFT, KeyframeType.RETREAT}
-                    for kind in kinds[kinds.index(KeyframeType.GRASP) + 1 :]
-                ):
+                # A contact-friction object pick needs a LIFT so the physical
+                # grasp can attach its retention hold; PICK_TOOL uses rack attach
+                # and accepts LIFT or RETREAT.  Models frequently label the
+                # post-grasp separation as RETREAT instead of LIFT, so rather
+                # than discard an otherwise-valid object pick, promote the first
+                # post-grasp RETREAT to a LIFT (identical pose) to meet the
+                # contract.  This keeps the generator's stochastic output usable
+                # without loosening the downstream physical_grasp requirement.
+                is_tool_pick = task_operation(request.task) == "PICK_TOOL"
+                if KeyframeType.GRASP not in kinds:
                     rejected_candidates.append(
-                        f"{strategy_id}: PICK requires GRASP followed by "
-                        "LIFT or RETREAT"
+                        f"{strategy_id}: PICK requires a GRASP keyframe"
                     )
                     continue
+                grasp_pos = kinds.index(KeyframeType.GRASP)
+                followers = kinds[grasp_pos + 1 :]
+                if is_tool_pick:
+                    if not any(
+                        kind in {KeyframeType.LIFT, KeyframeType.RETREAT}
+                        for kind in followers
+                    ):
+                        rejected_candidates.append(
+                            f"{strategy_id}: PICK_TOOL requires GRASP followed by "
+                            "LIFT or RETREAT"
+                        )
+                        continue
+                elif KeyframeType.LIFT not in followers:
+                    promote_at = next(
+                        (
+                            index
+                            for index in range(grasp_pos + 1, len(kinds))
+                            if kinds[index] is KeyframeType.RETREAT
+                        ),
+                        None,
+                    )
+                    if promote_at is None:
+                        rejected_candidates.append(
+                            f"{strategy_id}: PICK requires GRASP followed by a LIFT"
+                        )
+                        continue
+                    keyframes[promote_at] = keyframes[promote_at].model_copy(
+                        update={"keyframe_type": KeyframeType.LIFT}
+                    )
+                    kinds[promote_at] = KeyframeType.LIFT
             if releases_resource:
                 if KeyframeType.PLACE not in kinds or KeyframeType.RETREAT not in kinds[
                     kinds.index(KeyframeType.PLACE) + 1 :
@@ -672,7 +850,7 @@ class OpenAIKeyframeProvider:
 
         if not strategies:
             details = "; ".join(rejected_candidates)
-            raise OpenAIKeyframeProviderError(
+            raise NoValidKeyframeCandidatesError(
                 f"{self.provider_name} response contained no valid keyframe candidates"
                 + (f": {details}" if details else "")
             )
@@ -709,16 +887,22 @@ class OpenAIKeyframeProvider:
         )
 
     def _request_response(self, instructions: str, payload: dict[str, Any]) -> Any:
-        return self._openai_client().responses.parse(
+        request_kwargs: dict[str, Any] = dict(
             model=self.config.model,
             instructions=instructions,
             input=_canonical_json(payload),
             text_format=GeneratedKeyframeBatch,
-            reasoning={"effort": self.config.reasoning_effort},
             max_output_tokens=self.config.max_output_tokens,
             store=False,
             timeout=self.config.timeout_s,
         )
+        # ``reasoning.effort`` is only valid for reasoning models (o-series,
+        # gpt-5*).  Classic chat models such as gpt-4o reject it with a 400
+        # "Unsupported parameter: 'reasoning.effort'".  Send it only when the
+        # target model supports it so an explicit --model gpt-4o still works.
+        if _model_supports_reasoning_effort(self.config.model):
+            request_kwargs["reasoning"] = {"effort": self.config.reasoning_effort}
+        return self._openai_client().responses.parse(**request_kwargs)
 
     def generate(self, request: MotionPlanRequest) -> KeyframePlanArtifact:
         payload = _prompt_payload(request, self.config.candidate_count)
@@ -752,46 +936,76 @@ class OpenAIKeyframeProvider:
                 )
             return cached
 
-        try:
-            response = self._request_response(instructions, payload)
-        except OpenAIKeyframeProviderError:
-            raise
-        except Exception as error:  # noqa: BLE001 - SDK error surface varies
-            raise OpenAIKeyframeProviderError(
-                f"{self.provider_name} keyframe request failed ({type(error).__name__})"
-            ) from None
-
-        parsed = getattr(response, "output_parsed", None)
-        if parsed is None:
-            response_id = str(getattr(response, "id", "unknown"))
-            status = str(getattr(response, "status", "unknown"))
-            incomplete_details = getattr(response, "incomplete_details", None)
-            incomplete_reason = getattr(incomplete_details, "reason", None)
-            reason_suffix = (
-                f", reason={incomplete_reason}"
-                if incomplete_reason is not None
-                else ""
-            )
-            raise OpenAIKeyframeProviderError(
-                f"{self.provider_name} response {response_id!r} had no parsed output "
-                f"(status={status}{reason_suffix})"
-            )
-        if not isinstance(parsed, GeneratedKeyframeBatch):
+        # Re-sample on a non-compliant batch (no valid candidates): the request
+        # is stochastic, so a fresh generation usually satisfies the contract.
+        # Hard API errors and schema/parse failures are not retried.
+        last_no_candidates: NoValidKeyframeCandidatesError | None = None
+        for _attempt in range(_MAX_GENERATION_ATTEMPTS):
             try:
-                parsed = GeneratedKeyframeBatch.model_validate(parsed)
-            except ValidationError as error:
+                response = self._request_response(instructions, payload)
+            except OpenAIKeyframeProviderError:
+                raise
+            except Exception as error:  # noqa: BLE001 - SDK error surface varies
+                # Surface the API's own reason (e.g. an unsupported parameter for
+                # a given model) so a 400 is diagnosable.  The openai SDK carries
+                # the human message in .message/.body/.response, not always in
+                # str(); try each.  These hold the API error body, not the
+                # request payload.
+                detail = ""
+                for source in (
+                    getattr(error, "message", None),
+                    getattr(error, "body", None),
+                    getattr(getattr(error, "response", None), "text", None),
+                    str(error),
+                    repr(error),
+                ):
+                    if source:
+                        detail = str(source)
+                        break
+                detail = detail.replace("\n", " ")[:800]
                 raise OpenAIKeyframeProviderError(
-                    f"{self.provider_name} response did not match the keyframe batch schema"
-                ) from error
+                    f"{self.provider_name} keyframe request failed "
+                    f"({type(error).__name__}): {detail}"
+                ) from None
 
-        artifact = self._convert(
-            request,
-            parsed,
-            prompt_hash=prompt_hash,
-            response_id=str(getattr(response, "id", "unknown")),
-        )
-        self._store_cache(cache_key, artifact)
-        return artifact
+            parsed = getattr(response, "output_parsed", None)
+            if parsed is None:
+                response_id = str(getattr(response, "id", "unknown"))
+                status = str(getattr(response, "status", "unknown"))
+                incomplete_details = getattr(response, "incomplete_details", None)
+                incomplete_reason = getattr(incomplete_details, "reason", None)
+                reason_suffix = (
+                    f", reason={incomplete_reason}"
+                    if incomplete_reason is not None
+                    else ""
+                )
+                raise OpenAIKeyframeProviderError(
+                    f"{self.provider_name} response {response_id!r} had no parsed output "
+                    f"(status={status}{reason_suffix})"
+                )
+            if not isinstance(parsed, GeneratedKeyframeBatch):
+                try:
+                    parsed = GeneratedKeyframeBatch.model_validate(parsed)
+                except ValidationError as error:
+                    raise OpenAIKeyframeProviderError(
+                        f"{self.provider_name} response did not match the keyframe batch schema"
+                    ) from error
+
+            try:
+                artifact = self._convert(
+                    request,
+                    parsed,
+                    prompt_hash=prompt_hash,
+                    response_id=str(getattr(response, "id", "unknown")),
+                )
+            except NoValidKeyframeCandidatesError as error:
+                last_no_candidates = error
+                continue
+            self._store_cache(cache_key, artifact)
+            return artifact
+
+        assert last_no_candidates is not None
+        raise last_no_candidates
 
 
 __all__ = [

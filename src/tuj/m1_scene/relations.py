@@ -256,6 +256,69 @@ def graspable_on_support(node: dict, ee: dict, edges: list[dict],
                    "check": f"height_{round(height_mm, 1)}>={min_grasp_height_mm}"}
 
 
+def container_layout(members: list[dict], container: dict,
+                     gap_mm: float = 10.0, wall_mm: float | None = None) -> dict:
+    """컨테이너 내부를 나눠 멤버마다 서로 다른 목표 자리를 준다 (0909).
+
+    같은 컨테이너로 가는 물체들이 저마다 "그 영역에 놓아라"만 받으면, 놓는 쪽은
+    매번 같은 자리(영역 중심)를 고르고 먼저 놓인 것과 겹친다 (c3_1: 트레이 중앙의
+    접시 위로 머그가 내려와 관통). 어디에 무엇을 놓을지는 계획이 아는 사실이므로
+    여기서 배치를 잡아 서브골마다 다른 자리를 실어 준다.
+
+    선반(shelf) 채우기: footprint 깊이 내림차순으로 한 줄씩 x를 채우고, 폭이 모자라면
+    다음 줄로 내린다. 한 층에 다 안 들어가면 남는 것은 overflow 로 보고하되(계획은
+    적층을 택할 수 있다) 자리는 계속 배정한다 — 겹치더라도 서로 다른 자리가
+    영역 중심 한 점보다 낫다.
+
+    반환 slots[id] = {"uv": [u, v], "offset_mm": [dx, dy], "row": r}
+      · uv 는 내부 반치수 기준 정규화 좌표(-1..1). M1 점군 mm 와 실행계 m 의
+        절대 치수가 어긋나도(같은 물체를 다른 시야로 잰다) 비율은 옮겨 간다.
+    """
+    open_w, open_d, src_tag = _container_opening_mm(container, wall_mm)
+    half = (open_w / 2.0, open_d / 2.0)
+    order = sorted(members, key=lambda m: -float(m["bbox_mm"][1]))
+    rows: list[dict] = []
+    for m in order:
+        w, d = float(m["bbox_mm"][0]), float(m["bbox_mm"][1])
+        row = rows[-1] if rows else None
+        if row is not None and row["width"] + gap_mm + w <= open_w:
+            row["items"].append((m["id"], w, d))
+            row["width"] += gap_mm + w
+            row["depth"] = max(row["depth"], d)
+        else:
+            rows.append({"items": [(m["id"], w, d)], "width": w, "depth": d})
+    used_d = sum(r["depth"] for r in rows) + gap_mm * max(0, len(rows) - 1)
+    overflow = [m["id"] for m in order
+                if float(m["bbox_mm"][0]) > open_w or float(m["bbox_mm"][1]) > open_d]
+    if used_d > open_d:                       # 한 층에 다 못 들어감 — 줄 간격을 눌러 담는다
+        squeeze = (open_d - sum(r["depth"] for r in rows)) / max(1, len(rows) - 1) \
+            if len(rows) > 1 else 0.0
+        step_gap = max(0.0, min(gap_mm, squeeze))
+        overflow += [i for r in rows[1:] for i, _, _ in r["items"] if i not in overflow]
+    else:
+        step_gap = gap_mm
+    total_d = sum(r["depth"] for r in rows) + step_gap * max(0, len(rows) - 1)
+    slots: dict[str, dict] = {}
+    y = -min(total_d, open_d) / 2.0
+    for r_index, row in enumerate(rows):
+        cy = y + row["depth"] / 2.0
+        x = -row["width"] / 2.0
+        for oid, w, _d in row["items"]:
+            cx = x + w / 2.0
+            slots[oid] = {
+                "uv": [round(max(-1.0, min(1.0, cx / half[0])), 4),
+                       round(max(-1.0, min(1.0, cy / half[1])), 4)],
+                "offset_mm": [round(cx, 1), round(cy, 1)], "row": r_index}
+            x += w + gap_mm
+        y += row["depth"] + step_gap
+    ok = not overflow
+    return {"type": "container_layout", "container_id": container.get("id"),
+            "slots": slots, "rows": len(rows), "overflow": overflow,
+            "value_mm": round(open_d - total_d, 1), "pass": bool(ok),
+            "check": (f"shelf_fit(open_{round(open_w, 1)}x{round(open_d, 1)}[{src_tag}]"
+                      f", rows_{len(rows)}, used_d_{round(total_d, 1)}, gap_{gap_mm})")}
+
+
 # ── 집합 술어 (구 materialize.query_batch / query_swept_space) ────────────────
 def _greedy_partition(members: list[dict], cap_mm: float) -> list[list[str]]:
     """주축 정렬 그리디: 폭이 cap 안에 들어오는 만큼씩 근접한 것끼리 묶는다."""

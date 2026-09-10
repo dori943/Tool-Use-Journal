@@ -29,7 +29,8 @@ sys.path.insert(0, os.path.join(_ROOT, "src"))
 sys.path.insert(0, _ROOT)                      # task_registry (단일 출처)
 
 from tuj.m2_subgoal.ground import load_scene
-from tuj.m2_subgoal.ingest import apply_grounding, measurement_feedback, update_confidence
+from tuj.m2_subgoal.ingest import (apply_grounding, assign_container_slots,
+                                   measurement_feedback, update_confidence)
 from tuj.m2_subgoal.pipeline import run_m2
 from tuj.m2_subgoal.regroup import split_by_partition
 from tuj.m2_subgoal.rough import LLMRough
@@ -149,6 +150,10 @@ def main():
         print(line)
     if split_logs:
         for line in apply_grounding(out, m1):
+            print(line)
+        # 같은 컨테이너로 가는 형제들에게 서로 다른 자리를 준다 (0909) — 목적지가
+        # 하나뿐이면 실행계가 매번 영역 중심을 골라 먼저 놓인 것 위로 내려온다.
+        for line in assign_container_slots(out, m1):
             print(line)
 
     unresolved = [s["subgoal_id"] for s in out["m2_subgoals"]

@@ -34,7 +34,17 @@ def _props(
     density=1000.0,
     extents=(100.0, 50.0, 40.0),
     material="plastic",
+    *,
+    thickness_cm=(0.2, 0.5),
+    include_shell_hypotheses=True,
 ):
+    hyp = {
+        "name": material,
+        "prob": 0.8,
+        "density_kgm3": [float(density) * 0.9, float(density) * 1.1],
+    }
+    if include_shell_hypotheses:
+        hyp["thickness_cm"] = list(thickness_cm)
     return {
         "geometry": {
             "length_mm": 100.0,
@@ -58,9 +68,7 @@ def _props(
             "rms_mm": 1.0,
         },
         "confidence": 0.8,
-        "materials_topk": [
-            {"name": material, "prob": 0.8}
-        ],
+        "materials_topk": [hyp],
     }
 
 
@@ -645,10 +653,13 @@ def _hit_with_bad_surface_rms(
 
     assert node["grounding_source"] == "memory"
 
-    # Stored physical properties reused
+    # Stored physical properties reused; mass from shell integral (not stored 0.2)
     assert node["material"] == "apple_flesh"
     assert node["density_kgm3"] == 900.0
-    assert node["mass_kg"] == 0.2
+    assert node["mass_kg"] != 0.2
+    assert node.get("mass_source") == "shell_mass_integral"
+    bbox_mass = round(float(np.prod(np.asarray([100.0, 50.0, 40.0]) / 1000.0)) * 900.0, 3)
+    assert node["mass_kg"] < bbox_mass
 
     # Geometry refreshed from current observation
     assert geometry_is_current(
@@ -707,6 +718,127 @@ def test_geometry_is_current_rejects_non_finite_ee_fields():
     del missing["surface_rms_mm"]
 
     assert not geometry_is_current(missing)
+
+
+def test_cross_task_hit_reuses_intrinsic_keeps_current_geometry_and_mass(tmp_path):
+    """CASE 2: HIT ok, but old footprint/mass must not overwrite current observation."""
+    from tuj.m1_scene.ee_rules import evaluate_ee, grasp_dim_mm
+
+    memory = PropertyMemory(
+        tmp_path / "m.json", task_id="c3_2",
+        bbox_relative_threshold=0.25, density_relative_threshold=0.20)
+    old = _props(density=1000.0, extents=(72.8, 100.0, 90.0), material="ceramic")
+    old["geometry"]["footprint_mm"] = [72.8, 100.0]
+    old["mass_kg"] = 0.05
+    memory.update_entry("c2_1", "obj_mug_mug", old)
+    memory.save()
+
+    c3 = {"calls": 0}
+    full = CountingBackend()
+
+    def infer(_):
+        c3["calls"] += 1
+        return DensityOnlyResult(1050, True)
+
+    # Current mug larger than stored footprint 72.8
+    scene = build_m1([{
+        "name": "mug", "cls": "mug",
+        "points": _points((0, 0, 50), half=(41.0, 60.0, 47.0)),
+    }])
+    scene["nodes"][0]["bbox_mm"] = [82.0, 120.0, 94.0]
+    debug = {}
+    ee_pool = [
+        {"ee_id": "2F", "type": "parallel_2f", "stroke_mm": 85,
+         "payload_kg": 5.0, "grip_force_n": 235.0},
+        {"ee_id": "3F", "type": "underactuated_3f", "aperture_mm": 140,
+         "payload_kg": 5.0, "grip_force_n": 200.0},
+    ]
+    stats = ground_scene(
+        scene, backend=full, memory=memory, density_infer=infer,
+        retrieval_debug=debug, ee_pool=ee_pool)
+
+    node = scene["nodes"][0]
+    assert stats["memory_hits"] == 1 and stats["grounded"] == 0
+    assert c3["calls"] == 1 and full.calls == 0
+    assert debug[node["id"]]["result"] == "HIT"
+    assert debug[node["id"]]["geometry_source"] == "current_observation"
+    assert debug[node["id"]]["intrinsic_source"] == "memory"
+
+    assert node["material"] == "ceramic"
+    assert node["density_kgm3"] == 1000.0
+    assert node["geometry"]["footprint_mm"] == [82.0, 120.0]
+    assert node["geometry"]["footprint_mm"] != [72.8, 100.0]
+    assert grasp_dim_mm(node["geometry"]) == 82.0
+    assert node["mass_kg"] != 0.05
+    assert node.get("mass_source") == "shell_mass_integral"
+    from tuj.m1_scene.grounding import estimate_mass_kg_from_bbox
+    bbox_mass = estimate_mass_kg_from_bbox(
+        node, node["density_kgm3"], bool(node["geometry"].get("cylinder_like")))
+    # Hollow/thin-shell shell integral must not equal solid bbox×density overestimate.
+    assert node["mass_kg"] < bbox_mass
+    assert node["mass_kg"] < 2.5  # 3F payload headroom for mug-like object
+
+    # EE uses merged intr (current geometry), not stale memory footprint
+    assert evaluate_ee(ee_pool[0], {
+        "geometry": node["geometry"], "mass_kg": node["mass_kg"], "mu": node["mu"],
+    })["checks"][0]["value"] == 82.0
+
+
+def test_exact_hit_prefers_current_observation_geometry(tmp_path):
+    """CASE 3: same-task exact still refreshes geometry from current observation."""
+    memory = PropertyMemory(tmp_path / "m.json", task_id="same")
+    props = _props(density=800.0, extents=(50.0, 50.0, 50.0), material="plastic")
+    props["geometry"]["footprint_mm"] = [50.0, 50.0]
+    props["mass_kg"] = 9.99
+    memory.update_entry("same", "obj_spoon_spoon", props)
+    memory.save()
+
+    full = CountingBackend()
+    scene = _spoon_scene()
+    scene["nodes"][0]["bbox_mm"] = [110.0, 60.0, 45.0]
+    debug = {}
+    stats = ground_scene(
+        scene, backend=full, memory=memory,
+        density_infer=lambda _: DensityOnlyResult(9999, True),
+        retrieval_debug=debug, ee_pool=[{
+            "ee_id": "2F", "type": "parallel_2f", "stroke_mm": 85,
+            "payload_kg": 5.0, "grip_force_n": 235.0}])
+
+    node = scene["nodes"][0]
+    assert stats["memory_hits"] == 1 and full.calls == 0
+    assert debug[node["id"]]["lookup_type"] == "intra_task_exact"
+    assert node["material"] == "plastic"
+    assert node["geometry"]["footprint_mm"] == [110.0, 60.0]
+    assert node["mass_kg"] != 9.99
+    assert node.get("mass_source") == "shell_mass_integral"
+    from tuj.m1_scene.grounding import estimate_mass_kg_from_bbox
+    assert node["mass_kg"] < estimate_mass_kg_from_bbox(node, 800.0)
+
+
+def test_memory_hit_shell_mass_not_bbox_solid(tmp_path):
+    """CASE: hypotheses with thickness → shell mass; without thickness → bbox fallback."""
+    from tuj.m1_scene.grounding import (
+        apply_memory_hit_to_observation, estimate_mass_kg_from_bbox)
+
+    scene = build_m1([{
+        "name": "obj", "cls": "obj",
+        "points": _points((0, 0, 10), half=(40.0, 40.0, 20.0)),
+    }])
+    node = scene["nodes"][0]
+    node["bbox_mm"] = [80.0, 80.0, 80.0]
+
+    with_thick = _props(density=2500.0, material="ceramic", thickness_cm=(0.3, 0.8))
+    with_thick["mass_kg"] = 9.0
+    merged = apply_memory_hit_to_observation(node, with_thick)
+    assert merged["mass_source"] == "shell_mass_integral"
+    assert merged["mass_kg"] != 9.0
+    assert merged["mass_kg"] < estimate_mass_kg_from_bbox(node, 2500.0)
+
+    no_thick = _props(density=2500.0, material="ceramic", include_shell_hypotheses=False)
+    merged2 = apply_memory_hit_to_observation(node, no_thick)
+    assert merged2["mass_source"] == "bbox_density_fallback"
+    assert merged2["mass_kg"] == estimate_mass_kg_from_bbox(
+        node, 2500.0, bool(merged2["geometry"].get("cylinder_like")))
 
 
 def test_integrated_runner_propagates_supported_default_gemini_model(monkeypatch):

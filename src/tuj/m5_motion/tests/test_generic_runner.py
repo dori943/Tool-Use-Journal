@@ -140,8 +140,8 @@ def _world() -> WorldSnapshot:
 
 
 class _FakePlannerPool:
-    def __init__(self, repository, *, seed):
-        del repository, seed
+    def __init__(self, repository, *, seed, **provider_options):
+        del repository, seed, provider_options
 
     def __call__(self, request):
         start = request.world.robot_state.joint_positions_rad
@@ -403,6 +403,7 @@ def test_generic_cli_plans_with_request_backend_and_writes_manifest(
         "ToolUseJournalPlannerPool",
         _FakePlannerPool,
     )
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-key")
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-key")
 
     exit_code = main(
@@ -457,6 +458,7 @@ def test_generic_cli_replaces_stale_summary_when_planning_fails(
         "ToolUseJournalPlannerPool",
         FailingPlannerPool,
     )
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-key")
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-key")
 
     with pytest.raises(RuntimeError, match="expected planner failure"):
@@ -485,6 +487,8 @@ def test_generic_cli_replaces_stale_summary_when_planning_fails(
 def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
     tmp_path, monkeypatch
 ) -> None:
+    from tuj.m5_motion import live_execution
+
     task_path = tmp_path / "video_task.json"
     task_path.write_text(
         json.dumps(
@@ -537,6 +541,7 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
         "from_repository",
         fake_session,
     )
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-key")
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-key")
 
     exit_code = main(

@@ -1,0 +1,268 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:eefbd822cc507f6c3ef5:execution-report",
+  "run_id": "simulation-run:0000:eefbd822cc507f6c3ef5",
+  "plan_id": "motion-plan:92019f18abb34cbe2bcd6358",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:eefbd822cc507f6c3ef5:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:eefbd822cc507f6c3ef5",
+    "input_artifact_ids": [
+      "simulation-run-artifact:eefbd822cc507f6c3ef52e7f",
+      "motion-plan-artifact:92019f18abb34cbe2bcd6358"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "FAILED",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      -0.513503440465625,
+      -1.0029287234032331,
+      1.8274295893432153,
+      -2.534659683700838,
+      -1.5073883676558713,
+      -0.5098484210005108
+    ],
+    "joint_velocities_rad_s": [
+      -0.00002768807200995679,
+      -0.0005474212210422639,
+      0.00006267287958499701,
+      0.0005000686575974091,
+      0.000016422422300598807,
+      -0.00002846660905975447
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        -0.08211850469030123,
+        -0.1762153080044489,
+        1.0625225721651395
+      ],
+      "orientation_xyzw": [
+        -0.70531013408653,
+        0.7047658678504849,
+        -0.058451252884645664,
+        0.049255835228012704
+      ]
+    },
+    "gripper": {
+      "mode": "CLOSED",
+      "command": 1.0
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 9.820000000001004,
+    "max_joint_tracking_error_rad": 0.06032965705228399,
+    "max_eef_tracking_error_m": 0.025716773606010893,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG1_s1_d1:SG1_s1_d1:strategy_top_down:2:kf_top_down_grasp:event:0:GRIPPER_CLOSE",
+      "scheduled_time_s": 5.462186859005422,
+      "actual_time_s": 5.740000000001917,
+      "status": "SUCCESS",
+      "message": "finger gripper close command set to 1.000"
+    }
+  ],
+  "failure": {
+    "code": "GRASP_RETENTION_FAILED",
+    "category": "PHYSICAL_GRASP",
+    "message": "contact-friction grasp of 'spoon' did not satisfy formation, lift, and retention requirements",
+    "segment_id": null,
+    "waypoint_index": null,
+    "event_id": null,
+    "expected": {
+      "validation_status": "SUCCESS",
+      "held_tool_id": "spoon"
+    },
+    "observed": {
+      "status": "FAILED",
+      "object_id": "spoon",
+      "contact_formation": {
+        "status": "FAILED",
+        "formed_at_simulation_time_s": null,
+        "required_contact_ticks": 5
+      },
+      "grasp_retention": {
+        "status": "FAILED",
+        "retained_at_end": false,
+        "final_hold_duration_s": 0.0,
+        "required_final_hold_duration_s": 1.0
+      },
+      "sample_count": 204,
+      "final_contact_count": 0,
+      "final_contact_groups": [],
+      "final_bilateral_contact": false,
+      "final_lift_m": 0.000045686973219272176,
+      "max_lift_m": 0.00008104136401609896,
+      "minimum_lift_m": 0.05,
+      "final_normal_force_n": 0.0,
+      "retention_target_normal_force_n": 10.0,
+      "retention_force_model": "FALLBACK",
+      "retention_control_mode": "FORCE_TARGET",
+      "relative_grasp_transform": {
+        "object_id": "spoon",
+        "free_joint_name": "spoon_joint0",
+        "reference_kind": "site",
+        "reference_name": "gripper0_right_grip_site",
+        "position_in_reference_m": [
+          0.015344884374506793,
+          -0.00037723954063787184,
+          0.11665314113904864
+        ],
+        "orientation_in_reference_xyzw": [
+          0.711241516582481,
+          0.7020978854293217,
+          -0.02444909234497828,
+          0.02441938264236254
+        ]
+      }
+    },
+    "evidence_refs": []
+  },
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "2F",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": 1.0,
+    "ee_transition_count": 0,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 491,
+    "nominal_plan_duration_s": 9.525685031318785,
+    "final_plan_time_s": 9.525685031318785,
+    "adaptive_settle_extra_duration_s": 0.29431496868221885,
+    "segment_tracking": [
+      {
+        "segment_id": "SG1_s1_d1:SG1_s1_d1:strategy_top_down:0:SG1_s1_d1:SG1_s1_d1:strategy_top_down:1:kf_top_down_pre_grasp",
+        "keyframe_id": "SG1_s1_d1:SG1_s1_d1:strategy_top_down:1:kf_top_down_pre_grasp",
+        "target_block_id": null,
+        "nominal_end_time_s": 3.8978351086098337,
+        "actual_execution_time_s": 3.9000000000013024,
+        "max_joint_error_rad": 0.027495936602831783,
+        "eef_position_error_m": 0.010285042721453076,
+        "eef_orientation_error_rad": 0.007764897063117948,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_s1_d1:SG1_s1_d1:strategy_top_down:1:SG1_s1_d1:SG1_s1_d1:strategy_top_down:2:kf_top_down_grasp",
+        "keyframe_id": "SG1_s1_d1:SG1_s1_d1:strategy_top_down:2:kf_top_down_grasp",
+        "target_block_id": null,
+        "nominal_end_time_s": 6.962186859005422,
+        "actual_execution_time_s": 7.240000000002418,
+        "max_joint_error_rad": 0.005212432689299273,
+        "eef_position_error_m": 0.0043197500839406,
+        "eef_orientation_error_rad": 0.0072257077465652155,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.26000000000008683,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_s1_d1:SG1_s1_d1:strategy_top_down:2:SG1_s1_d1:SG1_s1_d1:strategy_top_down:3:kf_top_down_lift",
+        "keyframe_id": "SG1_s1_d1:SG1_s1_d1:strategy_top_down:3:kf_top_down_lift",
+        "target_block_id": null,
+        "nominal_end_time_s": 9.525685031318785,
+        "actual_execution_time_s": 9.820000000001004,
+        "max_joint_error_rad": 0.00024413378505827588,
+        "eef_position_error_m": 0.00008618443857460103,
+        "eef_orientation_error_rad": 0.00033029458652445023,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      }
+    ],
+    "grasp_execution_mode": "CONTACT_FRICTION",
+    "grasp_retention_validation": {
+      "status": "FAILED",
+      "object_id": "spoon",
+      "contact_formation": {
+        "status": "FAILED",
+        "formed_at_simulation_time_s": null,
+        "required_contact_ticks": 5
+      },
+      "grasp_retention": {
+        "status": "FAILED",
+        "retained_at_end": false,
+        "final_hold_duration_s": 0.0,
+        "required_final_hold_duration_s": 1.0
+      },
+      "sample_count": 204,
+      "final_contact_count": 0,
+      "final_contact_groups": [],
+      "final_bilateral_contact": false,
+      "final_lift_m": 0.000045686973219272176,
+      "max_lift_m": 0.00008104136401609896,
+      "minimum_lift_m": 0.05,
+      "final_normal_force_n": 0.0,
+      "retention_target_normal_force_n": 10.0,
+      "retention_force_model": "FALLBACK",
+      "retention_control_mode": "FORCE_TARGET",
+      "relative_grasp_transform": {
+        "object_id": "spoon",
+        "free_joint_name": "spoon_joint0",
+        "reference_kind": "site",
+        "reference_name": "gripper0_right_grip_site",
+        "position_in_reference_m": [
+          0.015344884374506793,
+          -0.00037723954063787184,
+          0.11665314113904864
+        ],
+        "orientation_in_reference_xyzw": [
+          0.711241516582481,
+          0.7020978854293217,
+          -0.02444909234497828,
+          0.02441938264236254
+        ]
+      }
+    },
+    "physical_grasp_transform": {
+      "object_id": "spoon",
+      "free_joint_name": "spoon_joint0",
+      "reference_kind": "site",
+      "reference_name": "gripper0_right_grip_site",
+      "position_in_reference_m": [
+        0.015344884374506793,
+        -0.00037723954063787184,
+        0.11665314113904864
+      ],
+      "orientation_in_reference_xyzw": [
+        0.711241516582481,
+        0.7020978854293217,
+        -0.02444909234497828,
+        0.02441938264236254
+      ]
+    },
+    "physical_grasp_execution_succeeded": false,
+    "trajectory_execution_status": "SUCCESS"
+  }
+}

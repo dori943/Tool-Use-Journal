@@ -1248,14 +1248,20 @@ def main(
             "planning_started_at_unix_s": planning_started_at_unix_s,
         },
     )
-    show_viewer = not args.headless and args.video is None
+    # 0909: live_session 생성이 누락되어 있었다. 계획 중 각 플랜을 실행하는
+    # plan_executor 로 넘기며, 시뮬레이션을 요청하지 않으면 None 이다.
+    video_path = (
+        args.video.expanduser().resolve() if args.video is not None else None
+    )
+    show_viewer = (
+        simulation_mode is not None
+        and not args.headless
+        and video_path is None
+    )
     realtime_factor = (
         args.realtime_factor
         if args.realtime_factor is not None
         else (1.0 if show_viewer else 0.0)
-    )
-    video_path = (
-        args.video.expanduser().resolve() if args.video is not None else None
     )
     planners = None
     live_session = None

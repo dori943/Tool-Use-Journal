@@ -167,6 +167,45 @@ class _RuntimeState:
     simulation_time_s: float
 
 
+def _active_contact_snapshot(
+    env: object, limit: int = 16
+) -> tuple[dict[str, Any], ...]:
+    """Every touching pair in the scene, strongest first.
+
+    A settle that stalls looks the same in the joint error whether the arm is
+    blocked by what it carries or merely tracking badly, and the two need
+    opposite fixes.  Recording the contacts at the moment the wait expires
+    separates them without re-running the task.
+    """
+
+    try:
+        model, data = _raw_model_data(env)
+    except Exception:  # pragma: no cover - diagnostics must never mask a failure
+        return ()
+    rows: list[dict[str, Any]] = []
+    try:
+        for contact_id in range(int(data.ncon)):
+            contact = data.contact[contact_id]
+            wrench = np.empty(6, dtype=float)
+            mujoco.mj_contactForce(model, data, contact_id, wrench)
+            rows.append(
+                {
+                    "geom_a": _name(
+                        model, mujoco.mjtObj.mjOBJ_GEOM, int(contact.geom1)
+                    ),
+                    "geom_b": _name(
+                        model, mujoco.mjtObj.mjOBJ_GEOM, int(contact.geom2)
+                    ),
+                    "penetration_m": -float(contact.dist),
+                    "normal_force_n": abs(float(wrench[0])),
+                }
+            )
+    except Exception:  # pragma: no cover - diagnostics must never mask a failure
+        return tuple(rows[:limit])
+    rows.sort(key=lambda row: row["normal_force_n"], reverse=True)
+    return tuple(rows[:limit])
+
+
 def _capture_runtime_state(env: object) -> _RuntimeState:
     model, data = _raw_model_data(env)
     qpos: dict[str, tuple[float, ...]] = {}
@@ -4001,6 +4040,12 @@ class ToolUseJournalControllerTrajectoryPlayer(
                                 "custom_settle": settle_state.get(
                                     "custom_settle"
                                 ),
+                                "contacts": [
+                                    dict(row)
+                                    for row in _active_contact_snapshot(
+                                        self.runtime.env
+                                    )
+                                ],
                             },
                         )
                         return failed_report()

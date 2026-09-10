@@ -564,6 +564,67 @@ class ToolUseJournalCollisionContextFactory:
         return sorted({tuple(sorted((left, item))) for item in selectors if item})
 
     @staticmethod
+    def _region_occupant_ids(
+        request: MotionPlanRequest,
+        target: str,
+    ) -> list[str]:
+        """Ids of scene objects already resting inside the destination region.
+
+        Multi-object kitting packs several objects into one region and the task
+        permits them to rest against or on top of one another, so the held
+        object is allowed to contact whatever is already there.  Membership uses
+        the region's world AABB: an object whose centre lies within the region
+        footprint and at or above its floor counts as an occupant.  A
+        single-object region has no occupants, so this returns an empty list and
+        leaves those tasks unchanged.
+        """
+        region_id = request.task.goal.target_region_id
+        if not region_id:
+            return []
+        objects = request.world.objects
+        region = objects.get(region_id)
+        if (
+            not isinstance(region, dict)
+            or "pose" not in region
+            or "dimensions_m" not in region
+        ):
+            return []
+        from scipy.spatial.transform import Rotation
+
+        r_pose = region["pose"]
+        r_pos = np.asarray(r_pose["position_m"], dtype=float)
+        r_rot = Rotation.from_quat(r_pose["orientation_xyzw"]).as_matrix()
+        r_center_local = np.asarray(
+            region.get("anchors", {}).get("center", [0.0, 0.0, 0.0]), dtype=float
+        )
+        r_center = r_pos + r_rot @ r_center_local
+        r_half = np.abs(r_rot) @ (np.asarray(region["dimensions_m"], dtype=float) / 2.0)
+        region_bottom = float(r_center[2] - r_half[2])
+        occupants: list[str] = []
+        for other_id, other in objects.items():
+            if other_id in {target, region_id}:
+                continue
+            if (
+                not isinstance(other, dict)
+                or "pose" not in other
+                or "dimensions_m" not in other
+            ):
+                continue
+            pose = other["pose"]
+            if pose.get("frame_id", "world") != "world":
+                continue
+            center = np.asarray(pose["position_m"], dtype=float)
+            anchor = other.get("anchors", {}).get("center")
+            if anchor is not None:
+                center = center + Rotation.from_quat(
+                    pose["orientation_xyzw"]
+                ).as_matrix() @ np.asarray(anchor, dtype=float)
+            inside = bool(np.all(np.abs(center[:2] - r_center[:2]) <= r_half[:2]))
+            if inside and center[2] >= region_bottom - 1e-6:
+                occupants.append(other_id)
+        return occupants
+
+    @staticmethod
     def _metadata_selectors(request: MotionPlanRequest, key: str) -> list[str]:
         raw = request.task.metadata.get(key, ())
         if isinstance(raw, str):
@@ -1053,6 +1114,13 @@ class ToolUseJournalCollisionContextFactory:
         contact_selectors = list(request.task.allowed_touch_objects)
         if request.task.goal.target_region_id:
             contact_selectors.append(request.task.goal.target_region_id)
+            # Objects already packed into the destination region may be
+            # contacted (or rested upon) by the held object -- the task packs
+            # everything into one region and permits overlap -- so admit each
+            # occupant as an allowed collision pair for the PLACE contact.
+            for occupant in self._region_occupant_ids(request, target):
+                if occupant not in contact_selectors:
+                    contact_selectors.append(occupant)
         for candidate in bound.candidates:
             place = self._event_keyframe(
                 candidate,
@@ -1113,7 +1181,15 @@ class ToolUseJournalCollisionContextFactory:
                     "context_id": release_id,
                     "allowed_collision_pairs": self._contact_pairs(active_ee, [target]),
                 })
-            current_id = base.context_id
+            # Approach keyframes (TRANSFER/PRE_PLACE) carry the held object over
+            # an increasingly crowded region.  The task packs everything into one
+            # region and permits overlap, so let the held object contact the
+            # region and its current occupants throughout the descent -- not only
+            # at the final PLACE pose -- otherwise the approach into a dense tray
+            # is collision-filtered before it can reach the drop point.  For a
+            # region with no occupants this context only adds the region/touch
+            # pairs, matching the prior place-near-region behaviour.
+            current_id = contact_id
             withdrawal_pending = False
             for keyframe in candidate.keyframes:
                 keyframe.collision_context_after_events_id = None
@@ -1467,6 +1543,24 @@ class ToolUseJournalMotionRequestPlanner:
                 kinematics, adapter.data.qpos[adapter.robot._ref_joint_pos_indexes]
             )
         pipeline = MotionPlanningPipeline(execution_provider, kinematics)
+        # Portable (cross-environment) EE-path validation compares a template's
+        # stored canonical EEF pose against current-model forward kinematics.
+        # Every portable template records that pose in the bare-flange frame
+        # (it is commissioned with the no-gripper kinematics), so validation
+        # must evaluate the flange too.  ``kinematics`` above targets the
+        # mounted EE's grip site when one is mounted (needed for IK), which for
+        # a return/exchange template would offset the check by the whole
+        # gripper mount (~0.14 m) and reject a geometrically identical rack.
+        # Build a dedicated EE-independent flange FK for validation only; it is
+        # never used for IK or planning.
+        from tuj.m5_motion.kinematics import UR5eKinematics
+
+        try:
+            portable_validation_kinematics: Any = UR5eKinematics.from_robosuite_env(
+                env
+            )
+        except Exception:  # noqa: BLE001 - fall back to the planning kinematics
+            portable_validation_kinematics = kinematics
         factory = ToolUseJournalCollisionContextFactory(
             compiler,
             attachment_reference_name=(
@@ -1500,10 +1594,7 @@ class ToolUseJournalMotionRequestPlanner:
                 registry_root,
                 trajectory_paths=ee_attach_trajectory_paths,
             ),
-            # Bare attach artifacts store RobotState.eef_pose at the wrist.
-            # TCP IK can include a gripper-site rotation, even for NullGripper;
-            # compare the canonical artifact pose in its original body frame.
-            forward_kinematics=UR5eKinematics.from_robosuite_env(env),
+            forward_kinematics=portable_validation_kinematics,
             start_tolerance_rad=ee_attach_start_tolerance_rad,
             joint_position_limits_rad=getattr(
                 kinematics, "joint_limits_rad", None
@@ -1622,11 +1713,50 @@ class ToolUseJournalMotionRequestPlanner:
                 if self.ee_attach_policy is EEAttachPolicy.PRECOMPUTED_REQUIRED:
                     raise
                 self._log("[M5][EE_PATH] fallback=dynamic-planner")
+        self._ground_held_region_goal(request)
         return self.pipeline.plan(
             request,
             collision_context_factory=self.collision_context_factory,
-            **({"final_plan_validator": final_plan_validator} if final_plan_validator is not None else {}),
+            **(
+                {"final_plan_validator": final_plan_validator}
+                if final_plan_validator is not None
+                else {}
+            ),
         )
+
+    def _ground_held_region_goal(self, request: MotionPlanRequest) -> None:
+        """Give a held TRANSPORT/MOVE or region PLACE an object-space destination.
+
+        The scripted live runtime does this through its grasp retention; the
+        generic ``run.py`` pipeline reaches the keyframe generator without it,
+        so the model used to aim the gripper at a bare region anchor and the
+        carried object clipped the table (transport) or sank through the tray
+        floor (place).  Grounding here derives the current object pose from
+        ``robot_state.eef_pose`` and the recorded grasp transform, picks a free
+        spot inside the region, and publishes ``held_transport_goal`` /
+        ``held_place_goal`` (place also rewrites the stale M4 fallback
+        ``goal.target_pose`` so the released body is frozen where it lands).
+        """
+
+        from tuj.m5_motion.scripted_grasps.transport import (
+            HELD_PLACE_GOAL_ANCHOR,
+            HELD_TRANSPORT_GOAL_ANCHOR,
+            ground_held_region_goal,
+        )
+
+        try:
+            ground_held_region_goal(request)
+        except ValueError as error:
+            self._log(f"[M5][REGION_GOAL] grounding skipped: {error}")
+            return
+        for key in (HELD_TRANSPORT_GOAL_ANCHOR, HELD_PLACE_GOAL_ANCHOR):
+            goal = request.task.metadata.get(key)
+            if isinstance(goal, Mapping):
+                self._log(
+                    f"[M5][REGION_GOAL] {key} object={goal.get('object_id')} "
+                    f"region={request.task.goal.target_region_id} "
+                    f"source={goal.get('source')}"
+                )
 
 
 class WorkcellMotionRequestRouter:

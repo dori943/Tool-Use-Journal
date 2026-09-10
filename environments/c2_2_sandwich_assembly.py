@@ -1021,6 +1021,10 @@ class C2_2_SandwichAssembly(KitchenBase):
             "bread_plate"
         )
 
+        # 0909: 빵 두 장만 음수 간격(-5mm)으로 겹쳐 쌓고 있었다. M5 는 파지 시작
+        # 시점의 지지면 관통을 1mm 까지만 허용하므로 첫 서브골에서 바인딩이 막혔고,
+        # 관측에서도 아래 빵이 거의 가려져 bbox 가 실제보다 훨씬 작게 잡혔다.
+        # 다른 재료와 같은 양수 간격으로 맞춘다.
         self._stack_items(
             bread_xy,
             bread_top,
@@ -1028,7 +1032,7 @@ class C2_2_SandwichAssembly(KitchenBase):
                 "bread_a",
                 "bread_b",
             ],
-            clearance=-0.005,
+            clearance=0.0002,
         )
 
         # ====================================================

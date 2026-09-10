@@ -60,6 +60,14 @@ class ScriptedGraspSession:
         self.failure = None
         self._planner = None
         self._planner_key = None
+        # Per-step artifact dirs (``<index>-<token>`` and their ``grasp``/plan
+        # subfolders) are created with exist_ok=False, and a re-run reuses the
+        # same index+request-hash names, so a prior run's tree collides
+        # (FileExistsError on ``.../grasp``).  Clear the session output once here
+        # so re-runs start clean while the within-run collision guard stays.
+        import shutil
+        if self.output.exists():
+            shutil.rmtree(self.output)
         self.output.mkdir(parents=True, exist_ok=True)
 
     def execute_request(self, request, *, completed_subgoal=None):

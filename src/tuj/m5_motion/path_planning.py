@@ -201,6 +201,7 @@ class CartesianEdgePlanner:
         previous = tuple(float(value) for value in source)
         path: list[JointConfig] = [previous]
         minimum: float | None = None
+        rejected_minimum: float | None = None
         for index in range(1, steps + 1):
             fraction = index / steps
             position = start_xyz + fraction * (target_xyz - start_xyz)

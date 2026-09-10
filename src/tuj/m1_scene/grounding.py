@@ -209,6 +209,107 @@ def geometry_is_current(geometry) -> bool:
     return len(seq) >= 2 and all(_finite_number(x) for x in seq[:2])
 
 
+def estimate_mass_kg_from_bbox(node: dict, density_kgm3: float,
+                               cylinder_like: bool = False) -> float:
+    """최후 폴백: bbox 부피(m³) × density (hollow object에는 부적절)."""
+    vol = float(np.prod(np.asarray(node["bbox_mm"], dtype=np.float64) / 1000.0))
+    return round(vol * (np.pi / 4 if cylinder_like else 1.0) * float(density_kgm3), 3)
+
+
+def estimate_mass_from_material_hypotheses(points_mm, materials_topk) -> dict | None:
+    """Full SiPhy와 동일: 저장된 material hypotheses(thickness 포함) + 현재 점군 → shell mass.
+
+    materials_topk 항목에 density_kgm3·thickness_cm range와 prob가 있어야 한다.
+    불완전하면 None → 호출측이 bbox 폴백으로 떨어질 수 있다.
+    """
+    from tuj.m1_scene.siphy_backend import (  # local: avoid import cycle at module load
+        _effective_probs, shell_mass_integral)
+
+    if points_mm is None or len(np.asarray(points_mm)) < 3:
+        return None
+    if not materials_topk:
+        return None
+
+    dens_rows, thick_rows, probs = [], [], []
+    for m in materials_topk:
+        dens = m.get("density_kgm3")
+        thick = m.get("thickness_cm")
+        if dens is None or thick is None:
+            return None
+        dens = list(dens) if not isinstance(dens, (int, float)) else [float(dens), float(dens)]
+        thick = list(thick) if not isinstance(thick, (int, float)) else [float(thick), float(thick)]
+        if len(dens) < 2:
+            dens = [float(dens[0]), float(dens[0])]
+        if len(thick) < 2:
+            thick = [float(thick[0]), float(thick[0])]
+        dens_rows.append([float(dens[0]), float(dens[1])])
+        thick_rows.append([float(thick[0]), float(thick[1])])
+        probs.append(max(float(m.get("prob", 0.0)), 0.0))
+
+    probs_raw = np.asarray(probs, dtype=np.float64)
+    if probs_raw.sum() <= 0:
+        probs_raw = np.full(len(probs_raw), 1.0 / len(probs_raw))
+    else:
+        probs_raw = probs_raw / probs_raw.sum()
+    probs_eff, _, _, _ = _effective_probs(probs_raw)
+    return shell_mass_integral(
+        points_mm, probs_eff,
+        np.asarray(dens_rows, dtype=np.float64),
+        np.asarray(thick_rows, dtype=np.float64))
+
+
+def apply_memory_hit_to_observation(node: dict, reused: dict) -> dict:
+    """Memory HIT: intrinsic/material 재사용 + 현재 observation geometry/mass.
+
+    재사용: material, density, Young's, mu(마찰계수), confidence, materials_topk, caption
+    현재 관측: geometry 전부
+    mass: Full SiPhy ``shell_mass_integral`` (hypotheses thickness × 현재 점군).
+          thickness 정보가 없을 때만 bbox×density 폴백.
+    """
+    geom = geometry_from_node(node)
+    density = reused["density_kgm3"]
+
+    shell = estimate_mass_from_material_hypotheses(
+        node.get("_points"), reused.get("materials_topk"))
+    if shell is not None:
+        mass = shell["mass_kg"]
+        mass_range = shell.get("mass_range_kg")
+        mass_source = "shell_mass_integral"
+    else:
+        mass = estimate_mass_kg_from_bbox(
+            node, density, bool(geom.get("cylinder_like")))
+        mass_range = None
+        mass_source = "bbox_density_fallback"
+
+    mu_src = reused.get("mu") or {}
+    mu = {
+        "mu": mu_src.get("mu"),
+        "stage": mu_src.get("stage", 0),
+        "material": mu_src.get("material"),
+        # RMS는 geometry-dependent → 현재 상면 RMS로 맞춤 (μ 계수 자체는 memory)
+        "rms_mm": geom.get("surface_rms_mm", mu_src.get("rms_mm")),
+    }
+
+    out = {
+        "geometry": geom,
+        "material": reused.get("material"),
+        "density_kgm3": density,
+        "mass_kg": mass,
+        "youngs_gpa": reused.get("youngs_gpa"),
+        "mu": mu,
+        "confidence": reused.get("confidence"),
+        "geometry_source": "current_observation",
+        "intrinsic_source": "memory",
+        "mass_source": mass_source,
+    }
+    if mass_range is not None:
+        out["mass_range_kg"] = mass_range
+    for k in ("materials_topk", "caption"):
+        if k in reused:
+            out[k] = reused[k]
+    return out
+
+
 # ── intrinsic 접지 진입점 ─────────────────────────────
 
 def ground_intrinsic(node: dict, crop_rgb=None, backend: PropertyBackend | None = None,
@@ -222,15 +323,16 @@ def ground_intrinsic(node: dict, crop_rgb=None, backend: PropertyBackend | None 
 
     mass = props.get("mass_kg")
     if mass is None:                                   # 백엔드 미제공 시 bbox부피×밀도 폴백
-        vol = float(np.prod(np.asarray(node["bbox_mm"]) / 1000.0))
-        mass = round(vol * (np.pi / 4 if geom["cylinder_like"] else 1.0)
-                     * props["density_kgm3"], 3)
+        mass = estimate_mass_kg_from_bbox(
+            node, props["density_kgm3"], bool(geom.get("cylinder_like")))
 
     mu = friction.estimate(props["material"], rms, **friction_hooks)
     out = {"geometry": geom,
            "material": props["material"], "density_kgm3": props["density_kgm3"],
            "mass_kg": mass, "youngs_gpa": props.get("youngs_gpa"),
-           "mu": mu, "confidence": props.get("confidence")}
+           "mu": mu, "confidence": props.get("confidence"),
+           "geometry_source": "current_observation",
+           "intrinsic_source": "backend"}
     for k in ("mass_range_kg", "materials_topk", "caption"):   # SiPhy 부가 출력 보존
         if k in props:
             out[k] = props[k]

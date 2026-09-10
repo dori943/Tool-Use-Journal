@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import shutil
 from pathlib import Path
 
 from .live_execution import LivePlanExecutionError, LivePlanExecutionSession
@@ -27,6 +28,13 @@ class ControllerPlanPreview:
             raise ValueError('controller preview requires a controller session')
         self.live = live_session
         self.output_dir = Path(output_dir)
+        # Preview directories are created per candidate with exist_ok=False so a
+        # duplicated index within a run is caught.  A prior run leaves numbered
+        # directories behind (subgoals after an EE exchange restart the index at
+        # 0000), so clear the tree once here to keep the within-run guard while
+        # letting re-runs start clean instead of raising FileExistsError.
+        if self.output_dir.exists():
+            shutil.rmtree(self.output_dir)
         self.index = 0
 
     @staticmethod
