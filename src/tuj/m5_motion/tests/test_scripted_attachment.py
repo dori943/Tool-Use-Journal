@@ -89,3 +89,36 @@ def test_rejected_attachment_is_a_failed_integration(monkeypatch, tmp_path):
     assert result["attachment_used"] is False
     retained.assert_not_called()
     runtime.mark_attached_object_as_tool.assert_not_called()
+
+
+def test_scripted_planning_failure_preserves_rejected_edge_evidence(monkeypatch, tmp_path):
+    from tuj.m5_motion.scripted_grasps import live
+    from tuj.m5_motion.tests.test_scripted_grasps import request_for, ENTRIES
+    from tuj.m5_motion.pipeline import MotionPlanningPipelineError
+
+    request = request_for(ENTRIES[4], action="MOVE")
+    world = request.world
+    monkeypatch.setattr(live, "snapshot", lambda *args: world.model_copy(deep=True))
+    edge = SimpleNamespace(source_keyframe_id="transfer", target_keyframe_id="place",
+        source_branch_id="a", target_branch_id="b", failure_code="COLLISION",
+        detail="held object collides with destination rim")
+    attempt = SimpleNamespace(strategy_id="place", failure_code="NO_CONNECTED_SEQUENCE",
+        detail="no connected branches", resolved_keyframes=(), ik_diagnostics=(),
+        selection=SimpleNamespace(rejected_edges=(edge,)))
+    error = MotionPlanningPipelineError("planning failed",
+        compilation=SimpleNamespace(attempts=(attempt,)))
+
+    def planner(_request):
+        raise error
+
+    session = live.ScriptedGraspSession(SimpleNamespace(env=object()), tmp_path, tmp_path,
+        planner_factory=lambda *args, **kwargs: planner)
+    with pytest.raises(MotionPlanningPipelineError) as caught:
+        session.execute_request(request)
+    assert caught.value is error
+    manifest = json.loads((tmp_path / "live-execution-manifest.json").read_text())
+    step = manifest["steps"][0]
+    assert step["status"] == "FAILED"
+    from pathlib import Path
+    saved = json.loads(Path(step["planning_failure"]).read_text())
+    assert saved["attempts"][0]["rejected_edges"][0]["detail"] == edge.detail

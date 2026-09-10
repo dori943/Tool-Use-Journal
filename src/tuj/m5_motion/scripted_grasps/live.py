@@ -141,6 +141,9 @@ class ScriptedGraspSession:
             return record
         except Exception as error:
             record.update(status="FAILED", error=f"{type(error).__name__}: {error}")
+            if getattr(error, "compilation", None) is not None:
+                from tuj.m5_motion.object_function_runner import _write_planning_failure
+                record["planning_failure"] = str(_write_planning_failure(directory, request, error))
             self.world = snapshot(self.runtime, self.world)
             raise
         finally:
