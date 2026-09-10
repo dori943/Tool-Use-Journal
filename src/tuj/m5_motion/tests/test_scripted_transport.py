@@ -283,3 +283,46 @@ def test_a_full_region_stacks_squarely_instead_of_being_driven_into_the_occupant
     plate_top=plate_center[2]+.005
     assert carried_center[2]-half_height>=plate_top+.005-1e-9
     assert hint['release_clearance_m']>=.01-1e-12
+
+
+def test_a_full_region_stacks_on_the_flat_support_not_astride_a_taller_neighbour():
+    """The resting surface is the highest overlapped occupant, not the widest.
+
+    c3_1: the bread's slot lay on the plate, which the search rejected as
+    occupied, and then ranked a spot that was fully on the plate *by area* yet
+    straddled the mug standing on it.  Only the mug ever touches the bread
+    there, so the release had to clear the mug's rim by a few millimetres and
+    the place never settled.
+    """
+    from tuj.m5_motion.scripted_grasps.transport import ground_held_place
+    request=_tray_request(.005)
+    request.task.action_type='place'
+    # An axis-aligned tray holding a wide flat plate with a tall mug standing
+    # on one end of it -- the c3_1 layout, with no free spot left beside them.
+    request.world.objects['tray']={'pose':{'frame_id':'world','position_m':REGION_POSITION,
+        'orientation_xyzw':[0.,0.,0.,1.]},'dimensions_m':[.40,.50,.064],
+        'anchors':{'center':[0.,0.,0.]}}
+    plate_center=np.asarray(REGION_POSITION)+np.array([.03,0.,-.01])
+    request.world.objects['plate']={'pose':{'frame_id':'world',
+        'position_m':plate_center.tolist(),'orientation_xyzw':[0.,0.,0.,1.]},
+        'dimensions_m':[.27,.50,.012],'anchors':{'center':[0.,0.,0.]}}
+    mug_center=np.asarray(REGION_POSITION)+np.array([-.07,0.,.04])
+    request.world.objects['mug']={'pose':{'frame_id':'world',
+        'position_m':mug_center.tolist(),'orientation_xyzw':[0.,0.,0.,1.]},
+        'dimensions_m':[.09,.09,.09],'anchors':{'center':[0.,0.,0.]}}
+    _generic_held(request,ENTRIES[4].object_id)
+    request.task.metadata['action_parameters']={'placement_slot':{
+        'region':'obj_tray_tray','uv':[.9,0.],'source':'m2_container_layout'}}
+    ground_held_place(request)
+    hint=request.task.metadata['held_place_goal']
+    destination=np.asarray(request.world.objects['tray']['anchors'][hint['anchor']])+REGION_POSITION
+    carried_center=destination+BODY[:3,:3]@CENTER_IN_BODY
+    my_half=np.abs(BODY[:2,:3])@LOCAL_SIZE/2.
+    # Clear of the mug's footprint, so nothing is balanced on its rim...
+    gap=np.abs(carried_center[:2]-mug_center[:2])-(my_half+np.array([.045,.045]))
+    assert gap.max()>0., gap
+    # ...and released just over the plate rather than over the mug's top.
+    half_height=float(np.abs(BODY[2,:3])@LOCAL_SIZE/2.)
+    plate_top=plate_center[2]+.006
+    assert carried_center[2]-half_height==pytest.approx(plate_top+.01)
+    assert carried_center[2]-half_height<mug_center[2]+.045
