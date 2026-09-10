@@ -393,35 +393,6 @@ class ToolUseJournalPlannerPool:
         self._planners.clear()
 
 
-def rebuild_offscreen_context(env: Any) -> None:
-    """Give a freshly swapped-in environment its own offscreen render context.
-
-    An EE exchange builds the incoming environment while the outgoing one is
-    still open and closes the outgoing one straight after.  The new context is
-    created against the old one's GL context, so closing the old environment
-    leaves it dead: ``sim.render()`` then returns the same stale buffer for
-    every frame.  A probe stepping physics 30 times after an exchange got a
-    byte-identical frame each time, which is what recorded video showed as
-    noise that started the moment the robot picked up its first EE.
-    """
-    sim = getattr(env, "sim", None)
-    if sim is None:
-        return
-    try:
-        from robosuite.utils.binding_utils import MjRenderContextOffscreen
-    except ImportError:  # recording is best effort; never stop the run for it
-        return
-    try:
-        sim._render_context_offscreen = None
-        sim.add_render_context(
-            MjRenderContextOffscreen(
-                sim, device_id=getattr(env, "render_gpu_device_id", -1)
-            )
-        )
-    except Exception as error:  # noqa: BLE001
-        print(f"[M5][VIDEO] offscreen context rebuild skipped: {error}")
-
-
 class GenericSimulationVideoRecorder:
     """Record the runtime's current EE environment at simulated-time cadence."""
 
@@ -460,7 +431,6 @@ class GenericSimulationVideoRecorder:
         if not self._writer.isOpened():
             self._writer.release()
             raise RuntimeError(f"could not open video writer for {self.path}")
-        self._context_env_id = id(runtime.env)
         try:
             runtime.set_render_callback(self.capture)
             self._write_frame(runtime.env)
@@ -478,9 +448,6 @@ class GenericSimulationVideoRecorder:
         return float(raw_time or 0.0)
 
     def _write_frame(self, env: Any) -> None:
-        if id(env) != self._context_env_id:
-            self._context_env_id = id(env)
-            rebuild_offscreen_context(env)
         rgb = env.sim.render(
             camera_name=self.camera,
             width=self.width,
