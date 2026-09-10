@@ -772,10 +772,29 @@ class ToolUseJournalCollisionContextFactory:
         source = artifact
         bound = artifact.model_copy(deep=True)
         contexts = {base.context_id: base}
+        from .flatten_contact import is_flatten_contact
+        contact_id = None
+        if is_flatten_contact(request.task) and len(request.task.target_ids) == 1:
+            target = request.task.target_ids[0]
+            config = request.world.objects[target].get("flattening_configuration", {})
+            if config.get("allow_active_ee_contact") is True:
+                contact_id = base.context_id + ":material-contact"
+                contexts[contact_id] = base.model_copy(update={
+                    "context_id": contact_id,
+                    "allowed_collision_pairs": sorted({
+                        *base.allowed_collision_pairs,
+                        tuple(sorted((base.active_ee, target))),
+                    }),
+                })
         for candidate in bound.candidates:
             current_id = base.context_id
             for keyframe in candidate.keyframes:
                 selected = keyframe.collision_context_id or current_id
+                if contact_id is not None:
+                    # Incoming engagement and withdrawal edges include intentional
+                    # contact. Hover and subsequent unrelated edges retain the base.
+                    selected = (contact_id if keyframe.metadata.get("flatten_stage")
+                                in {"engage", "press", "unload"} else base.context_id)
                 if selected not in contexts:
                     raise ToolUseJournalCollisionBindingError(
                         f"strategy {candidate.strategy_id!r} supplies unknown "

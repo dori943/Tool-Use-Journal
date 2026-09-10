@@ -47,12 +47,18 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
     summary = {"mode": "SCRIPTED_GRASP_LIVE", "status": "FAILED",
                "task_goal_status": "NOT_EVALUATED"}
     try:
+        recording_options = (
+            {"camera_names": args.camera, "camera_heights": args.height,
+             "camera_widths": args.width}
+            if args.video is not None
+            else {}
+        )
         runtime = ToolUseJournalEERuntime.from_repository_for_controller(repository,
             _runtime_environment_name(initial_world), active_ee=_runtime_active_ee(initial_world),
             seed=args.seed, scripted_grasps=True, ignore_done=True,
             has_renderer=not args.headless and args.video is None,
             has_offscreen_renderer=args.video is not None, use_camera_obs=False,
-            render_camera=args.camera)
+            render_camera=args.camera, **recording_options)
         if not args.headless and args.video is None:
             _select_live_viewer_camera(runtime, args.camera)
         preview = initial_world

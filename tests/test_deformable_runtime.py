@@ -103,3 +103,37 @@ def test_contact_query_identifies_flex_and_preserves_unrelated_geom_queries():
     assert check_native_contact(runtime.model, runtime.data, runtime.obj)
     assert not check_native_contact(runtime.model, runtime.data, 'missing_button')
     assert not check_native_contact(runtime.model, runtime.data, runtime.obj, 'missing_button')
+
+
+def test_contact_force_monitor_rejects_overload_and_ignores_support_only():
+    import pytest
+    runtime = make_runtime()
+    body = runtime.model.body('press').id
+    geoms = np.flatnonzero(runtime.model.geom_bodyid == body)
+    runtime.begin_contact_measurement(geoms, .01)
+    for _ in range(500):
+        step(runtime)
+        runtime.observe_contacts()
+    assert runtime.contact_measurement['impulse_ns'] == 0
+    runtime.data.mocap_pos[int(runtime.model.body_mocapid[body]), 2] = .04
+    with pytest.raises(ValueError, match='TOOL_CONTACT_FORCE_LIMIT'):
+        for _ in range(50):
+            step(runtime)
+            runtime.observe_contacts()
+
+def test_ee_contact_is_separate_from_tool_and_counts_toward_force_limit():
+    import pytest
+    runtime = make_runtime()
+    body = runtime.model.body('press').id
+    geoms = np.flatnonzero(runtime.model.geom_bodyid == body)
+    runtime.begin_contact_measurement([], .01, ee_geoms=geoms)
+    runtime.data.mocap_pos[int(runtime.model.body_mocapid[body]), 2] = .04
+    with pytest.raises(ValueError, match='TOOL_CONTACT_FORCE_LIMIT'):
+        for _ in range(100):
+            step(runtime)
+            runtime.observe_contacts()
+    contact = runtime.contact_measurement
+    assert contact['impulse_ns'] == 0
+    assert contact['ee_impulse_ns'] > 0
+    assert contact['combined_peak_force_n'] == contact['ee_peak_force_n']
+    assert contact['unloaded_duration_s'] == 0

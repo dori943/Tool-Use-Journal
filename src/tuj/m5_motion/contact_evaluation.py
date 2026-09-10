@@ -431,6 +431,14 @@ class TaskAwareGoalEvaluator:
         observed_world: WorldSnapshot | None,
     ) -> GoalEvaluation:
         task = request.task
+        from .flatten_contact import is_flatten_contact, flattening_outcome
+        if is_flatten_contact(task):
+            if observed_world is None or len(task.target_ids) != 1:
+                return _result(request, GoalEvaluationStatus.UNKNOWN, 'measured deformable state unavailable')
+            record = observed_world.objects.get(task.target_ids[0], {})
+            passed, evidence = flattening_outcome(record)
+            return _result(request, GoalEvaluationStatus.SATISFIED if passed else GoalEvaluationStatus.FAILED,
+                           'measured contact and residual flattening', observed=evidence)
         if is_acquire_task(task):
             from tuj.m5_motion.physical_grasp import uses_contact_friction
 

@@ -6,6 +6,7 @@ operations may change nodal state.
 """
 import numpy as np
 import mujoco
+from copy import deepcopy
 
 
 def contact_endpoint_name(model, contact, side):
@@ -53,6 +54,7 @@ class FlexMaterialRuntime:
         self.root = model.body(obj.root_body).id
         self.mocap = int(model.body_mocapid[self.root])
         self.last_time = None
+        self.contact_measurement = None
 
     def prepare_forces(self):
         positions = self.data.xpos[self.bodies].copy()
@@ -74,6 +76,7 @@ class FlexMaterialRuntime:
         self.data.xfrc_applied[self.bodies] = 0
         self.material = self.obj.new_material()
         self.last_time = None
+        self.contact_measurement = None
         mujoco.mj_forward(self.model, self.data)
 
     def state(self):
@@ -103,11 +106,64 @@ class FlexMaterialRuntime:
 
     def metrics(self):
         vertices = self.data.xpos[self.bodies]
-        return {"bounds_min_m": vertices.min(axis=0).tolist(),
+        return {"initial_height_m": float(np.ptp(self.obj.reference_positions[:, 2])),
+                "bounds_min_m": vertices.min(axis=0).tolist(),
                 "bounds_max_m": vertices.max(axis=0).tolist(),
                 "height_m": float(np.ptp(vertices[:, 2])),
                 "volume_ratio": float(self.material.volumes(vertices).sum()
-                                      / self.material.reference_volumes.sum())}
+                                      / self.material.reference_volumes.sum()),
+                "tool_contact": deepcopy(self.contact_measurement)}
+
+    def begin_contact_measurement(self, tool_geoms, force_limit_n, ee_geoms=()):
+        if not np.isfinite(force_limit_n) or force_limit_n <= 0:
+            raise ValueError("positive tool force limit required")
+        self._tool_geoms = frozenset(tool_geoms)
+        self._ee_geoms = frozenset(ee_geoms) - self._tool_geoms
+        self._flex_id = mujoco.mj_name2id(self.model, mujoco.mjtObj.mjOBJ_FLEX, self.obj.flex.get("name"))
+        self.contact_measurement = {"start_height_m": self.metrics()['height_m'],
+                                    "force_limit_n": float(force_limit_n),
+                                    "peak_force_n": 0., "impulse_ns": 0.,
+                                    "contact_duration_s": 0., "current_force_n": 0.}
+        self.contact_measurement['unloaded_duration_s'] = 0.
+        self.contact_measurement.update(ee_current_force_n=0., ee_peak_force_n=0.,
+                                        ee_impulse_ns=0., combined_current_force_n=0.,
+                                        combined_peak_force_n=0.)
+
+    def observe_contacts(self):
+        if self.contact_measurement is None:
+            return
+        total = 0.
+        ee_total = 0.
+        for i in range(self.data.ncon):
+            contact = self.data.contact[i]
+            if any(int(contact.flex[s]) == self._flex_id
+                   and int(contact.geom[1-s]) in self._tool_geoms for s in (0, 1)):
+                wrench = np.zeros(6)
+                mujoco.mj_contactForce(self.model, self.data, i, wrench)
+                total += max(0., float(wrench[0]))
+            elif any(int(contact.flex[s]) == self._flex_id
+                     and int(contact.geom[1-s]) in self._ee_geoms for s in (0, 1)):
+                wrench = np.zeros(6)
+                mujoco.mj_contactForce(self.model, self.data, i, wrench)
+                ee_total += max(0., float(wrench[0]))
+        record = self.contact_measurement
+        combined = total + ee_total
+        record['ee_current_force_n'] = ee_total
+        record['ee_peak_force_n'] = max(record['ee_peak_force_n'], ee_total)
+        record['ee_impulse_ns'] += ee_total * self.model.opt.timestep
+        record['combined_current_force_n'] = combined
+        record['combined_peak_force_n'] = max(record['combined_peak_force_n'], combined)
+        record['current_force_n'] = total
+        record['peak_force_n'] = max(record['peak_force_n'], total)
+        record['impulse_ns'] += total * self.model.opt.timestep
+        if total > 0:
+            record['contact_duration_s'] += self.model.opt.timestep
+        if combined > 0:
+            record['unloaded_duration_s'] = 0.
+        else:
+            record['unloaded_duration_s'] += self.model.opt.timestep
+        if combined > record['force_limit_n']:
+            raise ValueError(f"TOOL_CONTACT_FORCE_LIMIT: combined {combined:.6f} N exceeds {record['force_limit_n']:.6f} N")
 
     def geometry_record(self):
         rotation = self.data.xmat[self.root].reshape(3, 3)
@@ -122,4 +178,5 @@ class FlexMaterialRuntime:
                             "top": [float(center[0]), float(center[1]), float(upper[2])],
                             "top_center": [float(center[0]), float(center[1]), float(upper[2])],
                             "bottom": [float(center[0]), float(center[1]), float(lower[2])]},
-                "deformable_metrics": self.metrics()}
+                "deformable_metrics": self.metrics(),
+                "flattening_configuration": deepcopy(getattr(self.obj, "flattening_config", {}))}

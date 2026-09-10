@@ -199,6 +199,7 @@ class C1_2_DoughFlatten(KitchenBase):
             self.objects[model.name] = model
             self.model.merge_objects([model])
             if isinstance(model, DeformableDoughObject):
+                model.flattening_config = self.dough_material_config
                 deformable = self.model.root.find("deformable")
                 if deformable is None:
                     deformable = ET.SubElement(self.model.root, "deformable")
@@ -415,6 +416,10 @@ class C1_2_DoughFlatten(KitchenBase):
     def check_contact(self, geoms_1, geoms_2=None):
         return check_native_contact(self.sim.model._model, self.sim.data._data, geoms_1, geoms_2)
 
+    def after_physics_step(self):
+        for runtime in self.deformable_runtimes.values():
+            runtime.observe_contacts()
+
     def _place_object_state(self, obj, position, quaternion):
         runtime = self.deformable_runtimes.get(obj.name)
         if runtime is not None:
@@ -502,7 +507,9 @@ class C1_2_DoughFlatten(KitchenBase):
         self._align_tools_on_row()
 
     def _check_success(self):
-        return False
+        from tuj.m5_motion.flatten_contact import flattening_outcome
+        runtime = self.deformable_runtimes.get('dough')
+        return runtime is not None and flattening_outcome(runtime.geometry_record())[0]
 
     def get_evaluation_material_gt(self):
         """평가 전용 GT. 관측 및 LLM/M3 입력 경로에서는 호출하지 않는다."""
