@@ -8,7 +8,7 @@ planning without pretending that an already-held object is a new grasp.
 from __future__ import annotations
 
 import copy
-from dataclasses import asdict, dataclass
+from dataclasses import asdict, dataclass, fields
 import hashlib
 import json
 import math
@@ -118,8 +118,12 @@ def _attachment_from_payload(raw: object) -> AttachedObjectState | None:
         raise RuntimeCheckpointError("checkpoint attachment must be an object")
     try:
         weld_raw = raw.get("breakable_weld")
+        if isinstance(weld_raw, Mapping) and set(weld_raw) - {
+            field.name for field in fields(BreakableWeldConfig)
+        }:
+            raise ValueError("unknown checkpoint weld configuration field")
         weld = (
-            BreakableWeldConfig(**dict(weld_raw))
+            BreakableWeldConfig.from_parameters(weld_raw)
             if isinstance(weld_raw, Mapping)
             else None
         )
