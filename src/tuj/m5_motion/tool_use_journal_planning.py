@@ -632,6 +632,67 @@ class ToolUseJournalCollisionContextFactory:
         return sorted({tuple(sorted((left, item))) for item in selectors if item})
 
     @staticmethod
+    def _region_occupant_ids(
+        request: MotionPlanRequest,
+        target: str,
+    ) -> list[str]:
+        """Ids of scene objects already resting inside the destination region.
+
+        Multi-object kitting packs several objects into one region and the task
+        permits them to rest against or on top of one another, so the held
+        object is allowed to contact whatever is already there.  Membership uses
+        the region's world AABB: an object whose centre lies within the region
+        footprint and at or above its floor counts as an occupant.  A
+        single-object region has no occupants, so this returns an empty list and
+        leaves those tasks unchanged.
+        """
+        region_id = request.task.goal.target_region_id
+        if not region_id:
+            return []
+        objects = request.world.objects
+        region = objects.get(region_id)
+        if (
+            not isinstance(region, dict)
+            or "pose" not in region
+            or "dimensions_m" not in region
+        ):
+            return []
+        from scipy.spatial.transform import Rotation
+
+        r_pose = region["pose"]
+        r_pos = np.asarray(r_pose["position_m"], dtype=float)
+        r_rot = Rotation.from_quat(r_pose["orientation_xyzw"]).as_matrix()
+        r_center_local = np.asarray(
+            region.get("anchors", {}).get("center", [0.0, 0.0, 0.0]), dtype=float
+        )
+        r_center = r_pos + r_rot @ r_center_local
+        r_half = np.abs(r_rot) @ (np.asarray(region["dimensions_m"], dtype=float) / 2.0)
+        region_bottom = float(r_center[2] - r_half[2])
+        occupants: list[str] = []
+        for other_id, other in objects.items():
+            if other_id in {target, region_id}:
+                continue
+            if (
+                not isinstance(other, dict)
+                or "pose" not in other
+                or "dimensions_m" not in other
+            ):
+                continue
+            pose = other["pose"]
+            if pose.get("frame_id", "world") != "world":
+                continue
+            center = np.asarray(pose["position_m"], dtype=float)
+            anchor = other.get("anchors", {}).get("center")
+            if anchor is not None:
+                center = center + Rotation.from_quat(
+                    pose["orientation_xyzw"]
+                ).as_matrix() @ np.asarray(anchor, dtype=float)
+            inside = bool(np.all(np.abs(center[:2] - r_center[:2]) <= r_half[:2]))
+            if inside and center[2] >= region_bottom - 1e-6:
+                occupants.append(other_id)
+        return occupants
+
+    @staticmethod
     def _metadata_selectors(request: MotionPlanRequest, key: str) -> list[str]:
         raw = request.task.metadata.get(key, ())
         if isinstance(raw, str):
@@ -1116,6 +1177,13 @@ class ToolUseJournalCollisionContextFactory:
         contact_selectors = list(request.task.allowed_touch_objects)
         if request.task.goal.target_region_id:
             contact_selectors.append(request.task.goal.target_region_id)
+            # Objects already packed into the destination region may be
+            # contacted (or rested upon) by the held object -- the task packs
+            # everything into one region and permits overlap -- so admit each
+            # occupant as an allowed collision pair for the PLACE contact.
+            for occupant in self._region_occupant_ids(request, target):
+                if occupant not in contact_selectors:
+                    contact_selectors.append(occupant)
         for candidate in bound.candidates:
             place = self._event_keyframe(
                 candidate,
@@ -1172,7 +1240,16 @@ class ToolUseJournalCollisionContextFactory:
                     "context_id": release_id,
                     "allowed_collision_pairs": self._contact_pairs(active_ee, [target]),
                 })
-            current_id = base.context_id
+            # Approach keyframes (TRANSFER/PRE_PLACE) into a crowded destination
+            # region need the same occupant contact allowances as PLACE;
+            # otherwise descent is collision-filtered before the drop.  When the
+            # region has no occupants, keep the held attached/base context until
+            # PLACE so ordinary place filtering is not widened on every approach.
+            region_id = request.task.goal.target_region_id
+            crowded_destination = bool(
+                region_id and self._region_occupant_ids(request, target)
+            )
+            current_id = contact_id if crowded_destination else base.context_id
             withdrawal_pending = False
             for keyframe in candidate.keyframes:
                 keyframe.collision_context_after_events_id = None
@@ -1692,7 +1769,7 @@ class ToolUseJournalMotionRequestPlanner:
             log=log,
         )
 
-    def __call__(self, request: MotionPlanRequest) -> Any:
+    def __call__(self, request: MotionPlanRequest, *, final_plan_validator=None) -> Any:
         if is_move_to_workspace_request(request):
             if self.move_to_workspace_planner is None:
                 raise PrecomputedEEPathError(
@@ -1815,6 +1892,11 @@ class ToolUseJournalMotionRequestPlanner:
         return self.pipeline.plan(
             request,
             collision_context_factory=self.collision_context_factory,
+            **(
+                {"final_plan_validator": final_plan_validator}
+                if final_plan_validator is not None
+                else {}
+            ),
         )
 
     def _append_safe_rack_exit(self, request: MotionPlanRequest, exchange_plan: Any) -> Any:

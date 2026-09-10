@@ -166,6 +166,45 @@ class _RuntimeState:
     simulation_time_s: float
 
 
+def _active_contact_snapshot(
+    env: object, limit: int = 16
+) -> tuple[dict[str, Any], ...]:
+    """Every touching pair in the scene, strongest first.
+
+    A settle that stalls looks the same in the joint error whether the arm is
+    blocked by what it carries or merely tracking badly, and the two need
+    opposite fixes.  Recording the contacts at the moment the wait expires
+    separates them without re-running the task.
+    """
+
+    try:
+        model, data = _raw_model_data(env)
+    except Exception:  # pragma: no cover - diagnostics must never mask a failure
+        return ()
+    rows: list[dict[str, Any]] = []
+    try:
+        for contact_id in range(int(data.ncon)):
+            contact = data.contact[contact_id]
+            wrench = np.empty(6, dtype=float)
+            mujoco.mj_contactForce(model, data, contact_id, wrench)
+            rows.append(
+                {
+                    "geom_a": _name(
+                        model, mujoco.mjtObj.mjOBJ_GEOM, int(contact.geom1)
+                    ),
+                    "geom_b": _name(
+                        model, mujoco.mjtObj.mjOBJ_GEOM, int(contact.geom2)
+                    ),
+                    "penetration_m": -float(contact.dist),
+                    "normal_force_n": abs(float(wrench[0])),
+                }
+            )
+    except Exception:  # pragma: no cover - diagnostics must never mask a failure
+        return tuple(rows[:limit])
+    rows.sort(key=lambda row: row["normal_force_n"], reverse=True)
+    return tuple(rows[:limit])
+
+
 def _capture_runtime_state(env: object) -> _RuntimeState:
     model, data = _raw_model_data(env)
     qpos: dict[str, tuple[float, ...]] = {}
@@ -1175,11 +1214,15 @@ class ToolUseJournalEERuntime:
                 f"{self._active_ee!r}"
             )
         normalized = self._normalized_command(command, engaged=engaged)
-        if engaged and normalized < 0.0:
+        if suction and engaged != (normalized > -1.0):
+            raise ToolUseJournalRuntimeError(
+                "suction-off requires -1; suction-on requires a command greater than -1"
+            )
+        if not suction and engaged and normalized < 0.0:
             raise ToolUseJournalRuntimeError(
                 "close / suction-on command must be non-negative"
             )
-        if not engaged and normalized >= 0.0:
+        if not suction and not engaged and normalized >= 0.0:
             raise ToolUseJournalRuntimeError(
                 "open / suction-off command must be less than zero"
             )
@@ -1661,8 +1704,10 @@ class ToolUseJournalEERuntime:
         applied_force = required_force * force_scale
         applied_torque = required_torque * torque_scale
         object_wrench = np.concatenate((applied_force, applied_torque))
-        lever = actual_position - np.asarray(
-            data.xpos[reference_body_id], dtype=float
+        # xfrc_applied acts at each body's center of mass, not its frame origin.
+        # Use those application points so the internal pair has zero net torque.
+        lever = np.asarray(data.xipos[object_body_id], dtype=float) - np.asarray(
+            data.xipos[reference_body_id], dtype=float
         )
         reference_wrench = np.concatenate(
             (
@@ -1826,6 +1871,7 @@ class ToolUseJournalEERuntime:
         held_tool_id: str | None,
         attachment_position_tolerance_m: float = 5e-3,
         attachment_orientation_tolerance_rad: float = 5e-2,
+        attachment_observation: AttachedObjectState | None = None,
     ) -> None:
         """Restore checkpoint-only state without reclassifying it as a grasp.
 
@@ -1840,7 +1886,8 @@ class ToolUseJournalEERuntime:
                 "cannot restore logical state while an object is attached"
             )
         command = self._normalized_command(gripper_command, engaged=grasp_engaged)
-        if grasp_engaged != (command >= 0.0):
+        command_engaged = command > -1.0 if self._active_ee == "vac" else command >= 0.0
+        if grasp_engaged != command_engaged:
             raise ToolUseJournalRuntimeError(
                 "checkpoint gripper command disagrees with grasp state"
             )
@@ -1883,11 +1930,20 @@ class ToolUseJournalEERuntime:
                 object_position - reference_position
             )
             observed_rotation = reference_rotation.T @ object_rotation
+            expected_attachment = attachment
+            if attachment_observation is not None:
+                identity_fields = ("object_id", "free_joint_name", "reference_kind", "reference_name", "mode")
+                if attachment.mode is not AttachmentMode.BREAKABLE_WELD or any(
+                    getattr(attachment_observation, name) != getattr(attachment, name)
+                    for name in identity_fields
+                ):
+                    raise ToolUseJournalRuntimeError("checkpoint observed attachment identity mismatch")
+                expected_attachment = attachment_observation
             expected_position = np.asarray(
-                attachment.position_in_reference_m, dtype=float
+                expected_attachment.position_in_reference_m, dtype=float
             )
             expected_rotation = np.asarray(
-                attachment.rotation_in_reference, dtype=float
+                expected_attachment.rotation_in_reference, dtype=float
             )
             position_error = float(
                 np.linalg.norm(observed_position - expected_position)
@@ -2216,6 +2272,15 @@ class ToolUseJournalKinematicTrajectoryPlayer:
         self.runtime = runtime
         self._collision_probe = collision_probe
 
+    def _check_collision(self, joint_config, *, context):
+        probe = self._collision_probe
+        if isinstance(probe, MuJoCoCollisionModelRegistry):
+            return probe.check(
+                joint_config, context=context,
+                runtime_state=_raw_model_data(self.runtime.env),
+            )
+        return probe.check(joint_config, context=context)
+
     @staticmethod
     def _arm_joint_addresses(
         env: object, joint_names: Sequence[str]
@@ -2302,12 +2367,29 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             )
             return f"finger gripper close command set to {value:.3f}"
         if event.event_type is EventType.SUCTION_ON:
+            command = event.command
+            load_detail = ""
+            if self._CONTROLLER_TRACKING and command is None and target:
+                from tuj.m5_motion.adhesion_load import payload_adhesion_load
+
+                model, _ = _raw_model_data(self.runtime.env)
+                body, _, _ = self.runtime._object_free_joint(self.runtime.env, target)
+                adapter = ToolUseJournalEnvironmentAdapter(self.runtime.env)
+                ee_body = mujoco.mj_name2id(
+                    model, mujoco.mjtObj.mjOBJ_BODY, adapter.mounted_root_body
+                )
+                load = payload_adhesion_load(model, body, ee_body)
+                command = load.command
+                load_detail = (
+                    f"; payload base force {load.base_force_n:.6f} N"
+                    f", capacity {load.capacity_n:.6f} N"
+                )
             value = self.runtime.command_gripper(
                 engaged=True,
                 suction=True,
-                command=event.command,
+                command=command,
             )
-            return f"vacuum suction enabled with command {value:.3f}"
+            return f"vacuum suction enabled with command {value:.6f}{load_detail}"
         if event.event_type is EventType.SUCTION_OFF:
             value = self.runtime.command_gripper(
                 engaged=False,
@@ -2328,7 +2410,10 @@ class ToolUseJournalKinematicTrajectoryPlayer:
                     "require_grasp_command must be boolean"
                 )
             attachment_mode = event.parameters.get(
-                "attachment_mode", AttachmentMode.KINEMATIC.value
+                "attachment_mode",
+                AttachmentMode.BREAKABLE_WELD.value
+                if self._CONTROLLER_TRACKING
+                else AttachmentMode.KINEMATIC.value,
             )
             try:
                 mode = (
@@ -2715,7 +2800,7 @@ class ToolUseJournalKinematicTrajectoryPlayer:
                         self._collision_probe is not None
                         and segment.collision_context_before is not None
                     ):
-                        collision = self._collision_probe.check(
+                        collision = self._check_collision(
                             waypoint.joint_positions_rad,
                             context=segment.collision_context_before,
                         )
@@ -3327,7 +3412,10 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 action[gripper_start:gripper_end] = 0.0
                 return action
             command = float(self.runtime.gripper_command)
-            if command == 0.0:
+            if getattr(robot.gripper["right"], "action_is_absolute", False):
+                self._gripper_rate_credit = 0.0
+                gripper_action = command
+            elif command == 0.0:
                 self._gripper_rate_credit = 0.0
                 gripper_action = 0.0
             elif abs(command) >= 1.0:
@@ -4090,6 +4178,12 @@ class ToolUseJournalControllerTrajectoryPlayer(
                                 "custom_settle": settle_state.get(
                                     "custom_settle"
                                 ),
+                                "contacts": [
+                                    dict(row)
+                                    for row in _active_contact_snapshot(
+                                        self.runtime.env
+                                    )
+                                ],
                             },
                         )
                         return failed_report()
@@ -4141,7 +4235,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     and check_collision_now
                 ):
                     collision_check_count += 1
-                    collision = self._collision_probe.check(
+                    collision = self._check_collision(
                         actual,
                         context=segment.collision_context_before,
                     )

@@ -37,6 +37,9 @@ HELD_PLACE_START_ANCHOR = 'held_place_start'
 REGION_WALL_ALLOWANCE_M = 0.02
 REGION_FLOOR_FALLBACK_M = 0.005
 FREE_SPOT_GRID_M = 0.01
+# Occupants whose tops agree to within this share the load of what is put
+# on them; below it only the higher one is touched.
+SUPPORT_LEVEL_TOLERANCE_M = 0.002
 
 
 def _action(task):
@@ -249,15 +252,27 @@ class _Grounding:
         return best
 
     def _supported_fraction(self, xy):
-        """Largest share of the object footprint a single occupant carries."""
+        """Share of the footprint carried by the occupant it will actually rest on.
+
+        Only the highest overlapped occupant ever touches the object; anything
+        lower never takes load, so scoring by the best supporter of any height
+        rewards a spot that is squarely on a flat item while straddling the rim
+        of something taller standing on it.  That is what put the bread on the
+        mug in c3_1 -- fully on the plate by area, resting on the mug in fact.
+        """
         mine = self.half[:2]
         area = float(4. * mine[0] * mine[1]) or 1.
-        best = 0.
-        for c, h, _t in self._occupants():
+        carried = []
+        for c, h, top in self._occupants():
             overlap = np.minimum(xy + mine, c + h) - np.maximum(xy - mine, c - h)
             if np.all(overlap > 0.):
-                best = max(best, float(overlap[0] * overlap[1]) / area)
-        return round(best, 3)
+                carried.append((top, float(overlap[0] * overlap[1]) / area))
+        if not carried:
+            return 0.
+        resting_top = max(top for top, _f in carried)
+        # Occupants level with the highest one share the load; lower ones do not.
+        return round(max(f for top, f in carried
+                         if top >= resting_top - SUPPORT_LEVEL_TOLERANCE_M), 3)
 
     def interior_top_world_z(self):
         """Highest point of anything already inside the region (rim if empty).
@@ -286,9 +301,35 @@ class _Grounding:
     # -- publication ---------------------------------------------------------
     def publish(self, goal_key, start_key, desired_center, extra):
         # Object-space destination: the body origin translated so the bbox center
-        # lands on desired_center; the grasp orientation is preserved verbatim.
+        # lands on desired_center; the grasp orientation is preserved, except for
+        # an optional 90 deg yaw about the region's vertical that puts the held
+        # object's SHORT footprint side along the region's SHORT axis (long side
+        # along the long axis). A narrow region (e.g. a tray) otherwise leaves no
+        # margin when the object's long axis lands across it, so settle drift on
+        # release overhangs the rim (target_fully_inside_region failure). The yaw
+        # is vertical-only, so the object's height/floor geometry is unchanged.
         destination = self.T_WB.copy()
-        destination[:3, 3] += desired_center - self.center
+        region_rotation = self.T_WR[:3, :3]
+        object_in_region = region_rotation.T @ destination[:3, :3]
+        short_axis = int(np.argmin(self.region_dims[:2]))
+        long_axis = 1 - short_axis
+        extent_along_short = float(
+            np.abs(object_in_region[short_axis, :]) @ self.local_size
+        )
+        extent_if_rotated = float(
+            np.abs(object_in_region[long_axis, :]) @ self.local_size
+        )
+        if extent_if_rotated + 1e-6 < extent_along_short:
+            yaw_about_region_z = np.array(
+                [[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]
+            )
+            destination[:3, :3] = region_rotation @ (
+                yaw_about_region_z @ object_in_region
+            )
+        # Re-anchor the (possibly rotated) body so its bbox center lands exactly
+        # on desired_center.  Equivalent to the previous translate-only path when
+        # no yaw is applied.
+        destination[:3, 3] = desired_center - destination[:3, :3] @ self.center_in_body
         anchors = self.record.setdefault('anchors', {})
         anchors[goal_key] = (inverse(self.T_WR) @ destination)[:3, 3].tolist()
         anchors[start_key] = (inverse(self.T_WR) @ self.T_WB)[:3, 3].tolist()

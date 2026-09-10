@@ -10,6 +10,33 @@ import numpy as np
 import xml.etree.ElementTree as ET
 
 
+def exclude_parallel_2f_linkage_selfcontact(root,prefix):
+    """Stop the 2F inner linkage from also closing itself through contact.
+
+    inner_finger and inner_knuckle are two links of one four-bar whose closure
+    is already enforced by the equality couplings installed above. Their native
+    meshes overlap by about 11mm at every gripper opening -- fully open and
+    fully closed differ by 0.3mm -- so this is the rest geometry of the
+    mechanism, not a travel limit. MuJoCo resolves that overlap as a real
+    contact of roughly 1.6kN on each side, three orders of magnitude above any
+    grasp force, and the resulting constant internal wrench holds the arm's
+    steady-state pose error above the settle tolerance: c3_1 never converged at
+    a bread grasp or a bread place with nothing under the object.
+    """
+    bodies={b.get('name') for b in root.findall('.//worldbody//body')}
+    contact=root.find('contact')
+    if contact is None: contact=ET.SubElement(root,'contact')
+    known={(e.get('body1'),e.get('body2')) for e in contact.findall('exclude')}
+    added=[]
+    for side in ('left','right'):
+        pair=(prefix+side+'_inner_finger',prefix+side+'_inner_knuckle')
+        if not bodies.issuperset(pair):
+            raise ValueError(f'Expected native 2F linkage bodies {pair}')
+        if pair in known or pair[::-1] in known: continue
+        ET.SubElement(contact,'exclude',body1=pair[0],body2=pair[1]);added.append(list(pair))
+    return added
+
+
 def repair_spoon_parallel_2f_xml(root,prefix):
     """Explicit parallel linkage for the native 2F mesh/joint layout.
 

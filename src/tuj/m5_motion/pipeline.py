@@ -660,6 +660,7 @@ class MotionPlanningPipeline:
         collision_contexts: Mapping[str, CollisionContext] | None = None,
         initial_collision_context_id: str | None = None,
         final_segment_validator: FinalSegmentValidator | None = None,
+        final_plan_validator: Callable[[MotionPlanRequest, MotionPlan], None] | None = None,
         collision_context_factory: CollisionContextFactory | None = None,
         edge_planner: EdgePlanner | None = None,
     ) -> MotionPlanningResult:
@@ -886,6 +887,8 @@ class MotionPlanningPipeline:
                     final_segment_validator=final_validator,
                     joint_position_limits_rad=joint_limits,
                 )
+                if final_plan_validator is not None:
+                    final_plan_validator(request, plan)
             except (
                 MotionPlanBuildError,
                 TrajectoryProcessingError,
@@ -961,6 +964,7 @@ class MotionPlanningPipeline:
             }
             retry_arguments = {
                 "edge_planner": edge_planner,
+                "final_plan_validator": final_plan_validator,
             }
             if collision_context_factory is not None:
                 retry_arguments["collision_context_factory"] = (
