@@ -895,6 +895,9 @@ class ToolUseJournalCollisionContextFactory:
                     if withdrawal_pending:
                         current_id = detached_id
                         withdrawal_pending = False
+        from tuj.m5_motion.release_separation import bind_release_separation
+
+        bind_release_separation(self.compiler, request, bound, contexts, target)
         return _stamp_bound_artifact(request, source, bound), contexts
 
     def _bind_ee_exchange(

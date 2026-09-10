@@ -1381,6 +1381,16 @@ class ToolUseJournalCollisionModelCompiler:
             world, target, primary,
         )
 
+    def initial_release_geometry_pairs(self, world, target, margin):
+        from tuj.m5_motion.release_separation import release_geometry_pairs
+
+        capture = self._captures[self.reference_active_ee]
+        compiled = self.compile(self.reference_active_ee)
+        return release_geometry_pairs(
+            compiled.model, compiled.baseline_qpos, capture.object_body_names,
+            capture.mounted_root_body_name, world, target, margin,
+        )
+
     def initial_object_clearance(self, objects, first: str, second: str) -> float | None:
         """Measure selected support geometry at request poses without live mutation."""
         from tuj.m5_motion.support_distance import object_pair_clearance
