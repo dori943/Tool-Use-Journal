@@ -679,3 +679,23 @@ def test_runtime_render_callback_uses_current_environment() -> None:
     runtime.render()
 
     assert observed == [first, second]
+
+
+def test_runtime_render_updates_native_mjviewer() -> None:
+    from tuj.m5_motion.tool_use_journal_runtime import ToolUseJournalEERuntime
+
+    updates: list[str] = []
+    viewer = SimpleNamespace(update=lambda: updates.append("updated"))
+    env = SimpleNamespace(
+        renderer="mjviewer",
+        viewer=viewer,
+        render=lambda: (_ for _ in ()).throw(AssertionError("mjviewer render is a no-op")),
+    )
+    runtime = object.__new__(ToolUseJournalEERuntime)
+    runtime._closed = False
+    runtime._env = env
+    runtime._render_callback = None
+
+    runtime.render()
+
+    assert updates == ["updated"]
