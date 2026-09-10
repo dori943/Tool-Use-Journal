@@ -4,7 +4,7 @@ import mujoco
 import numpy as np
 
 from environments.deformable_material import MaterialParameters
-from environments.deformable_runtime import FlexMaterialRuntime
+from environments.deformable_runtime import FlexMaterialRuntime, check_native_contact
 from environments.objects.deformable_ellipsoid import DeformableEllipsoidObject
 
 
@@ -94,3 +94,12 @@ def test_world_forces_rotate_with_material_without_spurious_plasticity():
                                original.data.xfrc_applied[original.bodies, :3] @ rotation.as_matrix().T,
                                atol=1e-9)
     np.testing.assert_allclose(original.material.plastic_gradient, rotated.material.plastic_gradient, atol=1e-10)
+
+
+def test_contact_query_identifies_flex_and_preserves_unrelated_geom_queries():
+    runtime = make_runtime()
+    for _ in range(500):
+        step(runtime)
+    assert check_native_contact(runtime.model, runtime.data, runtime.obj)
+    assert not check_native_contact(runtime.model, runtime.data, 'missing_button')
+    assert not check_native_contact(runtime.model, runtime.data, runtime.obj, 'missing_button')

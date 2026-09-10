@@ -8,6 +8,38 @@ import numpy as np
 import mujoco
 
 
+def contact_endpoint_name(model, contact, side):
+    """Resolve native contact endpoints without treating flex's -1 as a geom."""
+    geom = int(contact.geom[side])
+    if geom >= 0:
+        return model.geom(geom).name
+    flex = int(contact.flex[side])
+    if flex >= 0:
+        return mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_FLEX, flex)
+    raise ValueError("contact endpoint has neither geom nor flex identity")
+
+
+def check_native_contact(model, data, first, second=None):
+    def names(value):
+        if value is None:
+            return None
+        if isinstance(value, str):
+            return {value}
+        if hasattr(value, "contact_geoms"):
+            result = set(value.contact_geoms)
+            if hasattr(value, "flex"):
+                result.add(value.flex.get("name"))
+            return result
+        return set(value)
+    left, right = names(first), names(second)
+    for contact in data.contact[:data.ncon]:
+        a, b = (contact_endpoint_name(model, contact, side) for side in (0, 1))
+        if ((a in left and (right is None or b in right))
+                or (b in left and (right is None or a in right))):
+            return True
+    return False
+
+
 class FlexMaterialRuntime:
     def __init__(self, model, data, obj):
         self.model, self.data, self.obj = model, data, obj
@@ -76,3 +108,18 @@ class FlexMaterialRuntime:
                 "height_m": float(np.ptp(vertices[:, 2])),
                 "volume_ratio": float(self.material.volumes(vertices).sum()
                                       / self.material.reference_volumes.sum())}
+
+    def geometry_record(self):
+        rotation = self.data.xmat[self.root].reshape(3, 3)
+        local = (self.data.xpos[self.bodies] - self.data.xpos[self.root]) @ rotation
+        lower, upper = local.min(axis=0) - self.obj.radius, local.max(axis=0) + self.obj.radius
+        center = (lower + upper) / 2
+        return {"dimensions_m": (upper - lower).tolist(),
+                "collision_enabled": True,
+                "flex_name": self.obj.flex.get("name"),
+                "collision_points_m": local.tolist(),
+                "anchors": {"center": center.tolist(),
+                            "top": [float(center[0]), float(center[1]), float(upper[2])],
+                            "top_center": [float(center[0]), float(center[1]), float(upper[2])],
+                            "bottom": [float(center[0]), float(center[1]), float(lower[2])]},
+                "deformable_metrics": self.metrics()}
