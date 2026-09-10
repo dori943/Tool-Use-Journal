@@ -388,7 +388,10 @@ def test_place_binds_detach_and_stationary_target_pose_for_retreat(release_conta
     bottle = next(
         item for item in detached.free_object_poses if item.object_id == "bottle"
     )
-    assert bottle.pose == target_pose
+    # The untagged keyframe puts the reference at bottle center (.4, 0, .2).
+    # Its captured +.1m attachment offset survives release; goal pose is stale.
+    assert bottle.pose.position_m == pytest.approx((0.4, 0.0, 0.3))
+    assert bottle.pose.orientation_xyzw == pytest.approx((0.0, 0.0, 0.0, 1.0))
     if release_contact:
         assert detached.allowed_collision_pairs
         assert clear[0].collision_context_id != retreat.collision_context_id

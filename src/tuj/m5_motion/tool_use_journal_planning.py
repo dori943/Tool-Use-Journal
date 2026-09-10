@@ -20,6 +20,8 @@ from tuj.m5_motion.attachment_retarget import (
     ATTACHED_OBJECT_POSE_SUBJECT,
     POSE_SUBJECT_KEY,
     POSE_SUBJECT_OBJECT_ID_KEY,
+    attachment_transform,
+    object_pose_for_end_effector_pose,
 )
 from tuj.m5_motion.ee_exchange import RoutedKeyframeStrategyProvider
 from tuj.m5_motion.ee_exchange_entry import (
@@ -830,7 +832,7 @@ class ToolUseJournalCollisionContextFactory:
                 KeyframeType.PLACE,
             )
             token = _short_digest((candidate.strategy_id, place.keyframe_id))
-            detached_target_pose = target_pose
+            resolved_place = RelativePoseResolver(request.world).resolve(place)
             if (
                 str(place.metadata.get(POSE_SUBJECT_KEY, "")).upper()
                 == ATTACHED_OBJECT_POSE_SUBJECT
@@ -840,9 +842,13 @@ class ToolUseJournalCollisionContextFactory:
                 # desired pose.  Freeze the newly detached collision body at
                 # that candidate-specific pose, not at the stale task goal
                 # pose captured before keyframe generation.
-                detached_target_pose = RelativePoseResolver(
-                    request.world
-                ).resolve(place)
+                detached_target_pose = resolved_place
+            else:
+                # Untagged generated keyframes describe the grasp reference,
+                # not the object. Keep geometry continuous across DETACH.
+                detached_target_pose = object_pose_for_end_effector_pose(
+                    resolved_place, attachment_transform(request.world, target)
+                )
             contact_id = f"place-contact:{target}:{token}"
             detached_id = f"object-detached:{target}:{token}"
             contact = base.model_copy(
