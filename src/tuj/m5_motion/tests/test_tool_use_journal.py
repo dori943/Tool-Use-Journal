@@ -1324,3 +1324,261 @@ def test_player_replays_plan_and_executes_ee_exchange_events() -> None:
     )
     assert report.metadata["controller_tracking_simulated"] is False
     runtime.close()
+
+
+def _acquire_contact_settle_fixtures() -> tuple[
+    ToolUseJournalControllerTrajectoryPlayer,
+    TrajectorySegment,
+    MotionPlan,
+]:
+    runtime = SimpleNamespace(
+        object_contact_metrics=lambda object_id: AttachmentContactMetrics(
+            contact_count=0
+        )
+    )
+    player = ToolUseJournalControllerTrajectoryPlayer(runtime)
+    segment = TrajectorySegment(
+        segment_id="acquire-contact",
+        segment_type=SegmentType.GRASP,
+        start_time_s=0.0,
+        end_time_s=1.0,
+        collision_checked=False,
+        waypoints=[
+            TrajectoryWaypoint(
+                time_from_start_s=0.0,
+                joint_positions_rad=[0.0] * len(ARM_JOINTS),
+            ),
+            TrajectoryWaypoint(
+                time_from_start_s=1.0,
+                joint_positions_rad=[0.1] * len(ARM_JOINTS),
+            ),
+        ],
+        metadata={
+            "motion_end_time_s": 1.0,
+            "tracking_settle": {
+                "eef_tolerance_m": 0.005,
+                "eef_orientation_tolerance_rad": 0.05,
+                "max_wait_s": 5.0,
+                "required_consecutive_ticks": 3,
+            },
+        },
+    )
+    plan = MotionPlan(
+        plan_id="acquire-contact-plan",
+        request_id="acquire-contact-request",
+        provenance=_provenance(
+            "acquire-contact-plan-artifact",
+            "MotionPlan",
+            ModuleName.MOTION_PLANNER,
+        ),
+        scene_signature="acquire-contact-scene",
+        robot_id="ur5e_0",
+        joint_names=list(ARM_JOINTS),
+        segments=[segment],
+        duration_s=1.0,
+        events=[
+            TrajectoryEvent(
+                event_id="suction-on",
+                time_from_start_s=1.0,
+                event_type=EventType.SUCTION_ON,
+                target_id="target_object",
+            ),
+            TrajectoryEvent(
+                event_id="attach",
+                time_from_start_s=1.0,
+                event_type=EventType.ATTACH_OBJECT,
+                target_id="target_object",
+            ),
+        ],
+        expected_final_state=RobotState(
+            robot_id="ur5e_0",
+            joint_names=list(ARM_JOINTS),
+            joint_positions_rad=[0.1] * len(ARM_JOINTS),
+            joint_velocities_rad_s=[0.0] * len(ARM_JOINTS),
+        ),
+    )
+    player._playback_plan = plan
+    return player, segment, plan
+
+
+def test_acquire_contact_settle_passes_with_target_contact_despite_tcp_residual() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+    player.runtime.object_contact_metrics = lambda object_id: AttachmentContactMetrics(
+        contact_count=2, contact_groups=("suction",)
+    )
+    player._ee_contact_partners = lambda *, allowed_object_ids: {
+        "target_contact_pairs": [("ee_cup", "target_object")],
+        "foreign_object_contact_pairs": [],
+        "environment_contact_pairs": [],
+        "ee_contact_geoms": ["ee_cup"],
+        "intended_target_contact": True,
+    }
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.02,
+        eef_position_error_m=0.016,
+        eef_orientation_error_rad=0.02,
+    )
+
+    assert result is not None
+    assert result["mode"] == "ACQUIRE_CONTACT_SETTLE"
+    assert result["succeeded"] is True
+    assert result["intended_target_contact"] is True
+    assert result["eef_position_error_m"] == pytest.approx(0.016)
+
+
+def test_acquire_contact_settle_fails_without_intended_contact() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+    player.runtime.object_contact_metrics = lambda object_id: AttachmentContactMetrics(
+        contact_count=0
+    )
+    player._ee_contact_partners = lambda *, allowed_object_ids: {
+        "target_contact_pairs": [],
+        "foreign_object_contact_pairs": [],
+        "environment_contact_pairs": [],
+        "ee_contact_geoms": [],
+        "intended_target_contact": False,
+    }
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.02,
+        eef_position_error_m=0.016,
+        eef_orientation_error_rad=0.01,
+    )
+
+    assert result is not None
+    assert result["succeeded"] is False
+    assert result["intended_target_contact"] is False
+
+
+def test_acquire_contact_settle_rejects_wrong_object_contact() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+    player.runtime.object_contact_metrics = lambda object_id: AttachmentContactMetrics(
+        contact_count=1, contact_groups=("suction",)
+    )
+    player._ee_contact_partners = lambda *, allowed_object_ids: {
+        "target_contact_pairs": [("ee_cup", "target_object")],
+        "foreign_object_contact_pairs": [("ee_cup", "other_object")],
+        "environment_contact_pairs": [],
+        "ee_contact_geoms": ["ee_cup"],
+        "intended_target_contact": True,
+    }
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.01,
+        eef_position_error_m=0.016,
+        eef_orientation_error_rad=0.01,
+    )
+
+    assert result is not None
+    assert result["succeeded"] is False
+    assert result["foreign_object_ok"] is False
+
+
+def test_acquire_contact_settle_rejects_environment_collision() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+    player.runtime.object_contact_metrics = lambda object_id: AttachmentContactMetrics(
+        contact_count=1, contact_groups=("suction",)
+    )
+    player._ee_contact_partners = lambda *, allowed_object_ids: {
+        "target_contact_pairs": [("ee_cup", "target_object")],
+        "foreign_object_contact_pairs": [],
+        "environment_contact_pairs": [("ee_cup", "table_top")],
+        "ee_contact_geoms": ["ee_cup"],
+        "intended_target_contact": True,
+    }
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.01,
+        eef_position_error_m=0.016,
+        eef_orientation_error_rad=0.01,
+    )
+
+    assert result is not None
+    assert result["succeeded"] is False
+    assert result["environment_ok"] is False
+
+
+def test_non_contact_motion_keeps_default_pose_settle() -> None:
+    player, segment, plan = _acquire_contact_settle_fixtures()
+    plan.events.clear()
+    plan.events.append(
+        TrajectoryEvent(
+            event_id="wait-only",
+            time_from_start_s=1.0,
+            event_type=EventType.WAIT,
+        )
+    )
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.0,
+        eef_position_error_m=0.001,
+        eef_orientation_error_rad=0.0,
+    )
+
+    assert result is None
+
+
+def test_acquire_contact_settle_defers_when_tcp_already_within_tolerance() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.0,
+        eef_position_error_m=0.001,
+        eef_orientation_error_rad=0.0,
+    )
+
+    assert result is None
+
+
+def test_acquire_contact_settle_fails_when_orientation_out_of_tolerance() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+    player.runtime.object_contact_metrics = lambda object_id: AttachmentContactMetrics(
+        contact_count=2, contact_groups=("suction",)
+    )
+    player._ee_contact_partners = lambda *, allowed_object_ids: {
+        "target_contact_pairs": [("ee_cup", "target_object")],
+        "foreign_object_contact_pairs": [],
+        "environment_contact_pairs": [],
+        "ee_contact_geoms": ["ee_cup"],
+        "intended_target_contact": True,
+    }
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.01,
+        eef_position_error_m=0.016,
+        eef_orientation_error_rad=0.08,
+    )
+
+    assert result is not None
+    assert result["succeeded"] is False
+    assert result["orientation_ok"] is False
+    assert result["intended_target_contact"] is True

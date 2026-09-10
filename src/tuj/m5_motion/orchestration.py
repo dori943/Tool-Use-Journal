@@ -437,12 +437,18 @@ def _resource_transition_requests(
                     "from_ee": from_ee or None,
                     "to_ee": to_ee,
                     "task_planner_steps": [
-                        step.model_dump(mode="json") for step in exchange_steps
+                        step.model_dump(mode="json")
+                        for step in exchange_steps
                     ],
                 },
                 selected_plan_artifact_id=selected_plan_artifact_id,
             )
         )
+
+    # SAFE RACK EXIT is owned by the EE attach/exchange planner success
+    # contract (appended onto the attach/exchange plan).  M4 may still annotate
+    # MOVE_TO_WORKSPACE after KEEP_EE or ATTACH; never materialize it here as a
+    # separate request — that would re-run rack exit between manipulations.
 
     tool_actions = {
         "RETURN_TOOL",

@@ -8,7 +8,11 @@ from tuj.m5_motion.schema import (
     KeyframeType,
     MotionPlanRequest,
 )
-from tuj.m5_motion.task_semantics import is_release_task, task_operation
+from tuj.m5_motion.task_semantics import (
+    is_acquire_task,
+    is_release_task,
+    task_operation,
+)
 
 
 class KeyframePhaseContractError(ValueError):
@@ -31,6 +35,25 @@ def validate_keyframe_phase_contract(
     operation = task_operation(request.task)
     for strategy in artifact.candidates:
         keyframes = strategy.keyframes
+        if is_acquire_task(request.task) and operation != "PICK_TOOL":
+            grasp_indices = [
+                index
+                for index, keyframe in enumerate(keyframes)
+                if keyframe.keyframe_type is KeyframeType.GRASP
+            ]
+            if len(grasp_indices) != 1:
+                raise KeyframePhaseContractError(
+                    f"acquire strategy {strategy.strategy_id!r} requires exactly one GRASP"
+                )
+            grasp_index = grasp_indices[0]
+            if not any(
+                keyframe.keyframe_type is KeyframeType.PRE_GRASP
+                for keyframe in keyframes[:grasp_index]
+            ):
+                raise KeyframePhaseContractError(
+                    f"acquire strategy {strategy.strategy_id!r} requires "
+                    "PRE_GRASP before GRASP"
+                )
         if operation == "TRANSPORT":
             forbidden = [
                 keyframe.keyframe_id

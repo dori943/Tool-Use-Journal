@@ -377,3 +377,255 @@ def test_dispatch_uses_keyframe_planner_type() -> None:
     )
 
     assert result.joint_path[1] == (3.0,)
+
+
+class _CountingPlanner:
+    def __init__(
+        self,
+        *,
+        result: EdgePlanResult,
+        tag: str,
+    ) -> None:
+        self.result = result
+        self.tag = tag
+        self.calls: list[
+            tuple[
+                RelativeKeyframeSpec | None,
+                RelativeKeyframeSpec,
+            ]
+        ] = []
+
+    def plan(self, source, target, source_keyframe, target_keyframe):
+        del source, target
+        self.calls.append((source_keyframe, target_keyframe))
+        return self.result
+
+
+def _standoff_keyframe(
+    planner: KeyframePlannerType,
+    *,
+    kind: KeyframeType = KeyframeType.PRE_GRASP,
+    keyframe_id: str = "pre",
+) -> RelativeKeyframeSpec:
+    return RelativeKeyframeSpec(
+        keyframe_id=keyframe_id,
+        keyframe_type=kind,
+        frame_ref="object:target",
+        anchor="center",
+        approach_axis_xyz=(0.0, 0.0, 1.0),
+        planner=planner,
+    )
+
+
+def test_dispatch_cartesian_success_skips_rrt_on_first_pregrasp() -> None:
+    cartesian = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=True,
+            joint_path=((0.0,), (1.0,)),
+        ),
+        tag="cartesian",
+    )
+    sampling = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=True,
+            joint_path=((0.0,), (9.0,)),
+        ),
+        tag="rrt",
+    )
+    dispatcher = PlannerDispatchEdgePlanner(
+        joint=_TaggedPlanner(0.0),
+        cartesian=cartesian,
+        sampling_based=sampling,
+    )
+
+    result = dispatcher.plan(
+        (0.0,),
+        (1.0,),
+        None,
+        _standoff_keyframe(KeyframePlannerType.CARTESIAN),
+    )
+
+    assert result.valid
+    assert result.joint_path[-1] == (1.0,)
+    assert len(cartesian.calls) == 1
+    assert sampling.calls == []
+
+
+def test_dispatch_cartesian_intermediate_collision_falls_back_to_rrt() -> None:
+    cartesian = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=False,
+            failure_code="CARTESIAN_INTERMEDIATE_STATE_INVALID",
+            detail="tray collision on sample",
+        ),
+        tag="cartesian",
+    )
+    sampling = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=True,
+            joint_path=((0.0,), (0.5,), (1.0,)),
+        ),
+        tag="rrt",
+    )
+    dispatcher = PlannerDispatchEdgePlanner(
+        joint=_TaggedPlanner(0.0),
+        cartesian=cartesian,
+        sampling_based=sampling,
+    )
+
+    result = dispatcher.plan(
+        (0.0,),
+        (1.0,),
+        None,
+        _standoff_keyframe(KeyframePlannerType.CARTESIAN),
+    )
+
+    assert result.valid
+    assert result.joint_path == ((0.0,), (0.5,), (1.0,))
+    assert "fallback=SAMPLING_BASED" in result.detail
+    assert len(cartesian.calls) == 1
+    assert len(sampling.calls) == 1
+
+
+def test_dispatch_contact_edge_does_not_fall_back_to_rrt() -> None:
+    pre = _standoff_keyframe(KeyframePlannerType.CARTESIAN)
+    grasp = RelativeKeyframeSpec(
+        keyframe_id="grasp",
+        keyframe_type=KeyframeType.GRASP,
+        frame_ref="object:target",
+        anchor="center",
+        approach_axis_xyz=(0.0, 0.0, 1.0),
+        planner=KeyframePlannerType.CARTESIAN,
+    )
+    cartesian = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=False,
+            failure_code="CARTESIAN_INTERMEDIATE_STATE_INVALID",
+            detail="contact corridor blocked",
+        ),
+        tag="cartesian",
+    )
+    sampling = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=True,
+            joint_path=((0.0,), (1.0,)),
+        ),
+        tag="rrt",
+    )
+    dispatcher = PlannerDispatchEdgePlanner(
+        joint=_TaggedPlanner(0.0),
+        cartesian=cartesian,
+        sampling_based=sampling,
+    )
+
+    result = dispatcher.plan((0.0,), (1.0,), pre, grasp)
+
+    assert not result.valid
+    assert result.failure_code == "CARTESIAN_INTERMEDIATE_STATE_INVALID"
+    assert sampling.calls == []
+
+
+def test_dispatch_invalid_target_style_failure_does_not_fall_back() -> None:
+    cartesian = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=False,
+            failure_code="CARTESIAN_ENDPOINT_UNAVAILABLE",
+            detail="target pose unavailable",
+        ),
+        tag="cartesian",
+    )
+    sampling = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=True,
+            joint_path=((0.0,), (1.0,)),
+        ),
+        tag="rrt",
+    )
+    dispatcher = PlannerDispatchEdgePlanner(
+        joint=_TaggedPlanner(0.0),
+        cartesian=cartesian,
+        sampling_based=sampling,
+    )
+
+    result = dispatcher.plan(
+        (0.0,),
+        (1.0,),
+        None,
+        _standoff_keyframe(KeyframePlannerType.CARTESIAN),
+    )
+
+    assert not result.valid
+    assert result.failure_code == "CARTESIAN_ENDPOINT_UNAVAILABLE"
+    assert sampling.calls == []
+
+
+def test_dispatch_sampling_based_pregrasp_bypasses_fallback_wrapper() -> None:
+    cartesian = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=False,
+            failure_code="CARTESIAN_INTERMEDIATE_STATE_INVALID",
+            detail="should not run",
+        ),
+        tag="cartesian",
+    )
+    sampling = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=True,
+            joint_path=((0.0,), (2.0,)),
+        ),
+        tag="rrt",
+    )
+    dispatcher = PlannerDispatchEdgePlanner(
+        joint=_TaggedPlanner(0.0),
+        cartesian=cartesian,
+        sampling_based=sampling,
+    )
+
+    result = dispatcher.plan(
+        (0.0,),
+        (2.0,),
+        None,
+        _standoff_keyframe(KeyframePlannerType.SAMPLING_BASED),
+    )
+
+    assert result.valid
+    assert result.joint_path[-1] == (2.0,)
+    assert cartesian.calls == []
+    assert len(sampling.calls) == 1
+
+
+def test_dispatch_pre_place_standoff_also_falls_back() -> None:
+    cartesian = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=False,
+            failure_code="INTERPOLATED_STATE_INVALID",
+            detail="segment collision",
+        ),
+        tag="cartesian",
+    )
+    sampling = _CountingPlanner(
+        result=EdgePlanResult(
+            valid=True,
+            joint_path=((0.0,), (1.0,)),
+        ),
+        tag="rrt",
+    )
+    dispatcher = PlannerDispatchEdgePlanner(
+        joint=_TaggedPlanner(0.0),
+        cartesian=cartesian,
+        sampling_based=sampling,
+    )
+
+    result = dispatcher.plan(
+        (0.0,),
+        (1.0,),
+        None,
+        _standoff_keyframe(
+            KeyframePlannerType.CARTESIAN,
+            kind=KeyframeType.PRE_PLACE,
+            keyframe_id="pre-place",
+        ),
+    )
+
+    assert result.valid
+    assert len(sampling.calls) == 1

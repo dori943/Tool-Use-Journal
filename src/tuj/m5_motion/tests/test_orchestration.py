@@ -77,6 +77,14 @@ def _selected() -> SelectedPlan:
             ),
             PlanStep(
                 step_index=2,
+                kind="transition",
+                action="MOVE_TO_WORKSPACE",
+                parameters={"subgoal": "pick-part"},
+                subgoal_id="pick-part",
+                candidate_id="candidate-1",
+            ),
+            PlanStep(
+                step_index=3,
                 kind="subgoal",
                 action="EXECUTE_SUBGOAL",
                 subgoal_id="pick-part",
@@ -162,8 +170,10 @@ def test_live_executor_state_replaces_prediction_before_function(tmp_path):
     def execute(request, plan):
         world = request.world.model_copy(deep=True)
         world.robot_state.joint_positions_rad = [2.0 + len(observed)]
-        world.metadata["physical_active_ee"] = (
-            "3F" if request.task.action_type == "EE_EXCHANGE" else "2F")
+        if request.task.action_type in {"EE_EXCHANGE", "EE_ATTACH"}:
+            world.metadata["physical_active_ee"] = "3F"
+        else:
+            world.metadata["physical_active_ee"] = "2F"
         world.scene.signature = f"live:{len(observed)}"
         observed.append(request)
         return world
@@ -172,7 +182,7 @@ def test_live_executor_state_replaces_prediction_before_function(tmp_path):
             return None
         assert request.world.robot_state.joint_positions_rad == [3.0]
         world = request.world.model_copy(deep=True)
-        world.robot_state.joint_positions_rad = [4.0]
+        world.robot_state.joint_positions_rad = [5.0]
         world.robot_state.attached_object_id = "part"
         return world
     result = SelectedPlanMotionOrchestrator(
@@ -190,7 +200,7 @@ def test_live_executor_state_replaces_prediction_before_function(tmp_path):
     assert len(result.step_request_ids) == 3
     assert all(path.is_file() for path in result.handled_request_paths)
     assert all(path.is_file() for path in result.handled_world_paths)
-    assert result.final_world.robot_state.joint_positions_rad == [4.0]
+    assert result.final_world.robot_state.joint_positions_rad == [5.0]
     assert result.final_world.robot_state.attached_object_id == "part"
     assert result.final_world.scene.completed_subgoals == ["pick-part"]
     restored = MotionPlanStore(tmp_path).load_manifest()
@@ -265,7 +275,7 @@ def test_orchestrator_plans_transition_then_subgoal_and_persists(tmp_path) -> No
     assert entry.task.metadata["next_ee"] == "3F"
     assert result.requests[1].world.robot_state.joint_positions_rad == [0.1]
     assert result.requests[1].world.metadata["physical_active_ee"] == "2F"
-    assert result.requests[2].world.robot_state.joint_positions_rad == [0.2]
+    assert result.requests[2].world.robot_state.joint_positions_rad == pytest.approx([0.2])
     assert result.requests[2].world.metadata["physical_active_ee"] == "3F"
     assert result.requests[2].world.scene.signature.startswith("predicted:")
     assert result.final_world.robot_state.joint_positions_rad == pytest.approx([0.3])
@@ -462,6 +472,14 @@ def test_orchestrator_plans_initial_attach_from_empty_mount(tmp_path) -> None:
         ),
         PlanStep(
             step_index=1,
+            kind="transition",
+            action="MOVE_TO_WORKSPACE",
+            parameters={"subgoal": "pick-part"},
+            subgoal_id="pick-part",
+            candidate_id="candidate-1",
+        ),
+        PlanStep(
+            step_index=2,
             kind="subgoal",
             action="EXECUTE_SUBGOAL",
             subgoal_id="pick-part",
@@ -494,3 +512,53 @@ def test_orchestrator_plans_initial_attach_from_empty_mount(tmp_path) -> None:
     assert attach.task.metadata["to_ee"] == "3F"
     assert attach.task.target_ids == ["3F"]
     assert result.requests[1].world.metadata["physical_active_ee"] == "3F"
+
+
+def test_keep_ee_does_not_insert_move_to_workspace(tmp_path) -> None:
+    selected = _selected().model_copy(deep=True)
+    selected.steps = [
+        PlanStep(
+            step_index=0,
+            kind="transition",
+            action="KEEP_EE",
+            parameters={"ee": "2F"},
+            subgoal_id="pick-part",
+            candidate_id="candidate-1",
+        ),
+        PlanStep(
+            step_index=1,
+            kind="transition",
+            action="MOVE_TO_WORKSPACE",
+            parameters={"subgoal": "pick-part"},
+            subgoal_id="pick-part",
+            candidate_id="candidate-1",
+        ),
+        PlanStep(
+            step_index=2,
+            kind="subgoal",
+            action="EXECUTE_SUBGOAL",
+            subgoal_id="pick-part",
+            candidate_id="candidate-1",
+        ),
+    ]
+    result = SelectedPlanMotionOrchestrator(
+        _fake_planner,
+        store=MotionPlanStore(tmp_path),
+    ).plan(
+        selected,
+        initial_world=_world(),
+        constraints=MotionConstraints(
+            joint_limits={
+                "j1": JointDynamicLimit(
+                    max_velocity_rad_s=1.0,
+                    max_acceleration_rad_s2=2.0,
+                )
+            }
+        ),
+    )
+
+    assert [request.task.action_type for request in result.requests] == ["acquire"]
+    assert all(
+        request.task.action_type != "MOVE_TO_WORKSPACE"
+        for request in result.requests
+    )

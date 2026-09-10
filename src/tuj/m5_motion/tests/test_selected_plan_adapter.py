@@ -361,12 +361,68 @@ def test_inference_skips_sliver_and_selects_valid_support_candidate() -> None:
         constraints=MotionConstraints(collision_margin_m=0.005),
     )[1]
 
+    # Primary remains real-support; the coplanar sliver neighbor is also
+    # listed so a seam-like mesh contact cannot reject LIFT.
     assert request.task.metadata["support_collision_selectors"] == [
-        "real-support"
+        "neighbor-edge",
+        "real-support",
     ]
     assert request.task.metadata["support_initial_clearance_m"] == pytest.approx(
-        0.0005
+        0.0
     )
+    assert request.task.metadata["support_horizontal_overlap_ratio"] == pytest.approx(
+        1.0
+    )
+
+
+def test_infers_all_coplanar_tiled_supports_for_pick_acm() -> None:
+    selected = _selected_plan()
+    pick_world = _world("scene:pick", [0.2, 0.3])
+    # Object straddles the seam between two coplanar tiles.
+    pick_world.objects["part"] = {
+        "pose": {
+            "frame_id": "world",
+            "position_m": [0.5, 0.0, 0.05],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.2, 0.2, 0.1],
+    }
+    pick_world.obstacles = [
+        {
+            "obstacle_id": "counter_tile_a",
+            "aabb_min_m": [0.0, -0.5, -0.1],
+            "aabb_max_m": [1.0, 0.0, 0.0],
+            "collision_enabled": True,
+        },
+        {
+            "obstacle_id": "counter_tile_b",
+            "aabb_min_m": [0.0, 0.0, -0.1],
+            "aabb_max_m": [1.0, 0.5, 0.0],
+            "collision_enabled": True,
+        },
+        {
+            "obstacle_id": "lower_shelf",
+            "aabb_min_m": [0.0, -0.5, -0.5],
+            "aabb_max_m": [1.0, 0.5, -0.2],
+            "collision_enabled": True,
+        },
+    ]
+
+    request = SelectedPlanMotionRequestAdapter().convert(
+        selected,
+        worlds={
+            "sg-place": _world("scene:place", [0.0, 0.1]),
+            "sg-pick": pick_world,
+        },
+        constraints=MotionConstraints(collision_margin_m=0.005),
+    )[1]
+
+    assert request.task.metadata["support_collision_selectors"] == [
+        "counter_tile_a",
+        "counter_tile_b",
+    ]
+    assert "lower_shelf" not in request.task.metadata["support_collision_selectors"]
+    assert request.task.metadata["support_collision_policy"] == "AUTO_INITIAL_SUPPORT_V1"
 
 
 def test_normalizes_contact_friction_mode_before_support_inference() -> None:

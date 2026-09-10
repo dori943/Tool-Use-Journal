@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import json
 from types import SimpleNamespace
 
 import pytest
@@ -9,15 +10,19 @@ import pytest
 from tuj.m5_motion.kinematics import IKResult, IKSolutionSet
 from tuj.m5_motion.pipeline import (
     CollisionPlanningSetup,
+    DebugKeyframeStrategyProvider,
     MotionPlanningPipeline,
     MotionPlanningPipelineError,
+    _EdgeContextMaterializingPlanner,
 )
+from tuj.m5_motion.strategy import EdgePlanResult
 from tuj.m5_motion.plan_builder import MotionPlanBuilder
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
     CollisionContext,
     GoalType,
     JointDynamicLimit,
+    KeyframeEventType,
     ModuleName,
     MotionConstraints,
     MotionGoal,
@@ -161,6 +166,10 @@ class _FakeKinematics:
             enumeration_complete=True,
             attempted_seeds=1,
         )
+
+    @staticmethod
+    def forward_pose_world(qpos):
+        return (tuple(qpos[:2]) + (0.3,), (0.0, 0.0, 0.0, 1.0))
 
 
 class _OutsideReachKinematics:
@@ -332,6 +341,89 @@ def test_pipeline_preserves_raw_ik_diagnostics_and_reach_failure_code() -> None:
     assert diagnostic.best_position_error_m == pytest.approx(0.25)
     assert "conservative reach envelope" in diagnostic.solver_detail
     assert "conservative reach envelope" in diagnostic.validity_detail
+
+
+def test_pipeline_debug_dump_preserves_generated_bound_and_failed_pose(tmp_path) -> None:
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(),
+    )
+    provider = DebugKeyframeStrategyProvider(provider, tmp_path)
+    pipeline = MotionPlanningPipeline(
+        provider, _OutsideReachKinematics(), debug_dir=tmp_path
+    )
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    with pytest.raises(MotionPlanningPipelineError):
+        pipeline.plan(
+            _request(),
+            state_validator=lambda q, keyframe: True,
+            collision_contexts={context.context_id: context},
+            initial_collision_context_id=context.context_id,
+            final_segment_validator=lambda waypoints, selected_context: True,
+        )
+
+    generated_path, planning_path = sorted(tmp_path.glob("*.json"))
+    generated = json.loads(generated_path.read_text(encoding="utf-8"))
+    planning = json.loads(planning_path.read_text(encoding="utf-8"))
+    assert generated["stage"] == "VLM_GENERATED"
+    raw = generated["strategies"][0]["keyframes"][0]
+    assert raw["index"] == 0
+    assert raw["phase"] == "CUSTOM"
+    assert raw["frame_ref"] == "object:target"
+    assert raw["raw_offset_m"] == pytest.approx(0.05)
+    assert raw["raw_position_world_m"] == pytest.approx([0.4, 0.0, 0.25])
+
+    assert planning["stage"] == "BINDER_AND_COMPILER"
+    assert planning["binder_strategies"][0]["keyframes"][0][
+        "resolver_world_pose"
+    ]["position_m"] == pytest.approx([0.4, 0.0, 0.25])
+    assert planning["final_strategies"][0]["keyframes"][0][
+        "final_tcp_world_pose"
+    ]["position_m"] == pytest.approx([0.4, 0.0, 0.25])
+    failure = planning["compilation_attempts"][0]
+    assert failure["failure_code"] == "TARGET_OUTSIDE_REACH_ENVELOPE"
+    assert failure["failed_keyframe_id"] == raw["keyframe_id"]
+    assert failure["failed_keyframe_index"] == 0
+    assert failure["failed_keyframe_phase"] == "CUSTOM"
+    assert failure["resolved_final_tcp_keyframes"][0][
+        "final_tcp_world_pose"
+    ]["position_m"] == pytest.approx([0.4, 0.0, 0.25])
+
+
+def test_attachment_context_materializes_from_selected_source_branch_fk() -> None:
+    observed = []
+
+    class Delegate:
+        def plan(self, source, target, source_keyframe, target_keyframe):
+            del source_keyframe, target_keyframe
+            return EdgePlanResult(valid=True, joint_path=(source, target))
+
+    wrapper = _EdgeContextMaterializingPlanner(
+        Delegate(),
+        _FakeKinematics(),
+        lambda keyframe, pose: observed.append((keyframe.keyframe_id, pose)),
+    )
+    source_keyframe = SimpleNamespace(
+        keyframe_id="actual-grasp",
+        events_after=[KeyframeEventType.ATTACH_OBJECT],
+    )
+    target_keyframe = SimpleNamespace()
+
+    result = wrapper.plan(
+        (0.397, 0.002),
+        (0.5, 0.1),
+        source_keyframe,
+        target_keyframe,
+    )
+
+    assert result.valid
+    assert observed[0][0] == "actual-grasp"
+    assert observed[0][1].position_m == pytest.approx((0.397, 0.002, 0.3))
 
 
 def test_pipeline_distinguishes_collision_filtered_ik_branches() -> None:

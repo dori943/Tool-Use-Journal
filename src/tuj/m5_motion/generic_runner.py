@@ -332,10 +332,12 @@ class ToolUseJournalPlannerPool:
         ee_attach_policy: EEAttachPolicy | str = EEAttachPolicy.PRECOMPUTED_REQUIRED,
         ee_attach_start_tolerance_rad: float = 0.01,
         provider: Any | None = None,
+        debug_dir: Path | None = None,
     ) -> None:
         self.repository = repository
         self.seed = seed
         self.provider = provider
+        self.debug_dir = debug_dir
         self.ee_attach_registry_root = ee_attach_registry_root
         self.ee_attach_trajectory_paths = tuple(ee_attach_trajectory_paths)
         self.ee_return_trajectory_paths = tuple(ee_return_trajectory_paths)
@@ -380,6 +382,7 @@ class ToolUseJournalPlannerPool:
                     self.ee_attach_start_tolerance_rad
                 ),
                 provider=self.provider,
+                debug_dir=self.debug_dir,
             )
             self._planners[key] = planner
         return planner(request)
@@ -1181,7 +1184,10 @@ def main(
         envelope.get("artifact_id")
         or f"task-planner:selected-plan:{selected_hash[:24]}"
     )
-    planner_pool_options: dict[str, Any] = {"seed": args.seed}
+    planner_pool_options: dict[str, Any] = {
+        "seed": args.seed,
+        "debug_dir": output_dir / "debug",
+    }
     if args.provider == "gemini":
         from tuj.m5_motion.gemini_provider import GeminiKeyframeProvider, GeminiKeyframeProviderConfig
         config = GeminiKeyframeProviderConfig.from_environment(

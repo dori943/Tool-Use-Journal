@@ -18,6 +18,7 @@ from tuj.m5_motion.attachment_retarget import retarget_resolved_pose
 from tuj.m5_motion.geometry import RelativePoseResolver
 from tuj.m5_motion.schema import (
     KeyframePlannerType,
+    KeyframeType,
     RelativeKeyframeSpec,
     WorldSnapshot,
 )
@@ -581,9 +582,43 @@ class RRTConnectEdgePlanner:
         )
 
 
+# First free-space standoff after CURRENT_STATE: Cartesian may cross clutter
+# (e.g. SAFE_RACK_EXIT parked over a tray).  Contact-local edges stay Cartesian.
+_FIRST_FREE_SPACE_STANDBY_TYPES = frozenset(
+    {
+        KeyframeType.PRE_GRASP,
+        KeyframeType.PRE_PLACE,
+    }
+)
+_CARTESIAN_INTERMEDIATE_PATH_FAILURES = frozenset(
+    {
+        "CARTESIAN_INTERMEDIATE_STATE_INVALID",
+        "INTERPOLATED_STATE_INVALID",
+    }
+)
+
+
+def _is_current_to_first_free_space_standoff(
+    source_keyframe: RelativeKeyframeSpec | None,
+    target_keyframe: RelativeKeyframeSpec,
+) -> bool:
+    """True only for CURRENT_STATE → first PRE_GRASP / PRE_PLACE edge."""
+
+    return (
+        source_keyframe is None
+        and target_keyframe.keyframe_type in _FIRST_FREE_SPACE_STANDBY_TYPES
+    )
+
+
 @dataclass(frozen=True, slots=True)
 class PlannerDispatchEdgePlanner:
-    """Route each incoming keyframe edge to its declared planning algorithm."""
+    """Route each incoming keyframe edge to its declared planning algorithm.
+
+    Narrow exception: when ``CURRENT_STATE → PRE_GRASP/PRE_PLACE`` is declared
+    CARTESIAN and the straight SE(3) path fails only on intermediate state
+    validity, retry once with the existing sampling-based (RRT-Connect) planner.
+    Contact edges and already-SAMPLING_BASED edges are unchanged.
+    """
 
     joint: EdgePlanner
     cartesian: EdgePlanner
@@ -601,8 +636,64 @@ class PlannerDispatchEdgePlanner:
             KeyframePlannerType.CARTESIAN: self.cartesian,
             KeyframePlannerType.SAMPLING_BASED: self.sampling_based,
         }
-        return planners[target_keyframe.planner].plan(
+        primary = planners[target_keyframe.planner]
+        result = primary.plan(
             source, target, source_keyframe, target_keyframe
+        )
+        if (
+            result.valid
+            or target_keyframe.planner is not KeyframePlannerType.CARTESIAN
+            or not _is_current_to_first_free_space_standoff(
+                source_keyframe, target_keyframe
+            )
+            or result.failure_code not in _CARTESIAN_INTERMEDIATE_PATH_FAILURES
+        ):
+            return result
+
+        fallback = self.sampling_based.plan(
+            source, target, source_keyframe, target_keyframe
+        )
+        if fallback.valid:
+            detail = fallback.detail
+            suffix = (
+                "cartesian_intermediate_path_invalid;"
+                f" fallback=SAMPLING_BASED;"
+                f" cartesian_failure={result.failure_code}"
+            )
+            if detail:
+                detail = f"{detail}; {suffix}"
+            else:
+                detail = suffix
+            print(
+                "[M5][EDGE] CURRENT→"
+                f"{target_keyframe.keyframe_type.value} "
+                f"CARTESIAN failed ({result.failure_code}); "
+                "SAMPLING_BASED fallback ok"
+            )
+            return EdgePlanResult(
+                valid=True,
+                joint_path=fallback.joint_path,
+                detail=detail,
+                min_clearance_m=fallback.min_clearance_m,
+            )
+        print(
+            "[M5][EDGE] CURRENT→"
+            f"{target_keyframe.keyframe_type.value} "
+            f"CARTESIAN failed ({result.failure_code}); "
+            "SAMPLING_BASED fallback also failed "
+            f"({fallback.failure_code or 'UNKNOWN'})"
+        )
+        # Keep the original Cartesian diagnostic; do not hide path collisions
+        # behind a later RRT timeout/exhaustion code.
+        return EdgePlanResult(
+            valid=False,
+            failure_code=result.failure_code,
+            detail=(
+                f"{result.detail}; sampling_based_fallback_failed="
+                f"{fallback.failure_code or 'UNKNOWN'}"
+                + (f": {fallback.detail}" if fallback.detail else "")
+            ),
+            min_clearance_m=result.min_clearance_m,
         )
 
 

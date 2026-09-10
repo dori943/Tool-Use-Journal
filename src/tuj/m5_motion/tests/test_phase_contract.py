@@ -113,6 +113,22 @@ def test_transport_rejects_place_and_release_effects() -> None:
         validate_keyframe_phase_contract(_request("transport"), artifact)
 
 
+def test_object_acquire_requires_pregrasp_before_grasp() -> None:
+    missing_pre = _artifact(
+        _keyframe("grasp", KeyframeType.GRASP),
+        _keyframe("lift", KeyframeType.LIFT),
+    )
+    with pytest.raises(KeyframePhaseContractError, match="PRE_GRASP before GRASP"):
+        validate_keyframe_phase_contract(_request("acquire"), missing_pre)
+
+    valid = _artifact(
+        _keyframe("pre", KeyframeType.PRE_GRASP),
+        _keyframe("grasp", KeyframeType.GRASP),
+        _keyframe("lift", KeyframeType.LIFT),
+    )
+    validate_keyframe_phase_contract(_request("acquire"), valid)
+
+
 def test_release_requires_detach_before_open_and_retreat_after_place() -> None:
     invalid = _artifact(
         _keyframe("transfer", KeyframeType.TRANSFER),

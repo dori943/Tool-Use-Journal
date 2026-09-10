@@ -163,8 +163,8 @@ def _batch(*, frame_ref: str = "object:bottle") -> GeneratedKeyframeBatch:
                         planner="CARTESIAN",
                     ),
                     GeneratedKeyframe(
-                        keyframe_id="retreat",
-                        keyframe_type="RETREAT",
+                        keyframe_id="lift",
+                        keyframe_type="LIFT",
                         frame_ref=frame_ref,
                         anchor="center",
                         approach_axis_xyz=[1.0, 0.0, 0.0],
@@ -800,3 +800,511 @@ def test_return_tool_place_keeps_eef_semantics() -> None:
 
     for keyframe in artifact.candidates[0].keyframes:
         assert "pose_subject" not in keyframe.metadata
+
+
+def _pick_strategy(strategy_id: str, *kinds: str) -> GeneratedStrategy:
+    offsets = {
+        "PRE_GRASP": 0.12,
+        "GRASP": 0.01,
+        "LIFT": 0.15,
+        "RETREAT": 0.15,
+        "TRANSFER": 0.08,
+        "PLACE": 0.0,
+    }
+    return GeneratedStrategy(
+        strategy_id=strategy_id,
+        rationale="Synthetic pick candidate for contract tests.",
+        keyframes=[
+            GeneratedKeyframe(
+                keyframe_id=f"{strategy_id}-{index}-{kind.lower()}",
+                keyframe_type=kind,
+                frame_ref="object:bottle",
+                anchor="top_center",
+                approach_axis_xyz=[0.0, 0.0, 1.0],
+                tool_axis_to_align="-z",
+                offset_along_approach_m=offsets.get(kind, 0.1),
+                roll_rad=0.0,
+                planner="CARTESIAN",
+            )
+            for index, kind in enumerate(kinds, start=1)
+        ],
+    )
+
+
+def test_object_pick_grasp_then_lift_is_valid() -> None:
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            _pick_strategy("a", "PRE_GRASP", "GRASP", "LIFT"),
+            _pick_strategy("b", "PRE_GRASP", "GRASP", "LIFT"),
+        ]
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    artifact = provider.generate(_request())
+
+    assert len(artifact.candidates) == 2
+    for candidate in artifact.candidates:
+        kinds = [item.keyframe_type.value for item in candidate.keyframes]
+        assert kinds == ["PRE_GRASP", "GRASP", "LIFT"]
+        assert candidate.keyframes[0].offset_along_approach_m == pytest.approx(0.12)
+        assert "materialized_pre_grasp" not in candidate.keyframes[0].metadata
+
+
+def test_object_pick_without_pregrasp_materializes_outward_standoff() -> None:
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            _pick_strategy("a", "GRASP", "LIFT"),
+            _pick_strategy("b", "GRASP", "LIFT"),
+        ]
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    artifact = provider.generate(_request())
+
+    for candidate in artifact.candidates:
+        pre, grasp, lift = candidate.keyframes
+        assert [item.keyframe_type.value for item in candidate.keyframes] == [
+            "PRE_GRASP",
+            "GRASP",
+            "LIFT",
+        ]
+        assert pre.frame_ref == grasp.frame_ref
+        assert pre.anchor == grasp.anchor
+        assert pre.approach_axis_xyz == grasp.approach_axis_xyz
+        assert pre.tool_axis_to_align == grasp.tool_axis_to_align
+        assert pre.roll_rad == grasp.roll_rad
+        assert pre.planner == grasp.planner
+        assert pre.offset_along_approach_m == pytest.approx(
+            grasp.offset_along_approach_m + 0.08
+        )
+        assert pre.metadata["materialized_pre_grasp"] is True
+        assert pre.events_after == []
+        assert grasp.events_after
+        assert lift.keyframe_type.value == "LIFT"
+
+
+def test_object_pick_without_lift_is_rejected() -> None:
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            _pick_strategy("a", "PRE_GRASP", "GRASP"),
+            _pick_strategy("b", "PRE_GRASP", "GRASP"),
+        ]
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    with pytest.raises(
+        OpenAIKeyframeProviderError, match="PICK requires GRASP followed by a LIFT"
+    ):
+        provider.generate(_request())
+
+
+def test_object_pick_grasp_followed_by_non_lift_is_rejected() -> None:
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            _pick_strategy("a", "PRE_GRASP", "GRASP", "TRANSFER"),
+            _pick_strategy("b", "PRE_GRASP", "GRASP", "PLACE"),
+        ]
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    with pytest.raises(
+        OpenAIKeyframeProviderError, match="PICK requires GRASP followed by a LIFT"
+    ):
+        provider.generate(_request())
+
+
+def test_openai_style_post_grasp_retreat_normalizes_to_lift_for_acquire() -> None:
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            _pick_strategy("direct_1", "PRE_GRASP", "GRASP", "RETREAT"),
+            _pick_strategy("standoff_top", "PRE_GRASP", "GRASP", "RETREAT"),
+            _pick_strategy("side_approach", "PRE_GRASP", "GRASP", "RETREAT"),
+            _pick_strategy("custom_roll", "PRE_GRASP", "GRASP", "RETREAT"),
+        ]
+    )
+    request = _request()
+    request.task.action_type = "acquire"
+    request.task.metadata["operation"] = "ACQUIRE"
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=4),
+        client=_FakeClient(batch),
+    )
+
+    artifact = provider.generate(request)
+
+    assert len(artifact.candidates) == 4
+    for candidate in artifact.candidates:
+        kinds = [item.keyframe_type.value for item in candidate.keyframes]
+        assert kinds == ["PRE_GRASP", "GRASP", "LIFT"]
+        assert candidate.keyframes[-1].keyframe_type.value == "LIFT"
+
+
+def test_place_validation_still_requires_retreat_after_place() -> None:
+    request = _request()
+    request.task.action_type = "place"
+    request.task.metadata["operation"] = "PLACE"
+    request.task.goal = MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle")
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_release_batch()),
+    )
+
+    artifact = provider.generate(request)
+
+    for candidate in artifact.candidates:
+        kinds = [item.keyframe_type.value for item in candidate.keyframes]
+        assert kinds == ["PRE_PLACE", "PLACE", "RETREAT"]
+
+
+def _place_strategy(strategy_id: str, *kinds: str, axis=None) -> GeneratedStrategy:
+    offsets = {
+        "PRE_PLACE": 0.10,
+        "PLACE": 0.01,
+        "LIFT": 0.12,
+        "RETREAT": 0.12,
+        "TRANSFER": 0.08,
+        "CUSTOM": 0.12,
+    }
+    return GeneratedStrategy(
+        strategy_id=strategy_id,
+        rationale="Synthetic place candidate for contract tests.",
+        keyframes=[
+            GeneratedKeyframe(
+                keyframe_id=f"{strategy_id}-{index}-{kind.lower()}",
+                keyframe_type=kind,
+                frame_ref="object:bottle",
+                anchor="top_center",
+                approach_axis_xyz=list(axis or [0.0, 0.0, 1.0]),
+                tool_axis_to_align="-z",
+                offset_along_approach_m=offsets.get(kind, 0.1),
+                roll_rad=0.0,
+                planner="CARTESIAN",
+            )
+            for index, kind in enumerate(kinds, start=1)
+        ],
+    )
+
+
+def _place_request() -> MotionPlanRequest:
+    request = _request()
+    request.task.action_type = "place"
+    request.task.metadata["operation"] = "PLACE"
+    request.task.goal = MotionGoal(goal_type=GoalType.POSE, target_object_id="bottle")
+    return request
+
+
+def test_openai_style_post_place_lift_normalizes_to_retreat() -> None:
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            _place_strategy("ST001", "PRE_PLACE", "PLACE", "LIFT"),
+            _place_strategy("ST003", "PRE_PLACE", "PLACE", "LIFT"),
+        ]
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    artifact = provider.generate(_place_request())
+
+    assert len(artifact.candidates) == 2
+    for candidate in artifact.candidates:
+        kinds = [item.keyframe_type.value for item in candidate.keyframes]
+        assert kinds == ["PRE_PLACE", "PLACE", "RETREAT"]
+        assert candidate.keyframes[-1].keyframe_type.value == "RETREAT"
+
+
+def test_place_without_withdrawal_is_rejected_with_phase_diagnostic() -> None:
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            _place_strategy("a", "PRE_PLACE", "PLACE"),
+            _place_strategy("b", "PRE_PLACE", "PLACE", "TRANSFER"),
+        ]
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    with pytest.raises(
+        OpenAIKeyframeProviderError,
+        match=r"PLACE requires PLACE followed by RETREAT \(phases=",
+    ):
+        provider.generate(_place_request())
+
+
+def test_place_custom_after_place_is_not_synthesized_into_retreat() -> None:
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            _place_strategy("a", "PRE_PLACE", "PLACE", "CUSTOM"),
+            _place_strategy("b", "PRE_PLACE", "PLACE", "CUSTOM"),
+        ]
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    with pytest.raises(
+        OpenAIKeyframeProviderError, match="PLACE requires PLACE followed by RETREAT"
+    ):
+        provider.generate(_place_request())
+
+
+def test_near_unit_approach_axis_is_normalized() -> None:
+    axis = [0.0, 0.0, 0.997]
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            _place_strategy("ST002", "PRE_PLACE", "PLACE", "RETREAT", axis=axis),
+            _place_strategy("ST004", "PRE_PLACE", "PLACE", "RETREAT", axis=axis),
+        ]
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    artifact = provider.generate(_place_request())
+
+    for candidate in artifact.candidates:
+        for keyframe in candidate.keyframes:
+            norm = sum(value * value for value in keyframe.approach_axis_xyz) ** 0.5
+            assert norm == pytest.approx(1.0)
+            assert keyframe.approach_axis_xyz[2] == pytest.approx(1.0)
+
+
+def test_zero_and_nonfinite_approach_axes_are_rejected_with_raw_norm() -> None:
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            _place_strategy("zero", "PRE_PLACE", "PLACE", "RETREAT", axis=[0.0, 0.0, 0.0]),
+            _place_strategy(
+                "nan", "PRE_PLACE", "PLACE", "RETREAT", axis=[float("nan"), 0.0, 1.0]
+            ),
+        ]
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    with pytest.raises(
+        OpenAIKeyframeProviderError, match=r"raw_approach_axis_xyz=.*norm="
+    ):
+        provider.generate(_place_request())
+
+
+def test_pick_retreat_to_lift_canonicalization_is_unchanged() -> None:
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            _pick_strategy("direct_1", "PRE_GRASP", "GRASP", "RETREAT"),
+            _pick_strategy("standoff_top", "PRE_GRASP", "GRASP", "RETREAT"),
+        ]
+    )
+    request = _request()
+    request.task.action_type = "acquire"
+    request.task.metadata["operation"] = "ACQUIRE"
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    artifact = provider.generate(request)
+
+    for candidate in artifact.candidates:
+        assert [item.keyframe_type.value for item in candidate.keyframes] == [
+            "PRE_GRASP",
+            "GRASP",
+            "LIFT",
+        ]
+
+
+def test_payload_exposes_acquire_operation_for_pick_contract() -> None:
+    request = _request()
+    request.task.action_type = "acquire"
+    request.task.metadata["operation"] = "ACQUIRE"
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_batch()),
+    )
+
+    provider.generate(request)
+
+    payload = json.loads(provider._client.responses.calls[0]["input"])
+    assert payload["task"]["action_type"] == "acquire"
+    assert payload["task"]["operation"] == "ACQUIRE"
+    assert "ACQUIRE" in provider._client.responses.calls[0]["instructions"] or (
+        "Object-acquire" in provider._client.responses.calls[0]["instructions"]
+    )
+
+
+def test_place_payload_exposes_operation_held_place_goal_and_phase_contract() -> None:
+    request = _place_request()
+    request.task.goal = MotionGoal(
+        goal_type=GoalType.POSE,
+        target_object_id="bottle",
+        target_region_id="tray",
+    )
+    request.world.robot_state.attached_object_id = "bottle"
+    request.world.objects["tray"] = {
+        "pose": {
+            "position_m": [0.2, 0.3, 0.7],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.3, 0.2, 0.05],
+        "anchors": {
+            "center": [0.0, 0.0, 0.0],
+            "held_place_goal": [0.0, 0.0, 0.05],
+            "held_place_start": [0.3, -0.2, 0.2],
+        },
+    }
+    request.task.metadata["held_place_goal"] = {
+        "frame_ref": "object:tray",
+        "anchor": "held_place_goal",
+        "start_anchor": "held_place_start",
+        "object_id": "bottle",
+        "source": "WORLD_GRASP_TRANSFORM_AND_DESTINATION_BBOX",
+    }
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_release_batch()),
+    )
+
+    provider.generate(request)
+
+    call = provider._client.responses.calls[0]
+    payload = json.loads(call["input"])
+    assert payload["task"]["action_type"] == "place"
+    assert payload["task"]["operation"] == "PLACE"
+    assert payload["task"]["goal"]["target_region_id"] == "tray"
+    assert payload["held_place_goal"]["anchor"] == "held_place_goal"
+    assert payload["held_transport_goal"] is None
+    assert payload["phase_contract"]["operation"] == "PLACE"
+    assert payload["phase_contract"]["required"] == "PLACE followed by RETREAT"
+    assert "TRANSFER-only strategies" in payload["phase_contract"]["invalid"]
+    instructions = call["instructions"]
+    assert "TRANSFER-only strategies are invalid for PLACE" in instructions
+    assert "PLACE is the release event" in instructions
+    assert "suction/vacuum" in instructions
+    assert "PRE_PLACE (approach) → PLACE (release) → RETREAT" in instructions
+
+
+def test_transport_payload_keeps_transfer_contract_without_place_goal() -> None:
+    request = _held_transport_request()
+    request.task.metadata["held_transport_goal"] = {
+        "frame_ref": "object:tray",
+        "anchor": "held_transport_goal",
+        "object_id": "bottle",
+    }
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_transfer_batch()),
+    )
+
+    provider.generate(request)
+
+    call = provider._client.responses.calls[0]
+    payload = json.loads(call["input"])
+    assert payload["task"]["operation"] == "TRANSPORT"
+    assert payload["held_transport_goal"]["anchor"] == "held_transport_goal"
+    assert payload["held_place_goal"] is None
+    assert payload["phase_contract"]["required"] == (
+        "TRANSFER-only while keeping the object held"
+    )
+    assert "Do not emit PLACE, PRE_PLACE, or" in call["instructions"]
+    assert "RETREAT for TRANSPORT/MOVE" in call["instructions"]
+
+
+def test_transfer_only_place_candidates_remain_rejected() -> None:
+    batch = GeneratedKeyframeBatch(
+        candidates=[
+            GeneratedStrategy(
+                strategy_id="t1",
+                rationale="Transit only.",
+                keyframes=[
+                    GeneratedKeyframe(
+                        keyframe_id="a",
+                        keyframe_type="TRANSFER",
+                        frame_ref="object:bottle",
+                        anchor="top_center",
+                        approach_axis_xyz=[0.0, 0.0, 1.0],
+                        tool_axis_to_align="-z",
+                        offset_along_approach_m=0.0,
+                        roll_rad=0.0,
+                        planner="SAMPLING_BASED",
+                    ),
+                    GeneratedKeyframe(
+                        keyframe_id="b",
+                        keyframe_type="TRANSFER",
+                        frame_ref="object:bottle",
+                        anchor="top_center",
+                        approach_axis_xyz=[0.0, 0.0, 1.0],
+                        tool_axis_to_align="-z",
+                        offset_along_approach_m=0.0,
+                        roll_rad=0.0,
+                        planner="SAMPLING_BASED",
+                    ),
+                ],
+            ),
+            GeneratedStrategy(
+                strategy_id="t2",
+                rationale="Transit only again.",
+                keyframes=[
+                    GeneratedKeyframe(
+                        keyframe_id="a",
+                        keyframe_type="TRANSFER",
+                        frame_ref="object:bottle",
+                        anchor="top_center",
+                        approach_axis_xyz=[0.0, 0.0, 1.0],
+                        tool_axis_to_align="-z",
+                        offset_along_approach_m=0.05,
+                        roll_rad=0.0,
+                        planner="SAMPLING_BASED",
+                    ),
+                    GeneratedKeyframe(
+                        keyframe_id="b",
+                        keyframe_type="TRANSFER",
+                        frame_ref="object:bottle",
+                        anchor="top_center",
+                        approach_axis_xyz=[0.0, 0.0, 1.0],
+                        tool_axis_to_align="-z",
+                        offset_along_approach_m=0.0,
+                        roll_rad=0.0,
+                        planner="SAMPLING_BASED",
+                    ),
+                    GeneratedKeyframe(
+                        keyframe_id="c",
+                        keyframe_type="TRANSFER",
+                        frame_ref="object:bottle",
+                        anchor="top_center",
+                        approach_axis_xyz=[0.0, 0.0, 1.0],
+                        tool_axis_to_align="-z",
+                        offset_along_approach_m=0.1,
+                        roll_rad=0.0,
+                        planner="CARTESIAN",
+                    ),
+                ],
+            ),
+        ]
+    )
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(batch),
+    )
+
+    with pytest.raises(
+        OpenAIKeyframeProviderError,
+        match=r"phases=TRANSFER→TRANSFER",
+    ):
+        provider.generate(_place_request())

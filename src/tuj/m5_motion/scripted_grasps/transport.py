@@ -360,6 +360,19 @@ def ground_held_place(request, retention=None):
     if g is None:
         return
     release_clearance = max(REGION_FLOOR_FALLBACK_M, float(request.constraints.collision_margin_m))
+    # Multi-finger fingertips reach below the grip TCP into the region floor.
+    # Seat the held object high enough that the retargeted TCP clears that
+    # immersion plus the planner margin (same constant as acquire enclosure).
+    from tuj.m5_motion.grasp_geometry import (
+        _request_uses_multi_finger,
+        multi_finger_finger_below_tcp_m,
+    )
+    if _request_uses_multi_finger(request):
+        release_clearance = max(
+            release_clearance,
+            float(multi_finger_finger_below_tcp_m())
+            + float(request.constraints.collision_margin_m),
+        )
     desired_center = g.region_world.copy()
     desired_center[:2] = g.free_destination_xy()
     support_z, stacked = g.support_top_world_z(desired_center[:2])

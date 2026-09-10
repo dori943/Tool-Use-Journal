@@ -2858,6 +2858,13 @@ class ToolUseJournalControllerTrajectoryPlayer(
     _PLAYER_ID = "TOOL_USE_JOURNAL_CONTROLLER_V1"
     _PLAYBACK_MODE = "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER"
     _CONTROLLER_TRACKING = True
+    _ACQUIRE_CONTACT_EVENT_TYPES = frozenset(
+        {
+            EventType.ATTACH_OBJECT,
+            EventType.SUCTION_ON,
+            EventType.GRIPPER_CLOSE,
+        }
+    )
 
     def __init__(
         self,
@@ -2876,6 +2883,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
         self._collision_check_stride = collision_check_stride
         self._gripper_rate_credit = 0.0
         self._active_segment: TrajectorySegment | None = None
+        self._playback_plan: MotionPlan | None = None
 
     def _custom_settle_evaluation(
         self,
@@ -2884,17 +2892,197 @@ class ToolUseJournalControllerTrajectoryPlayer(
         settle_config: Mapping[str, float | int],
         joint_error_rad: float,
         eef_position_error_m: float | None,
+        eef_orientation_error_rad: float | None = None,
     ) -> Mapping[str, Any] | None:
         """Optionally replace rigid EEF settling with task-relevant physics.
 
-        The default controller remains joint / EEF based.  A subclass carrying
-        a frictionally held free tool can instead return a mapping containing a
-        boolean ``succeeded`` and its observed task-space evidence.  Keeping
-        this hook in the generic player avoids teaching the runtime about any
-        particular tool geometry.
+        Acquire contact keyframes (ATTACH / suction-on / gripper-close) may
+        nominate a penetrating TCP that physics cannot reach after first
+        contact.  For those endpoints only, intended EE-target contact plus
+        orientation convergence is sufficient.  Non-contact motion keeps the
+        default joint / EEF gate by returning ``None``.  Subclasses may still
+        override this hook for tool-specific settle contracts.
         """
 
-        return None
+        del joint_error_rad
+        return self._acquire_contact_settle_evaluation(
+            segment=segment,
+            settle_config=settle_config,
+            eef_position_error_m=eef_position_error_m,
+            eef_orientation_error_rad=eef_orientation_error_rad,
+        )
+
+    @classmethod
+    def _acquire_contact_target_id(
+        cls,
+        plan: MotionPlan,
+        segment: TrajectorySegment,
+    ) -> str | None:
+        """Return the acquire target for a contact-sensitive settle segment."""
+
+        motion_end_time = float(
+            segment.metadata.get("motion_end_time_s", segment.end_time_s)
+        )
+        attach_target: str | None = None
+        grasp_target: str | None = None
+        for event in plan.events:
+            if event.event_type not in cls._ACQUIRE_CONTACT_EVENT_TYPES:
+                continue
+            if not (
+                motion_end_time - cls._TIME_TOLERANCE_S
+                <= event.time_from_start_s
+                <= segment.end_time_s + cls._TIME_TOLERANCE_S
+            ):
+                continue
+            target = event.target_id
+            if not isinstance(target, str) or not target:
+                continue
+            if event.event_type is EventType.ATTACH_OBJECT:
+                attach_target = target
+            else:
+                grasp_target = target
+        return attach_target or grasp_target
+
+    def _ee_contact_partners(
+        self,
+        *,
+        allowed_object_ids: set[str],
+    ) -> dict[str, Any]:
+        """Classify live EE contacts into target / foreign-object / environment."""
+
+        model, data = _raw_model_data(self.runtime.env)
+        adapter = ToolUseJournalEnvironmentAdapter(self.runtime.env)
+        mounted_id = mujoco.mj_name2id(
+            model, mujoco.mjtObj.mjOBJ_BODY, adapter.mounted_root_body
+        )
+        if mounted_id < 0:
+            raise ToolUseJournalRuntimeError("mounted EE body is absent")
+        ee_geoms = set(self.runtime._subtree_geom_ids(model, mounted_id))
+        robot_root_name = str(adapter.robot.robot_model.root_body)
+        robot_root_id = mujoco.mj_name2id(
+            model, mujoco.mjtObj.mjOBJ_BODY, robot_root_name
+        )
+        robot_bodies = (
+            set(_descendant_body_ids(model, robot_root_id))
+            if robot_root_id >= 0
+            else set()
+        )
+        body_to_object: dict[int, str] = {}
+        raw_bodies = getattr(self.runtime.env, "obj_body_id", {})
+        if isinstance(raw_bodies, Mapping):
+            for object_id, body_id in raw_bodies.items():
+                try:
+                    body_to_object[int(body_id)] = str(object_id)
+                except (TypeError, ValueError):
+                    continue
+
+        target_pairs: list[tuple[str, str]] = []
+        foreign_object_pairs: list[tuple[str, str]] = []
+        environment_pairs: list[tuple[str, str]] = []
+        ee_contact_geoms: set[str] = set()
+
+        for contact_id in range(int(data.ncon)):
+            contact = data.contact[contact_id]
+            geom_a = int(contact.geom1)
+            geom_b = int(contact.geom2)
+            if geom_a in ee_geoms and geom_b in ee_geoms:
+                continue
+            if geom_a not in ee_geoms and geom_b not in ee_geoms:
+                continue
+            ee_geom = geom_a if geom_a in ee_geoms else geom_b
+            other_geom = geom_b if geom_a in ee_geoms else geom_a
+            other_body = int(model.geom_bodyid[other_geom])
+            if other_body in robot_bodies:
+                continue
+            ee_name = (
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, ee_geom) or ""
+            )
+            other_name = (
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, other_geom)
+                or ""
+            )
+            ee_contact_geoms.add(ee_name)
+            object_id = body_to_object.get(other_body)
+            pair = (ee_name, other_name if object_id is None else object_id)
+            if object_id is None:
+                environment_pairs.append(pair)
+            elif object_id in allowed_object_ids:
+                target_pairs.append(pair)
+            else:
+                foreign_object_pairs.append(pair)
+
+        return {
+            "target_contact_pairs": target_pairs,
+            "foreign_object_contact_pairs": foreign_object_pairs,
+            "environment_contact_pairs": environment_pairs,
+            "ee_contact_geoms": sorted(ee_contact_geoms),
+            "intended_target_contact": bool(target_pairs),
+        }
+
+    def _acquire_contact_settle_evaluation(
+        self,
+        *,
+        segment: TrajectorySegment,
+        settle_config: Mapping[str, float | int],
+        eef_position_error_m: float | None,
+        eef_orientation_error_rad: float | None,
+    ) -> Mapping[str, Any] | None:
+        plan = self._playback_plan
+        if plan is None or "tracking_settle" not in segment.metadata:
+            return None
+        target_id = self._acquire_contact_target_id(plan, segment)
+        if target_id is None:
+            return None
+        # Preserve joint-only / already-converged pose settles.  Contact-aware
+        # success is an escape hatch only when the nominal TCP residual remains
+        # outside the configured EEF position tolerance.
+        if "eef_tolerance_m" not in settle_config:
+            return None
+        if (
+            eef_position_error_m is None
+            or eef_position_error_m <= float(settle_config["eef_tolerance_m"])
+        ):
+            return None
+
+        partners = self._ee_contact_partners(allowed_object_ids={target_id})
+        metrics = self.runtime.object_contact_metrics(target_id)
+        intended_contact = bool(partners["intended_target_contact"]) and (
+            int(metrics.contact_count) > 0
+        )
+        orientation_ok = (
+            "eef_orientation_tolerance_rad" not in settle_config
+            or (
+                eef_orientation_error_rad is not None
+                and eef_orientation_error_rad
+                <= float(settle_config["eef_orientation_tolerance_rad"])
+            )
+        )
+        foreign_ok = not partners["foreign_object_contact_pairs"]
+        environment_ok = not partners["environment_contact_pairs"]
+        succeeded = bool(
+            intended_contact and orientation_ok and foreign_ok and environment_ok
+        )
+        return {
+            "mode": "ACQUIRE_CONTACT_SETTLE",
+            "succeeded": succeeded,
+            "target_object_id": target_id,
+            "intended_target_contact": intended_contact,
+            "orientation_ok": orientation_ok,
+            "foreign_object_ok": foreign_ok,
+            "environment_ok": environment_ok,
+            "target_contact_count": int(metrics.contact_count),
+            "target_contact_groups": list(metrics.contact_groups),
+            "target_contact_pairs": list(partners["target_contact_pairs"]),
+            "foreign_object_contact_pairs": list(
+                partners["foreign_object_contact_pairs"]
+            ),
+            "environment_contact_pairs": list(
+                partners["environment_contact_pairs"]
+            ),
+            "ee_contact_geoms": list(partners["ee_contact_geoms"]),
+            "eef_position_error_m": eef_position_error_m,
+            "eef_orientation_error_rad": eef_orientation_error_rad,
+        }
 
     def _plan_time_step_s(
         self,
@@ -3440,6 +3628,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
 
         report_name = report_id or f"{run.run_id}:execution-report"
         plan = run.plan
+        self._playback_plan = plan
         executed_events: list[ExecutedEvent] = []
         executed_event_ids: set[str] = set()
         max_tracking_error = 0.0
@@ -3465,6 +3654,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 0.0, executed_time - plan_time
             )
             report.metadata["segment_tracking"] = segment_tracking
+            self._playback_plan = None
             return report
 
         def failed_report(
@@ -3830,6 +4020,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
                         settle_config=settle_config,
                         joint_error_rad=step_joint_error,
                         eef_position_error_m=target_eef_error,
+                        eef_orientation_error_rad=target_eef_orientation_error,
                     )
                     settle_ok = (
                         joint_ok and eef_ok and eef_orientation_ok

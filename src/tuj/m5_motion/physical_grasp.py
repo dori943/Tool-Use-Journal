@@ -434,12 +434,35 @@ class ContactFrictionKeyframeProvider:
 
     def generate(self, request: MotionPlanRequest) -> KeyframePlanArtifact:
         artifact = self._provider.generate(request)
+        from tuj.m5_motion.grasp_geometry import (
+            bind_acquire_world_contact_frames,
+            bind_grasp_geometry,
+            bind_multi_finger_place_support_clearance,
+            bind_multi_finger_tabletop_enclosure,
+            bind_suction_surface_contact,
+        )
+
+        # Object-acquire PRE/GRASP/LIFT on frame_ref=world resolve at the world
+        # origin (~3.7 m from a kitchen base). Rewrite onto object:<target>
+        # before geometry binders. No-op for PICK_TOOL / non-acquire / already
+        # object-framed contact phases.
+        artifact = bind_acquire_world_contact_frames(artifact, request)
+        # Vacuum object-acquire GRASP: keep symbolic anchors, bind TCP to the
+        # approach-facing suction surface when the pose still sits inside the
+        # object.  No-op for 2F/3F, PLACE/TRANSPORT, and already-surface poses.
+        artifact = bind_suction_surface_contact(artifact, request)
+        # Multi-finger acquires on blocked tabletop supports: rewrite lateral /
+        # underside / inverted approaches to a support-clear top-down enclosure.
+        # No-op for vacuum, 2F opposed-contact, and free-space objects.
+        artifact = bind_multi_finger_tabletop_enclosure(artifact, request)
+        # Multi-finger region PLACE/PRE_PLACE: raise release height so finger
+        # geoms clear the region floor and rim (shared finger_below with acquire).
+        # No-op otherwise.
+        artifact = bind_multi_finger_place_support_clearance(artifact, request)
         if releases_contact_friction(request):
             return with_contact_friction_release(artifact)
         if not uses_contact_friction(request):
             return artifact
-        from tuj.m5_motion.grasp_geometry import bind_grasp_geometry
-
         artifact = bind_grasp_geometry(artifact, request)
         raw_profile = request.task.metadata.get("grasp_profile")
         profile = PhysicalGraspProfile.from_mapping(
