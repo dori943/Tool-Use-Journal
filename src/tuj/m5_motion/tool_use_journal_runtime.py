@@ -1832,6 +1832,7 @@ class ToolUseJournalEERuntime:
         held_tool_id: str | None,
         attachment_position_tolerance_m: float = 5e-3,
         attachment_orientation_tolerance_rad: float = 5e-2,
+        attachment_observation: AttachedObjectState | None = None,
     ) -> None:
         """Restore checkpoint-only state without reclassifying it as a grasp.
 
@@ -1890,11 +1891,20 @@ class ToolUseJournalEERuntime:
                 object_position - reference_position
             )
             observed_rotation = reference_rotation.T @ object_rotation
+            expected_attachment = attachment
+            if attachment_observation is not None:
+                identity_fields = ("object_id", "free_joint_name", "reference_kind", "reference_name", "mode")
+                if attachment.mode is not AttachmentMode.BREAKABLE_WELD or any(
+                    getattr(attachment_observation, name) != getattr(attachment, name)
+                    for name in identity_fields
+                ):
+                    raise ToolUseJournalRuntimeError("checkpoint observed attachment identity mismatch")
+                expected_attachment = attachment_observation
             expected_position = np.asarray(
-                attachment.position_in_reference_m, dtype=float
+                expected_attachment.position_in_reference_m, dtype=float
             )
             expected_rotation = np.asarray(
-                attachment.rotation_in_reference, dtype=float
+                expected_attachment.rotation_in_reference, dtype=float
             )
             position_error = float(
                 np.linalg.norm(observed_position - expected_position)
