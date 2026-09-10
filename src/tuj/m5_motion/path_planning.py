@@ -217,6 +217,7 @@ class CartesianEdgePlanner:
                 )
                 valid_solutions = []
                 rejected: list[str] = []
+                rejected_minimum: float | None = None
                 for solution in solutions.solutions:
                     candidate = tuple(float(value) for value in solution.qpos)
                     valid, failure_code, detail, clearance = _state_report(
@@ -224,17 +225,18 @@ class CartesianEdgePlanner:
                     )
                     if valid:
                         valid_solutions.append(candidate)
-                    elif len(rejected) < 3:
-                        rejected.append(
-                            f"{solution.branch_id}: "
-                            f"{failure_code or 'STATE_INVALID'}: {detail}"
-                        )
-                    if clearance is not None:
-                        minimum = (
-                            clearance
-                            if minimum is None
-                            else min(minimum, clearance)
-                        )
+                    else:
+                        if len(rejected) < 3:
+                            rejected.append(
+                                f"{solution.branch_id}: "
+                                f"{failure_code or 'STATE_INVALID'}: {detail}"
+                            )
+                        if clearance is not None:
+                            rejected_minimum = (
+                                clearance
+                                if rejected_minimum is None
+                                else min(rejected_minimum, clearance)
+                            )
                 if not valid_solutions:
                     position_text = ", ".join(f"{value:.6f}" for value in position)
                     if not solutions.solutions:
@@ -267,7 +269,16 @@ class CartesianEdgePlanner:
                             f"{index}/{steps}; position_m=[{position_text}]; "
                             f"{reason}"
                         ),
-                        min_clearance_m=minimum,
+                        min_clearance_m=(
+                            rejected_minimum
+                            if minimum is None
+                            else min(
+                                minimum,
+                                rejected_minimum
+                                if rejected_minimum is not None
+                                else minimum,
+                            )
+                        ),
                     )
                 selected = min(
                     valid_solutions,
