@@ -794,8 +794,8 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
     parser.add_argument("--validate-input-only", action="store_true")
     parser.add_argument("--dry-run", action="store_true")
     parser.add_argument("--scripted-grasps", action=argparse.BooleanOptionalAction,
-        default=False,
-        help="explicitly use repository object grasp functions before motion planning")
+        default=None,
+        help="prioritize object grasp functions before motion planning (default for controller/video; --no-scripted-grasps selects generic planning)")
     parser.add_argument(
         "--simulate",
         choices=("kinematic", "controller"),
@@ -913,6 +913,16 @@ def main(
     simulation_mode = args.simulate or (
         "controller" if args.video is not None else None
     )
+    if args.scripted_grasps is None:
+        alternate_grasp_requested = (
+            args.grasp_provider == "object-function"
+            or args.grasp_execution_mode != "auto"
+            or args.grasp_profile is not None
+            or args.pick_keyframes is not None
+        )
+        args.scripted_grasps = (
+            simulation_mode == "controller" and not alternate_grasp_requested
+        )
     if args.scripted_grasps and simulation_mode != "controller":
         parser.error("--scripted-grasps requires --simulate controller")
     if args.scripted_grasps and (
