@@ -1665,8 +1665,10 @@ class ToolUseJournalEERuntime:
         applied_force = required_force * force_scale
         applied_torque = required_torque * torque_scale
         object_wrench = np.concatenate((applied_force, applied_torque))
-        lever = actual_position - np.asarray(
-            data.xpos[reference_body_id], dtype=float
+        # xfrc_applied acts at each body's center of mass, not its frame origin.
+        # Use those application points so the internal pair has zero net torque.
+        lever = np.asarray(data.xipos[object_body_id], dtype=float) - np.asarray(
+            data.xipos[reference_body_id], dtype=float
         )
         reference_wrench = np.concatenate(
             (
