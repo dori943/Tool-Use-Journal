@@ -116,6 +116,9 @@ PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 �
 - ordered: 지시문이 대상들을 처리하는 순서를 명시하는가 (예: 왼쪽부터, 순서대로,
   큰 것부터). 순서 요구가 없으면 false. 순서 자체는 여기서 정하지 않는다 (뒤 단계가
   장면 이미지를 보고 정한다).
+  최종 상태가 겹쳐 쌓인 형태인 태스크는 놓는 차례가 곧 아래에서 위로의 층이 되어
+  결과가 달라지므로 언제나 true다. 대상들이 서로의 위가 아니라 같은 목적지 하나로
+  간다고 적더라도 마찬가지다.
 - JSON 배열만 출력한다.
 
 출력 형식:
@@ -279,7 +282,9 @@ def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
     for s in subs:
         s.setdefault("container_id", None)
         s.setdefault("tool_candidate_ids", [])
-        s["ordered"] = bool(s.get("ordered", False))     # 0908: 순서 요구 여부 (VLM 순서 판정 게이트)
+        # 0908: 순서 요구 여부 (VLM 순서 판정 게이트). stack은 프롬프트가 이미
+        # "target_ids 순서가 곧 쌓는 순서"로 정의하므로 순서가 없을 수 없다.
+        s["ordered"] = bool(s.get("ordered", False)) or s.get("kind") == "stack"
         out.append(s)   # 0828: relocate 물체당 강제 분리 제거 — 분할은 측정 후 regroup이 한다
 
     # 같은 (kind, 목적지) 서브골은 하나로 합친다. 분해 시점에는 목적지 단위로만 묶고,
@@ -503,7 +508,7 @@ class LLMRough:
         # 0908: 순서 요구가 있는 relocate 서브골만 VLM으로 정렬 (도희 0905 요청 —
         # M1 좌→우 정렬 규칙 대신 frame.png를 보고 판단, 순서 없는 태스크는 VLM 미호출).
         for s in subgoals:
-            if s.get("ordered") and s.get("kind") == "relocate":
+            if s.get("ordered") and s.get("kind") in {"relocate", "stack"}:
                 self._order_targets(task, s, m1)
 
     def _generate_single(self, task, ids, node_lines):
