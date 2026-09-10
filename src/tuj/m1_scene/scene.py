@@ -23,8 +23,7 @@ from .ee_rules import evaluate_ee, reach_check
 from .grounding import (
     FrictionHead,
     MockBackend,
-    geometry_from_node,
-    geometry_is_current,
+    apply_memory_hit_to_observation,
     ground_intrinsic,
 )
 from .relations import flat_face, region_clear, top_exposed
@@ -124,29 +123,24 @@ def ground_scene(
             retrieval_debug[nid] = debug
 
             if reused is not None:
-                intr = reused
+                # Intrinsic/material만 memory에서 재사용하고,
+                # geometry·mass는 항상 현재 observation으로 재결합한다.
+                # (과거 footprint/mass가 EE feasibility에 들어가면 안 됨)
+                intr = apply_memory_hit_to_observation(node, reused)
                 stats["memory_hits"] += 1
+                stats["geom_refreshed"] += 1
 
-                # Object Knowledge의 물성은 그대로 재사용하되,
-                # EE evaluation에 필요한 geometry가 invalid하면
-                # 현재 observation의 point cloud로 geometry만 refresh한다.
-                #
-                # 이 경우에도 C3 / Full SiPhy를 다시 호출하지 않는다.
-                if not geometry_is_current(intr.get("geometry")):
-                    intr["geometry"] = geometry_from_node(node)
-                    stats["geom_refreshed"] += 1
-
-                    log(
-                        module="m1",
-                        event="memory_geom_refresh",
-                        node=nid,
-                    )
+                debug = retrieval_debug[nid]
+                debug["geometry_source"] = "current_observation"
+                debug["intrinsic_source"] = "memory"
 
                 log(
                     module="m1",
                     event="memory_hit",
                     node=nid,
                     lookup_type=debug.get("lookup_type"),
+                    geometry_source="current_observation",
+                    intrinsic_source="memory",
                 )
 
                 how = "memory"

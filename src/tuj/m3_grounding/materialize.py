@@ -14,8 +14,8 @@ from __future__ import annotations
 
 from . import relational
 from .ee_conditioned import evaluate_ee, grip_slip_margin_fn, reach_check
-from .intrinsic import (FrictionHead, MockBackend, geometry_from_node,
-                        geometry_is_current, ground_intrinsic)
+from .intrinsic import (FrictionHead, MockBackend, apply_memory_hit_to_observation,
+                        geometry_from_node, geometry_is_current, ground_intrinsic)
 
 
 class Materializer:
@@ -68,7 +68,10 @@ class Materializer:
                     self.task_id, node_id, self.nodes[node_id].get("bbox_mm"), crop_rgb, infer)
                 self.retrieval_debug[node_id] = debug
                 if reused is not None:
-                    self._cache[node_id] = reused
+                    self._cache[node_id] = apply_memory_hit_to_observation(
+                        self.nodes[node_id], reused)
+                    debug["geometry_source"] = "current_observation"
+                    debug["intrinsic_source"] = "memory"
                     self.log(module="m0", event="object_knowledge_hit", node=node_id,
                              lookup_type=debug["lookup_type"])
             hooks = {}
