@@ -322,10 +322,12 @@ class ToolUseJournalPlannerPool:
         ee_attach_policy: EEAttachPolicy | str = EEAttachPolicy.PRECOMPUTED_REQUIRED,
         ee_attach_start_tolerance_rad: float = 0.01,
         provider: Any | None = None,
+        final_plan_validator: Any | None = None,
     ) -> None:
         self.repository = repository
         self.seed = seed
         self.provider = provider
+        self.final_plan_validator = final_plan_validator
         self.ee_attach_registry_root = ee_attach_registry_root
         self.ee_attach_trajectory_paths = tuple(ee_attach_trajectory_paths)
         self.ee_return_trajectory_paths = tuple(ee_return_trajectory_paths)
@@ -372,6 +374,8 @@ class ToolUseJournalPlannerPool:
                 provider=self.provider,
             )
             self._planners[key] = planner
+        if self.final_plan_validator is not None:
+            return planner(request, final_plan_validator=self.final_plan_validator)
         return planner(request)
 
     def close(self) -> None:
@@ -1244,6 +1248,12 @@ def main(
                 height=args.height,
                 video_fps=args.video_fps,
             )
+            if simulation_mode == "controller":
+                from tuj.m5_motion.controller_preview import ControllerPlanPreview
+
+                planners.final_plan_validator = ControllerPlanPreview(
+                    live_session, output_dir / "controller_previews"
+                )
         result = SelectedPlanMotionOrchestrator(
             planners,
             store=MotionPlanStore(output_dir),

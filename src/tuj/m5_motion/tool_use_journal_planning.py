@@ -1302,7 +1302,7 @@ class ToolUseJournalMotionRequestPlanner:
             log=log,
         )
 
-    def __call__(self, request: MotionPlanRequest) -> Any:
+    def __call__(self, request: MotionPlanRequest, *, final_plan_validator=None) -> Any:
         if is_ee_exchange_entry_request(request):
             source = str(
                 request.task.metadata.get("entry_ee")
@@ -1393,6 +1393,7 @@ class ToolUseJournalMotionRequestPlanner:
         return self.pipeline.plan(
             request,
             collision_context_factory=self.collision_context_factory,
+            **({"final_plan_validator": final_plan_validator} if final_plan_validator is not None else {}),
         )
 
 

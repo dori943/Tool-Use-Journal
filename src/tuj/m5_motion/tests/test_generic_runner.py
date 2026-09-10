@@ -444,18 +444,31 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
     video_path = tmp_path / "run.mp4"
     observed: dict[str, object] = {}
 
-    def fake_execute(planning, **kwargs):
-        observed["planning"] = planning
+    from tuj.m5_motion.live_execution import LivePlanExecutionSession
+    from tuj.m5_motion.orchestration import _predicted_world
+
+    class FakeLiveSession:
+        controller = True
+        status = "IN_PROGRESS"
+        run_count = 0
+        report_count = 0
+        manifest_path = output_dir / "simulation" / "live-execution-manifest.json"
+
+        def __call__(self, request, plan):
+            self.run_count += 1
+            self.report_count += 1
+            return _predicted_world(request.world, request, plan, completed_subgoal=None)
+
+        def complete(self, **kwargs):
+            observed["completed"] = True
+            self.status = "SUCCESS"
+
+        def close(self):
+            observed["closed"] = True
+
+    def fake_session(repository, world, output_dir, **kwargs):
         observed.update(kwargs)
-        return SimpleNamespace(
-            successful=True,
-            status=SimpleNamespace(value="SUCCESS"),
-            runs=(object(), object()),
-            reports=(object(), object()),
-            manifest_path=output_dir / "simulation" / "simulation-manifest.json",
-            detail="ok",
-            failed_index=None,
-        )
+        return FakeLiveSession()
 
     monkeypatch.setattr(
         generic_runner,
@@ -463,9 +476,9 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
         _FakePlannerPool,
     )
     monkeypatch.setattr(
-        generic_runner,
-        "execute_planning_result",
-        fake_execute,
+        LivePlanExecutionSession,
+        "from_repository",
+        fake_session,
     )
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-key")
 
@@ -486,12 +499,14 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
     assert observed["mode"] == "controller"
     assert observed["show_viewer"] is False
     assert observed["video"] == video_path.resolve()
+    assert observed["completed"] and observed["closed"]
     summary = json.loads(
         (output_dir / "m5_summary.json").read_text(encoding="utf-8")
     )
     assert summary["planning_status"] == "SUCCESS"
     assert summary["simulation_status"] == "SUCCESS"
     assert summary["simulation_mode"] == "controller"
+    assert summary["simulation_run_count"] == 2
     assert summary["video"] == str(video_path.resolve())
 
 
