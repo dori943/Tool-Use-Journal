@@ -547,7 +547,22 @@ def make_tool_use_journal_env(
         if env_name in {"C1_2_DoughFlatten", "C2_2_SandwichAssembly", "C4_2_DiagonalFitPacking"}:
             if options.get("render_camera") in {"frontview", "agentview"}:
                 options["render_camera"] = "robot0_robotview"
+    profile_rebuilds_model = scripted_grasps and not (
+        env_name == "C1_1_LegoSweep" and active_ee not in {"3F", "vac"}
+    )
+    deferred_offscreen_renderer = bool(
+        profile_rebuilds_model and options.get("has_offscreen_renderer")
+    )
+    if deferred_offscreen_renderer:
+        # configure_environment() replaces the model and simulator.  Creating
+        # an offscreen context before that replacement leaves two contexts
+        # alive during an EE swap and makes every later frame black.  Restore
+        # the request before configuring the final simulator so reset() creates
+        # exactly one context for the model that will actually be rendered.
+        options["has_offscreen_renderer"] = False
     env = suite.make(env_name=env_name, **options)
+    if deferred_offscreen_renderer:
+        setattr(env, "has_offscreen_renderer", True)
     if active_ee is None and getattr(env, "robot_configs", None):
         # Set this before the caller's first reset. RoboCasa constructs the
         # robot lazily, and a task-specific default here would make a reusable
