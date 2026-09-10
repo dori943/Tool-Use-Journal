@@ -172,30 +172,84 @@ class _Grounding:
         margin = max(.01, float(self.request.constraints.collision_margin_m) * 2.)
         occupants = self._occupants()
         mine = self.half[:2]
+        center_xy = self.region_world[:2]
+        if not occupants:
+            return center_xy
+
+        def clearance(xy):
+            # Minimum per-occupant gap: how far this footprint clears each
+            # occupant along its least-separated axis (negative = overlap).
+            gaps = [
+                float(np.max(np.abs(xy - c) - (h + mine)))
+                for c, h in occupants
+            ]
+            return min(gaps) if gaps else float("inf")
 
         def free(xy):
-            return all(np.any(np.abs(xy - c) >= h + mine + margin) for c, h in occupants)
+            return clearance(xy) >= margin
 
-        center_xy = self.region_world[:2]
         if free(center_xy):
             return center_xy
-        limit = self.region_half[:2] - REGION_WALL_ALLOWANCE_M - mine
-        if np.any(limit <= 0.):
-            return center_xy
-        xs = np.arange(-limit[0], limit[0] + 1e-9, FREE_SPOT_GRID_M)
-        ys = np.arange(-limit[1], limit[1] + 1e-9, FREE_SPOT_GRID_M)
-        for dx, dy in sorted(((dx, dy) for dx in xs for dy in ys), key=lambda v: v[0] ** 2 + v[1] ** 2):
-            xy = center_xy + np.array([dx, dy])
-            if free(xy):
-                return xy
-        return center_xy
+        # Search the reachable interior (clamp the range to >= 0 per axis so an
+        # object wider than the interior on one axis still sweeps the other).
+        limit = np.maximum(
+            self.region_half[:2] - REGION_WALL_ALLOWANCE_M - mine, 0.0
+        )
+        def _axis_offsets(extent: float) -> np.ndarray:
+            values = np.arange(-extent, extent + 1e-9, FREE_SPOT_GRID_M)
+            return values if values.size else np.array([0.0])
+
+        xs = _axis_offsets(float(limit[0]))
+        ys = _axis_offsets(float(limit[1]))
+        cells = [
+            center_xy + np.array([float(dx), float(dy)])
+            for dx in xs
+            for dy in ys
+        ]
+        # Prefer the nearest spot that meets the full margin; if none does
+        # (the region is too crowded for this footprint), fall back to the
+        # spot that maximises clearance from occupants — spreading objects to
+        # opposite ends of the region — instead of stacking on the centre.
+        clear_cells = [xy for xy in cells if free(xy)]
+        if clear_cells:
+            return min(
+                clear_cells,
+                key=lambda xy: float(np.sum((xy - center_xy) ** 2)),
+            )
+        return max(cells, key=clearance)
 
     # -- publication ---------------------------------------------------------
     def publish(self, goal_key, start_key, desired_center, extra):
         # Object-space destination: the body origin translated so the bbox center
-        # lands on desired_center; the grasp orientation is preserved verbatim.
+        # lands on desired_center; the grasp orientation is preserved, except for
+        # an optional 90 deg yaw about the region's vertical that puts the held
+        # object's SHORT footprint side along the region's SHORT axis (long side
+        # along the long axis). A narrow region (e.g. a tray) otherwise leaves no
+        # margin when the object's long axis lands across it, so settle drift on
+        # release overhangs the rim (target_fully_inside_region failure). The yaw
+        # is vertical-only, so the object's height/floor geometry is unchanged.
         destination = self.T_WB.copy()
-        destination[:3, 3] += desired_center - self.center
+        region_rotation = self.T_WR[:3, :3]
+        object_in_region = region_rotation.T @ destination[:3, :3]
+        short_axis = int(np.argmin(self.region_dims[:2]))
+        long_axis = 1 - short_axis
+        extent_along_short = float(
+            np.abs(object_in_region[short_axis, :]) @ self.local_size
+        )
+        extent_if_rotated = float(
+            np.abs(object_in_region[long_axis, :]) @ self.local_size
+        )
+        if extent_if_rotated + 1e-6 < extent_along_short:
+            yaw_about_region_z = np.array(
+                [[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]
+            )
+            destination[:3, :3] = region_rotation @ (
+                yaw_about_region_z @ object_in_region
+            )
+        # Re-anchor the (possibly rotated) body so its bbox center lands exactly
+        # on desired_center.  Equivalent to the previous translate-only path when
+        # no yaw is applied.
+        destination[:3, 3] = desired_center - destination[:3, :3] @ self.center_in_body
         anchors = self.record.setdefault('anchors', {})
         anchors[goal_key] = (inverse(self.T_WR) @ destination)[:3, 3].tolist()
         anchors[start_key] = (inverse(self.T_WR) @ self.T_WB)[:3, 3].tolist()

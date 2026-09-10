@@ -31,6 +31,14 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     ("bottle", "C1_2_DoughFlatten", "3F", "bottle"),
     ("spatula", "C1_2_DoughFlatten", "3F", "spatula"),
     ("spoon", "C1_2_DoughFlatten", "2F", "spoon"),
+    # C2_1 reuses the validated object-frame 2F spoon recipe so the tabletop
+    # sorting pick uses the tuned scripted grasp (reliable formation/lift/
+    # retention) instead of a per-run LLM contact-friction grasp.  The plate is
+    # NOT registered here: M4 mounts the vacuum EE for the flat plate in C2_1,
+    # and the only plate recipe is 2F, so registering it would raise
+    # SCRIPTED_GRASP_EE_MISMATCH.  Leaving it unregistered routes the plate
+    # through the ordinary vac grasp path.
+    ("spoon", "C2_1_ObjectSorting", "2F", "spoon"),
     ("apple", "C2_1_ObjectSorting", "3F", "catalog"),
     ("bread", "C2_1_ObjectSorting", "3F", "catalog"),
     ("mug", "C2_1_ObjectSorting", "3F", "catalog"),

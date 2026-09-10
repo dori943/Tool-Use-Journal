@@ -70,6 +70,20 @@ class MissingOpenAIAPIKeyError(OpenAIKeyframeProviderError):
     """OPENAI_API_KEY is not available to the process."""
 
 
+class NoValidKeyframeCandidatesError(OpenAIKeyframeProviderError):
+    """The model returned a batch, but no strategy satisfied the keyframe contract.
+
+    Sampling is non-deterministic, so a fresh generation usually complies; this
+    distinct type lets ``generate`` re-sample a bounded number of times instead
+    of failing the whole plan on one non-compliant response.
+    """
+
+
+# The model occasionally omits a required keyframe (e.g. the RETREAT after a
+# PLACE).  Re-sample a few times before surfacing the failure.
+_MAX_GENERATION_ATTEMPTS = 3
+
+
 class _StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -764,29 +778,50 @@ class OpenAIKeyframeProvider:
             picks_resource = is_acquire_task(request.task)
             releases_resource = is_release_task(request.task)
             if picks_resource:
-                # A contact-friction object pick (with_contact_friction_grasp)
-                # requires a LIFT keyframe specifically; a RETREAT does not
-                # count.  PICK_TOOL uses rack attach, not contact friction, so
-                # it still accepts LIFT or RETREAT.
+                # A contact-friction object pick needs a LIFT so the physical
+                # grasp can attach its retention hold; PICK_TOOL uses rack attach
+                # and accepts LIFT or RETREAT.  Models frequently label the
+                # post-grasp separation as RETREAT instead of LIFT, so rather
+                # than discard an otherwise-valid object pick, promote the first
+                # post-grasp RETREAT to a LIFT (identical pose) to meet the
+                # contract.  This keeps the generator's stochastic output usable
+                # without loosening the downstream physical_grasp requirement.
                 is_tool_pick = task_operation(request.task) == "PICK_TOOL"
-                allowed_followers = (
-                    {KeyframeType.LIFT, KeyframeType.RETREAT}
-                    if is_tool_pick
-                    else {KeyframeType.LIFT}
-                )
-                followers = (
-                    kinds[kinds.index(KeyframeType.GRASP) + 1 :]
-                    if KeyframeType.GRASP in kinds
-                    else []
-                )
-                if KeyframeType.GRASP not in kinds or not any(
-                    kind in allowed_followers for kind in followers
-                ):
+                if KeyframeType.GRASP not in kinds:
                     rejected_candidates.append(
-                        f"{strategy_id}: PICK requires GRASP followed by "
-                        + ("LIFT or RETREAT" if is_tool_pick else "a LIFT")
+                        f"{strategy_id}: PICK requires a GRASP keyframe"
                     )
                     continue
+                grasp_pos = kinds.index(KeyframeType.GRASP)
+                followers = kinds[grasp_pos + 1 :]
+                if is_tool_pick:
+                    if not any(
+                        kind in {KeyframeType.LIFT, KeyframeType.RETREAT}
+                        for kind in followers
+                    ):
+                        rejected_candidates.append(
+                            f"{strategy_id}: PICK_TOOL requires GRASP followed by "
+                            "LIFT or RETREAT"
+                        )
+                        continue
+                elif KeyframeType.LIFT not in followers:
+                    promote_at = next(
+                        (
+                            index
+                            for index in range(grasp_pos + 1, len(kinds))
+                            if kinds[index] is KeyframeType.RETREAT
+                        ),
+                        None,
+                    )
+                    if promote_at is None:
+                        rejected_candidates.append(
+                            f"{strategy_id}: PICK requires GRASP followed by a LIFT"
+                        )
+                        continue
+                    keyframes[promote_at] = keyframes[promote_at].model_copy(
+                        update={"keyframe_type": KeyframeType.LIFT}
+                    )
+                    kinds[promote_at] = KeyframeType.LIFT
             if releases_resource:
                 if KeyframeType.PLACE not in kinds or KeyframeType.RETREAT not in kinds[
                     kinds.index(KeyframeType.PLACE) + 1 :
@@ -815,7 +850,7 @@ class OpenAIKeyframeProvider:
 
         if not strategies:
             details = "; ".join(rejected_candidates)
-            raise OpenAIKeyframeProviderError(
+            raise NoValidKeyframeCandidatesError(
                 f"{self.provider_name} response contained no valid keyframe candidates"
                 + (f": {details}" if details else "")
             )
@@ -901,63 +936,76 @@ class OpenAIKeyframeProvider:
                 )
             return cached
 
-        try:
-            response = self._request_response(instructions, payload)
-        except OpenAIKeyframeProviderError:
-            raise
-        except Exception as error:  # noqa: BLE001 - SDK error surface varies
-            # Surface the API's own reason (e.g. an unsupported parameter for a
-            # given model) so a 400 is diagnosable.  The openai SDK carries the
-            # human message in .message/.body/.response, not always in str();
-            # try each.  These hold the API error body, not the request payload.
-            detail = ""
-            for source in (
-                getattr(error, "message", None),
-                getattr(error, "body", None),
-                getattr(getattr(error, "response", None), "text", None),
-                str(error),
-                repr(error),
-            ):
-                if source:
-                    detail = str(source)
-                    break
-            detail = detail.replace("\n", " ")[:800]
-            raise OpenAIKeyframeProviderError(
-                f"{self.provider_name} keyframe request failed "
-                f"({type(error).__name__}): {detail}"
-            ) from None
-
-        parsed = getattr(response, "output_parsed", None)
-        if parsed is None:
-            response_id = str(getattr(response, "id", "unknown"))
-            status = str(getattr(response, "status", "unknown"))
-            incomplete_details = getattr(response, "incomplete_details", None)
-            incomplete_reason = getattr(incomplete_details, "reason", None)
-            reason_suffix = (
-                f", reason={incomplete_reason}"
-                if incomplete_reason is not None
-                else ""
-            )
-            raise OpenAIKeyframeProviderError(
-                f"{self.provider_name} response {response_id!r} had no parsed output "
-                f"(status={status}{reason_suffix})"
-            )
-        if not isinstance(parsed, GeneratedKeyframeBatch):
+        # Re-sample on a non-compliant batch (no valid candidates): the request
+        # is stochastic, so a fresh generation usually satisfies the contract.
+        # Hard API errors and schema/parse failures are not retried.
+        last_no_candidates: NoValidKeyframeCandidatesError | None = None
+        for _attempt in range(_MAX_GENERATION_ATTEMPTS):
             try:
-                parsed = GeneratedKeyframeBatch.model_validate(parsed)
-            except ValidationError as error:
+                response = self._request_response(instructions, payload)
+            except OpenAIKeyframeProviderError:
+                raise
+            except Exception as error:  # noqa: BLE001 - SDK error surface varies
+                # Surface the API's own reason (e.g. an unsupported parameter for
+                # a given model) so a 400 is diagnosable.  The openai SDK carries
+                # the human message in .message/.body/.response, not always in
+                # str(); try each.  These hold the API error body, not the
+                # request payload.
+                detail = ""
+                for source in (
+                    getattr(error, "message", None),
+                    getattr(error, "body", None),
+                    getattr(getattr(error, "response", None), "text", None),
+                    str(error),
+                    repr(error),
+                ):
+                    if source:
+                        detail = str(source)
+                        break
+                detail = detail.replace("\n", " ")[:800]
                 raise OpenAIKeyframeProviderError(
-                    f"{self.provider_name} response did not match the keyframe batch schema"
-                ) from error
+                    f"{self.provider_name} keyframe request failed "
+                    f"({type(error).__name__}): {detail}"
+                ) from None
 
-        artifact = self._convert(
-            request,
-            parsed,
-            prompt_hash=prompt_hash,
-            response_id=str(getattr(response, "id", "unknown")),
-        )
-        self._store_cache(cache_key, artifact)
-        return artifact
+            parsed = getattr(response, "output_parsed", None)
+            if parsed is None:
+                response_id = str(getattr(response, "id", "unknown"))
+                status = str(getattr(response, "status", "unknown"))
+                incomplete_details = getattr(response, "incomplete_details", None)
+                incomplete_reason = getattr(incomplete_details, "reason", None)
+                reason_suffix = (
+                    f", reason={incomplete_reason}"
+                    if incomplete_reason is not None
+                    else ""
+                )
+                raise OpenAIKeyframeProviderError(
+                    f"{self.provider_name} response {response_id!r} had no parsed output "
+                    f"(status={status}{reason_suffix})"
+                )
+            if not isinstance(parsed, GeneratedKeyframeBatch):
+                try:
+                    parsed = GeneratedKeyframeBatch.model_validate(parsed)
+                except ValidationError as error:
+                    raise OpenAIKeyframeProviderError(
+                        f"{self.provider_name} response did not match the keyframe batch schema"
+                    ) from error
+
+            try:
+                artifact = self._convert(
+                    request,
+                    parsed,
+                    prompt_hash=prompt_hash,
+                    response_id=str(getattr(response, "id", "unknown")),
+                )
+            except NoValidKeyframeCandidatesError as error:
+                last_no_candidates = error
+                continue
+            self._store_cache(cache_key, artifact)
+            return artifact
+
+        assert last_no_candidates is not None
+        raise last_no_candidates
 
 
 __all__ = [

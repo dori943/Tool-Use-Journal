@@ -17,7 +17,17 @@ def configure_environment(env, environment, ee):
         env.scripted_grasp_profile = {"environment": environment, "ee": ee,
             "correction": {"policy": "NATIVE_HAND", "source_assets_changed": False}}
         return env
-    if kitchen:
+    # Only *real* RoboCasa kitchens get the robosuite-default arm start. The
+    # coarse ``kitchen`` flag above is "any env != C1_1", which also catches the
+    # tabletop rack tasks (C2_1/C3_1). Those must keep the commissioned
+    # bare-flange home (TOOL_USE_JOURNAL_BARE_HOME_QPOS) that make_tool_use_journal_env
+    # installs, or the precomputed EE-rack trajectories fail their exact
+    # start-state contract (bare->2F START_STATE_MISMATCH ~1.991 rad).
+    is_robocasa_kitchen = any(
+        getattr(cls, "__module__", "").startswith("robocasa.")
+        for cls in type(env).__mro__
+    )
+    if is_robocasa_kitchen:
         env.robot_configs[0]["initial_qpos"] = [0., -1.8, 1.2, -.97, -1.57, 0.]
     corrected = not (environment == "C1_2_DoughFlatten" and ee == "3F")
     env._load_model()

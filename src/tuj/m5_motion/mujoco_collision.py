@@ -23,6 +23,7 @@ from typing import Protocol
 import mujoco
 import numpy as np
 
+from tuj.m5_motion.runtime_collision_state import copy_runtime_configuration
 from tuj.m5_motion.schema import CollisionContext, RelativeKeyframeSpec, TrajectoryWaypoint
 from tuj.m5_motion.strategy import EdgePlanResult, JointConfig, wrapped_joint_delta
 
@@ -792,6 +793,7 @@ class MuJoCoCollisionValidator:
         *,
         context: CollisionContext | None = None,
         context_id: str | None = None,
+        runtime_state: tuple[mujoco.MjModel, mujoco.MjData] | None = None,
     ) -> CollisionCheckResult:
         """Check one arm state, failing closed on incomplete scene bindings."""
 
@@ -820,6 +822,16 @@ class MuJoCoCollisionValidator:
             context_state_failure = self._apply_context_state(selected_context)
             if context_state_failure is not None:
                 return context_state_failure
+
+            if runtime_state is not None:
+                try:
+                    copy_runtime_configuration(*runtime_state, self.model, self.data)
+                except ValueError as error:
+                    return CollisionCheckResult(
+                        valid=False,
+                        failure_code="RUNTIME_COLLISION_STATE_UNAVAILABLE",
+                        detail=str(error),
+                    )
 
             moving_geom_indices = sorted(moving_geoms)
             original_margins = self.model.geom_margin[moving_geom_indices].copy()
@@ -1103,6 +1115,7 @@ class MuJoCoCollisionModelRegistry:
         *,
         context: CollisionContext | None = None,
         context_id: str | None = None,
+        runtime_state: tuple[mujoco.MjModel, mujoco.MjData] | None = None,
     ) -> CollisionCheckResult:
         selected, failure = self._select_context(keyframe, context, context_id)
         if failure is not None:
@@ -1119,7 +1132,7 @@ class MuJoCoCollisionModelRegistry:
                 failure_code="COLLISION_MODEL_UNAVAILABLE",
                 detail=f"compiled collision model {version!r} is not registered",
             )
-        return validator.check(joint_config, context=selected)
+        return validator.check(joint_config, context=selected, runtime_state=runtime_state)
 
     def __call__(
         self, joint_config: JointConfig, keyframe: RelativeKeyframeSpec
