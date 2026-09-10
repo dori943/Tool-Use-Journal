@@ -456,6 +456,39 @@ def compute_workcell_signature(
     return _digest(payload)
 
 
+
+def _endpoint_settle_metadata(
+    request: MotionPlanRequest,
+    index: int,
+    total: int,
+) -> dict[str, object]:
+    """Require endpoint convergence on the last segment of a cached EE path.
+
+    A cached rack path's clearances are the ones measured at its own endpoint.
+    Kinematic playback lands exactly there, but controller playback lands only
+    near it, and the next subgoal is planned from wherever the arm actually
+    stopped -- which is how a departure that clears the parked gripper in the
+    cache came to graze it by 0.1 mm.  Plan construction already attaches this
+    to keyframes whose events mutate object state; an EE exchange hands its
+    endpoint to the next planner in the same way, so it needs it too.
+
+    The tolerance is in joint space, not EEF space.  Attaching an EE moves the
+    grasp site the EEF pose is measured at (bare flange -> cup or fingertips),
+    so the cached waypoint's EEF target and the post-attach runtime pose are
+    not in the same frame; comparing them reports the fixed tool offset as
+    error (0.11 m for the vacuum cup) and can never converge.  Joint space is
+    both frame-stable and what actually carries to the next plan.
+    """
+    if index != total - 1:
+        return {}
+    return {
+        "tracking_settle": {
+            # Matches --ee-attach-start-tolerance-rad, the symmetric check on
+            # the other end of the same cached path.
+            "joint_tolerance_rad": 0.01,
+        }
+    }
+
 class _TemplateModel(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
@@ -1297,6 +1330,9 @@ class PrecomputedEEAttachPlanner:
                     "trajectory_id": template.trajectory_id,
                     "source_segment_id": segment.segment_id,
                     "cross_environment_reuse": cross_environment,
+                    **_endpoint_settle_metadata(
+                        request, index, len(template.segments)
+                    ),
                 },
             )
             for index, segment in enumerate(template.segments)

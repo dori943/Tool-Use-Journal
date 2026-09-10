@@ -55,6 +55,10 @@ class Subgoal(_AliasedModel):
     target_ids: list[str] = Field(default_factory=list)
     goal_region_id: str | None = None
     tool_id: str | None = None
+    # Upstream-decided execution parameters for this detail (e.g. the slot M2
+    # assigned inside a shared container). Carried verbatim onto the candidate
+    # so the motion layer sees the decision the plan already made.
+    action_parameters: dict[str, Any] = Field(default_factory=dict)
     preconditions: list[Condition] = Field(default_factory=list)
     postconditions: list[Condition] = Field(default_factory=list)
     establish: list[Condition] = Field(default_factory=list)

@@ -352,10 +352,7 @@ class EEExchangeEntryPlanner:
             max_joint_step_rad=request.constraints.max_joint_path_step_rad,
             wrap_joints=False,
         )
-        planner_name = "DIRECT_JOINT"
-        if direct.valid:
-            geometric_path: tuple[tuple[float, ...], ...] = (start, target)
-        else:
+        def _sampled_path() -> tuple[tuple[float, ...], ...]:
             rrt = RRTConnectEdgePlanner(
                 collision_checker,  # type: ignore[arg-type]
                 self.joint_position_limits_rad,
@@ -374,11 +371,10 @@ class EEExchangeEntryPlanner:
                     f"{result.failure_code or 'RRT_CONNECT_FAILED'}: {result.detail}",
                     trajectory_id=selected.trajectory_id,
                 )
-            geometric_path = result.joint_path
-            planner_name = "RRT_CONNECT"
+            path = result.joint_path
             if request.options.simplify_path:
-                geometric_path = deterministic_shortcut(
-                    geometric_path,
+                path = deterministic_shortcut(
+                    path,
                     lambda left, right: validate_joint_segment(
                         left,
                         right,
@@ -388,40 +384,61 @@ class EEExchangeEntryPlanner:
                         wrap_joints=False,
                     ).valid,
                 )
-        minimum_clearance = _minimum_clearance(
-            geometric_path,
-            keyframe,
-            collision_checker,
-            request.constraints.max_joint_path_step_rad,
-        )
-        try:
-            timed = QuinticTimeParameterizer(
-                sample_dt_s=request.options.interpolation_dt_s
-            ).parameterize(
-                selected.joint_names,
+            return path
+
+        # The geometric check samples the path at max_joint_path_step_rad; the
+        # authoritative final check runs on the timed waypoints, which are
+        # denser.  A straight interpolation can therefore clear the coarse
+        # samples and still graze between them -- c3_1 rejected the whole entry
+        # because one timed waypoint passed the parked 2F gripper with 4.934 mm
+        # of the required 5 mm.  Fall through to the sampling planner rather
+        # than failing the leg, the way a rejected keyframe strategy falls
+        # through to the next one.
+        attempts: list[tuple[str, Any]] = []
+        if direct.valid:
+            attempts.append(("DIRECT_JOINT", lambda: (start, target)))
+        attempts.append(("RRT_CONNECT", _sampled_path))
+
+        final_detail = "timed trajectory failed final collision validation"
+        for planner_name, build_path in attempts:
+            geometric_path: tuple[tuple[float, ...], ...] = build_path()
+            minimum_clearance = _minimum_clearance(
                 geometric_path,
-                request.constraints.joint_limits,
-                velocity_scaling=request.constraints.velocity_scaling,
-                acceleration_scaling=request.constraints.acceleration_scaling,
-                jerk_scaling=request.constraints.jerk_scaling,
+                keyframe,
+                collision_checker,
+                request.constraints.max_joint_path_step_rad,
             )
-        except TrajectoryProcessingError as error:
-            raise EEExchangeEntryPlanningError(
-                EEExchangeEntryFailureCode.DYNAMICS_INVALID,
-                str(error),
-                trajectory_id=selected.trajectory_id,
-            ) from error
-        final_validator = getattr(collision_checker, "final_segment_validator", None)
-        if callable(final_validator) and not final_validator(timed.waypoints, context):
+            try:
+                timed = QuinticTimeParameterizer(
+                    sample_dt_s=request.options.interpolation_dt_s
+                ).parameterize(
+                    selected.joint_names,
+                    geometric_path,
+                    request.constraints.joint_limits,
+                    velocity_scaling=request.constraints.velocity_scaling,
+                    acceleration_scaling=request.constraints.acceleration_scaling,
+                    jerk_scaling=request.constraints.jerk_scaling,
+                )
+            except TrajectoryProcessingError as error:
+                raise EEExchangeEntryPlanningError(
+                    EEExchangeEntryFailureCode.DYNAMICS_INVALID,
+                    str(error),
+                    trajectory_id=selected.trajectory_id,
+                ) from error
+            final_validator = getattr(
+                collision_checker, "final_segment_validator", None
+            )
+            if not callable(final_validator) or final_validator(
+                timed.waypoints, context
+            ):
+                break
             report = getattr(collision_checker, "last_path_collision_check", None)
-            detail = (
-                f"{report.failure_code}: {report.detail}"
-                if report is not None
-                else "timed trajectory failed final collision validation"
-            )
+            if report is not None:
+                final_detail = f"{report.failure_code}: {report.detail}"
+        else:
             raise EEExchangeEntryPlanningError(
                 EEExchangeEntryFailureCode.FINAL_COLLISION_CHECK_FAILED,
-                detail,
+                final_detail,
                 trajectory_id=selected.trajectory_id,
             )
         digest = hashlib.sha256(
@@ -459,6 +476,16 @@ class EEExchangeEntryPlanner:
                 "source": "dynamic-exchange-entry",
                 "planner": planner_name,
                 "return_trajectory_id": selected.trajectory_id,
+                # This leg exists to arrive exactly at the cached return
+                # path's start state, which is then checked against
+                # --ee-attach-start-tolerance-rad (0.01 rad).  Controller
+                # playback stops near the endpoint, not on it, so without a
+                # convergence wait the arm handed over 0.010618 rad of error
+                # and the return path was refused (c3_1).  Settle to half the
+                # accepted tolerance so the check that follows has margin.
+                "tracking_settle": {
+                    "joint_tolerance_rad": 0.005,
+                },
             },
         )
         plan = MotionPlan(

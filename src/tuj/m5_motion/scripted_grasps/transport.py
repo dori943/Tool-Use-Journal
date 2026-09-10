@@ -10,8 +10,12 @@ space keeps both the scripted live runtime (``retention``) and the generic
 ``run.py`` pipeline (attachment metadata on the WorldSnapshot) on one contract.
 
 Transport ends above the region with rim clearance; place ends with the object
-bbox a release clearance above the region's interior floor.  Both pick the
-same free XY spot so several objects can share one tray without stacking.
+bbox a release clearance above whatever it will rest on.  Both pick the same
+XY spot -- the slot M2 assigned inside the region when the plan divided it
+among several objects, else the region centre -- and move off it to the nearest
+clear spot when it is taken, so objects share one tray without stacking.  When
+the region has no room left they stack squarely on the largest support rather
+than being driven into it.
 """
 import math
 import numpy as np
@@ -33,6 +37,9 @@ HELD_PLACE_START_ANCHOR = 'held_place_start'
 REGION_WALL_ALLOWANCE_M = 0.02
 REGION_FLOOR_FALLBACK_M = 0.005
 FREE_SPOT_GRID_M = 0.01
+# Occupants whose tops agree to within this share the load of what is put
+# on them; below it only the higher one is touched.
+SUPPORT_LEVEL_TOLERANCE_M = 0.002
 
 
 def _action(task):
@@ -146,7 +153,10 @@ class _Grounding:
         return float((self.T_WR @ np.r_[self.region_center_local[0], self.region_center_local[1], floor_local, 1.])[2])
 
     def _occupants(self):
-        """World XY footprints of scene objects already inside the region."""
+        """World XY footprints (and tops) of scene objects already in the region."""
+        cached = getattr(self, '_occupant_cache', None)
+        if cached is not None:
+            return cached
         out = []
         region_bottom = self.region_world[2] - self.region_half[2]
         for other_id, other in self.request.world.objects.items():
@@ -164,11 +174,43 @@ class _Grounding:
             half = np.abs(R[:2, :]) @ np.asarray(other['dimensions_m'], dtype=float) / 2.
             inside = np.all(np.abs(center[:2] - self.region_world[:2]) <= self.region_half[:2])
             if inside and center[2] >= region_bottom - 1e-6:
-                out.append((center[:2], half))
+                top = float(center[2] + (np.abs(R[2, :]) @ np.asarray(
+                    other['dimensions_m'], dtype=float)) / 2.)
+                out.append((center[:2], half, top))
+        self._occupant_cache = out
         return out
 
+    def _slot_xy(self):
+        """World XY of the slot the plan assigned inside this region, if any.
+
+        M2 divides a shared container among the objects that go into it and
+        publishes each one's spot as a normalized offset of the interior half
+        extent, so the upstream scene scale (point-cloud AABB) need not match
+        the executed one.  Without it every object aims at the same region
+        centre and lands on whatever was put there first.
+        """
+        params = self.task.metadata.get('action_parameters')
+        slot = (params or {}).get('placement_slot') if isinstance(params, dict) else None
+        if not isinstance(slot, dict):
+            return None
+        uv = slot.get('uv')
+        if not (isinstance(uv, (list, tuple)) and len(uv) >= 2):
+            return None
+        inner = np.maximum(self.region_half[:2] - REGION_WALL_ALLOWANCE_M, 0.)
+        offset = np.clip(np.asarray(uv[:2], dtype=float), -1., 1.) * inner
+        limit = np.maximum(inner - self.half[:2], 0.)
+        return self.region_world[:2] + np.clip(offset, -limit, limit)
+
     def free_destination_xy(self):
-        """Region-center XY, or the nearest interior spot clear of occupants."""
+        """The plan's slot when it is clear, else the nearest interior spot that is.
+
+        The search is anchored on the assigned slot (region centre when the plan
+        assigned none) and, when the region cannot hold one more footprint
+        without contact, returns the spot with the most clearance instead of
+        falling back to the anchor.  Returning the anchor put every object at
+        the same place, so each release drove the held object into the one
+        already there (c3_1: mug into the plate, all place strategies filtered).
+        """
         margin = max(.01, float(self.request.constraints.collision_margin_m) * 2.)
         occupants = self._occupants()
         mine = self.half[:2]
@@ -185,38 +227,88 @@ class _Grounding:
             ]
             return min(gaps) if gaps else float("inf")
 
-        def free(xy):
-            return clearance(xy) >= margin
+        def clearance(xy):
+            """Smallest per-object AABB separation; >= 0 means no contact."""
+            if not occupants:
+                return float('inf')
+            return min(float(np.max(np.abs(xy - c) - (h + mine + margin)))
+                       for c, h, _t in occupants)
 
-        if free(center_xy):
-            return center_xy
-        # Search the reachable interior (clamp the range to >= 0 per axis so an
-        # object wider than the interior on one axis still sweeps the other).
-        limit = np.maximum(
-            self.region_half[:2] - REGION_WALL_ALLOWANCE_M - mine, 0.0
-        )
-        def _axis_offsets(extent: float) -> np.ndarray:
-            values = np.arange(-extent, extent + 1e-9, FREE_SPOT_GRID_M)
-            return values if values.size else np.array([0.0])
+        anchor = self._slot_xy()
+        if anchor is None:
+            anchor = self.region_world[:2]
+        if clearance(anchor) >= 0.:
+            return anchor
+        limit = self.region_half[:2] - REGION_WALL_ALLOWANCE_M - mine
+        if np.any(limit <= 0.):
+            return anchor
+        center_xy = self.region_world[:2]
+        xs = np.arange(-limit[0], limit[0] + 1e-9, FREE_SPOT_GRID_M)
+        ys = np.arange(-limit[1], limit[1] + 1e-9, FREE_SPOT_GRID_M)
+        best, best_key = anchor, None
+        for dx, dy in sorted(((dx, dy) for dx in xs for dy in ys),
+                             key=lambda v: (v[0] - (anchor - center_xy)[0]) ** 2
+                             + (v[1] - (anchor - center_xy)[1]) ** 2):
+            xy = center_xy + np.array([dx, dy])
+            gap = clearance(xy)
+            if gap >= 0.:
+                return xy
+            # No room left: stack, and stack squarely.  Ranking by clearance
+            # alone picks the spot hanging furthest off the rim of what is
+            # already there, which then topples; the footprint that sits fully
+            # on one occupant is the one that holds.
+            key = (self._supported_fraction(xy), gap,
+                   -float(np.sum((xy - anchor) ** 2)))
+            if best_key is None or key > best_key:
+                best, best_key = xy, key
+        return best
 
-        xs = _axis_offsets(float(limit[0]))
-        ys = _axis_offsets(float(limit[1]))
-        cells = [
-            center_xy + np.array([float(dx), float(dy)])
-            for dx in xs
-            for dy in ys
-        ]
-        # Prefer the nearest spot that meets the full margin; if none does
-        # (the region is too crowded for this footprint), fall back to the
-        # spot that maximises clearance from occupants — spreading objects to
-        # opposite ends of the region — instead of stacking on the centre.
-        clear_cells = [xy for xy in cells if free(xy)]
-        if clear_cells:
-            return min(
-                clear_cells,
-                key=lambda xy: float(np.sum((xy - center_xy) ** 2)),
-            )
-        return max(cells, key=clearance)
+    def _supported_fraction(self, xy):
+        """Share of the footprint carried by the occupant it will actually rest on.
+
+        Only the highest overlapped occupant ever touches the object; anything
+        lower never takes load, so scoring by the best supporter of any height
+        rewards a spot that is squarely on a flat item while straddling the rim
+        of something taller standing on it.  That is what put the bread on the
+        mug in c3_1 -- fully on the plate by area, resting on the mug in fact.
+        """
+        mine = self.half[:2]
+        area = float(4. * mine[0] * mine[1]) or 1.
+        carried = []
+        for c, h, top in self._occupants():
+            overlap = np.minimum(xy + mine, c + h) - np.maximum(xy - mine, c - h)
+            if np.all(overlap > 0.):
+                carried.append((top, float(overlap[0] * overlap[1]) / area))
+        if not carried:
+            return 0.
+        resting_top = max(top for top, _f in carried)
+        # Occupants level with the highest one share the load; lower ones do not.
+        return round(max(f for top, f in carried
+                         if top >= resting_top - SUPPORT_LEVEL_TOLERANCE_M), 3)
+
+    def interior_top_world_z(self):
+        """Highest point of anything already inside the region (rim if empty).
+
+        What the carried object has to fly over is not the rim but whatever is
+        stacked in there.  Clearing the rim alone drove the bread through the
+        mug standing on the plate (c3_1).
+        """
+        rim = self.region_world[2] + self.region_half[2]
+        return max([rim, *(t for _c, _h, t in self._occupants())])
+
+    def support_top_world_z(self, xy):
+        """Top of whatever the object will rest on at ``xy``, and whether it stacks.
+
+        The region floor when the spot is clear, otherwise the highest occupant
+        the footprint overlaps.  A full region has to stack, and releasing at
+        floor height then drives the object through what is already there.
+        """
+        floor = self.floor_top_world_z()
+        mine = self.half[:2]
+        tops = [t for c, h, t in self._occupants()
+                if np.all(np.abs(np.asarray(xy, dtype=float) - c) < h + mine)]
+        top = max([floor, *tops])
+        return top, bool(tops and top > floor)
 
     # -- publication ---------------------------------------------------------
     def publish(self, goal_key, start_key, desired_center, extra):
@@ -301,7 +393,8 @@ def ground_held_transport(request, retention=None):
     # Keep the measured object bbox clear of the rim without an arbitrary 5 cm
     # standoff that can place a reachable kitchen destination outside UR5e reach.
     clearance = max(.02, request.constraints.collision_margin_m * 2.)
-    desired_center[2] = max(g.center[2], g.region_world[2] + g.region_half[2] + g.half[2] + clearance)
+    desired_center[2] = max(g.center[2],
+                            g.interior_top_world_z() + g.half[2] + clearance)
     g.task.goal.target_pose = None
     g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, {})
 
@@ -322,7 +415,14 @@ def ground_held_place(request, retention=None):
     release_clearance = max(REGION_FLOOR_FALLBACK_M, float(request.constraints.collision_margin_m))
     desired_center = g.region_world.copy()
     desired_center[:2] = g.free_destination_xy()
-    origin_z = g.floor_top_world_z() + release_clearance + g.bottom_below_origin()
+    support_z, stacked = g.support_top_world_z(desired_center[:2])
+    if stacked:
+        # Releasing exactly at the required margin above another object leaves
+        # the state validity check on the boundary; double it so the stacked
+        # release keyframe is inside the margin, not on it.
+        release_clearance = max(release_clearance,
+                                float(request.constraints.collision_margin_m) * 2.)
+    origin_z = support_z + release_clearance + g.bottom_below_origin()
     desired_center[2] = g.center[2] + (origin_z - g.T_WB[2, 3])
     destination = g.publish(
         HELD_PLACE_GOAL_ANCHOR, HELD_PLACE_START_ANCHOR, desired_center,

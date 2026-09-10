@@ -17,6 +17,35 @@ def execution_initial_world(runtime, preview, *, externally_supplied):
     return snapshot(runtime, preview)
 
 
+def _planning_rejections(error):
+    """Per-strategy rejected edges carried on a motion-planning failure."""
+    compilation = getattr(error, "compilation", None)
+    attempts = getattr(compilation, "attempts", None)
+    if not attempts:
+        return None
+    report = []
+    for attempt in attempts:
+        selection = getattr(attempt, "selection", None)
+        edges = list(getattr(selection, "rejected_edges", ()) or ())
+        counts = {}
+        for edge in edges:
+            counts[edge.failure_code] = counts.get(edge.failure_code, 0) + 1
+        report.append({
+            "strategy_id": attempt.strategy_id,
+            "failure_code": (attempt.failure_code
+                             or getattr(selection, "failure_code", None) or "?"),
+            "detail": attempt.detail or getattr(selection, "detail", ""),
+            "rejected_edge_counts": counts,
+            "rejected_edges": [
+                {"from": edge.source_keyframe_id, "to": edge.target_keyframe_id,
+                 "from_branch": edge.source_branch_id,
+                 "to_branch": edge.target_branch_id,
+                 "failure_code": edge.failure_code, "detail": edge.detail}
+                for edge in edges],
+        })
+    return report
+
+
 def execute_selected_plan_live(args, selected, initial_world, constraints, options,
                                repository, output, artifact_id, planner_options):
     from tuj.m5_motion.generic_runner import (
@@ -29,12 +58,23 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
     summary = {"mode": "SCRIPTED_GRASP_LIVE", "status": "FAILED",
                "task_goal_status": "NOT_EVALUATED"}
     try:
+        # The offscreen context is sized from the environment's camera options
+        # (256x256 by default). Recording asks sim.render() for the video size,
+        # and reading a 960x540 image out of a 256x256 buffer yields noise and
+        # a vertically flipped picture -- so declare the recording size the way
+        # the generic and live-execution runners already do.
+        recording_options = (
+            {"camera_names": args.camera, "camera_heights": args.height,
+             "camera_widths": args.width}
+            if args.video is not None
+            else {}
+        )
         runtime = ToolUseJournalEERuntime.from_repository_for_controller(repository,
             _runtime_environment_name(initial_world), active_ee=_runtime_active_ee(initial_world),
             seed=args.seed, scripted_grasps=True, ignore_done=True,
             has_renderer=not args.headless and args.video is None,
             has_offscreen_renderer=args.video is not None, use_camera_obs=False,
-            render_camera=args.camera)
+            render_camera=args.camera, **recording_options)
         preview = initial_world
         initial_world = execution_initial_world(runtime, preview,
             externally_supplied=args.initial_world is not None)
@@ -80,6 +120,16 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
                 time.sleep(.02)
     except Exception as error:
         summary["detail"] = f"{type(error).__name__}: {error}"
+        # A planning failure carries its per-strategy rejected edges on the
+        # exception. This path catches the exception instead of letting it
+        # reach the integrated runner's dump, so the reasons were lost and a
+        # failure could only be read as "no strategy produced a path".
+        rejections = _planning_rejections(error)
+        if rejections is not None:
+            path = output / "m5_failure.json"
+            path.write_text(json.dumps(rejections, ensure_ascii=False, indent=2),
+                            encoding="utf-8")
+            summary["failure_detail"] = str(path.resolve())
         if session:
             session.failure = summary["detail"]
             summary["manifest"] = str(session.save_manifest().resolve())

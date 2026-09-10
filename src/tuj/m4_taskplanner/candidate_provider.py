@@ -88,7 +88,8 @@ class StaticCandidateProvider:
                         proposal.required_capabilities
                     ),
                     nominal_execution_cost=proposal.nominal_execution_cost,
-                    metadata=dict(proposal.metadata),
+                    metadata={**subgoal.action_parameters,
+                              **dict(proposal.metadata)},
                 )
             )
         result.sort(key=lambda candidate: candidate.candidate_id)
@@ -155,6 +156,7 @@ class CatalogCandidateProvider:
             action_type=subgoal.action_type,
             source="deterministic_rule",
             suitability_score=None,
+            metadata=dict(subgoal.action_parameters),
         )
 
 

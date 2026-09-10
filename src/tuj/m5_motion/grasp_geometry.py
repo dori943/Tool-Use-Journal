@@ -347,6 +347,25 @@ def _object_dimensions(record: Mapping[str, object]) -> tuple[float, float, floa
     return tuple(float(value) for value in vector)
 
 
+def _mapping_get(value: object, key: str) -> object:
+    return value.get(key) if isinstance(value, Mapping) else None
+
+
+def _finite_points(value: object) -> "np.ndarray | None":
+    """An (N, 3) array of finite points, or None when the record has none."""
+    if value is None:
+        return None
+    try:
+        points = np.asarray(value, dtype=float)
+    except (TypeError, ValueError):
+        return None
+    if points.ndim != 2 or points.shape[0] < 1 or points.shape[1] != 3:
+        return None
+    if not np.all(np.isfinite(points)):
+        return None
+    return points
+
+
 def _object_world_bounds(
     record: Mapping[str, object],
     dimensions: tuple[float, float, float] | None = None,
@@ -544,6 +563,33 @@ def support_clearance_context_from_world(
     if bounds is None:
         return None
     object_minimum, object_maximum = bounds
+    # The vertical gap decides whether the object is resting on the support,
+    # and the collision check that later rejects the pick measures the object's
+    # actual collision geometry.  Measure the same geometry here when the
+    # record carries it: a metric bbox is a loose hull, and for an irregular
+    # mesh its bottom sinks below the surface by more than this tolerance
+    # (bread 8.6 mm, apple 6.0 mm) even though the mesh rests on it within
+    # 0.1 mm -- so the contact went unrecognised and the lift was refused for
+    # touching the very table the object was sitting on.  Horizontal overlap
+    # stays on the bbox: it is a footprint measure, not a contact one.
+    object_bottom_z = float(object_minimum[2])
+    contact_points = _finite_points(record.get("collision_points_m"))
+    if contact_points is not None:
+        pose_position = _finite_vector(
+            _mapping_get(record.get("pose"), "position_m"), 3
+        )
+        pose_orientation = _finite_vector(
+            _mapping_get(record.get("pose"), "orientation_xyzw"), 4
+        )
+        if pose_position is not None and pose_orientation is not None:
+            try:
+                point_rotation = quaternion_matrix_xyzw(pose_orientation)
+            except ValueError:
+                point_rotation = None
+            if point_rotation is not None:
+                object_bottom_z = float(
+                    (contact_points @ point_rotation.T + pose_position)[:, 2].min()
+                )
 
     inferred: list[SupportClearanceContext] = []
 
@@ -561,7 +607,7 @@ def support_clearance_context_from_world(
             support_minimum,
             support_maximum,
         )
-        gap_m = float(object_minimum[2] - support_maximum[2])
+        gap_m = object_bottom_z - float(support_maximum[2])
         if (
             overlap_ratio <= 0.0
             or overlap_ratio + 1e-9 < minimum_horizontal_overlap_ratio
@@ -571,7 +617,7 @@ def support_clearance_context_from_world(
         context = _make_support_context(
             support_id=support_id,
             surface_z_m=float(support_maximum[2]),
-            object_bottom_z_m=float(object_minimum[2]),
+            object_bottom_z_m=object_bottom_z,
             object_top_z_m=float(object_maximum[2]),
             horizontal_overlap_ratio=overlap_ratio,
             source=source,
