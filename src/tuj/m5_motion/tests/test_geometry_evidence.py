@@ -3,7 +3,13 @@ from __future__ import annotations
 import numpy as np
 import pytest
 
-from tuj.m1_scene import MockBackend, ground_scene, serialize
+from tuj.m1_scene import (
+    MockBackend,
+    PropertyMemory,
+    build_m1,
+    ground_scene,
+    serialize,
+)
 from tuj.m5_motion.geometry_evidence import (
     carry_observation_geometry,
     integrate_m1_geometry,
@@ -55,6 +61,9 @@ def _m1(*, center=(900.0, 100.0, 500.0)):
         "geometry_metadata": {
             "schema": "M1_GEOMETRY_V2",
             "meters_per_unit": 0.001,
+            "bbox_kind": "WORLD_AXIS_ALIGNED_OBSERVED_ENVELOPE",
+            "source": "DEPTH_INSTANCE_SEGMENTATION",
+            "completeness": "OBSERVED_SURFACES_ONLY",
             "coordinate_frame": {
                 "frame_id": "camera_aligned_observation",
                 "transform_to_world": {
@@ -64,6 +73,27 @@ def _m1(*, center=(900.0, 100.0, 500.0)):
             },
         },
     }
+
+
+def _planar_m1(*, center=(900.0, 100.0, 500.0)):
+    x, y = np.meshgrid(
+        np.linspace(center[0] - 60.0, center[0] + 60.0, 6),
+        np.linspace(center[1] - 50.0, center[1] + 50.0, 6),
+    )
+    z = np.linspace(center[2] - 0.003, center[2] + 0.003, x.size).reshape(
+        x.shape
+    )
+    m1 = build_m1(
+        [
+            {
+                "name": "plate",
+                "cls": "plate",
+                "points": np.column_stack((x.ravel(), y.ravel(), z.ravel())),
+            }
+        ]
+    )
+    m1["geometry_metadata"] = _m1(center=center)["geometry_metadata"]
+    return m1
 
 
 def test_m1_bbox_is_normalized_and_bound_to_m5_object():
@@ -110,6 +140,123 @@ def test_grounded_m1_bbox_remains_valid_for_m5_geometry_contract():
     assert report["planning_safe"] is True
     assert report["records"][0]["status"] == "ALIGNED"
     assert "observation_geometry" in integrated.objects["plate"]
+
+
+def test_planar_m1_surface_bbox_remains_valid_for_m5_geometry_contract(tmp_path):
+    center = (900.0, 100.0, 510.3)
+    memory_path = tmp_path / "memory.json"
+    ground_scene(
+        _planar_m1(center=center),
+        backend=MockBackend(),
+        memory=PropertyMemory(memory_path, task_id="test-task"),
+    )
+
+    m1 = _planar_m1(center=center)
+    raw_z_span_mm = float(np.ptp(m1["nodes"][0]["_points"][:, 2]))
+    assert raw_z_span_mm == pytest.approx(0.006)
+    assert m1["nodes"][0]["bbox_mm"] == [120.0, 100.0, 0.0]
+
+    stats = ground_scene(
+        m1,
+        backend=MockBackend(),
+        memory=PropertyMemory(memory_path, task_id="test-task"),
+    )
+    assert stats["memory_hits"] == 1
+    integrated, report = integrate_m1_geometry(
+        _world(),
+        serialize(m1),
+        required_object_ids={"plate"},
+        separation_tolerance_m=0.01,
+    )
+
+    assert report["planning_safe"] is True
+    assert report["unsafe_required_object_ids"] == []
+    assert report["missing_required_observations"] == []
+    assert report["records"][0]["status"] == "ALIGNED"
+    assert report["records"][0]["observed_dimensions_m"] == pytest.approx(
+        [0.12, 0.10, 0.0]
+    )
+    assert report["records"][0]["maximum_separation_m"] == pytest.approx(0.0003)
+    evidence = integrated.objects["plate"]["observation_geometry"]
+    corners = np.asarray(evidence["local_bbox_corners_m"], dtype=float)
+    assert corners.shape == (8, 3)
+    assert np.all(np.isfinite(corners))
+    bounds = spatial_record(integrated.objects["plate"])["world_bounds"]
+    assert bounds["source"].endswith("+m1_observation_union")
+    assert bounds["aabb_min_m"] == pytest.approx([0.14, 0.05, 0.49])
+    assert bounds["aabb_max_m"] == pytest.approx([0.26, 0.15, 0.5103])
+
+
+@pytest.mark.parametrize(
+    ("metadata_key", "metadata_value"),
+    (
+        ("schema", "UNKNOWN"),
+        ("bbox_kind", "COMPLETE_OBJECT_AABB"),
+        ("completeness", "COMPLETE_OBJECT"),
+    ),
+)
+def test_planar_bbox_requires_explicit_surface_observation_contract(
+    metadata_key, metadata_value
+):
+    m1 = _planar_m1()
+    m1["geometry_metadata"][metadata_key] = metadata_value
+
+    _, report = integrate_m1_geometry(
+        _world(),
+        m1,
+        required_object_ids={"plate"},
+        separation_tolerance_m=0.01,
+    )
+
+    assert report["planning_safe"] is False
+    assert report["unsafe_required_object_ids"] == ["plate"]
+    assert report["missing_required_observations"] == ["plate"]
+    assert report["records"][0]["status"] == "INVALID_NODE"
+
+
+@pytest.mark.parametrize(
+    "dimensions",
+    (
+        [120.0, 100.0, -1.0],
+        [120.0, 0.0, 0.0],
+        [0.0, 0.0, 0.0],
+        [120.0, 100.0, float("nan")],
+        [120.0, 100.0, float("inf")],
+        [120.0, 100.0, "not-a-number"],
+        [[120.0], [100.0], [0.0]],
+    ),
+)
+def test_invalid_observed_bbox_dimensions_remain_fail_closed(dimensions):
+    m1 = _m1()
+    m1["nodes"][0]["geometry"]["aabb_size"] = dimensions
+
+    _, report = integrate_m1_geometry(
+        _world(),
+        m1,
+        required_object_ids={"plate"},
+        separation_tolerance_m=0.01,
+    )
+
+    assert report["planning_safe"] is False
+    assert report["unsafe_required_object_ids"] == ["plate"]
+    assert report["missing_required_observations"] == ["plate"]
+    assert report["records"][0]["status"] == "INVALID_NODE"
+
+
+def test_disjoint_planar_required_geometry_still_stops_planning_contract():
+    m1 = _planar_m1(center=(1400.0, 100.0, 500.0))
+
+    _, report = integrate_m1_geometry(
+        _world(),
+        m1,
+        required_object_ids={"plate"},
+        separation_tolerance_m=0.01,
+    )
+
+    assert report["planning_safe"] is False
+    assert report["unsafe_required_object_ids"] == ["plate"]
+    assert report["missing_required_observations"] == []
+    assert report["records"][0]["status"] == "DISJOINT"
 
 
 def test_disjoint_required_geometry_stops_planning_contract():

@@ -57,6 +57,7 @@ from tuj.m5_motion.grasp_geometry import (
     bind_grasp_geometry,
     opposed_contact_spec,
     support_clearance_context,
+    support_clearance_context_from_world,
 )
 from tuj.m5_motion.kinematics import (
     IKResult,
@@ -383,6 +384,7 @@ __all__ = [
     "target_fully_inside_region",
     "opposed_contact_spec",
     "support_clearance_context",
+    "support_clearance_context_from_world",
     "tool_use_journal_joint_position_controller_config",
     "uses_contact_friction",
     "with_contact_friction_grasp",

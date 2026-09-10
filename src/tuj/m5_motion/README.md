@@ -167,7 +167,10 @@ python scripts\run_m5_motion_planner.py `
 bbox는 object-local corner로 변환되어 물체가 이동해도 계획용 안전 외피가 함께
 이동한다. 필수 Tool/target의 두 envelope가 허용 오차 이상 떨어져 있으면
 `geometry_alignment.json`을 남기고 trajectory 생성을 시작하지 않는다. 최종 충돌
-판정의 기준은 계속 MuJoCo collision geometry다.
+판정의 기준은 계속 MuJoCo collision geometry다. M1의 metadata가 bbox를
+`OBSERVED_SURFACES_ONLY`로 명시하면 평면 관측의 한 축 크기는 0일 수 있다. 이 경우
+두 축 이상을 span하는 비음수 bbox는 정합 근거로 허용하되, 두 축을 span하지
+못하거나 음수인 bbox는 거부한다.
 
 #### M4 입력 grounding 계약
 
@@ -760,11 +763,19 @@ factory가 적용하는 collision state는 GPT 출력이 아니라 deterministic
 PLACE 목표 표면과의 의도된 접촉이 필요하면 `MotionTask.allowed_touch_objects` 또는
 `target_region_id`에 MuJoCo entity/body/geom selector를 넣어야 한다. 허용 목록은 PLACE
 contact context에만 적용되며 전체 경로에 전역 허용되지 않는다.
-PICK 직후 물체가 지지면에서 떨어지는 첫 LIFT 구간에만 지지면 접촉을 허용해야 하면
-`MotionTask.metadata["support_collision_selectors"]`에 selector 목록을 넣는다. 첫 LIFT가
-끝나면 strict attached context로 자동 복귀한다. 물체를 도구처럼 들고 의도적으로 다른
-물체를 접촉하는 일반 동작은 `allowed_touch_objects`가 그 attached-object context에
-적용된다.
+PICK 대상이 바닥이나 선반 위에 놓여 있으면 adapter가 object OBB와 world의
+obstacle/object AABB(또는 `support_relations`)를 비교해 지지면을 자동 추론한다. 초기
+간격이 `support_contact_tolerance_m` 이내이고 footprint 중첩률이
+`support_min_horizontal_overlap_ratio`(기본 0.5) 이상인 후보 중 수직 간격이 가장 작고
+수평 중첩이 큰 하나를 exact selector로 고른다. M4 action parameter의
+`support_collision_selectors`가 있으면 그 값을 우선하며, 자동 추론을 끄려면
+`support_collision_selectors=[]`를 명시한다.
+
+이 예외는 GRASP 직후의 첫 LIFT/RETREAT 하나에만 적용된다. 해당 구간에서도 target과
+선택된 support 쌍만 `support_penetration_tolerance_m`(1 mm 하드 상한)까지 허용하고,
+종점은 strict attached context로 다시 검사한다. 추론 근거와 허용 한계는 collision
+context metadata에 기록된다. 물체를 도구처럼 들고 의도적으로 다른 물체를 접촉하는
+일반 동작은 `allowed_touch_objects`가 그 attached-object context에 적용된다.
 
 runtime에서 이미 물체를 들고 있는 snapshot을 만들 때는 실제 attachment state도 함께
 전달한다.

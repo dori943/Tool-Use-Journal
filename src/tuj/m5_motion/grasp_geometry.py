@@ -22,6 +22,7 @@ from tuj.m5_motion.schema import (
     KeyframeType,
     MotionPlanRequest,
     RelativeKeyframeSpec,
+    WorldSnapshot,
 )
 
 
@@ -438,7 +439,7 @@ def _make_support_context(
 
 def _explicit_support_clearance(
     record: Mapping[str, object],
-    request: MotionPlanRequest,
+    world: WorldSnapshot,
     object_id: str,
     bounds: tuple[np.ndarray, np.ndarray] | None,
 ) -> SupportClearanceContext | None:
@@ -448,7 +449,7 @@ def _explicit_support_clearance(
     for key in ("support_surface", "support"):
         if key in record:
             candidates.append((record[key], f"object.{key}"))
-    relations = request.world.metadata.get("support_relations")
+    relations = world.metadata.get("support_relations")
     if isinstance(relations, Mapping) and object_id in relations:
         candidates.append((relations[object_id], "world.support_relations"))
     elif isinstance(relations, Sequence) and not isinstance(relations, (str, bytes)):
@@ -507,13 +508,14 @@ def _explicit_support_clearance(
     return None
 
 
-def support_clearance_context(
+def support_clearance_context_from_world(
     record: object,
-    request: MotionPlanRequest,
+    world: WorldSnapshot,
     object_id: str,
     dimensions: tuple[float, float, float] | None = None,
     *,
     tolerance_m: float = 0.01,
+    minimum_horizontal_overlap_ratio: float = 0.0,
 ) -> SupportClearanceContext | None:
     """Resolve support clearance for any metric-bbox object.
 
@@ -526,10 +528,17 @@ def support_clearance_context(
 
     if tolerance_m < 0.0 or not math.isfinite(tolerance_m):
         raise ValueError("tolerance_m must be finite and non-negative")
+    if (
+        not math.isfinite(minimum_horizontal_overlap_ratio)
+        or not 0.0 <= minimum_horizontal_overlap_ratio <= 1.0
+    ):
+        raise ValueError(
+            "minimum_horizontal_overlap_ratio must be finite and within [0, 1]"
+        )
     if not isinstance(record, Mapping):
         return None
     bounds = _object_world_bounds(record, dimensions)
-    explicit = _explicit_support_clearance(record, request, object_id, bounds)
+    explicit = _explicit_support_clearance(record, world, object_id, bounds)
     if explicit is not None:
         return explicit
     if bounds is None:
@@ -553,7 +562,11 @@ def support_clearance_context(
             support_maximum,
         )
         gap_m = float(object_minimum[2] - support_maximum[2])
-        if overlap_ratio <= 0.0 or abs(gap_m) > tolerance_m:
+        if (
+            overlap_ratio <= 0.0
+            or overlap_ratio + 1e-9 < minimum_horizontal_overlap_ratio
+            or abs(gap_m) > tolerance_m
+        ):
             return
         context = _make_support_context(
             support_id=support_id,
@@ -566,10 +579,13 @@ def support_clearance_context(
         if context is not None:
             inferred.append(context)
 
-    for obstacle in request.world.obstacles:
+    for obstacle in world.obstacles:
         if not isinstance(obstacle, Mapping):
             continue
-        if obstacle.get("collision_enabled") is False:
+        if (
+            obstacle.get("collision_enabled") is False
+            or obstacle.get("collision_enabled_in_source") is False
+        ):
             continue
         minimum = _finite_vector(obstacle.get("aabb_min_m"), 3)
         maximum = _finite_vector(obstacle.get("aabb_max_m"), 3)
@@ -582,10 +598,13 @@ def support_clearance_context(
             "world.obstacles.aabb",
         )
 
-    for candidate_id, candidate_record in request.world.objects.items():
+    for candidate_id, candidate_record in world.objects.items():
         if candidate_id == object_id or not isinstance(candidate_record, Mapping):
             continue
-        if candidate_record.get("collision_enabled") is False:
+        if (
+            candidate_record.get("collision_enabled") is False
+            or candidate_record.get("collision_enabled_in_source") is False
+        ):
             continue
         candidate_bounds = _object_world_bounds(candidate_record)
         if candidate_bounds is None:
@@ -606,6 +625,27 @@ def support_clearance_context(
             -item.horizontal_overlap_ratio,
             -item.surface_z_m,
         ),
+    )
+
+
+def support_clearance_context(
+    record: object,
+    request: MotionPlanRequest,
+    object_id: str,
+    dimensions: tuple[float, float, float] | None = None,
+    *,
+    tolerance_m: float = 0.01,
+    minimum_horizontal_overlap_ratio: float = 0.0,
+) -> SupportClearanceContext | None:
+    """Resolve support clearance from a complete motion request."""
+
+    return support_clearance_context_from_world(
+        record,
+        request.world,
+        object_id,
+        dimensions,
+        tolerance_m=tolerance_m,
+        minimum_horizontal_overlap_ratio=minimum_horizontal_overlap_ratio,
     )
 
 
@@ -883,4 +923,5 @@ __all__ = [
     "bind_grasp_geometry",
     "opposed_contact_spec",
     "support_clearance_context",
+    "support_clearance_context_from_world",
 ]

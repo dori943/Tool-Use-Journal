@@ -15,6 +15,7 @@ from tuj.m5_motion.schema import (
     ModuleName,
     MotionConstraints,
     MotionPlan,
+    MotionPlanRequest,
     RobotState,
     SceneRef,
     SegmentType,
@@ -280,6 +281,50 @@ def test_orchestrator_plans_transition_then_subgoal_and_persists(tmp_path) -> No
     assert restored.requests == result.requests
     assert restored.plans == result.plans
     assert restored.final_world == result.final_world
+
+
+def test_orchestrator_persists_the_rebound_request_before_planner_failure(
+    tmp_path,
+) -> None:
+    observed: list[MotionPlanRequest] = []
+
+    def failing_pick_planner(request: MotionPlanRequest) -> MotionPlan:
+        observed.append(request.model_copy(deep=True))
+        if request.task.action_type == "acquire":
+            raise RuntimeError("expected PICK planning failure")
+        return _fake_planner(request)
+
+    orchestrator = SelectedPlanMotionOrchestrator(
+        failing_pick_planner,
+        store=MotionPlanStore(tmp_path),
+    )
+
+    with pytest.raises(RuntimeError, match="expected PICK planning failure"):
+        orchestrator.plan(
+            _selected(),
+            initial_world=_world(),
+            constraints=MotionConstraints(
+                joint_limits={
+                    "j1": JointDynamicLimit(
+                        max_velocity_rad_s=1.0,
+                        max_acceleration_rad_s2=2.0,
+                    )
+                }
+            ),
+        )
+
+    request_files = sorted((tmp_path / "requests").glob("*.json"))
+    plan_files = sorted((tmp_path / "plans").glob("*.json"))
+    assert len(request_files) == 3
+    assert len(plan_files) == 2
+    assert request_files[-1].name.startswith("0002-")
+    persisted = MotionPlanRequest.model_validate_json(
+        request_files[-1].read_text(encoding="utf-8")
+    )
+    assert persisted == observed[-1]
+    assert persisted.task.action_type == "acquire"
+    assert persisted.world.scene.signature.startswith("predicted:")
+    assert not (tmp_path / "motion-plan-manifest.json").exists()
 
 
 def test_orchestrator_carries_generic_contact_friction_state_through_place() -> None:

@@ -55,6 +55,12 @@ def depth_clearance(target: dict, container: dict, wall_mm: float | None = None,
       · 바닥 수용: 대상 footprint(최소변) ≤ 컨테이너 개구(내부치수 우선, 없으면 외곽 − 벽두께)
       · 전도 없음: 대상 높이 ≤ tip_ratio × 바닥 최소변 (가늘고 높은 물체만 탈락)
     value_mm = 두 여유 중 빡빡한 쪽. (종전: 깊이 25mm 트레이에서 사과/빵/머그 전부 unsat)"""
+    # C4-2 임시 예외: 우유 카튼을 packing box에 세워 담는
+    # 태스크 소유 정책을 반영해 전도 허용 비율을 높인다.
+    if (target.get("id") == "obj_milk_milk"
+            and container.get("id") == "obj_box_packing_box"):
+        tip_ratio = 4.0
+
     open_w, open_d, src = _container_opening_mm(container, wall_mm)
     base = min(target["bbox_mm"][0], target["bbox_mm"][1])
     h = target["bbox_mm"][2]

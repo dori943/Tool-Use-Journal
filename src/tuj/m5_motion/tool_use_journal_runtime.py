@@ -2328,12 +2328,29 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             )
             return f"finger gripper close command set to {value:.3f}"
         if event.event_type is EventType.SUCTION_ON:
+            command = event.command
+            load_detail = ""
+            if self._CONTROLLER_TRACKING and command is None and target:
+                from tuj.m5_motion.adhesion_load import payload_adhesion_load
+
+                model, _ = _raw_model_data(self.runtime.env)
+                body, _, _ = self.runtime._object_free_joint(self.runtime.env, target)
+                adapter = ToolUseJournalEnvironmentAdapter(self.runtime.env)
+                ee_body = mujoco.mj_name2id(
+                    model, mujoco.mjtObj.mjOBJ_BODY, adapter.mounted_root_body
+                )
+                load = payload_adhesion_load(model, body, ee_body)
+                command = load.command
+                load_detail = (
+                    f"; payload base force {load.base_force_n:.6f} N"
+                    f", capacity {load.capacity_n:.6f} N"
+                )
             value = self.runtime.command_gripper(
                 engaged=True,
                 suction=True,
-                command=event.command,
+                command=command,
             )
-            return f"vacuum suction enabled with command {value:.3f}"
+            return f"vacuum suction enabled with command {value:.6f}{load_detail}"
         if event.event_type is EventType.SUCTION_OFF:
             value = self.runtime.command_gripper(
                 engaged=False,
