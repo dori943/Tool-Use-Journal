@@ -74,10 +74,10 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
         if con.dist < 0 and (int(con.geom1) in c.robot_geoms or int(con.geom2) in c.robot_geoms)
         and int(con.geom1) not in c.gripper_geoms and int(con.geom2) not in c.gripper_geoms}
     c.support_gid = CatalogContext.find_support_geom(c)
-    c.support_top_z = CatalogContext.geom_top_height(c, c.support_gid)
+    c.support_top_z = max(CatalogContext.geom_top_height(c, g) for g in c.support_gids)
     c.thin_contact_profile = None
     if hasattr(recipe, "thin_contact_timeconstant_s"):
-        relevant = c.gripper_geoms | c.object_geoms | {c.support_gid}
+        relevant = c.gripper_geoms | c.object_geoms | c.support_gids
         original = {c.model.geom(i).name: c.model.geom_solref[i].tolist() for i in relevant}
         for i in relevant:
             c.model.geom_solref[i] = [recipe.thin_contact_timeconstant_s, 1.]
