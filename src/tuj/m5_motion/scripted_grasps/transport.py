@@ -213,6 +213,7 @@ class _Grounding:
         if pose.get('frame_id', 'world') != 'world':
             raise ValueError('TRANSPORT_REGION_WORLD_FRAME_REQUIRED')
         self.request, self.task, self.record, self.object_id = request, task, record, object_id
+        self.retention = retention
         self.T_WR = transform(pose['position_m'], rotation=Rotation.from_quat(pose['orientation_xyzw']).as_matrix())
         self.region_dims = np.asarray(record['dimensions_m'], dtype=float)
         self.region_center_local = np.asarray(record.get('anchors', {}).get('center', [0., 0., 0.]), dtype=float)

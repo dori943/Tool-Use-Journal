@@ -80,6 +80,13 @@ def configure_stable_face(g, record, container):
     margin = float(g.request.constraints.collision_margin_m)
     current = g.T_WR[:3, :3].T @ g.T_WB[:3, :3]
     choices = []
+    retained = getattr(getattr(g, 'retention', None), 'stable_packing_rotation', None)
+    if retained is not None:
+        g.destination_rotation = np.asarray(retained).copy()
+        g.half = np.ptp(points @ g.destination_rotation.T, axis=0) / 2.
+        g.preserve_destination_rotation = True
+        g.stable_face_xy = g.free_destination_xy()
+        return
     for axes in permutations(range(3)):
         for signs in product((-1., 1.), repeat=3):
             local = np.eye(3)[:, axes] @ np.diag(signs)
@@ -93,11 +100,37 @@ def configure_stable_face(g, record, container):
             g.half = np.ptp(points @ rotation.T, axis=0) / 2.
             xy = g.free_destination_xy()
             support, _ = g.support_top_world_z(xy)
+            if not stable_face_has_ik(g, xy):
+                continue
             angle = Rotation.from_matrix(current.T @ local).magnitude()
             # Quantization only breaks floating-point symmetry of equal faces.
             key = (round(float(extents[2]), 9), round(float(support), 9), angle)
             choices.append((key, rotation.copy(), g.half.copy(), xy.copy()))
     if not choices:
-        raise ValueError('PACKING_NO_STABLE_FACE_FITS')
+        raise ValueError('PACKING_NO_REACHABLE_STABLE_FACE_FITS')
     _, g.destination_rotation, g.half, g.stable_face_xy = min(choices, key=lambda row: row[0])
     g.preserve_destination_rotation = True
+    if getattr(g, 'retention', None) is not None:
+        g.retention.stable_packing_rotation = g.destination_rotation.copy()
+
+
+def stable_face_has_ik(g, xy):
+    """Prefilter full measured-grasp targets; path collision checks remain mandatory."""
+    retention = getattr(g, 'retention', None)
+    if retention is None:
+        return True
+    from .frames import inverse
+    c = retention.context
+    clearance = max(.02, float(g.request.constraints.collision_margin_m) * 2.)
+    center = np.r_[xy, max(g.center[2], g.interior_top_world_z() + g.half[2] + clearance)]
+    target = np.eye(4)
+    target[:3, :3] = g.destination_rotation
+    target[:3, 3] = center - g.destination_rotation @ g.center_in_body
+    target = target @ inverse(inverse(g.T_WE) @ g.T_WB)
+    solved = c.kinematics.solve_all_ik(target[:3, 3], Rotation.from_matrix(target[:3, :3]).as_quat(),
+                                       seed_qpos=c.data.qpos[c.arm_ids])
+    g.task.metadata.setdefault('stable_face_ik_candidates', []).append({
+        'object_orientation_xyzw': Rotation.from_matrix(g.destination_rotation).as_quat().tolist(),
+        'raw_ik_count': len(solved.solutions),
+    })
+    return bool(solved.solutions)
