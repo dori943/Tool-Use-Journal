@@ -546,6 +546,16 @@ def gap_width_mm(m1: dict | None, target_id: str, exclude: set[str] | None = Non
     return round(best, 1) if best is not None else None
 
 
+def binds_tool(details: list[dict]) -> bool:
+    """이 서브골의 액션 열이 실제로 ?tool 을 바인딩하는가.
+
+    도구 후보가 있다는 것과 액션 스키마에 도구 단계가 있다는 것은 다르다.
+    sweep_collect 류는 확보/반납 액션이 있어 참, relocate/stack 은 거짓이다.
+    """
+    return any(v == "?tool"
+               for d in details for v in (d.get("binding") or {}).values())
+
+
 def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None) -> list[dict]:
     """eval_by == m3 인 술어 인스턴스 → 판정 사양 (술어 1건이 어느 노드/쌍을 보는지).
 
@@ -659,6 +669,17 @@ def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None)
                 for a in actors:
                     q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
                               "call": {**call, "actor": a}})
+    # 0911: 액션 스키마에 ?tool 이 없는 서브골(relocate/stack)도 이제 도구 후보를
+    # 받는다. 그 후보는 어느 사전조건에도 안 붙어 있어 위 루프가 질의를 내지 않고,
+    # 측정값이 없으면 "도구가 필요한가"를 판단할 근거 자체가 없어 확정이 영영 보류된다.
+    # 후보 자체에 대한 측정을 따로 발행한다 (판정이 아니라 판단 재료).
+    if tool_ids and not binds_tool(details):
+        for t in tool_ids:
+            for kind in ("ee", "graspable_on_support"):
+                q.append({"subgoal_id": subgoal["subgoal_id"],
+                          "queried_by": f"{subgoal['subgoal_id']}_toolprobe",
+                          "call": {"kind": kind, "node_id": t}})
+
     # 동일 호출 중복 제거 (같은 노드 intrinsic 2회 등 — M3 캐시가 있지만 명세도 깨끗하게)
     seen, uniq = set(), []
     for x in q:
