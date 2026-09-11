@@ -18,6 +18,12 @@ class GraspEntry:
         module = import_module(f"{__package__}.objects.{name}")
         if self.driver == "catalog":
             return getattr(module, name + "_recipe")()
+        if self.driver == "spoon":
+            # Spoon has independently calibrated 2F and 3F recipes.  The EE
+            # chosen by M4 is part of the dispatch key, so recipe selection
+            # must preserve that choice instead of falling back to the 2F
+            # dataclass default.
+            return module.spoon_recipe(self.ee,self.environment)
         return getattr(module, self.object_id.title() + "Recipe")()
 
     def function(self):
@@ -31,13 +37,6 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     ("bottle", "C1_2_DoughFlatten", "3F", "bottle"),
     ("spatula", "C1_2_DoughFlatten", "3F", "spatula"),
     ("spoon", "C1_2_DoughFlatten", "2F", "spoon"),
-<<<<<<< Updated upstream
-    # 0909: C3_1 also picks the spoon with the 2F gripper. Without an entry for
-    # this environment the generic path plans the grasp, and its pose put the
-    # object 10.6 cm from the grip site: the fingers closed on air (0 contacts,
-    # 0.08 mm lift against a 50 mm requirement).
-    ("spoon", "C3_1_ObjectSorting", "2F", "spoon"),
-=======
     # C2_1 reuses the validated object-frame 2F spoon recipe so the tabletop
     # sorting pick uses the tuned scripted grasp (reliable formation/lift/
     # retention) instead of a per-run LLM contact-friction grasp.  The plate is
@@ -48,7 +47,6 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # the 2F ``plate`` driver used at C1_1 (objects/plate.py / grasp_plate).
     ("spoon", "C2_1_ObjectSorting", "2F", "spoon"),
     ("plate", "C2_1_ObjectSorting", "vac", "catalog", "plate_vac"),
->>>>>>> Stashed changes
     ("apple", "C2_1_ObjectSorting", "3F", "catalog"),
     ("bread", "C2_1_ObjectSorting", "3F", "catalog"),
     ("mug", "C2_1_ObjectSorting", "3F", "catalog"),

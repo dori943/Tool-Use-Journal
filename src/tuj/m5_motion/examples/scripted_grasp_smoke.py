@@ -12,13 +12,23 @@ from tuj.m5_motion.tool_use_journal_runtime import ToolUseJournalEERuntime
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("object", choices=[entry.object_id for entry in ENTRIES])
+    parser.add_argument("object", choices=sorted({entry.object_id for entry in ENTRIES}))
+    parser.add_argument("--ee", choices=("2F", "3F", "vac"),
+        help="select an exact registered end effector when an object has alternatives")
+    parser.add_argument("--environment",
+        help="select an exact registered environment when an object appears in multiple tasks")
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--seed", type=int, default=0)
     parser.add_argument("--dx", type=float, default=0., help="scenario placement offset, before grasp")
     parser.add_argument("--followup", action="store_true", help="also check ordinary M5 movement and physical release")
     args = parser.parse_args()
-    entry = next(e for e in ENTRIES if e.object_id == args.object)
+    matches = [e for e in ENTRIES if e.object_id == args.object
+        and (args.ee is None or e.ee == args.ee)
+        and (args.environment is None or e.environment == args.environment)]
+    if not matches:
+        parser.error(f"no scripted grasp for object={args.object!r}, "
+            f"ee={args.ee!r}, environment={args.environment!r}")
+    entry = matches[0]
     runtime = ToolUseJournalEERuntime.from_repository_for_controller(REPOSITORY, entry.environment,
         active_ee=entry.ee, seed=args.seed, scripted_grasps=True, ignore_done=True)
     try:
@@ -37,6 +47,8 @@ def main():
             from tuj.m5_motion.examples.scripted_grasp_followup import check_followup
             result["followup"] = check_followup(runtime, entry, args.output / "followup", args.seed)
         print(json.dumps({"status": result["status"], "object": entry.object_id,
+            "environment": entry.environment, "ee": entry.ee,
+            "recipe_id": result.get("recipe", {}).get("recipe_id"),
             "metrics": result.get("metrics"), "followup": result.get("followup")}, default=str, indent=2))
         return 0
     finally:
