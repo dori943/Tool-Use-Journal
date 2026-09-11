@@ -111,7 +111,8 @@ class GraspMotionContext:
         if cartesian:
             duration=max(duration,np.linalg.norm(target[:3,3]-self.grip_pose()[:3,3])/self.recipe.cartesian_speed_m_s*1.5)
         for f in np.linspace(0,1,math.ceil(duration*50)+1)[1:]:
-            u=f*f*(3-2*f)*arc[-1]
+            u=(f if stage=='LIFT' and getattr(self.recipe,'linear_lift_start',False)
+               else f*f*(3-2*f))*arc[-1]
             q=np.array([np.interp(u,arc,path[:,j]) for j in range(6)])
             self.step(q,opening)
         for _ in range(50):

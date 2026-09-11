@@ -14,7 +14,7 @@ def attach_vacuum(context):
     context.runtime.command_gripper(engaged=True, suction=True, command=command)
     attachment = context.runtime.attach_object(context.object_id,
         attachment_mode='KINEMATIC', max_attach_distance_m=.002,
-        max_attach_penetration_m=.002)
+        max_attach_penetration_m=context.recipe.maximum_vacuum_attach_penetration_m)
     record = {'policy':VACUUM_POLICY, 'time_s':float(context.data.time),
         'attachment':asdict(attachment), 'contact_before_attach':context.trace[-1],
         'T_GB_at_attach':context.trace[-1]['T_GB'],
