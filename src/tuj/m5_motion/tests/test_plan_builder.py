@@ -175,7 +175,9 @@ def test_plan_builder_applies_event_scoped_collision_state() -> None:
     assert plan.segments[0].metadata["tracking_settle"] == {
         "eef_tolerance_m": 0.005,
         "eef_orientation_tolerance_rad": 0.05,
-        "max_wait_s": 2.0,
+        # bad7410 이 물체 상태 변경 키프레임의 수렴 예산을 2초에서 5초로 늘리면서
+        # 이 단언을 함께 갱신하지 않아 그때부터 계속 실패하고 있었다.
+        "max_wait_s": 5.0,
         "required_consecutive_ticks": 3,
     }
     assert plan.segments[0].collision_context_after == attached
