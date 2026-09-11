@@ -19,9 +19,9 @@ EE가 운반해야 하는 object mass와 Tool mass의 합을 EE payload와 비�
 
 적용 가능한 component의 최소 margin score를 물리 suitability로 사용한다.
 component가 `FAIL`이면 후보를 제거하지만, 모두 `PASS`인 후보는 margin score가
-낮다는 이유로 제거하지 않는다. 이 점수는 후보 정렬에만 쓴다. `UNKNOWN`은 완전한
-candidate보다 뒤에 정렬되며 `unknown_suitability_policy`의
-`reject/allow/defer` 설정을 따른다.
+낮다는 이유로 제거하지 않는다. 이 점수는 후보 정렬과 plan tie-break에만 쓴다.
+`UNKNOWN`은 완전한 candidate보다 뒤에 정렬되며
+`unknown_suitability_policy`의 `reject/allow/defer` 설정을 따른다.
 
 `vlm` 또는 `knowledge_graph`가 제공한 외부 후보는 별도의 제안 품질 점수를
 반드시 포함해야 하며, `candidate_score_threshold`는 이 제공 점수에만 적용한다.
@@ -29,6 +29,11 @@ M4가 생성한 `deterministic_rule` 후보와 명시적인 `manual` 후보에�
 threshold를 적용하지 않는다. 제공 점수는
 `provided_suitability_score` metadata로 보존한다. 기본 물리 scorer가
 활성화된 이후의 `suitability_score`는 물리 margin만 나타낸다.
+
+품질 threshold, 물리 feasibility, top-k를 통과한 후보는 먼저 EE/Tool 교체,
+motion, execution의 운영 비용으로 비교한다. 이 운영 비용이 모두 같을 때는 plan
+전체의 candidate suitability 합이 높은 쪽을 선택하고, 그마저 같을 때만 candidate
+ID를 결정론적 최종 tie-breaker로 사용한다.
 
 접촉 위치, 손목 방향, 개구 폭, 접촉력, suction seal처럼 작업 pose에 종속되는
 평가는 Task Planner에서 수행하지 않는다. 외부 좌표를 사용하는 Motion Planner와

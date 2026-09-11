@@ -1,16 +1,24 @@
-"""Lexicographic cost vector.
+"""Lexicographic operational cost and search tie-breaking.
 
 Hard-constraint violations are never expressed as large costs (infeasible
-edges simply do not exist), and suitability scores are never mixed into the
-cost (below-threshold candidates are removed before search). Plans that
-survive are compared purely by lexicographic order of this vector:
+edges simply do not exist). Plans that survive are compared first by the
+lexicographic order of the operational cost vector:
 
     ee_switches > tool_switches > motion_cost > execution_cost
+
+If those four costs are identical, search prefers the plan with the higher
+accumulated candidate suitability. The suitability term is deliberately kept
+out of :class:`CostVector`, which remains the externally reported operational
+cost.
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+from math import isfinite
+
+
+SUITABILITY_SCALE = 1_000_000
 
 
 @dataclass(frozen=True, order=True, slots=True)
@@ -60,3 +68,45 @@ class CostVector:
         if skip_zero:
             return {k: v for k, v in d.items() if v != 0}
         return d
+
+
+def suitability_penalty(score: float | None) -> int:
+    """Convert a higher-is-better score into a stable integer search cost."""
+
+    if score is None or not isfinite(score):
+        return SUITABILITY_SCALE
+    normalized = min(1.0, max(0.0, float(score)))
+    return SUITABILITY_SCALE - round(normalized * SUITABILITY_SCALE)
+
+
+@dataclass(frozen=True, slots=True)
+class SearchPriority:
+    """Internal Dijkstra priority; not part of the serialized cost vector."""
+
+    operational_cost: CostVector
+    suitability_penalty: int = 0
+
+    def __post_init__(self) -> None:
+        if self.suitability_penalty < 0:
+            raise ValueError(
+                "SearchPriority.suitability_penalty must be non-negative"
+            )
+
+    @classmethod
+    def zero(cls) -> "SearchPriority":
+        return cls(CostVector.zero())
+
+    def advance(
+        self,
+        edge_cost: CostVector,
+        edge_suitability_penalty: int = 0,
+    ) -> "SearchPriority":
+        return SearchPriority(
+            operational_cost=self.operational_cost + edge_cost,
+            suitability_penalty=(
+                self.suitability_penalty + edge_suitability_penalty
+            ),
+        )
+
+    def as_tuple(self) -> tuple[int, int, int, int, int]:
+        return self.operational_cost.as_tuple() + (self.suitability_penalty,)
