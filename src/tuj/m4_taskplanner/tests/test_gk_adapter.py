@@ -342,6 +342,22 @@ def test_gk_upstream_selected_tool_is_preserved_across_group() -> None:
     )
 
 
+def test_gk_preserves_explicit_empty_grounded_ee_intersection() -> None:
+    gk = _gk()
+    gk["gk_by_subgoal"][0]["nodes"][
+        "obj_PlateObject_light_plate"
+    ]["ee"] = {
+        "2F": {"feasible": False},
+    }
+
+    request = build_request_from_gk(
+        gk, _m2(), m1_payload=_m1(), robot_spec_payload=_robot_spec()
+    )
+
+    assert all(subgoal.feasible_ee == [] for subgoal in request.task_graph.subgoals)
+    assert plan(request).status is PlanStatus.INFEASIBLE_NO_CANDIDATE
+
+
 def test_gk_does_not_fallback_from_upstream_selected_tool() -> None:
     request = build_request_from_gk(
         _gk(),
