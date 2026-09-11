@@ -16,6 +16,7 @@ contact force and wrench limits can produce ``GRASP_LOST``.
 
 from __future__ import annotations
 
+import gc
 import math
 import time
 from bisect import bisect_right
@@ -272,6 +273,38 @@ def _restore_runtime_state(env: object, state: _RuntimeState) -> None:
             data.ctrl[actuator_id] = state.ctrl_by_actuator[name]
     data.time = state.simulation_time_s
     mujoco.mj_forward(model, data)
+
+
+def _release_offscreen_render_context(env: object) -> bool:
+    """Release an EE variant's GL context before constructing its replacement."""
+
+    sim = getattr(env, "sim", None)
+    context = getattr(sim, "_render_context_offscreen", None)
+    if context is None:
+        return False
+    sim._render_context_offscreen = None
+    del context
+    gc.collect()
+    return True
+
+
+def _initialize_offscreen_render_context(env: object) -> None:
+    """Restore rendering after a failed EE swap leaves the old env active."""
+
+    if not getattr(env, "has_offscreen_renderer", False):
+        return
+    sim = getattr(env, "sim", None)
+    if sim is None or getattr(sim, "_render_context_offscreen", None) is not None:
+        return
+    from robosuite.utils.binding_utils import MjRenderContextOffscreen
+
+    MjRenderContextOffscreen(
+        sim,
+        device_id=int(getattr(env, "render_gpu_device_id", -1)),
+    )
+    context = sim._render_context_offscreen
+    context.vopt.geomgroup[0] = 1 if env.render_collision_mesh else 0
+    context.vopt.geomgroup[1] = 1 if env.render_visual_mesh else 0
 
 
 @dataclass(frozen=True, slots=True)
@@ -2128,6 +2161,9 @@ class ToolUseJournalEERuntime:
         old_env = self._env
         state = _capture_runtime_state(old_env)
         new_env: object | None = None
+        old_offscreen_released = bool(
+            self._close_replaced and _release_offscreen_render_context(old_env)
+        )
         try:
             new_env = self._factory(to_ee)
             new_env.reset()  # type: ignore[attr-defined]
@@ -2172,6 +2208,14 @@ class ToolUseJournalEERuntime:
                 close = getattr(new_env, "close", None)
                 if callable(close):
                     close()
+            if old_offscreen_released:
+                try:
+                    _initialize_offscreen_render_context(old_env)
+                except Exception as restore_error:
+                    raise ToolUseJournalRuntimeError(
+                        "EE transition failed and the previous offscreen "
+                        f"renderer could not be restored: {restore_error}"
+                    ) from error
             if isinstance(error, ToolUseJournalRuntimeError):
                 raise
             if isinstance(error, ToolUseJournalCompatibilityError):
@@ -3470,6 +3514,9 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 sim.step()
             self.runtime.synchronize_attached_object()
             self.runtime.finish_attachment_step()
+            after_physics = getattr(env, "after_physics_step", None)
+            if callable(after_physics):
+                after_physics()
             if retention is not None:
                 retention.audit_substep()
             update_observables = getattr(env, "_update_observables", None)
