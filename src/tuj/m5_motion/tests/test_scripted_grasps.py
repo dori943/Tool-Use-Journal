@@ -51,7 +51,12 @@ def test_exact_scene_object_and_ee_dispatch(entry):
 
 
 def test_excluded_unknown_and_wrong_hand():
-    assert len(ENTRIES) == 15
+    spoon_routes={(e.environment,e.ee) for e in ENTRIES if e.object_id=='spoon'}
+    assert spoon_routes=={
+        ('C1_2_DoughFlatten','2F'),('C1_2_DoughFlatten','3F'),
+        ('C2_1_ObjectSorting','2F'),('C2_1_ObjectSorting','3F'),
+        ('C3_1_ObjectSorting','2F'),('C3_1_ObjectSorting','3F'),
+    }
     assert not {"tongs", "ladle"} & {e.object_id for e in ENTRIES}
     assert resolve(request_for(object_id="plate_large")) is None
     assert resolve(request_for(object_id="tongs")) is None
@@ -59,6 +64,56 @@ def test_excluded_unknown_and_wrong_hand():
     request.task.ee = "3F"
     with pytest.raises(ValueError, match="EE_MISMATCH"):
         resolve(request)
+
+
+@pytest.mark.parametrize('environment',(
+    'C1_2_DoughFlatten','C2_1_ObjectSorting','C3_1_ObjectSorting'))
+@pytest.mark.parametrize('ee',('2F','3F'))
+def test_spoon_dispatch_preserves_m4_selected_hand(environment,ee):
+    entry=next(e for e in ENTRIES if (e.object_id,e.environment,e.ee)==(
+        'spoon',environment,ee))
+    request=request_for(entry)
+    assert resolve(request)==entry
+    recipe=entry.recipe()
+    assert recipe.ee_id==ee
+    assert recipe.model_class==(
+        'JacoThreeFingerDexterousGripper' if ee=='3F'
+        else 'Robotiq85Gripper')
+    if ee=='3F' and environment.endswith('ObjectSorting'):
+        assert recipe.lateral_offset_m==-.0035
+        assert recipe.handle_fraction==-.08
+        assert recipe.three_finger_hold_close_margin==.1
+
+
+def test_three_finger_spoon_gate_requires_balanced_opposed_contact():
+    from tuj.m5_motion.scripted_grasps.spoon_runtime import (
+        three_finger_contact_established,three_finger_pinch_event,
+        three_finger_ready)
+    sample={'finger_contacts':['thumb','index','pinky'],
+        'finger_force_n':{'thumb':3.,'index':1.5,'pinky':1.5},
+        'normal_opposition':.9,'contact_span_m':.03}
+    assert three_finger_contact_established(sample)
+    assert three_finger_pinch_event(sample)
+    overloaded={**sample,'finger_force_n':{'thumb':4.,'index':2.5,'pinky':2.}}
+    assert three_finger_contact_established(overloaded)
+    assert not three_finger_pinch_event(overloaded)
+    one_sided={**sample,'finger_contacts':['thumb','index'],
+        'finger_force_n':{'thumb':3.,'index':1.5,'pinky':0.}}
+    assert not three_finger_contact_established(one_sided)
+    ripple=[sample.copy() for _ in range(4)]+[{**sample,
+        'finger_force_n':{'thumb':2.,'index':1.,'pinky':.5}}]
+    assert three_finger_ready(ripple)
+    assert not three_finger_ready(ripple[:-1]+[one_sided])
+
+
+def test_three_finger_spoon_force_deadband_prevents_command_drift():
+    from tuj.m5_motion.scripted_grasps.objects.spoon import spoon_recipe
+    from tuj.m5_motion.scripted_grasps.spoon_runtime import update_three_finger_commands
+    recipe=spoon_recipe('3F')
+    command=np.array([-.42,-.41,-.41])
+    np.testing.assert_allclose(update_three_finger_commands(
+        command,[2.6,1.2,1.1],recipe),command)
+    assert update_three_finger_commands(command,[5.,3.,3.],recipe)[0]>command[0]
 
 
 def test_plate_is_routable_but_explicitly_experimental():

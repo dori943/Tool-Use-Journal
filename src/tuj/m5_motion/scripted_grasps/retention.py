@@ -62,6 +62,10 @@ class GraspRetention:
             from .spatula_runtime import update_three_finger_commands
             if not getattr(recipe, 'hold_finger_positions', False):
                 self.commands = update_three_finger_commands(self.commands, measured, recipe)
+                command_min=getattr(c,'three_finger_hold_command_min',None)
+                if command_min is not None:
+                    self.commands=np.clip(self.commands,command_min,
+                        c.three_finger_hold_command_max)
             if self.entry.driver == "catalog":
                 self.commands = bound_spoon_3f_commands(self.commands)
         elif c.two_finger_force_hold:

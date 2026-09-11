@@ -18,6 +18,12 @@ class GraspEntry:
         module = import_module(f"{__package__}.objects.{name}")
         if self.driver == "catalog":
             return getattr(module, name + "_recipe")()
+        if self.driver == "spoon":
+            # Spoon has independently calibrated 2F and 3F recipes.  The EE
+            # chosen by M4 is part of the dispatch key, so recipe selection
+            # must preserve that choice instead of falling back to the 2F
+            # dataclass default.
+            return module.spoon_recipe(self.ee,self.environment)
         return getattr(module, self.object_id.title() + "Recipe")()
 
     def function(self):
@@ -36,6 +42,13 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # object 10.6 cm from the grip site: the fingers closed on air (0 contacts,
     # 0.08 mm lift against a 50 mm requirement).
     ("spoon", "C3_1_ObjectSorting", "2F", "spoon"),
+    # M4's selected EE is preserved all the way to the hand-specific spoon
+    # recipe. Object-sorting can emit either combination; both must avoid the
+    # generic grasp path that previously closed on air.
+    ("spoon", "C1_2_DoughFlatten", "3F", "spoon"),
+    ("spoon", "C2_1_ObjectSorting", "2F", "spoon"),
+    ("spoon", "C2_1_ObjectSorting", "3F", "spoon"),
+    ("spoon", "C3_1_ObjectSorting", "3F", "spoon"),
     ("apple", "C2_1_ObjectSorting", "3F", "catalog"),
     ("bread", "C2_1_ObjectSorting", "3F", "catalog"),
     ("mug", "C2_1_ObjectSorting", "3F", "catalog"),

@@ -1,4 +1,4 @@
-"""Handle grasp for the C1_2 spoon, in the geometric-center frame."""
+"""Scene-relative spoon handle grasps, in the geometric-center frame."""
 from dataclasses import dataclass, asdict, replace
 import numpy as np
 from scipy.spatial.transform import Rotation
@@ -28,6 +28,12 @@ class SpoonRecipe:
     thin_contact_timeconstant_s: float = .004
     three_finger_force_targets_n: tuple = (3.,1.5,1.5)
     three_finger_force_gain: float = .002
+    three_finger_force_deadband_n: float = .5
+    three_finger_joint_limit_timeconstant_s: float = .002
+    three_finger_joint_limit_impedance: tuple = (.9999,.9999,.001,.5,2.)
+    three_finger_joint_armature_kg_m2: float = .0001
+    three_finger_hold_close_margin: float = .05
+    three_finger_hold_open_margin: float = .005
     prelift_stabilization_s: float = .5
     two_finger_parallel_linkage: bool = True
     two_finger_force_target_n: float = 5.
@@ -69,6 +75,20 @@ class SpoonRecipe:
             raise ValueError('Invalid three-finger force targets')
         if not 0 < self.three_finger_force_gain <= .01:
             raise ValueError('Invalid three-finger force gain')
+        if not 0 <= self.three_finger_force_deadband_n < min(
+                self.three_finger_force_targets_n):
+            raise ValueError('Invalid three-finger force deadband')
+        if not 0 < self.three_finger_joint_limit_timeconstant_s <= .01:
+            raise ValueError('Invalid three-finger joint-limit time constant')
+        if len(self.three_finger_joint_limit_impedance)!=5 or not all(
+                np.isfinite(v) for v in self.three_finger_joint_limit_impedance):
+            raise ValueError('Invalid three-finger joint-limit impedance')
+        if not 0 <= self.three_finger_joint_armature_kg_m2 <= .01:
+            raise ValueError('Invalid three-finger joint armature')
+        if not 0 < self.three_finger_hold_close_margin <= .1:
+            raise ValueError('Invalid three-finger hold close margin')
+        if not 0 <= self.three_finger_hold_open_margin <= .02:
+            raise ValueError('Invalid three-finger hold open margin')
         if self.two_finger_force_target_n<=0 or not 0<self.two_finger_force_gain<=.01:
             raise ValueError('Invalid two-finger force feedback')
         if not 0 < self.maximum_joint_limit_error_rad <= .01:
@@ -77,14 +97,21 @@ class SpoonRecipe:
     def to_dict(self): return asdict(self)
 
 
-def spoon_recipe(ee_id='2F'):
+def spoon_recipe(ee_id='2F',environment=None):
     """Return the hand-specific pose; validation records identify passed runs."""
     if ee_id=='2F': return SpoonRecipe()
     if ee_id=='3F':
-        return replace(SpoonRecipe(),recipe_id='spoon_3f_handle_center_v2_unvalidated',
+        recipe=replace(SpoonRecipe(),recipe_id='spoon_3f_handle_center_v2',
             ee_id='3F',model_class='JacoThreeFingerDexterousGripper',lateral_offset_m=-.002,height_offset_m=.027,
-            handle_fraction=-.18,preshape_aperture_m=.025,preshape_closure_command=.5,
+            handle_fraction=-.18,tilt_deg=0.,handle_roll_deg=0.,close_duration_s=2.,
+            preshape_aperture_m=.025,preshape_closure_command=.5,
             two_finger_parallel_linkage=False)
+        if environment in {'C2_1_ObjectSorting','C3_1_ObjectSorting'}:
+            recipe=replace(recipe,
+                recipe_id='spoon_3f_object_sorting_handle_center_v5',
+                handle_fraction=-.08,lateral_offset_m=-.0035,
+                three_finger_hold_close_margin=.1)
+        return recipe
     raise ValueError('UNSUPPORTED_EE: choose 2F or 3F')
 
 
@@ -107,5 +134,5 @@ def build_spoon_targets(T_WB,center_in_body_m,local_size_m,recipe=None):
 
 
 def grasp_spoon(context,object_id='spoon',recipe=None):
-    if object_id!='spoon': raise ValueError('This recipe supports the C1_2 spoon')
+    if object_id!='spoon': raise ValueError('This recipe supports the canonical spoon')
     return context.execute_spoon(recipe or getattr(context,'recipe',None) or SpoonRecipe())
