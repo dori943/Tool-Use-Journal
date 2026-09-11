@@ -242,6 +242,8 @@ class _Grounding:
         )
         self.preserve_destination_rotation = home_orientation is not None
         self.half = np.abs(self.destination_rotation) @ self.local_size / 2.
+        from .container_orientation import configure_packing_orientation
+        configure_packing_orientation(self)
 
     def bottom_below_origin(self):
         """Depth of the object's lowest point under its body origin (world z).
@@ -531,6 +533,8 @@ def ground_held_transport(request, retention=None):
     clearance = max(.02, request.constraints.collision_margin_m * 2.)
     desired_center[2] = max(g.center[2],
                             g.interior_top_world_z() + g.half[2] + clearance)
+    from .container_orientation import packing_destination_center
+    desired_center = packing_destination_center(g, desired_center, place=False)
     g.task.goal.target_pose = None
     g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, {})
 
@@ -570,6 +574,8 @@ def ground_held_place(request, retention=None):
                                 float(request.constraints.collision_margin_m) * 2.)
     origin_z = support_z + release_clearance + g.bottom_below_origin()
     desired_center[2] = g.center[2] + (origin_z - g.T_WB[2, 3])
+    from .container_orientation import packing_destination_center
+    desired_center = packing_destination_center(g, desired_center, place=True)
     destination = g.publish(
         HELD_PLACE_GOAL_ANCHOR, HELD_PLACE_START_ANCHOR, desired_center,
         {'release_clearance_m': release_clearance})
