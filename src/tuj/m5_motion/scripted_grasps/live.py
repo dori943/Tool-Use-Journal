@@ -42,6 +42,13 @@ def snapshot(runtime, previous=None):
         world.metadata["contact_friction_held_objects"] = {
             retention.entry.object_id: retention.transform().model_dump(mode="json")}
     world.metadata["scripted_grasps"] = True
+    if retention is not None and retention.entry.ee in {"2F", "3F"}:
+        from .open_geometry import open_joint_positions
+        world.metadata["released_gripper_configuration"] = {
+            "ee": retention.entry.ee,
+            "source": "PUBLIC_OPEN_ENDPOINT_AND_LINKAGE",
+            "joint_positions": open_joint_positions(retention.context),
+        }
     return world
 
 
