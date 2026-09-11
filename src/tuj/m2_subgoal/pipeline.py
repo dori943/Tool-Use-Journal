@@ -15,6 +15,7 @@ M1 접지값과 관계 함수(ground.py)로 직접 수행하고, G_k 조립도 M
 from __future__ import annotations
 
 from .core import (add_container_seal_pres, add_uncover_effects, decompose,
+                   prune_tool_candidates,
                    invariants_for, partial_order, plan_evaluations)
 from .rough import TemplateRough
 
@@ -37,6 +38,11 @@ def object_ids_of(subgoal: dict, m1_serialized: dict | None = None) -> list[str]
 def run_m2(task: str, m1_serialized: dict, rough=None) -> dict:
     rough = rough or TemplateRough()
     subgoals = rough.generate(task, m1_serialized)
+
+    # 0911: 접지 질의(plan_evaluations)가 후보를 batch actor 로 쓰므로, 후보
+    # 정리는 반드시 decompose 이전에 끝나야 한다.
+    for _line in prune_tool_candidates(subgoals):
+        print(_line)
 
     all_details = []
     for s in subgoals:

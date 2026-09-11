@@ -25,7 +25,6 @@ import json
 
 from .core import TOOL_KINDS, binds_tool
 
-
 def _node_view(responses: list[dict]) -> dict:
     """같은 노드에 대한 응답 여러 건(intrinsic, ee 등)을 노드별 한 뷰로 합친다."""
     view: dict[str, dict] = {}
@@ -179,6 +178,9 @@ PROMPT_TOOL_BLOCK = """
 - sweep_collect(쓸어 모으기): 넓고 평평한 면. 필요 액션 횟수가 적은 것.
 - extract(틈에서 꺼내기): 틈보다 얇고 대상까지 닿을 만큼 긴 것.
 - scoop_transfer(떠 옮기기): 오목한 면이 있는 것.
+- stack(쌓기) / relocate(옮기기): 대상 하나를 옮기는 데는 도구가 필요 없다. 도구를
+  쓸 이유는 옮기는 횟수가 줄어드는 경우뿐이므로, 대상이 여럿일 때만 한 번에 여러
+  개를 받쳐 옮길 수 있는 넓고 평평한 면을 고른다. 대상이 하나면 null 로 둔다.
 공통 기준:
 - 핵심 술어({core})가 false인 후보는 고르지 말 것. 잡을 수 있는 EE가 없는 후보도 제외.
 - 리치 여유는 양수면 충분하며 우열 기준이 아니다. 잡을 수 있는 EE 종류 수도 우열 기준이 아니다.
@@ -236,7 +238,11 @@ def _apply_llm_tool_choice(s: dict, obj: dict, logs: list[str],
         s["tool_needed_hint"] = {"tool_id": pick, "reason": reason}
         s["tool_candidate_ids"] = []
         s.pop("selected_tool_id", None)
-        s.pop("partition_plan", None)
+        # 0911: partition_plan 은 지우지 않는다. 도구가 없는 서브골의 분할 계획은
+        # ee_pool_one_per_grasp 가 만든 "물체당 한 그룹"이고, 이것이 없으면 여러
+        # 물체가 한 서브골에 남아 공통 EE 교집합이 비어 버린다 (c3_1 에서 사과와
+        # 접시가 한 그룹에 묶여 EMPTY_FEASIBLE_EE 가 났다). 도구 판정 결과와
+        # 무관하게 맨손 분할은 그대로 살려 둔다.
         logs.append(f"  [도구 판정] {s['subgoal_id']}: 도구 필요 신호 {pick} ({reason}) — "
                     f"이 kind({s.get('kind')})에는 도구 액션이 없어 확정하지 않는다")
         return
@@ -246,7 +252,7 @@ def _apply_llm_tool_choice(s: dict, obj: dict, logs: list[str],
         s["selected_tool_id_rule"] = rule
         s["selected_tool_id"] = None
         s["tool_candidate_ids"] = []
-        s.pop("partition_plan", None)
+        # partition_plan 은 위와 같은 이유로 유지한다 (맨손 분할).
         logs.append(f"  [도구 판정] {s['subgoal_id']}: 도구 불필요로 판정 "
                     f"(규칙 선택 {rule} 기각) ({reason})")
         return

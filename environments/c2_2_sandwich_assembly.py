@@ -37,6 +37,7 @@ from environments.ee_rack import add_ee_rack
 from environments.kitchen_base import KitchenBase
 from environments.objects import (
     CheeseObject,
+    CuttingBoardObject,
     KnifeObject,
     LadleObject,
     PlateObject,
@@ -95,6 +96,12 @@ _CHEESE_THICKNESS = 0.004
 # 접시를 벗어난 재료는 스택에서 제외한다.
 _SANDWICH_STACK_XY_TOL_M = 0.09
 
+# 0911: 빵 두 장을 받침 위에서 y 축으로 벌려 놓는 거리(중심 간 2배).
+# 빵 113.3mm, 도마 긴 축 245.5mm -> 여유 구간은 56.7 ~ 66.1mm 이고 그 가운데를
+# 쓴다. 빵 사이 6.7mm, 도마 양 끝 6.1mm 씩 남는다. x 축으로 벌리면 turkey_plate
+# 와 겹치므로 축은 y 로 고정한다 (도마의 긴 축도 로컬 y 다).
+_BREAD_SIDE_BY_SIDE_DY_M = 0.06
+
 _SANDWICH_ITEMS = (
     "bread_a",
     "bread_b",
@@ -121,6 +128,7 @@ _XY_OFFSETS = {
 
     "bread_plate": (-0.20, 0.32),
     "serving_plate": (-0.20, 0.54),
+
 }
 
 
@@ -370,8 +378,12 @@ class C2_2_SandwichAssembly(KitchenBase):
             "bread_b":
                 SandwichBreadBObject,
 
+            # 0911: 접시(182mm)는 113mm 빵 두 장을 나란히 못 받친다. 벌려 놓으면
+            # 바깥쪽이 테두리에 걸쳐 굴러떨어진다 (실측: 빵A 가 64도로 서 버렸다).
+            # 도마는 245mm 이고 테두리가 없어 두 장이 평평하게 올라간다.
+            # 노드 id 를 건드리지 않도록 이름은 bread_plate 로 둔다.
             "bread_plate":
-                PlateObject,
+                CuttingBoardObject,
 
             # Turkey
             "turkey_plate":
@@ -1024,16 +1036,24 @@ class C2_2_SandwichAssembly(KitchenBase):
         # 0909: 빵 두 장만 음수 간격(-5mm)으로 겹쳐 쌓고 있었다. M5 는 파지 시작
         # 시점의 지지면 관통을 1mm 까지만 허용하므로 첫 서브골에서 바인딩이 막혔고,
         # 관측에서도 아래 빵이 거의 가려져 bbox 가 실제보다 훨씬 작게 잡혔다.
-        # 다른 재료와 같은 양수 간격으로 맞춘다.
-        self._stack_items(
-            bread_xy,
-            bread_top,
-            [
-                "bread_a",
-                "bread_b",
-            ],
-            clearance=0.0002,
-        )
+        # 0911: 간격만 고쳐서는 부족했다. 겹쳐 두는 한 아래 빵의 top_exposed 가
+        # 거짓이라, 쌓는 순서를 정하는 시각 언어 모델이 아래 빵을 1층으로 두는
+        # 순간 계획이 데드락에 걸린다 — 빵A 를 집으려면 빵B 를 먼저 치워야 하는데
+        # 빵B 는 마지막 층이라 나중에 집는다. 실행마다 순서가 갈려 같은 장면이
+        # 어떤 날은 풀리고 어떤 날은 FRONTIER_EXHAUSTED 로 죽었다. 겹치지 않게
+        # 나란히 놓아 두 장 모두 처음부터 노출되게 한다.
+        # 받침이 도마라 접시용 안착 오프셋(-10mm, 오목한 면 안쪽)을 되돌린다.
+        bread_top = bread_top - _PLATE_FOOD_SURFACE_OFFSET
+        for bread_name, dy in (
+            ("bread_a", -_BREAD_SIDE_BY_SIDE_DY_M),
+            ("bread_b", +_BREAD_SIDE_BY_SIDE_DY_M),
+        ):
+            self._stack_items(
+                bread_xy + np.array([0.0, dy]),
+                bread_top,
+                [bread_name],
+                clearance=0.0002,
+            )
 
         # ====================================================
         # Turkey → Turkey Plate
