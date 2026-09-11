@@ -546,6 +546,63 @@ def gap_width_mm(m1: dict | None, target_id: str, exclude: set[str] | None = Non
     return round(best, 1) if best is not None else None
 
 
+# 0911: 집어서 쓸 수 없는 장면 설비. 노드 id 는 obj_<class>_<instance> 꼴이다.
+FIXTURE_CLASSES = ("rack", "zone")
+
+
+def is_fixture(node_id: str) -> bool:
+    """랙/영역처럼 로봇이 집을 수 없는 고정 설비인가."""
+    if not isinstance(node_id, str):
+        return False
+    parts = node_id.split("_")
+    return len(parts) > 1 and parts[0] == "obj" and parts[1] in FIXTURE_CLASSES
+
+
+def task_payload_ids(subgoals: list[dict]) -> set[str]:
+    """이 태스크가 옮기거나 다루기로 한 물체 전부 (모든 서브골의 대상과 목적지)."""
+    ids: set[str] = set()
+    for s in subgoals:
+        ids.update(s.get("target_ids") or [])
+        if s.get("container_id"):
+            ids.add(s["container_id"])
+    return ids
+
+
+def prune_tool_candidates(subgoals: list[dict]) -> list[str]:
+    """도구 후보에서 설비와 태스크 대상물을 뺀다.
+
+    0911: 후보 생성을 "이 서브골의 대상도 목적지도 아니면 전부"로 뒤집으면서
+    EE 랙(c3_1)과 다른 서브골의 대상(c3_2 의 빵/접시)이 도구로 뽑혔다. 도구는
+    태스크가 다루는 물건이 아니라 그 일을 하려고 빌려 쓰는 물건이어야 한다.
+
+    반드시 접지 질의가 나가기 전에 불러야 한다. plan_evaluations 는 후보를
+    batch 질의의 actor 로 쓰므로, 질의를 보낸 뒤에 후보를 비우면 그 응답을 읽을
+    주체가 사라져 분할 계획이 통째로 없어진다 (c3_2/c4_2 가 그렇게 죽었다).
+    """
+    payload = task_payload_ids(subgoals)
+    logs = []
+    for s in subgoals:
+        raw = s.get("tool_candidate_ids") or []
+        if not raw:
+            continue
+        kept = [c for c in raw if not is_fixture(c) and c not in payload]
+        if len(kept) == len(raw):
+            continue
+        s["tool_candidate_ids"] = kept
+        s["object_ids"] = [o for o in (s.get("object_ids") or [])
+                           if o in kept or o not in set(raw) - set(kept)]
+        fixtures = [c for c in raw if is_fixture(c)]
+        used = [c for c in raw if c not in kept and c not in fixtures]
+        note = []
+        if fixtures:
+            note.append(f"설비 {fixtures}")
+        if used:
+            note.append(f"태스크 대상물 {used}")
+        logs.append(f"  [도구 후보] {s['subgoal_id']}: 제외 " + ", ".join(note)
+                    + f" (남은 후보 {len(kept)}개)")
+    return logs
+
+
 def binds_tool(details: list[dict]) -> bool:
     """이 서브골의 액션 열이 실제로 ?tool 을 바인딩하는가.
 
