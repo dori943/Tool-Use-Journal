@@ -244,6 +244,44 @@ def test_repository_environment_registry_is_discovered_from_package_import(
     assert observed["options"]["seed"] == 7
 
 
+def test_scripted_environment_creates_offscreen_context_after_profile_rebuild(
+    monkeypatch,
+) -> None:
+    import robosuite
+    from tuj.m5_motion.scripted_grasps import profiles
+
+    repository = Path(__file__).resolve().parents[4]
+    observed: dict[str, object] = {}
+
+    def fake_make(*, env_name: str, **options):
+        observed["make_offscreen"] = options["has_offscreen_renderer"]
+        return SimpleNamespace(
+            environment_name=env_name,
+            has_offscreen_renderer=options["has_offscreen_renderer"],
+            robot_configs=[{}],
+        )
+
+    def fake_configure(env, environment: str, ee: str | None) -> None:
+        observed["configure_offscreen"] = env.has_offscreen_renderer
+        observed["configure_args"] = (environment, ee)
+
+    monkeypatch.setattr(robosuite, "make", fake_make)
+    monkeypatch.setattr(profiles, "configure_environment", fake_configure)
+
+    env = make_tool_use_journal_env(
+        repository,
+        "C1_2_DoughFlatten",
+        active_ee="3F",
+        scripted_grasps=True,
+        has_offscreen_renderer=True,
+    )
+
+    assert observed["make_offscreen"] is False
+    assert observed["configure_offscreen"] is True
+    assert observed["configure_args"] == ("C1_2_DoughFlatten", "3F")
+    assert env.has_offscreen_renderer is True
+
+
 def test_adapter_captures_mjcf_world_and_target_ee_ids() -> None:
     env = _fake_env("2F")
     adapter = ToolUseJournalEnvironmentAdapter(env, source_revision="fixture")
@@ -432,6 +470,24 @@ def test_runtime_swaps_physical_model_and_preserves_named_state() -> None:
     assert _joint_qpos(runtime.env, ARM_JOINTS[0]) == pytest.approx([0.37])
     assert _joint_qpos(runtime.env, "apple_joint") == pytest.approx(apple_before)
     runtime.verify_tool_lock("vac")
+    runtime.close()
+
+
+def test_runtime_releases_replaced_offscreen_context_before_factory() -> None:
+    initial = _fake_env("2F")
+    initial.sim._render_context_offscreen = object()
+    observed: dict[str, object] = {}
+
+    def factory(active_ee):
+        observed["old_context_during_factory"] = (
+            initial.sim._render_context_offscreen
+        )
+        return _fake_env(active_ee)
+
+    runtime = ToolUseJournalEERuntime(initial, factory)
+    runtime.unlock("2F")
+
+    assert observed["old_context_during_factory"] is None
     runtime.close()
 
 

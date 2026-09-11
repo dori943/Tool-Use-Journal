@@ -170,6 +170,67 @@ def test_fixed_tool_continuity_preferred_over_extra_ee_switch() -> None:
     assert P.TERMINAL_RETURN_TOOL in step_actions
 
 
+def test_higher_suitability_breaks_equal_operational_cost_tie() -> None:
+    subgoals = [sg("S1", targets=["obj1"], feasible=["A", "B"])]
+    proposals = {
+        "S1": [
+            prop("S1-aaa-lower", "S1", "A", score=0.80),
+            prop("S1-zzz-higher", "S1", "B", score=0.90),
+        ]
+    }
+
+    result = plan(
+        make_request(subgoals, proposals=proposals, initial_ee=None),
+        suitability_scorer=None,
+    )
+
+    assert result.status is PlanStatus.SUCCESS
+    assert result.selected_plan is not None
+    assignment = result.selected_plan.candidate_assignments[0]
+    assert assignment.candidate_id == "S1-zzz-higher"
+    assert assignment.ee == "B"
+
+
+def test_suitability_does_not_override_lower_operational_cost() -> None:
+    subgoals = [sg("S1", targets=["obj1"], feasible=["A", "B"])]
+    proposals = {
+        "S1": [
+            prop("S1-A-lower-score", "S1", "A", score=0.70),
+            prop("S1-B-higher-score", "S1", "B", score=0.99),
+        ]
+    }
+
+    result = plan(
+        make_request(subgoals, proposals=proposals, initial_ee="A"),
+        suitability_scorer=None,
+    )
+
+    assert result.status is PlanStatus.SUCCESS
+    assert result.selected_plan is not None
+    assignment = result.selected_plan.candidate_assignments[0]
+    assert assignment.candidate_id == "S1-A-lower-score"
+    assert assignment.ee == "A"
+
+
+def test_candidate_id_is_only_the_final_equal_suitability_tiebreaker() -> None:
+    subgoals = [sg("S1", targets=["obj1"], feasible=["A", "B"])]
+    proposals = {
+        "S1": [
+            prop("S1-aaa", "S1", "A", score=0.90),
+            prop("S1-zzz", "S1", "B", score=0.90),
+        ]
+    }
+
+    result = plan(
+        make_request(subgoals, proposals=proposals, initial_ee=None),
+        suitability_scorer=None,
+    )
+
+    assert result.status is PlanStatus.SUCCESS
+    assert result.selected_plan is not None
+    assert result.selected_plan.candidate_assignments[0].candidate_id == "S1-aaa"
+
+
 # --------------------------------------------------------------------------- #
 # Brute-force optimality oracle (test-only; production never enumerates)      #
 # --------------------------------------------------------------------------- #

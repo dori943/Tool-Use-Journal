@@ -149,9 +149,19 @@ class FirstFeasibleBranchSelector:
 
         rejected: list[RejectedEdge] = []
         evaluations = 0
+        minimum_chain_evaluations = len(strategy.keyframes)
 
         def timed_out() -> bool:
             return time.monotonic() - started >= self._timeout_s
+
+        def budget_exhausted() -> bool:
+            # The outer wall-clock budget must not prevent the selector from
+            # evaluating even one complete keyframe chain.  Individual edge
+            # planners already have their own finite timeout, and the hard
+            # edge-evaluation cap remains authoritative.
+            return evaluations >= self._max_edge_evaluations or (
+                evaluations >= minimum_chain_evaluations and timed_out()
+            )
 
         def ordered_solutions(
             solutions: Sequence[IKResult], previous: IKResult | None, previous_q: JointConfig
@@ -177,7 +187,7 @@ class FirstFeasibleBranchSelector:
             nonlocal evaluations
             if layer_index == len(strategy.keyframes):
                 return list(nodes), list(edges)
-            if evaluations >= self._max_edge_evaluations or timed_out():
+            if budget_exhausted():
                 return None
 
             keyframe = strategy.keyframes[layer_index]
@@ -187,7 +197,7 @@ class FirstFeasibleBranchSelector:
                 previous_solution,
                 previous_q,
             ):
-                if evaluations >= self._max_edge_evaluations or timed_out():
+                if budget_exhausted():
                     return None
                 edge = edge_planner.plan(
                     previous_q,
@@ -234,7 +244,7 @@ class FirstFeasibleBranchSelector:
 
         chosen = visit(0, start_q, None, [], [])
         if chosen is None:
-            exhausted = evaluations >= self._max_edge_evaluations or timed_out()
+            exhausted = budget_exhausted()
             return BranchSelectionResult(
                 connected=None,
                 rejected_edges=tuple(rejected),

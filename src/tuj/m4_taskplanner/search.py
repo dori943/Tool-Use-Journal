@@ -2,8 +2,8 @@
 
 No topological orders are enumerated and no complete plans are materialized
 up front. Alternative interleavings coexist as alternative paths and the
-lexicographically cheapest one wins. Priority = (accumulated cost vector,
-deterministic tie-breaker, insertion sequence).
+lexicographically cheapest one wins. Priority = (accumulated operational cost,
+accumulated suitability penalty, deterministic tie-breaker, insertion sequence).
 """
 
 from __future__ import annotations
@@ -19,7 +19,11 @@ from tuj.m4_taskplanner.conditions import (
     symbolic_precondition_unmet,
 )
 from tuj.m4_taskplanner.constraints import TaskConstraintEngine
-from tuj.m4_taskplanner.cost import CostVector
+from tuj.m4_taskplanner.cost import (
+    CostVector,
+    SearchPriority,
+    suitability_penalty,
+)
 from tuj.m4_taskplanner.diagnostics import (
     ReasonCode,
     Rejection,
@@ -81,6 +85,7 @@ class SearchProblem:
 class SearchOutcome:
     goal_state: SearchState | None
     best_cost: dict[SearchState, CostVector]
+    best_priority: dict[SearchState, SearchPriority]
     parent: dict[SearchState, ParentEdge]
     stats: SearchStats
     rejections: list[Rejection] = field(default_factory=list)
@@ -287,7 +292,11 @@ def run_search(problem: SearchProblem) -> SearchOutcome:
     start_time = time.monotonic()
     stats = SearchStats()
     outcome = SearchOutcome(
-        goal_state=None, best_cost={}, parent={}, stats=stats
+        goal_state=None,
+        best_cost={},
+        best_priority={},
+        parent={},
+        stats=stats,
     )
     dynamic_rejections: dict[tuple[str, ...], Rejection] = {}
     all_subgoal_ids = sorted(problem.subgoals)
@@ -297,8 +306,13 @@ def run_search(problem: SearchProblem) -> SearchOutcome:
     ] = []
     seq = 0
     initial = problem.initial_state
-    outcome.best_cost[initial] = CostVector.zero()
-    heapq.heappush(heap, (CostVector.zero().as_tuple(), ("", "", ""), seq, initial))
+    initial_priority = SearchPriority.zero()
+    outcome.best_cost[initial] = initial_priority.operational_cost
+    outcome.best_priority[initial] = initial_priority
+    heapq.heappush(
+        heap,
+        (initial_priority.as_tuple(), ("", "", ""), seq, initial),
+    )
 
     while heap:
         if (
@@ -308,13 +322,12 @@ def run_search(problem: SearchProblem) -> SearchOutcome:
             outcome.limit_reached = True
             break
 
-        cost_tuple, _tie, _seq, state = heapq.heappop(heap)
+        priority_tuple, _tie, _seq, state = heapq.heappop(heap)
         stats.states_popped += 1
-        best = outcome.best_cost.get(state)
-        if best is None or cost_tuple > best.as_tuple():
+        priority = outcome.best_priority.get(state)
+        if priority is None or priority_tuple > priority.as_tuple():
             stats.dominated_states_pruned += 1
             continue
-        cost = best
 
         if _is_goal(state, problem):
             outcome.goal_state = state
@@ -356,8 +369,9 @@ def run_search(problem: SearchProblem) -> SearchOutcome:
                     stats,
                     state,
                     next_state,
-                    cost,
+                    priority,
                     terminal.cost,
+                    0,
                     ParentEdge(
                         prev_state=state,
                         subgoal_id=None,
@@ -512,8 +526,9 @@ def run_search(problem: SearchProblem) -> SearchOutcome:
                     stats,
                     state,
                     next_state,
-                    cost,
+                    priority,
                     transition.cost,
+                    suitability_penalty(candidate.suitability_score),
                     ParentEdge(
                         prev_state=state,
                         subgoal_id=sg_id,
@@ -550,22 +565,24 @@ def _relax(
     stats: SearchStats,
     state: SearchState,
     next_state: SearchState,
-    cost: CostVector,
+    priority: SearchPriority,
     edge_cost: CostVector,
+    edge_suitability_penalty: int,
     edge: ParentEdge,
     tie: tuple[str, str, str],
     seq: int,
 ) -> int:
     stats.edges_generated += 1
-    new_cost = cost + edge_cost
-    known = outcome.best_cost.get(next_state)
-    if known is not None and known.as_tuple() <= new_cost.as_tuple():
+    new_priority = priority.advance(edge_cost, edge_suitability_penalty)
+    known = outcome.best_priority.get(next_state)
+    if known is not None and known.as_tuple() <= new_priority.as_tuple():
         stats.dominated_states_pruned += 1
         return seq
-    outcome.best_cost[next_state] = new_cost
+    outcome.best_cost[next_state] = new_priority.operational_cost
+    outcome.best_priority[next_state] = new_priority
     outcome.parent[next_state] = edge
     seq += 1
-    heapq.heappush(heap, (new_cost.as_tuple(), tie, seq, next_state))
+    heapq.heappush(heap, (new_priority.as_tuple(), tie, seq, next_state))
     return seq
 
 

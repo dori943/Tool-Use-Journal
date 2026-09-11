@@ -97,6 +97,25 @@ class ScriptedGraspSession:
         task.tool = ALIASES.get(task.tool, task.tool)
         task.goal.target_object_id = ALIASES.get(task.goal.target_object_id, task.goal.target_object_id)
         task.allowed_touch_objects = [ALIASES.get(n, n) for n in task.allowed_touch_objects]
+        from tuj.m5_motion.flatten_contact import is_flatten_contact
+        if is_flatten_contact(task):
+            import numpy as np
+            from tuj.m5_motion.profiles import ContactExecutionProfile
+            materials = getattr(self.runtime.env, "deformable_runtimes", {})
+            if len(task.target_ids) != 1 or task.target_ids[0] not in materials:
+                raise ValueError("FLATTEN_DEFORMABLE_TARGET_REQUIRED")
+            env = self.runtime.env
+            rated_force = float(env.ee_catalog[task.ee]['payload_kg']) * float(np.linalg.norm(env.sim.model.opt.gravity))
+            task.contact.max_contact_force_n = min(task.contact.max_contact_force_n or rated_force, rated_force)
+            tool_geoms = [env.sim.model.geom_name2id(name) for name in request.world.objects[task.tool]['geom_names']]
+            gripper = env.robots[0].gripper['right']
+            ee_geoms = [env.sim.model.geom_name2id(name) for name in gripper.contact_geoms]
+            materials[task.target_ids[0]].begin_contact_measurement(
+                tool_geoms, task.contact.max_contact_force_n, ee_geoms=ee_geoms)
+            # Limit advance per control tick to the existing contact profile's
+            # penetration resolution; all original arm limits remain in force.
+            contact_speed = ContactExecutionProfile().contact_penetration_m / env.control_timestep
+            request.constraints.max_cartesian_speed_m_s = min(request.constraints.max_cartesian_speed_m_s or contact_speed, contact_speed)
         if retention is not None:
             from .transport import ground_held_transport
             ground_held_transport(request, retention)
@@ -152,6 +171,13 @@ class ScriptedGraspSession:
                 if not execution.successful:
                     raise RuntimeError(execution.detail)
             self.world = snapshot(self.runtime, self.world)
+            if is_flatten_contact(task):
+                from tuj.m5_motion.flatten_contact import flattening_outcome
+                passed, evidence = flattening_outcome(self.world.objects[task.target_ids[0]])
+                record['flattening_evaluation'] = evidence
+                save_json(directory / 'flattening_evaluation.json', evidence)
+                if not passed:
+                    raise RuntimeError('FLATTEN_PHYSICAL_GOAL_NOT_SATISFIED')
             if completed_subgoal and completed_subgoal not in self.world.scene.completed_subgoals:
                 self.world.scene.completed_subgoals.append(completed_subgoal)
             record["status"] = "SUCCESS"
@@ -162,6 +188,9 @@ class ScriptedGraspSession:
             return record
         except Exception as error:
             record.update(status="FAILED", error=f"{type(error).__name__}: {error}")
+            if getattr(error, "compilation", None) is not None:
+                from tuj.m5_motion.object_function_runner import _write_planning_failure
+                record["planning_failure"] = str(_write_planning_failure(directory, request, error))
             self.world = snapshot(self.runtime, self.world)
             raise
         finally:

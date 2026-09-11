@@ -130,11 +130,25 @@ def execute_grasp(runtime, entry, output, *, seed=0, request=None):
         runtime.finish_attachment_step = finish
     if result["status"] != "SUCCESS":
         raise GraspFailure(f"{entry.object_id}: {result.get('failure_stage')}: {result.get('failure_reason')}")
+    result["acquisition_status"] = result["status"]
+    result["acquisition_attachment_used"] = result.get("attachment_used", False)
     runtime.command_gripper(engaged=True, suction=entry.ee == "vac", command=1.)
-    if runtime.attachment is not None:
+    try:
+        if runtime.attachment is None:
+            # Acquisition must pass its physical hold validation before the
+            # existing runtime applies its contact-gated kinematic attachment.
+            runtime.attach_object(entry.object_id)
+        if runtime.attachment.object_id != entry.object_id:
+            raise GraspFailure("POST_GRASP_ATTACHMENT_OBJECT_MISMATCH")
         runtime.mark_attached_object_as_tool(entry.object_id)
-    else:
-        runtime.mark_contact_friction_object_as_tool(entry.object_id)
+    except Exception as error:
+        result.update(status="FAILED", failure_stage="POST_GRASP_ATTACHMENT",
+                      failure_reason=str(error), error_type=type(error).__name__,
+                      attachment_used=runtime.attachment is not None)
+        save_json(c.output / "result.json", result)
+        raise
+    result.update(attachment_used=True, attachment_mode=runtime.attachment.mode.value,
+                  attachment_phase="POST_VALIDATED_GRASP" if not result["acquisition_attachment_used"] else "ACQUISITION")
     from .retention import GraspRetention
     runtime.scripted_grasp_retention = GraspRetention(c, entry)
     result.update(final_robot_q=c.data.qpos[c.arm_ids].tolist(), object_pose_in_gripper=pose_dict(inverse(c.grip_pose()) @ c.body_pose()))

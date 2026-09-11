@@ -5,6 +5,24 @@ import time
 from .live import ScriptedGraspSession, snapshot
 
 
+def _select_live_viewer_camera(runtime, camera):
+    """Point the native viewer at the same fixed camera used for recording."""
+    env = runtime.env
+    viewer = getattr(env, "viewer", None)
+    set_camera = getattr(viewer, "set_camera", None)
+    model = getattr(getattr(env, "sim", None), "model", None)
+    if not callable(set_camera) or model is None:
+        return False
+    try:
+        camera_id = int(model.camera_name2id(camera))
+    except (TypeError, ValueError):
+        return False
+    if camera_id < 0:
+        return False
+    set_camera(camera_id)
+    return True
+
+
 def execution_initial_world(runtime, preview, *, externally_supplied):
     """File snapshots must reproduce; a live capture uses the actual robot.
 
@@ -75,6 +93,8 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
             has_renderer=not args.headless and args.video is None,
             has_offscreen_renderer=args.video is not None, use_camera_obs=False,
             render_camera=args.camera, **recording_options)
+        if not args.headless and args.video is None:
+            _select_live_viewer_camera(runtime, args.camera)
         preview = initial_world
         initial_world = execution_initial_world(runtime, preview,
             externally_supplied=args.initial_world is not None)

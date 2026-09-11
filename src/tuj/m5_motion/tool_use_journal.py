@@ -122,6 +122,10 @@ def settle_tool_use_journal_free_objects(
         dof_address = int(model.jnt_dofadr[joint_id])
         free_qpos[qpos_address : qpos_address + 7] = True
         free_dofs[dof_address : dof_address + 6] = True
+    materials = tuple(getattr(env, "deformable_runtimes", {}).values())
+    for material in materials:
+        free_qpos[material.qpos] = True
+        free_dofs[material.dofs] = True
     fixed_qpos = ~free_qpos
     fixed_dofs = ~free_dofs
     fixed_positions = np.asarray(data.qpos[fixed_qpos], dtype=float).copy()
@@ -129,7 +133,13 @@ def settle_tool_use_journal_free_objects(
     data.ctrl[:] = 0.0
     try:
         for _ in range(steps):
-            mujoco.mj_step(model, data)
+            if materials:
+                mujoco.mj_step1(model, data)
+                for material in materials:
+                    material.prepare_forces()
+                mujoco.mj_step2(model, data)
+            else:
+                mujoco.mj_step(model, data)
             data.qpos[fixed_qpos] = fixed_positions
             data.qvel[fixed_dofs] = 0.0
         mujoco.mj_forward(model, data)
@@ -537,7 +547,22 @@ def make_tool_use_journal_env(
         if env_name in {"C1_2_DoughFlatten", "C2_2_SandwichAssembly", "C4_2_DiagonalFitPacking"}:
             if options.get("render_camera") in {"frontview", "agentview"}:
                 options["render_camera"] = "robot0_robotview"
+    profile_rebuilds_model = scripted_grasps and not (
+        env_name == "C1_1_LegoSweep" and active_ee not in {"3F", "vac"}
+    )
+    deferred_offscreen_renderer = bool(
+        profile_rebuilds_model and options.get("has_offscreen_renderer")
+    )
+    if deferred_offscreen_renderer:
+        # configure_environment() replaces the model and simulator.  Creating
+        # an offscreen context before that replacement leaves two contexts
+        # alive during an EE swap and makes every later frame black.  Restore
+        # the request before configuring the final simulator so reset() creates
+        # exactly one context for the model that will actually be rendered.
+        options["has_offscreen_renderer"] = False
     env = suite.make(env_name=env_name, **options)
+    if deferred_offscreen_renderer:
+        setattr(env, "has_offscreen_renderer", True)
     if active_ee is None and getattr(env, "robot_configs", None):
         # Set this before the caller's first reset. RoboCasa constructs the
         # robot lazily, and a task-specific default here would make a reusable
@@ -832,6 +857,9 @@ class ToolUseJournalEnvironmentAdapter:
             )
             for object_id, body_id in sorted(self.object_body_ids.items())
         }
+        materials = getattr(self.env, "deformable_runtimes", {})
+        for object_id, material in materials.items():
+            objects[object_id].update(material.geometry_record())
         anchor_provider = getattr(self.env, "get_motion_anchor_offsets", None)
         if callable(anchor_provider):
             for object_id, record in objects.items():
@@ -911,6 +939,7 @@ class ToolUseJournalEnvironmentAdapter:
             rack=self._rack_records(),
             metadata={
                 "adapter": "tool-use-journal-v1",
+                "deformable_states": {name: material.state() for name, material in materials.items()},
                 "environment_name": self.environment_name,
                 "source_revision": self.source_revision,
                 "source_mjcf_sha256": xml_hash,
@@ -991,6 +1020,11 @@ def apply_world_snapshot_state(env: object, world: WorldSnapshot) -> None:
         data.qpos[address + 3 : address + 7] = quaternion_xyzw[[3, 0, 1, 2]]
 
     data.qvel[:] = 0.0
+    for object_id, state in world.metadata.get("deformable_states", {}).items():
+        material = getattr(env, "deformable_runtimes", {}).get(object_id)
+        if material is None:
+            raise ToolUseJournalCompatibilityError(f"missing deformable object {object_id!r}")
+        material.restore(state)
     mujoco.mj_forward(model, data)
 
 
@@ -1138,11 +1172,25 @@ def _selector_has_collision(model: mujoco.MjModel, selector: str) -> bool:
     body_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY, selector)
     if body_id < 0:
         return False
-    return any(
+    rigid = any(
         int(model.geom_contype[candidate])
         or int(model.geom_conaffinity[candidate])
         for candidate in _subtree_geom_ids(model, body_id)
     )
+    if rigid:
+        return True
+    for flex_id in range(model.nflex):
+        start, count = int(model.flex_vertadr[flex_id]), int(model.flex_vertnum[flex_id])
+        nodes = model.flex_vertbodyid[start:start + count]
+        for node in nodes:
+            ancestor = int(node)
+            while ancestor > 0 and ancestor != body_id:
+                ancestor = int(model.body_parentid[ancestor])
+            if ancestor != body_id:
+                break
+        else:
+            return True
+    return False
 
 
 @dataclass(frozen=True, slots=True)
@@ -1368,6 +1416,40 @@ class ToolUseJournalCollisionModelCompiler:
             ),
             source_revision=self.source_revision,
             reference_active_ee=reference_adapter.physical_active_ee,
+        )
+
+    def initial_static_support_contacts(self, world, target, primary):
+        """Measure only current upward contacts on coplanar fixed surfaces."""
+        from tuj.m5_motion.static_support import coplanar_static_support_contacts
+
+        capture = self._captures[self.reference_active_ee]
+        compiled = self.compile(self.reference_active_ee)
+        return coplanar_static_support_contacts(
+            compiled.model, compiled.baseline_qpos, capture.object_body_names,
+            world, target, primary,
+        )
+
+    def initial_release_geometry_pairs(self, world, target, margin):
+        from tuj.m5_motion.release_separation import release_geometry_pairs
+
+        capture = self._captures[self.reference_active_ee]
+        compiled = self.compile(self.reference_active_ee)
+        return release_geometry_pairs(
+            compiled.model, compiled.baseline_qpos, capture.object_body_names,
+            capture.mounted_root_body_name, world, target, margin,
+        )
+
+    def initial_object_clearance(self, objects, first: str, second: str) -> float | None:
+        """Measure selected support geometry at request poses without live mutation."""
+        from tuj.m5_motion.support_distance import object_pair_clearance
+
+        capture = self._captures[self.reference_active_ee]
+        if first not in capture.object_body_names or second not in capture.object_body_names:
+            return None
+        compiled = self.compile(self.reference_active_ee)
+        return object_pair_clearance(
+            compiled.model, compiled.baseline_qpos, capture.object_body_names,
+            objects, first, second,
         )
 
     def build_ee_exchange_contexts(

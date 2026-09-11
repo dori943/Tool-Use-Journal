@@ -26,6 +26,8 @@ def register_vacuum():
     class VacuumGripper(GripperModel):
         """흡착 EE. 액션 1차원(-1=off ~ +1=흡착max)을 adhesion ctrl로 매핑한다."""
 
+        action_is_absolute = True
+
         def __init__(self, idn=0):
             super().__init__(GRIPPER_XML, idn=idn)
 

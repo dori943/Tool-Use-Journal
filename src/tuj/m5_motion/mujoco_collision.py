@@ -357,12 +357,20 @@ class MuJoCoCollisionValidator:
                 f"unknown geom or body selector {selector!r}"
             )
         bodies = _descendant_body_ids(self.model, body_id)
-        return frozenset(
+        rigid = {
             geom_id
             for geom_id in range(self.model.ngeom)
             if int(self.model.geom_bodyid[geom_id]) in bodies
             and _collision_enabled(self.model, geom_id)
-        )
+        }
+        # Internal negative handles are distinct from native geom IDs. Flex
+        # endpoints are resolved from contact.flex, never from geom[-1].
+        for flex_id in range(self.model.nflex):
+            start = int(self.model.flex_vertadr[flex_id])
+            count = int(self.model.flex_vertnum[flex_id])
+            if all(int(b) in bodies for b in self.model.flex_vertbodyid[start:start + count]):
+                rigid.add(-1 - flex_id)
+        return frozenset(rigid)
 
     @staticmethod
     def _canonical_pair(pair: tuple[str, str]) -> tuple[str, str]:
@@ -584,14 +592,25 @@ class MuJoCoCollisionValidator:
         return None
 
     def _labels(self, geom_id: int) -> frozenset[str]:
-        body_id = int(self.model.geom_bodyid[geom_id])
+        body_id = self._endpoint_body(geom_id)
         return frozenset(
             {
-                _name(self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_id),
+                self._endpoint_name(geom_id),
                 _name(self.model, mujoco.mjtObj.mjOBJ_BODY, body_id),
                 *self._geom_entities.get(geom_id, ()),
             }
         )
+
+    def _endpoint_name(self, handle: int) -> str:
+        return _name(self.model, mujoco.mjtObj.mjOBJ_GEOM, handle) if handle >= 0 else _name(
+            self.model, mujoco.mjtObj.mjOBJ_FLEX, -1 - handle)
+
+    def _endpoint_body(self, handle: int) -> int:
+        if handle >= 0:
+            return int(self.model.geom_bodyid[handle])
+        start = int(self.model.flex_vertadr[-1 - handle])
+        node = int(self.model.flex_vertbodyid[start])
+        return int(self.model.body_parentid[node])
 
     def _is_adjacent_robot_pair(self, geom_a: int, geom_b: int) -> bool:
         if geom_a not in self._robot_geom_ids or geom_b not in self._robot_geom_ids:
@@ -833,10 +852,12 @@ class MuJoCoCollisionValidator:
                         detail=str(error),
                     )
 
-            moving_geom_indices = sorted(moving_geoms)
+            moving_geom_indices = sorted(g for g in moving_geoms if g >= 0)
             original_margins = self.model.geom_margin[moving_geom_indices].copy()
+            original_flex_margins = self.model.flex_margin.copy()
             try:
-                for geom_id in moving_geoms:
+                self.model.flex_margin[:] = np.maximum(self.model.flex_margin, self.collision_margin_m)
+                for geom_id in moving_geom_indices:
                     self.model.geom_margin[geom_id] = max(
                         float(self.model.geom_margin[geom_id]),
                         self.collision_margin_m,
@@ -844,6 +865,7 @@ class MuJoCoCollisionValidator:
                 mujoco.mj_forward(self.model, self.data)
             finally:
                 self.model.geom_margin[moving_geom_indices] = original_margins
+                self.model.flex_margin[:] = original_flex_margins
 
             contacts: list[CollisionContact] = []
             disallowed_distances: list[float] = []
@@ -852,6 +874,10 @@ class MuJoCoCollisionValidator:
                 contact = self.data.contact[contact_index]
                 geom_a = int(contact.geom1)
                 geom_b = int(contact.geom2)
+                if geom_a < 0:
+                    geom_a = -1 - int(contact.flex[0])
+                if geom_b < 0:
+                    geom_b = -1 - int(contact.flex[1])
                 if geom_a not in moving_geoms and geom_b not in moving_geoms:
                     continue
                 # Adjacent robot links intentionally meet at their joint and
@@ -863,8 +889,8 @@ class MuJoCoCollisionValidator:
                 allowed = self._is_allowed(
                     geom_a, geom_b, selected_context
                 )
-                body_a_id = int(self.model.geom_bodyid[geom_a])
-                body_b_id = int(self.model.geom_bodyid[geom_b])
+                body_a_id = self._endpoint_body(geom_a)
+                body_b_id = self._endpoint_body(geom_b)
                 bounded_minimum = self._bounded_minimum_distance(
                     geom_a,
                     geom_b,
@@ -877,12 +903,8 @@ class MuJoCoCollisionValidator:
                     < bounded_minimum - self._DISTANCE_TOLERANCE_M
                 )
                 record = CollisionContact(
-                    geom_a=_name(
-                        self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_a
-                    ),
-                    geom_b=_name(
-                        self.model, mujoco.mjtObj.mjOBJ_GEOM, geom_b
-                    ),
+                    geom_a=self._endpoint_name(geom_a),
+                    geom_b=self._endpoint_name(geom_b),
                     body_a=_name(
                         self.model, mujoco.mjtObj.mjOBJ_BODY, body_a_id
                     ),

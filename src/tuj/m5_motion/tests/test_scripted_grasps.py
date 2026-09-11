@@ -51,7 +51,7 @@ def test_exact_scene_object_and_ee_dispatch(entry):
 
 
 def test_excluded_unknown_and_wrong_hand():
-    assert len(ENTRIES) == 14
+    assert len(ENTRIES) == 15
     assert not {"tongs", "ladle"} & {e.object_id for e in ENTRIES}
     assert resolve(request_for(object_id="plate_large")) is None
     assert resolve(request_for(object_id="tongs")) is None
@@ -232,7 +232,17 @@ def test_place_switches_contact_proxy_to_free_object_after_release():
     assert before.attached_object_transforms == [held]
     assert ("bottle", "table_collision") in before.allowed_collision_pairs
     assert after.attached_object_ids == []
-    assert next(p for p in after.free_object_poses if p.object_id == "bottle").pose == target
+    from tuj.m5_motion.attachment_retarget import (
+        attachment_transform, object_pose_for_end_effector_pose,
+    )
+    from tuj.m5_motion.geometry import RelativePoseResolver
+    expected = object_pose_for_end_effector_pose(
+        RelativePoseResolver(request.world).resolve(place),
+        attachment_transform(request.world, "bottle"),
+    )
+    assert next(
+        p for p in after.free_object_poses if p.object_id == "bottle"
+    ).pose == expected
 
 
 def test_experimental_plate_routes_to_grasp_without_planner_fallback(monkeypatch, tmp_path):
