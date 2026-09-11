@@ -729,6 +729,12 @@ class ToolUseJournalEERuntime:
         if callback is not None:
             callback(self.env)
             return
+        viewer = getattr(self.env, "viewer", None)
+        if getattr(self.env, "renderer", None) == "mjviewer" and viewer is not None:
+            update = getattr(viewer, "update", None)
+            if callable(update):
+                update()
+                return
         render = getattr(self.env, "render", None)
         if callable(render):
             render()
