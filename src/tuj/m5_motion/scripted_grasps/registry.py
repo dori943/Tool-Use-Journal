@@ -34,6 +34,15 @@ class GraspEntry:
 
 ENTRIES = tuple(GraspEntry(*row) for row in (
     ("plate", "C1_1_LegoSweep", "2F", "plate"),
+    # 0911: C1_1 에서 M2 가 접시를 쓸어 담는 도구로 고르는데, 접지값상 접시는
+    # 폭 182mm 라 2F(개구 85mm)/3F(140mm)로는 안 잡히고 vac 만 가능하다. 2F 항목만
+    # 있으면 M4 의 constrain_task_request 가 SCRIPTED_GRASP_EE_INFEASIBLE 로 멈춘다.
+    # C2_1 에서 검증된 흡착 레시피를 그대로 쓴다 (같은 접시 자산). resolve() 가
+    # EE 로 매칭하므로 위 2F 항목과 공존한다.
+    # 주의: plate_vac_recipe() 의 task_id 가 'c2_1' 로 고정돼 있어 실행 기록에는
+    # C1_1 작업도 c2_1 로 남는다. 동작에는 영향이 없다 (catalog_types 는 task_id 를
+    # 화이트리스트로만 검사하고 dispatch_grasp 는 object_id 만 대조한다).
+    ("plate", "C1_1_LegoSweep", "vac", "catalog", "plate_vac"),
     ("bottle", "C1_2_DoughFlatten", "3F", "bottle"),
     ("spatula", "C1_2_DoughFlatten", "3F", "spatula"),
     ("spoon", "C1_2_DoughFlatten", "2F", "spoon"),
@@ -70,7 +79,9 @@ ALIASES = {f"obj_{e.object_id}_{e.object_id}": e.object_id for e in ENTRIES}
 # visibly distinct from validated entries in every execution artifact. A failed
 # experimental grasp still stops the task; it is never replaced by an LLM grasp.
 EXPERIMENTAL_INTEGRATION = {
-    "plate": "2F recipe is connected for C1_1; current-main physical validation is pending",
+    "plate": "2F recipe is connected for C1_1 and the C2_1 vacuum recipe is reused "
+             "there for the sweep tool; physical validation of a suction-held sweep "
+             "is pending",
 }
 PENDING_INTEGRATION = {}
 ENABLED_ENTRIES = tuple(entry for entry in ENTRIES if entry.object_id not in PENDING_INTEGRATION)
