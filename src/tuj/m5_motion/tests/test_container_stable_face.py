@@ -39,3 +39,28 @@ def test_stable_face_uses_free_floor_before_stacking():
     # The selected first face is stable and does not invent extra support height.
     assert g.support_top_world_z(g.stable_face_xy)[1] is False
     assert g.half[2]==pytest.approx(.02)
+
+
+def test_live_ik_filter_uses_measured_object_to_hand_transform(monkeypatch):
+    from types import SimpleNamespace
+    from tuj.m5_motion.scripted_grasps.container_orientation import stable_face_has_ik
+    monkeypatch.setattr('tuj.m5_motion.scripted_grasps.container_release.clear_container_rim',
+                        lambda g, target, retention: (target, {}))
+    req,oid=request();g=_Grounding(req,None,oid)
+    calls=[]
+    def solve(position, quaternion, **kwargs):
+        calls.append((np.array(position),Rotation.from_quat(quaternion).as_matrix()))
+        return SimpleNamespace(solutions=[])
+    c=SimpleNamespace(kinematics=SimpleNamespace(solve_all_ik=solve),
+                      data=SimpleNamespace(qpos=np.zeros(6)),arm_ids=np.arange(6))
+    g.retention=SimpleNamespace(context=c)
+    assert not stable_face_has_ik(g,g.stable_face_xy)
+    pos,rot=calls[0]
+    hand=np.eye(4);hand[:3,:3]=rot;hand[:3,3]=pos
+    # Forward reconstruction must recover the desired object, including its
+    # nonzero body-center offset, rather than mistaking object pose for hand pose.
+    obj=hand@np.linalg.inv(g.T_WE)@g.T_WB
+    np.testing.assert_allclose(obj[:3,:3],g.destination_rotation,atol=1e-12)
+    center=obj[:3,3]+obj[:3,:3]@g.center_in_body
+    np.testing.assert_allclose(center[:2],g.stable_face_xy,atol=1e-12)
+    assert req.task.metadata['stable_face_ik_candidates'][0]['raw_ik_count']==0
