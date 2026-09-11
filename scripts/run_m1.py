@@ -262,6 +262,12 @@ def robocasa_task_segmentation(env, spec, cam: str | None, h: int, w: int,
     extra_cls = spec.get("extra_bodies") or {}
     for sid, (name, model) in enumerate(_robocasa_tracked_models(env, spec), start=1):
         geom_ids = _object_visual_geom_ids(env, model)
+        if hasattr(model, "flex"):
+            import mujoco
+            flex_id = mujoco.mj_name2id(env.sim.model._model, mujoco.mjtObj.mjOBJ_FLEX, model.flex.get("name"))
+            if flex_id < 0:
+                raise ValueError(f"missing native flex for tracked object {name}")
+            geom_ids = [*geom_ids, -2 - flex_id]
         cls = extra_cls.get(name) or spec["class_of"](name)
         if not cls:
             continue
@@ -609,9 +615,21 @@ def _robocasa_scene_camera_render(env, h: int, w: int):
     seg_raw = env.sim.render(
         camera_name=None, width=w, height=h, depth=False, segmentation=True
     )
-    geom_seg = np.asarray(seg_raw)[::convention, :, 1]
+    geom_seg = _native_segmentation_ids(np.asarray(seg_raw)[::convention])
     return rgb, depth_m, geom_seg
 
+
+
+def _native_segmentation_ids(raw):
+    """Keep geom/flex IDs disjoint; -1 remains background."""
+    import mujoco
+    raw = np.asarray(raw)
+    result = np.full(raw.shape[:2], -1, dtype=np.int32)
+    geom = raw[..., 0] == int(mujoco.mjtObj.mjOBJ_GEOM)
+    flex = raw[..., 0] == int(mujoco.mjtObj.mjOBJ_FLEX)
+    result[geom] = raw[..., 1][geom]
+    result[flex] = -2 - raw[..., 1][flex]
+    return result
 
 
 def _raw_geom_segmentation(env, cam: str | None, h: int, w: int) -> np.ndarray:
@@ -620,7 +638,7 @@ def _raw_geom_segmentation(env, cam: str | None, h: int, w: int) -> np.ndarray:
     raw = env.sim.render(
         camera_name=cam, width=w, height=h, depth=False, segmentation=True)
     convention = IMAGE_CONVENTION_MAPPING[macros.IMAGE_CONVENTION]
-    return np.asarray(raw)[::convention, :, 1]
+    return _native_segmentation_ids(np.asarray(raw)[::convention])
 
 
 def instance_segmentation(env, obs: dict, cam: str, h: int, w: int) -> np.ndarray:

@@ -3,9 +3,12 @@ import pytest
 import numpy as np
 from scipy.spatial.transform import Rotation
 from tuj.m5_motion.attachment_retarget import ATTACHED_OBJECT_POSE_SUBJECT
-from tuj.m5_motion.schema import Pose
+from tuj.m5_motion.schema import AttachedObjectTransform, Pose
 from tuj.m5_motion.scripted_grasps.frames import inverse, transform
-from tuj.m5_motion.scripted_grasps.transport import ground_held_transport
+from tuj.m5_motion.scripted_grasps.transport import (
+    ground_held_region_goal,
+    ground_held_transport,
+)
 from tuj.m5_motion.geometry import tool_rotation_from_axis
 from tuj.m5_motion.tests.test_scripted_grasps import request_for,ENTRIES
 
@@ -16,6 +19,35 @@ BODY=transform([.2,.1,.8],rotation=Rotation.from_euler('z',25,degrees=True).as_m
 GRIP=transform([.24,.09,.89],rotation=Rotation.from_euler('xyz',[180,0,30],degrees=True).as_matrix())
 CENTER_IN_BODY=np.array([.01,-.02,0.])
 LOCAL_SIZE=np.array([.08,.08,.09])
+HOME=transform([-.35,.27,.76],rotation=Rotation.from_euler('z',15,degrees=True).as_matrix())
+HOME_CENTER=(HOME@np.r_[CENTER_IN_BODY,1.])[:3]
+HOME_BOTTOM=float(HOME_CENTER[2]-np.abs(HOME[2,:3])@LOCAL_SIZE/2.)
+
+
+def _home_retention(request):
+    T_GB=inverse(GRIP)@BODY
+    held=AttachedObjectTransform(
+        object_id=ENTRIES[4].object_id,
+        free_joint_name=ENTRIES[4].object_id+'_joint0',
+        reference_kind='site',
+        reference_name='gripper0_right_grip_site',
+        position_in_reference_m=tuple(T_GB[:3,3]),
+        orientation_in_reference_xyzw=tuple(
+            Rotation.from_matrix(T_GB[:3,:3]).as_quat()),
+    )
+    request.world.robot_state.attached_object_id=ENTRIES[4].object_id
+    request.world.robot_state.held_tool_id=ENTRIES[4].object_id
+    request.world.metadata['attached_object_transforms']={
+        ENTRIES[4].object_id:held.model_dump(mode='json')}
+    context=SimpleNamespace(body_pose=lambda:BODY,grip_pose=lambda:GRIP,
+        center_in_body=CENTER_IN_BODY,local_size=LOCAL_SIZE,
+        initial_body=HOME,initial_bottom=HOME_BOTTOM,support_top_z=HOME_BOTTOM)
+    return SimpleNamespace(
+        context=context,
+        entry=ENTRIES[4],
+        transform=lambda:held,
+        reference_transform=lambda:held,
+    )
 
 
 def _tray_request(margin):
@@ -114,6 +146,108 @@ def test_direct_caller_pose_is_authoritative_without_an_m4_fallback_marker():
     before=request.model_dump()
     ground_held_transport(request,SimpleNamespace(entry=ENTRIES[4]))
     assert request.model_dump()==before
+
+
+def test_conceptual_tool_rest_transports_to_measured_pregrasp_home():
+    request=request_for(ENTRIES[4],action='transport')
+    request.task.goal.target_region_id='tool_rest'
+    request.task.metadata['scripted_m4_implicit_object_pose']=True
+    ground_held_transport(request,_home_retention(request))
+
+    record=request.world.objects['tool_rest']
+    assert record['collision_enabled'] is False
+    assert record['metadata']['conceptual_tool_home'] is True
+    hint=request.task.metadata['held_transport_goal']
+    origin=np.asarray(record['pose']['position_m'])+np.asarray(
+        record['anchors'][hint['anchor']])
+    np.testing.assert_allclose(origin[:2],HOME[:2,3],atol=1e-10)
+    assert origin[2]>HOME[2,3]
+    np.testing.assert_allclose(
+        Rotation.from_quat(hint['object_orientation_xyzw']).as_matrix(),
+        HOME[:3,:3],
+        atol=1e-10,
+    )
+
+
+def test_conceptual_tool_rest_returns_to_measured_pregrasp_home():
+    request=request_for(ENTRIES[4],action='RETURN_TOOL')
+    request.task.goal.target_region_id='tool_rest'
+    request.task.metadata['scripted_m4_implicit_object_pose']=True
+    ground_held_region_goal(request,_home_retention(request))
+
+    assert 'held_transport_goal' not in request.task.metadata
+    hint=request.task.metadata['held_place_goal']
+    assert hint['object_id']==ENTRIES[4].object_id
+    goal=request.task.goal.target_pose
+    assert goal is not None
+    np.testing.assert_allclose(goal.position_m[:2],HOME[:2,3],atol=1e-10)
+    assert goal.position_m[2]>HOME[2,3]
+    np.testing.assert_allclose(
+        Rotation.from_quat(goal.orientation_xyzw).as_matrix(),
+        HOME[:3,:3],
+        atol=1e-10,
+    )
+
+
+@pytest.mark.parametrize('support_delta', [0., .000130453943949, -.001])
+@pytest.mark.parametrize('margin,tolerance', [(.005,.001),(.005,.005),(.008,.002)])
+def test_tool_return_clearance_uses_actual_support_not_contact_penetration(support_delta,margin,tolerance):
+    request=request_for(ENTRIES[4],action='RETURN_TOOL')
+    request.task.goal.target_region_id='tool_rest'
+    request.task.metadata['scripted_m4_implicit_object_pose']=True
+    request.constraints.collision_margin_m=margin
+    request.constraints.position_tolerance_m=tolerance
+    retention=_home_retention(request)
+    retention.context.support_top_z=HOME_BOTTOM+support_delta
+    ground_held_region_goal(request,retention)
+    goal=request.task.goal.target_pose
+    rotation=Rotation.from_quat(goal.orientation_xyzw).as_matrix()
+    center=np.asarray(goal.position_m)+rotation@CENTER_IN_BODY
+    bottom=center[2]-np.abs(rotation[2,:])@LOCAL_SIZE/2.
+    expected_floor=max(HOME_BOTTOM,retention.context.support_top_z)
+    assert bottom==pytest.approx(expected_floor+margin+tolerance,abs=1e-10)
+    assert bottom-tolerance-retention.context.support_top_z>=margin-1e-10
+    np.testing.assert_allclose(goal.position_m[:2],HOME[:2,3],atol=1e-10)
+    np.testing.assert_allclose(rotation,HOME[:3,:3],atol=1e-10)
+
+
+def test_tool_return_rejects_nonfinite_support_height():
+    request=request_for(ENTRIES[4],action='RETURN_TOOL')
+    request.task.goal.target_region_id='tool_rest'
+    retention=_home_retention(request)
+    retention.context.support_top_z=float('nan')
+    with pytest.raises(ValueError,match='TRANSPORT_TOOL_HOME_POSE_REQUIRED'):
+        ground_held_region_goal(request,retention)
+
+
+def test_conceptual_tool_rest_rejects_mismatched_retention_transform():
+    request=request_for(ENTRIES[4],action='transport')
+    request.task.goal.target_region_id='tool_rest'
+    request.task.metadata['scripted_m4_implicit_object_pose']=True
+    retention=_home_retention(request)
+    wrong=retention.reference_transform().model_copy(update={
+        'position_in_reference_m':(9.,9.,9.)})
+    retention.reference_transform=lambda:wrong
+
+    with pytest.raises(ValueError,match='TRANSPORT_TOOL_HOME_RETENTION_MISMATCH'):
+        ground_held_transport(request,retention)
+    assert 'tool_rest' not in request.world.objects
+
+
+def test_conceptual_tool_rest_ignores_bounded_live_pose_drift_for_provenance():
+    request=request_for(ENTRIES[4],action='RETURN_TOOL')
+    request.task.goal.target_region_id='tool_rest'
+    request.task.metadata['scripted_m4_implicit_object_pose']=True
+    retention=_home_retention(request)
+    drifted=retention.transform().model_copy(update={
+        'position_in_reference_m':tuple(
+            np.asarray(retention.transform().position_in_reference_m)
+            + np.array([2e-6,0.,0.]))})
+    retention.transform=lambda:drifted
+
+    ground_held_region_goal(request,retention)
+
+    assert request.task.metadata['held_place_goal']['object_id']==ENTRIES[4].object_id
 
 
 def test_static_packing_box_is_exposed_as_a_physical_goal_region(monkeypatch):

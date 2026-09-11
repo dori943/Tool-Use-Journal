@@ -91,9 +91,9 @@ M5 계획기에 이미 사용하는 provider가 있으면 `provider=...`로 전�
 
 ## 물체를 들고 있는 동안
 
-- 2F/3F 물체에는 attachment나 weld를 만들지 않는다.
-- `held_tool_id`와 `world.metadata.contact_friction_held_objects`에 **측정된** 상대 자세를 기록한다.
-- 충돌 검사에서만 이 상대 자세로 물체가 그리퍼를 따라가는 모델을 사용한다. 실행 시 실제 물체 qpos를 따라 쓰지 않는다.
+- 2F/3F의 기존 파지 함수는 접촉과 마찰로 lift/hold를 검증한다. 성공 후 기존 runtime의 `KINEMATIC` attachment를 적용한다. 접촉 거리와 침투 검사를 유지하며 현재 상대 자세를 저장한다.
+- `acquisition_attachment_used`는 파지 함수 안의 attachment 사용 여부이고, `attachment_used`와 `attachment_mode`는 통합 후 실제 runtime 상태다. 파지 또는 attach가 실패하면 후속 동작으로 진행하지 않는다.
+- 파지 이후 충돌 검사와 실행은 runtime attachment의 측정된 상대 자세를 사용한다. KINEMATIC 실행은 물체 qpos를 그 자세로 동기화한다. 이후 운반 성공을 마찰만으로 유지한 물리 파지 성공으로 해석하지 않는다.
 - 일반 M5 컨트롤러에서도 파지에 사용한 손가락 힘 피드백을 유지한다. 접촉 손실과 미끄러짐이 허용치를 넘으면 중단한다.
 - 물체를 놓으면 손가락 제어 유지와 held 상태를 해제한다. 물체를 든 채 EE 교체를 시도하면 거부한다.
 - bread/lid는 물체를 들고 있는 동안에만 팔 제어 강성을 높이고 release 때 기존 kp/kd를 복원한다. 현재 관절값에 가까운 IK 동치각을 각 요청마다 다시 선택한다.

@@ -441,7 +441,7 @@ def _contact_spec(
     action = _action_type(assignment, execution)
     mode = str(assignment.mode or "").strip()
     normalized = f"{action}:{mode}".lower()
-    if not any(token in normalized for token in ("push", "pull", "sweep")):
+    if not any(token in normalized for token in ("push", "pull", "sweep", "flatten")):
         return None
     surface = parameters.get("contact_surface", ContactSurfaceType.AUTO.value)
     return ContactManipulationSpec(

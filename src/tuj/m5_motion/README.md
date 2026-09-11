@@ -167,7 +167,10 @@ python scripts\run_m5_motion_planner.py `
 bbox는 object-local corner로 변환되어 물체가 이동해도 계획용 안전 외피가 함께
 이동한다. 필수 Tool/target의 두 envelope가 허용 오차 이상 떨어져 있으면
 `geometry_alignment.json`을 남기고 trajectory 생성을 시작하지 않는다. 최종 충돌
-판정의 기준은 계속 MuJoCo collision geometry다.
+판정의 기준은 계속 MuJoCo collision geometry다. M1의 metadata가 bbox를
+`OBSERVED_SURFACES_ONLY`로 명시하면 평면 관측의 한 축 크기는 0일 수 있다. 이 경우
+두 축 이상을 span하는 비음수 bbox는 정합 근거로 허용하되, 두 축을 span하지
+못하거나 음수인 bbox는 거부한다.
 
 #### M4 입력 grounding 계약
 

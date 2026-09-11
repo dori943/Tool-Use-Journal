@@ -800,3 +800,46 @@ def test_return_tool_place_keeps_eef_semantics() -> None:
 
     for keyframe in artifact.candidates[0].keyframes:
         assert "pose_subject" not in keyframe.metadata
+
+
+def test_grounded_tool_home_return_uses_exact_object_space_release_anchor() -> None:
+    request = _request()
+    request.task.action_type = "RETURN_TOOL"
+    request.task.tool = "bottle"
+    request.task.goal = MotionGoal(
+        goal_type=GoalType.POSE,
+        target_object_id="bottle",
+        target_region_id="tool_rest",
+    )
+    request.world.robot_state.held_tool_id = "bottle"
+    request.world.objects["tool_rest"] = {
+        "pose": {
+            "frame_id": "world",
+            "position_m": [0.2, 0.3, 0.7],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.2, 0.2, 0.005],
+        "anchors": {"held_place_goal": [0.0, 0.0, 0.05]},
+    }
+    request.task.metadata["held_place_goal"] = {
+        "frame_ref": "object:tool_rest",
+        "anchor": "held_place_goal",
+        "preserve_grasp_orientation": True,
+        "object_orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        "eef_orientation_xyzw": [1.0, 0.0, 0.0, 0.0],
+        "object_id": "bottle",
+    }
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_release_batch()),
+    )
+
+    artifact = provider.generate(request)
+
+    pre, place, retreat = artifact.candidates[0].keyframes
+    for keyframe in (pre, place):
+        assert keyframe.frame_ref == "object:tool_rest"
+        assert keyframe.anchor == "held_place_goal"
+        assert keyframe.metadata["pose_subject"] == "ATTACHED_OBJECT"
+    assert place.offset_along_approach_m == 0.0
+    assert "pose_subject" not in retreat.metadata

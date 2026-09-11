@@ -140,8 +140,8 @@ def _world() -> WorldSnapshot:
 
 
 class _FakePlannerPool:
-    def __init__(self, repository, *, seed):
-        del repository, seed
+    def __init__(self, repository, *, seed, **provider_options):
+        del repository, seed, provider_options
 
     def __call__(self, request):
         start = request.world.robot_state.joint_positions_rad
@@ -403,6 +403,7 @@ def test_generic_cli_plans_with_request_backend_and_writes_manifest(
         "ToolUseJournalPlannerPool",
         _FakePlannerPool,
     )
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-key")
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-key")
 
     exit_code = main(
@@ -457,6 +458,7 @@ def test_generic_cli_replaces_stale_summary_when_planning_fails(
         "ToolUseJournalPlannerPool",
         FailingPlannerPool,
     )
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-key")
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-key")
 
     with pytest.raises(RuntimeError, match="expected planner failure"):
@@ -503,7 +505,11 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
     video_path = tmp_path / "run.mp4"
     observed: dict[str, object] = {}
 
+    from tuj.m5_motion.live_execution import LivePlanExecutionSession
+    from tuj.m5_motion.orchestration import _predicted_world
+
     class FakeLiveSession:
+        controller = True
         status = "IN_PROGRESS"
         run_count = 0
         report_count = 0
@@ -512,26 +518,17 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
         def __call__(self, request, plan):
             self.run_count += 1
             self.report_count += 1
-            world = request.world.model_copy(deep=True)
-            world.robot_state = plan.expected_final_state.model_copy(deep=True)
-            return world
+            return _predicted_world(request.world, request, plan, completed_subgoal=None)
 
         def complete(self, **kwargs):
-            observed["complete"] = kwargs
+            observed["completed"] = True
             self.status = "SUCCESS"
-
-        def mark_failure(self, error):
-            observed["failure"] = error
-            self.status = "FAILED"
 
         def close(self):
             observed["closed"] = True
 
-    def fake_from_repository(repository, initial_world, session_output, **kwargs):
+    def fake_session(repository, world, output_dir, **kwargs):
         observed.update(kwargs)
-        observed["repository"] = repository
-        observed["initial_world"] = initial_world
-        observed["output_dir"] = session_output
         return FakeLiveSession()
 
     monkeypatch.setattr(
@@ -540,10 +537,11 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
         _FakePlannerPool,
     )
     monkeypatch.setattr(
-        live_execution.LivePlanExecutionSession,
+        LivePlanExecutionSession,
         "from_repository",
-        fake_from_repository,
+        fake_session,
     )
+    monkeypatch.setenv("GEMINI_API_KEY", "test-only-key")
     monkeypatch.setenv("OPENAI_API_KEY", "test-only-key")
 
     exit_code = main(
@@ -556,6 +554,7 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
             str(output_dir),
             "--video",
             str(video_path),
+            "--no-scripted-grasps",
         ]
     )
 
@@ -563,21 +562,24 @@ def test_generic_cli_video_runs_controller_simulation_and_writes_summary(
     assert observed["mode"] == "controller"
     assert observed["show_viewer"] is False
     assert observed["video"] == video_path.resolve()
-    assert observed["closed"] is True
+    assert observed["completed"] and observed["closed"]
     summary = json.loads(
         (output_dir / "m5_summary.json").read_text(encoding="utf-8")
     )
     assert summary["planning_status"] == "SUCCESS"
     assert summary["simulation_status"] == "SUCCESS"
     assert summary["simulation_mode"] == "controller"
+    assert summary["simulation_run_count"] == 2
     assert summary["video"] == str(video_path.resolve())
 
 
 @pytest.mark.parametrize("mode_args", [
+    ["--simulate", "controller"],
+    ["--video", "test.mp4"],
     ["--simulate", "controller", "--scripted-grasps"],
     ["--video", "test.mp4", "--scripted-grasps"],
 ])
-def test_explicit_scripted_mode_runs_before_constructing_planner(
+def test_default_and_explicit_scripted_mode_run_before_constructing_planner(
     tmp_path, monkeypatch, mode_args
 ):
     from tuj.m5_motion.scripted_grasps import cli

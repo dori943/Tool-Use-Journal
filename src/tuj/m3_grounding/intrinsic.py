@@ -4,4 +4,3 @@ from tuj.m1_scene.grounding import (FrictionHead, MockBackend, PropertyBackend, 
                                     GEOMETRY_REQUIRED, apply_memory_hit_to_observation,
                                     geometry_from_node, geometry_is_current, ground_intrinsic,
                                     pca_dims, surface_rms, seal_patch_rms_mm)
-

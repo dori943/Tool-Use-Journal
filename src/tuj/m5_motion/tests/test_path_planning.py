@@ -321,6 +321,85 @@ def test_cartesian_failure_distinguishes_valid_ik_from_invalid_state() -> None:
     assert result.min_clearance_m == -0.01
 
 
+class _MixedValidityKinematics:
+    def forward_pose_world(self, qpos):
+        return (qpos[0], qpos[1], 0.0), (0.0, 0.0, 0.0, 1.0)
+
+    def solve_all_ik(self, world_pos, orientation_xyzw, **kwargs):
+        del orientation_xyzw, kwargs
+        x = float(world_pos[0])
+        return IKSolutionSet(
+            solutions=(
+                IKResult(
+                    solved=True,
+                    qpos=(x, -1.0),
+                    position_error_m=0.0,
+                    orientation_error_rad=0.0,
+                    branch_id="colliding",
+                ),
+                IKResult(
+                    solved=True,
+                    qpos=(x, 0.0),
+                    position_error_m=0.0,
+                    orientation_error_rad=0.0,
+                    branch_id="clear",
+                ),
+            ),
+            enumeration_complete=True,
+        )
+
+
+class _MixedValidityValidator:
+    def check(self, config, keyframe):
+        del keyframe
+        if config[1] < -0.5:
+            return CollisionCheckResult(
+                valid=False,
+                failure_code="COLLISION_MARGIN_VIOLATION",
+                detail="rejected branch collides",
+                min_clearance_m=-0.05,
+            )
+        return CollisionCheckResult(valid=True, min_clearance_m=0.02)
+
+
+def test_cartesian_success_clearance_excludes_rejected_ik_branches() -> None:
+    world = WorldSnapshot(
+        scene=SceneRef(signature="scene"),
+        robot_state=RobotState(
+            robot_id="mixed",
+            joint_names=["x", "y"],
+            joint_positions_rad=[0.0, 0.0],
+        ),
+        objects={
+            "target": {
+                "pose": {
+                    "position_m": [1.0, 0.0, 0.0],
+                    "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                }
+            }
+        },
+    )
+    planner = CartesianEdgePlanner(
+        _MixedValidityKinematics(),
+        world,
+        _MixedValidityValidator(),
+        translation_step_m=0.25,
+        max_joint_step_rad=0.1,
+        wrap_joints=False,
+    )
+
+    result = planner.plan(
+        (0.0, 0.0),
+        (1.0, 0.0),
+        None,
+        _keyframe(KeyframePlannerType.CARTESIAN),
+    )
+
+    assert result.valid
+    assert result.min_clearance_m == pytest.approx(0.02)
+    assert all(q[1] == pytest.approx(0.0) for q in result.joint_path)
+
+
 def test_rrt_connect_routes_around_invalid_joint_region() -> None:
     def valid(q, keyframe):
         del keyframe
