@@ -198,10 +198,16 @@ def adapt_gk_m2_output(
             # 기준으로 좁힌다. 서브골 단위로 계산하면 쌓기처럼 한 서브골이 여러
             # 물체를 다룰 때 물체별 차이가 사라져, 얇은 재료에도 두꺼운 빵 기준의
             # EE 가 배정된다 (c2_2).
+            # 0911: 바인딩 값 전부를 owner 로 세면 목적지까지 "이 EE 로 잡을 수
+            # 있어야 하는 대상"이 된다. c2_2 의 마지막 층이 그래서 막혔다. 빵A
+            # {2F,3F} 를 터키{vac} 위에 놓는 단계에서 교집합이 비어 EMPTY_FEASIBLE_EE
+            # 가 났는데, 터키는 집는 대상이 아니라 받침이다. EE 가 실제로 드는
+            # 역할만 센다.
             detail_owners = [
-                _canonical_id(item, aliases, raw_to_canonical)
-                for item in _string_list(list(_mapping(detail.get("binding")).values()))
-                if isinstance(item, str) and not item.startswith("?")
+                _canonical_id(value, aliases, raw_to_canonical)
+                for role, value in _mapping(detail.get("binding")).items()
+                if role in GRASPED_ROLES
+                and isinstance(value, str) and not value.startswith("?")
             ]
             raw_action = str(detail.get("action_type") or "") or None
             action_type, mode = _split_action_type(raw_action)
@@ -877,6 +883,12 @@ def _normalize_tool_resource_action(
     if normalized in {"place", "release", "return"}:
         return "RETURN_TOOL"
     return action_type
+
+
+# EE 가 실제로 손에 드는 바인딩 역할. 나머지(?r 목적지, ?base 받침,
+# ?targets 쓸려 가는 대상, ?work 작업면)는 들리지 않으므로 EE 후보를 제약하지
+# 않는다. 새 액션 타입을 추가하면 드는 역할을 여기에 등록해야 한다.
+GRASPED_ROLES = frozenset({"?o", "?t"})
 
 
 def _feasible_ees_for_group(

@@ -51,6 +51,10 @@ def configure_environment(env, environment, ee):
         env.scripted_grasp_profile = {"environment": environment, "ee": ee,
             "correction": {"policy": "NATIVE_HAND", "source_assets_changed": False}}
         return env
+    # 0911 충돌 해결: bare -> EE 랙 경로 캐시는 tabletop(ee_rack)과 부엌
+    # (ee_rack_kitchen) 모두 BARE_HOME 에서 녹화돼 있다. 그래서 맨손으로
+    # 시작하는 실행(ee is None)은 절대 덮어쓰면 안 된다. EE 를 이미 달고
+    # 시작하는 실행은 랙 경로를 타지 않으므로 부엌 홈을 써도 안전하다.
     if kitchen and ee is not None:
         # Only a run that already carries an EE may start from the scripted
         # kitchen home. A bare start fetches its EE from the rack, and every

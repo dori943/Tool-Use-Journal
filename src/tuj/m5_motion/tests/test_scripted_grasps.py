@@ -103,16 +103,17 @@ def test_c3_2_plate_vac_and_fork_resolve_multi_instance():
     assert c1_plate.environment == "C1_1_LegoSweep" and c1_plate.ee == "2F"
     assert resolve(request_for(c1_plate)) == c1_plate
     assert c1_plate.recipe().recipe_id == "plate_2f_calibrated_center_v5"
-    # Explicit vac alternative still resolves when M4 selects vac for C1_1.
-    from tuj.m5_motion.scripted_grasps.registry import ALTERNATIVE_ENTRIES
-
+    # Explicit C1_1 vac ENTRIES row still resolves when M4 selects vac.
     c1_vac = next(
         entry
-        for entry in ALTERNATIVE_ENTRIES
-        if entry.object_id == "plate" and entry.ee == "vac"
+        for entry in ENTRIES
+        if entry.object_id == "plate"
+        and entry.environment == "C1_1_LegoSweep"
+        and entry.ee == "vac"
     )
     assert resolve(request_for(c1_vac)) == c1_vac
     assert c1_vac.module_name == "plate_vac"
+    assert c1_vac.recipe_name == "plate_vac_c2_1_recipe"
     assert c1_vac.recipe().task_id == "c2_1"
     # grasp_plate_vac must reuse the bound recipe (not default C3_2).
     from types import SimpleNamespace
