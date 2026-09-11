@@ -40,6 +40,109 @@ FREE_SPOT_GRID_M = 0.01
 # Occupants whose tops agree to within this share the load of what is put
 # on them; below it only the higher one is touched.
 SUPPORT_LEVEL_TOLERANCE_M = 0.002
+CONCEPTUAL_TOOL_REST_ID = 'tool_rest'
+CONCEPTUAL_TOOL_HOME_GOAL = 'conceptual_tool_home_goal'
+
+
+def _materialize_conceptual_tool_home(request, retention):
+    """Expose the pre-grasp tool pose as geometry for conceptual ``tool_rest``.
+
+    M2 deliberately represents a tool's return location with the semantic ID
+    ``tool_rest``.  Scripted live snapshots track the held body's current pose,
+    so unlike predicted planning worlds they cannot recover its original pose
+    after acquisition.  The grasp context owns that measured pre-grasp pose;
+    publish a non-colliding virtual floor around it for the ordinary region
+    transport/place grounding path.
+    """
+    task = request.task
+    region_id = task.goal.target_region_id
+    if region_id != CONCEPTUAL_TOOL_REST_ID or retention is None:
+        return
+    existing = request.world.objects.get(region_id)
+    if isinstance(existing, dict) and {'pose', 'dimensions_m'} <= set(existing):
+        return
+    object_id = getattr(getattr(retention, 'entry', None), 'object_id', None)
+    if object_id is None or task.target_ids != [object_id]:
+        return
+    if held_pose_subject(request) != object_id:
+        raise ValueError('TRANSPORT_TOOL_HOME_RETENTION_MISMATCH')
+    try:
+        world_transform = attachment_transform(request.world, object_id)
+        retained_transform = retention.reference_transform()
+        same_reference = (
+            retained_transform.object_id == world_transform.object_id
+            and retained_transform.reference_kind == world_transform.reference_kind
+            and retained_transform.reference_name == world_transform.reference_name
+        )
+        same_position = np.allclose(
+            retained_transform.position_in_reference_m,
+            world_transform.position_in_reference_m,
+            atol=1e-6,
+            rtol=0.,
+        )
+        same_orientation = np.allclose(
+            Rotation.from_quat(
+                retained_transform.orientation_in_reference_xyzw
+            ).as_matrix(),
+            Rotation.from_quat(
+                world_transform.orientation_in_reference_xyzw
+            ).as_matrix(),
+            atol=1e-6,
+            rtol=0.,
+        )
+    except (AttributeError, TypeError, ValueError):
+        raise ValueError('TRANSPORT_TOOL_HOME_RETENTION_MISMATCH') from None
+    if not (same_reference and same_position and same_orientation):
+        raise ValueError('TRANSPORT_TOOL_HOME_RETENTION_MISMATCH')
+    context = getattr(retention, 'context', None)
+    initial_body = np.asarray(getattr(context, 'initial_body', None), dtype=float)
+    center_in_body = np.asarray(getattr(context, 'center_in_body', None), dtype=float)
+    local_size = np.asarray(getattr(context, 'local_size', None), dtype=float)
+    initial_bottom = float(getattr(context, 'initial_bottom', float('nan')))
+    if (
+        initial_body.shape != (4, 4)
+        or center_in_body.shape != (3,)
+        or local_size.shape != (3,)
+        or not np.all(np.isfinite(initial_body))
+        or not np.all(np.isfinite(center_in_body))
+        or not np.all(np.isfinite(local_size))
+        or np.any(local_size <= 0.)
+        or not math.isfinite(initial_bottom)
+    ):
+        raise ValueError('TRANSPORT_TOOL_HOME_POSE_REQUIRED')
+    initial_center = (initial_body @ np.r_[center_in_body, 1.])[:3]
+    half_xy = np.abs(initial_body[:2, :3]) @ local_size / 2.
+    wall = max(
+        REGION_WALL_ALLOWANCE_M,
+        float(request.constraints.collision_margin_m) * 2.,
+    )
+    floor = REGION_FLOOR_FALLBACK_M
+    request.world.objects[region_id] = {
+        'pose': {
+            'frame_id': 'world',
+            'position_m': [
+                float(initial_center[0]),
+                float(initial_center[1]),
+                initial_bottom - floor / 2.,
+            ],
+            'orientation_xyzw': [0., 0., 0., 1.],
+        },
+        'dimensions_m': [
+            float(2. * (half_xy[0] + wall)),
+            float(2. * (half_xy[1] + wall)),
+            floor,
+        ],
+        'anchors': {'center': [0., 0., 0.]},
+        'collision_enabled': False,
+        'metadata': {
+            'conceptual_tool_home': True,
+            'object_id': object_id,
+            'object_orientation_xyzw': Rotation.from_matrix(
+                initial_body[:3, :3]
+            ).as_quat().tolist(),
+        },
+    }
+    task.metadata[CONCEPTUAL_TOOL_HOME_GOAL] = True
 
 
 def _action(task):
@@ -54,7 +157,14 @@ def _is_region_place(task):
     # RETURN_TOOL keeps its rack-dock semantics; only scene placements into a
     # region are grounded in object space here.
     action = _action(task)
-    return action in {'PLACE', 'RELEASE'} or action.startswith('PLACE_')
+    return (
+        action in {'PLACE', 'RELEASE'}
+        or action.startswith('PLACE_')
+        or (
+            action in {'RETURN_TOOL', 'TERMINAL_RETURN_TOOL'}
+            and task.metadata.get(CONCEPTUAL_TOOL_HOME_GOAL) is True
+        )
+    )
 
 
 def _implicit_region_goal(task, object_id):
@@ -110,7 +220,19 @@ class _Grounding:
             self.T_WB, self.center_in_body, self.local_size, self.T_WE = _held_body_from_world(request, object_id)
             self.source = 'WORLD_GRASP_TRANSFORM_AND_DESTINATION_BBOX'
         self.center = (self.T_WB @ np.r_[self.center_in_body, 1.])[:3]
-        self.half = np.abs(self.T_WB[:3, :3]) @ self.local_size / 2.
+        metadata = record.get('metadata') if isinstance(record, dict) else None
+        home_orientation = (
+            metadata.get('object_orientation_xyzw')
+            if isinstance(metadata, dict) and metadata.get('conceptual_tool_home') is True
+            else None
+        )
+        self.destination_rotation = (
+            Rotation.from_quat(home_orientation).as_matrix()
+            if isinstance(home_orientation, (list, tuple)) and len(home_orientation) == 4
+            else self.T_WB[:3, :3].copy()
+        )
+        self.preserve_destination_rotation = home_orientation is not None
+        self.half = np.abs(self.destination_rotation) @ self.local_size / 2.
 
     def bottom_below_origin(self):
         """Depth of the object's lowest point under its body origin (world z).
@@ -124,8 +246,10 @@ class _Grounding:
         points = record.get('collision_points_m') if isinstance(record, dict) else None
         if points is not None and len(points) >= 4:
             P = np.asarray(points, dtype=float)
-            return float(-(P @ self.T_WB[2, :3]).min())
-        return float(self.half[2] - (self.T_WB[:3, :3] @ self.center_in_body)[2])
+            return float(-(P @ self.destination_rotation[2, :]).min())
+        return float(
+            self.half[2] - (self.destination_rotation @ self.center_in_body)[2]
+        )
 
     # -- region interior -----------------------------------------------------
     def floor_top_world_z(self):
@@ -321,6 +445,7 @@ class _Grounding:
         # release overhangs the rim (target_fully_inside_region failure). The yaw
         # is vertical-only, so the object's height/floor geometry is unchanged.
         destination = self.T_WB.copy()
+        destination[:3, :3] = self.destination_rotation
         region_rotation = self.T_WR[:3, :3]
         object_in_region = region_rotation.T @ destination[:3, :3]
         short_axis = int(np.argmin(self.region_dims[:2]))
@@ -331,7 +456,10 @@ class _Grounding:
         extent_if_rotated = float(
             np.abs(object_in_region[long_axis, :]) @ self.local_size
         )
-        if extent_if_rotated + 1e-6 < extent_along_short:
+        if (
+            not self.preserve_destination_rotation
+            and extent_if_rotated + 1e-6 < extent_along_short
+        ):
             yaw_about_region_z = np.array(
                 [[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]
             )
@@ -383,6 +511,7 @@ def _grounding_for(request, retention, predicate):
 
 def ground_held_transport(request, retention=None):
     """Carry the held object to a free spot above the region with rim clearance."""
+    _materialize_conceptual_tool_home(request, retention)
     if request.task.metadata.get(HELD_TRANSPORT_GOAL_ANCHOR) is not None:
         return
     g = _grounding_for(request, retention, _is_transport)
@@ -407,6 +536,7 @@ def ground_held_place(request, retention=None):
     destination so the released collision body and later subgoals see the
     object where it was actually put down.
     """
+    _materialize_conceptual_tool_home(request, retention)
     if request.task.metadata.get(HELD_PLACE_GOAL_ANCHOR) is not None:
         return
     g = _grounding_for(request, retention, _is_region_place)
