@@ -259,6 +259,10 @@ class PhysicsSuitabilityScorer:
         if isinstance(meta_required, (int, float)):
             required = max(required or 0.0, float(meta_required))
         if required is None:
+            if candidate.metadata.get("requires_wrench") is True:
+                return SuitabilityComponent.unknown(
+                    "required contact wrench is missing"
+                )
             return SuitabilityComponent.not_applicable(
                 "subgoal has no wrench requirement"
             )

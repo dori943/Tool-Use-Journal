@@ -6,8 +6,8 @@ Task Planner의 기본 suitability는 앞단에서 고정된 Tool과 선택된 E
 ## Payload
 
 EE가 운반해야 하는 object mass와 Tool mass의 합을 EE payload와 비교한다.
-`object_remains_supported=true`인 push/pull 동작은 object 전체 질량을 운반 하중에
-더하지 않는다.
+`object_remains_supported=true`인 flatten/sweep 동작은 object 전체 질량을 운반
+하중에 더하지 않는다.
 PICK_TOOL/RETURN_TOOL처럼 같은 물리 자원이 object와 Tool 양쪽에 나타나면 질량을
 한 번만 센다. 두 catalog view의 값이 다르면 알려진 값 중 큰 값을 사용한다.
 
@@ -16,6 +16,8 @@ PICK_TOOL/RETURN_TOOL처럼 같은 물리 자원이 object와 Tool 양쪽에 나
 서브골 또는 candidate metadata의 `required_wrench`를 Tool의
 `deliverable_wrench`와 비교한다. 요구가 없으면 `NOT_APPLICABLE`, 필요한 수치가
 없으면 `UNKNOWN`이다.
+flatten/sweep은 `requires_wrench=true`로 표시하므로 접촉력 요구 수치가 누락된
+경우에도 `NOT_APPLICABLE`로 잘못 기록하지 않고 `UNKNOWN`으로 남긴다.
 
 ## 집계와 정책
 

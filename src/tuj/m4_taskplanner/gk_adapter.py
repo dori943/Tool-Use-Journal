@@ -238,6 +238,15 @@ def adapt_gk_m2_output(
                 target_ids=target_ids,
                 selected_tool_id=tool_id,
             )
+            action_parameters = dict(
+                _mapping(detail.get("action_parameters"))
+            )
+            if action_type == "tool_act" and mode in {"flatten", "sweep"}:
+                # These modes manipulate an object while it stays supported
+                # by the work surface. Payload is the carried tool only;
+                # contact force/torque is a separate wrench requirement.
+                action_parameters.setdefault("object_remains_supported", True)
+                action_parameters.setdefault("requires_wrench", True)
             region = binding.get("?r")
             goal_region_id = region if isinstance(region, str) else None
             if (
@@ -266,9 +275,7 @@ def adapt_gk_m2_output(
                     target_ids=target_ids,
                     goal_region_id=goal_region_id,
                     tool_id=tool_id,
-                    action_parameters=dict(
-                        _mapping(detail.get("action_parameters"))
-                    ),
+                    action_parameters=action_parameters,
                     preconditions=preconditions,
                     postconditions=establish,
                     establish=establish,

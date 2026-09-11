@@ -106,6 +106,23 @@ def test_wrench_capacity_is_checked_independently() -> None:
     assert failed.failure_reason is ReasonCode.WRENCH_INSUFFICIENT
 
 
+def test_contact_action_without_required_wrench_is_unknown() -> None:
+    scorer = PhysicsSuitabilityScorer(catalog())
+    assessment = scorer.score(
+        candidate(
+            tool="t1",
+            object_remains_supported=True,
+            requires_wrench=True,
+        ),
+        sg("S", targets=["heavy"], tool_id="t1", feasible=["A"]),
+    )
+
+    assert assessment.components["payload"].required == 1.0
+    assert assessment.components["wrench"].status is SuitabilityStatus.UNKNOWN
+    assert assessment.overall_score is None
+    assert not assessment.failed
+
+
 def test_missing_payload_data_is_unknown_not_perfect() -> None:
     raw = catalog().model_dump()
     raw["end_effectors"]["A"].pop("payload")

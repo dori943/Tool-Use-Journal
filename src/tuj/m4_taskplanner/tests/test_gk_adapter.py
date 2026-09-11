@@ -205,6 +205,8 @@ def test_gk_adapter_normalizes_c1_1_ids_actions_and_conditions() -> None:
     assert first.goal_region_id is None
     assert sweep.action_type == "tool_act"
     assert sweep.mode == "sweep"
+    assert sweep.action_parameters["object_remains_supported"] is True
+    assert sweep.action_parameters["requires_wrench"] is True
     assert sweep.target_ids == ["block_0"]
     assert sweep.goal_region_id == "collection_zone_visual"
     assert sweep.source_binding["?targets"] == ["block_0"]
@@ -218,6 +220,23 @@ def test_gk_adapter_normalizes_c1_1_ids_actions_and_conditions() -> None:
     assert request.resource_catalog.tools["light_plate"].mass == 0.2
     assert "heavy_plate" not in request.resource_catalog.tools
     assert request.resource_catalog.end_effectors["2F"].payload == 1.0
+
+
+@pytest.mark.parametrize("mode", ["sweep", "flatten"])
+def test_gk_marks_supported_contact_modes_as_wrench_actions(mode: str) -> None:
+    m2 = _m2()
+    m2["m2_subgoals"][0]["details"][1]["action_type"] = f"tool_act:{mode}"
+
+    request = build_request_from_gk(
+        _gk(), m2, m1_payload=_m1(), robot_spec_payload=_robot_spec()
+    )
+    contact = request.task_graph.subgoals[1]
+
+    assert contact.mode == mode
+    assert contact.action_parameters == {
+        "object_remains_supported": True,
+        "requires_wrench": True,
+    }
 
 
 def test_gk_bundle_uses_selected_tool_and_m2_scene_graph() -> None:
