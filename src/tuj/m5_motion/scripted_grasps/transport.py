@@ -348,8 +348,6 @@ class _Grounding:
         occupants = self._occupants()
         mine = self.half[:2]
         center_xy = self.region_world[:2]
-        if not occupants:
-            return center_xy
 
         def clearance(xy):
             # Minimum per-occupant gap: how far this footprint clears each
