@@ -441,7 +441,14 @@ def _held_goal_subject(request: MotionPlanRequest) -> _HeldGoalSubject | None:
     if operation in {"TRANSPORT", "MOVE"}:
         goal_key = "held_transport_goal"
         kinds = frozenset({KeyframeType.TRANSFER})
-    elif operation in {"PLACE", "RELEASE"} or operation.startswith("PLACE_"):
+    elif (
+        operation in {"PLACE", "RELEASE"}
+        or operation.startswith("PLACE_")
+        or (
+            operation in {"RETURN_TOOL", "TERMINAL_RETURN_TOOL"}
+            and request.task.metadata.get("held_place_goal") is not None
+        )
+    ):
         if not request.task.goal.target_region_id:
             return None
         goal_key = "held_place_goal"
@@ -743,16 +750,34 @@ class OpenAIKeyframeProvider:
                             metadata["packing_orientation_xyzw"] = list(
                                 held_goal.eef_orientation_xyzw
                             )
+                    frame_ref = item.frame_ref
+                    anchor = item.anchor
+                    offset_along_approach_m = item.offset_along_approach_m
+                    grounded_home = request.task.metadata.get("held_place_goal")
+                    if (
+                        operation in {"RETURN_TOOL", "TERMINAL_RETURN_TOOL"}
+                        and isinstance(grounded_home, Mapping)
+                        and item.keyframe_type
+                        in {KeyframeType.PRE_PLACE, KeyframeType.PLACE}
+                    ):
+                        # A conceptual tool rest is grounded from the measured
+                        # pre-grasp body pose.  Keep model-proposed approach
+                        # distances, but make the release itself use that exact
+                        # object-space frame and anchor.
+                        frame_ref = str(grounded_home["frame_ref"])
+                        anchor = str(grounded_home["anchor"])
+                        if item.keyframe_type is KeyframeType.PLACE:
+                            offset_along_approach_m = 0.0
                     keyframe = RelativeKeyframeSpec(
                         keyframe_id=(
                             f"{strategy_id}:{keyframe_index}:{item.keyframe_id}"
                         ),
                         keyframe_type=item.keyframe_type,
-                        frame_ref=item.frame_ref,
-                        anchor=item.anchor,
+                        frame_ref=frame_ref,
+                        anchor=anchor,
                         approach_axis_xyz=tuple(item.approach_axis_xyz),
                         tool_axis_to_align=item.tool_axis_to_align,
-                        offset_along_approach_m=item.offset_along_approach_m,
+                        offset_along_approach_m=offset_along_approach_m,
                         roll_rad=item.roll_rad,
                         planner=item.planner,
                         events_after=events,
