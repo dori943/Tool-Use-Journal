@@ -712,8 +712,20 @@ def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None)
                 if (head == "batch_feasible" and len(members) < 2
                         and "split_from" not in subgoal):
                     continue
-                actors = ([{"type": "object", "id": t} for t in tool_ids]
-                          if tool_ids else [{"type": "ee_pool"}])
+                if tool_ids:
+                    actors = [{"type": "object", "id": t} for t in tool_ids]
+                    # 0911: 도구 후보가 있어도 액션 스키마가 ?tool 을 바인딩하지
+                    # 않으면 뒤 단계가 "도구 불필요"로 판정할 수 있다. 그때 맨손
+                    # 분할 계획을 세우려면 ee_pool 기준 batch 응답이 있어야 하는데,
+                    # 여기서 객체 actor 만 보내면 그 응답이 없어 ingest 의 분할
+                    # 블록이 "batch 질의 자체가 없던 서브골"로 건너뛴다. 물체가
+                    # 통짜로 M4 에 가서 공통 EE 교집합이 비고 EMPTY_FEASIBLE_EE 가
+                    # 났다 (도희 c2_1, 0911). 도구를 쓸지 말지는 뒤에서 정하므로
+                    # 판단 재료는 양쪽 다 모아 둔다.
+                    if not binds_tool(details):
+                        actors.append({"type": "ee_pool"})
+                else:
+                    actors = [{"type": "ee_pool"}]
                 call = {"kind": "batch" if head == "batch_feasible" else "swept_space",
                         "action_type": subgoal["kind"], "member_ids": members}
                 if head == "act_space_clear":
