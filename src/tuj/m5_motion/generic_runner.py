@@ -425,6 +425,9 @@ class GenericSimulationVideoRecorder:
         self._cv2 = cv2
         self._last_simulation_time_s: float | None = None
         self._capture_credit = 0.0
+        self._diag_env_id = None
+        self._diag_frame = 0
+        self._prev_black = False
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self._writer = cv2.VideoWriter(
             str(self.path),
@@ -451,15 +454,134 @@ class GenericSimulationVideoRecorder:
             raw_time = getattr(getattr(raw_data, "_data", None), "time", None)
         return float(raw_time or 0.0)
 
-    def _write_frame(self, env: Any) -> None:
-        rgb = env.sim.render(
+    def _render(self, env: Any):
+        return env.sim.render(
             camera_name=self.camera,
             width=self.width,
             height=self.height,
         )[::-1]
+
+    def _rebuild_offscreen(self, env: Any) -> bool:
+        """Rebuild robosuite's offscreen render context for this env.
+
+        Diagnostics proved gripper-mounted envs render fine at creation and then
+        go permanently black partway through the scripted grasp (the object
+        weld/attachment step), while the camera, lights and scene stay valid and
+        the bare envs never darken.  That is a stale offscreen GL context, not a
+        scene problem.  Dropping ``_render_context_offscreen`` and constructing a
+        new MjRenderContextOffscreen re-binds a fresh GL context to the current
+        sim (add_render_context re-registers it), which restores the picture.
+        """
+
+        try:
+            from robosuite.utils.binding_utils import MjRenderContextOffscreen
+            sim = env.sim
+            if getattr(sim, "_render_context_offscreen", None) is not None:
+                del sim._render_context_offscreen
+                sim._render_context_offscreen = None
+            device_id = int(getattr(env, "render_gpu_device_id", -1))
+            MjRenderContextOffscreen(sim, device_id=device_id)
+            # robosuite's own reset sets these visibility flags after creating the
+            # context (base env _reset_internal): hide the collision-geom group and
+            # show the visual-mesh group.  A raw MjRenderContextOffscreen leaves the
+            # default groups on, so the collision geoms (bright default colors --
+            # the green arm / yellow flange / blue fingers) get drawn instead of the
+            # textured visual meshes.  Restore the flags so colors match the
+            # pre-rebuild frames.
+            context = sim._render_context_offscreen
+            context.vopt.geomgroup[0] = 1 if getattr(env, "render_collision_mesh", False) else 0
+            context.vopt.geomgroup[1] = 1 if getattr(env, "render_visual_mesh", True) else 0
+            return True
+        except Exception as error:
+            print(f"[VIDEO_DIAG]   offscreen-rebuild error: {error}", flush=True)
+            return False
+
+    def _write_frame(self, env: Any) -> None:
+        rgb = self._render(env)
+        is_black = float(rgb.mean()) < 1.0
+        # Recover only on the black ONSET (a fresh black frame following a good
+        # one), so a healthy stream costs nothing and a stuck-black segment
+        # triggers at most one rebuild until it recovers.
+        if is_black and not self._prev_black:
+            print("[VIDEO_DIAG]   black onset -> rebuilding offscreen context", flush=True)
+            if self._rebuild_offscreen(env):
+                rgb = self._render(env)
+                is_black = float(rgb.mean()) < 1.0
+                print(f"[VIDEO_DIAG]   after rebuild frame_mean={float(rgb.mean()):.2f}", flush=True)
+        self._prev_black = is_black
+        self._diagnose(env, rgb)
         self._writer.write(
             self._cv2.cvtColor(rgb, self._cv2.COLOR_RGB2BGR)
         )
+
+    def _diagnose(self, env: Any, rgb: Any) -> None:
+        """Log-only ground truth for the black-frame investigation.
+
+        Emits, on every EE-env change and every 30th frame, the env identity,
+        active EE, MuJoCo sim time and mean pixel brightness.  This tells us
+        whether a bad segment is a genuinely black render (mean ~0 while sim
+        time advances -> the swapped env renders black) or a frozen one (mean
+        nonzero but sim time not advancing -> no fresh frames for that segment).
+        Purely diagnostic: never alters a frame or aborts recording.
+        """
+
+        try:
+            self._diag_frame += 1
+            env_id = id(env)
+            new_env = env_id != self._diag_env_id
+            if new_env or self._diag_frame % 30 == 0:
+                mean = float(rgb.mean())
+                ee = getattr(self.runtime, "active_ee", None)
+                sim_time = self._simulation_time(env)
+                tag = "ENV-CHANGE" if new_env else "sample"
+                print(
+                    f"[VIDEO_DIAG] {tag} frame#{self._diag_frame} env={env_id} "
+                    f"ee={ee} sim_time={sim_time:.4f} frame_mean={mean:.2f} "
+                    f"black={'YES' if mean < 1.0 else 'no'}",
+                    flush=True,
+                )
+                if new_env:
+                    self._diagnose_camera(env)
+            self._diag_env_id = env_id
+        except Exception:
+            pass
+
+    def _diagnose_camera(self, env: Any) -> None:
+        """On each new env, log camera/scene metadata + a free-camera render.
+
+        Pins down why gripper-mounted envs render black while bare renders fine:
+        whether the recorder camera exists in this env, where it points, how many
+        cameras/lights the compiled model has, and whether a fixed free-camera
+        render is also black (scene/context) or fine (camera-specific).
+        """
+
+        try:
+            model = env.sim.model
+            names = list(getattr(model, "camera_names", []) or [])
+            in_model = self.camera in names
+            cam_id = model.camera_name2id(self.camera) if in_model else -1
+            cam_pos = (
+                model.cam_pos[cam_id].tolist() if cam_id >= 0 else None
+            )
+            nlight = int(getattr(model, "nlight", -1))
+            ncam = int(getattr(model, "ncam", len(names)))
+            # Free-camera render (camera_name=None) as a scene/context control.
+            try:
+                free = env.sim.render(
+                    camera_name=None, width=self.width, height=self.height
+                )
+                free_mean = float(free.mean())
+            except Exception as free_err:
+                free_mean = -1.0
+                print(f"[VIDEO_DIAG]   free-render error: {free_err}", flush=True)
+            print(
+                f"[VIDEO_DIAG]   camera='{self.camera}' in_model={in_model} "
+                f"cam_id={cam_id} cam_pos={cam_pos} ncam={ncam} nlight={nlight} "
+                f"cameras={names} free_cam_mean={free_mean:.2f}",
+                flush=True,
+            )
+        except Exception as error:
+            print(f"[VIDEO_DIAG]   camera-diag error: {error}", flush=True)
 
     def capture(self, env: Any) -> None:
         """Capture at the requested FPS even when runtime swaps EE models."""
