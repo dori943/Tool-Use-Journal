@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from collections.abc import Mapping, Sequence
+from copy import deepcopy
 from typing import Any
 
 import numpy as np
@@ -462,6 +463,25 @@ class TaskAwareGoalEvaluator:
             and str(packing_metadata.get("kind", "")).upper() == "CONTAINER"
             else self._region
         )
+        evaluation_world = observed_world
+        if (
+            (operation == "TRANSPORT" or is_release_task(task))
+            and task.metadata.get("conceptual_tool_home_goal") is True
+            and isinstance(region_record, Mapping)
+            and isinstance(region_record.get("metadata"), Mapping)
+            and region_record["metadata"].get("conceptual_tool_home") is True
+            and observed_world is not None
+            and task.goal.target_region_id not in observed_world.objects
+        ):
+            # ``tool_rest`` is a semantic destination built from the measured
+            # pre-grasp pose.  It must stay out of the simulator collision
+            # world, but the physical target pose is still observed there.
+            # Add only that reference geometry to a private evaluation copy so
+            # the ordinary transport/release predicate can verify the real body.
+            evaluation_world = observed_world.model_copy(deep=True)
+            evaluation_world.objects[task.goal.target_region_id] = deepcopy(
+                region_record
+            )
         if (
             operation == "TRANSPORT"
             and task.goal.target_region_id is not None
@@ -472,8 +492,8 @@ class TaskAwareGoalEvaluator:
             if held_target is not None and held_target in task.target_ids:
                 return CompositeGoalEvaluator(
                     (self._above_region, self._grasp)
-                ).evaluate(request, report, observed_world)
-            return self._above_region.evaluate(request, report, observed_world)
+                ).evaluate(request, report, evaluation_world)
+            return self._above_region.evaluate(request, report, evaluation_world)
         if (
             is_release_task(task)
             and task.goal.target_region_id is not None
@@ -495,7 +515,7 @@ class TaskAwareGoalEvaluator:
                     f"placed object {target!r} is still attached",
                     observed={"attached_object_id": state.attached_object_id},
                 )
-            return region_evaluator.evaluate(request, report, observed_world)
+            return region_evaluator.evaluate(request, report, evaluation_world)
         if (
             not is_resource_transition
             and task.goal.target_region_id is not None

@@ -352,6 +352,48 @@ def test_transport_of_held_target_requires_retention_and_above_region() -> None:
     assert retained.status is GoalEvaluationStatus.SATISFIED
 
 
+@pytest.mark.parametrize('action', ['transport', 'RETURN_TOOL'])
+def test_conceptual_tool_home_uses_request_geometry_with_observed_body(action) -> None:
+    request = _request(target_x_m=0.04)
+    request.task.action_type = action
+    request.task.target_ids = ["block"]
+    request.task.goal = MotionGoal(
+        goal_type=GoalType.POSE,
+        target_object_id="block",
+        target_region_id="tool_rest",
+    )
+    request.task.metadata["conceptual_tool_home_goal"] = True
+    request.world.robot_state.held_tool_id = "block"
+    request.world.objects["tool_rest"] = {
+        "pose": {
+            "frame_id": "world",
+            "position_m": [0.04, 0.0, 0.005],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.06, 0.06, 0.01],
+        "collision_enabled": False,
+        "metadata": {"conceptual_tool_home": True, "object_id": "block"},
+    }
+    observed = request.world.model_copy(deep=True)
+    del observed.objects["tool_rest"]
+    report = _report()
+    report.final_robot_state.held_tool_id = "block" if action == 'transport' else None
+
+    result = TaskAwareGoalEvaluator().evaluate(request, report, observed)
+
+    assert result.status is GoalEvaluationStatus.SATISFIED
+    if action == 'transport':
+        assert result.observed['evaluations'][0]['observed']['above_target_ids'] == ['block']
+    else:
+        assert result.observed['inside_target_ids'] == ['block']
+    assert "tool_rest" not in observed.objects
+    observed.objects['block']['pose']['position_m'][0] = 1.
+    outside = TaskAwareGoalEvaluator().evaluate(request, report, observed)
+    assert outside.status is GoalEvaluationStatus.FAILED
+    assert observed.objects['block']['pose']['position_m'][0] == 1.
+    assert 'tool_rest' not in observed.objects
+
+
 def test_place_into_region_requires_detachment_and_containment() -> None:
     request = _request(target_x_m=0.04)
     request.task.action_type = "place"
