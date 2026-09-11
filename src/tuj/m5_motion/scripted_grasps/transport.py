@@ -575,6 +575,12 @@ def ground_held_place(request, retention=None):
     destination = g.publish(
         HELD_PLACE_GOAL_ANCHOR, HELD_PLACE_START_ANCHOR, desired_center,
         {'release_clearance_m': release_clearance})
+    from .container_release import clear_container_rim
+    raised, evidence = clear_container_rim(g, destination, retention)
+    if evidence:
+        desired_center[2] += raised[2, 3] - destination[2, 3]
+        destination = g.publish(HELD_PLACE_GOAL_ANCHOR, HELD_PLACE_START_ANCHOR,
+            desired_center, {'release_clearance_m': release_clearance, **evidence})
     g.task.goal.target_pose = Pose(
         frame_id='world',
         position_m=tuple(float(v) for v in destination[:3, 3]),
