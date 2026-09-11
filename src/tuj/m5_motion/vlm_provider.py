@@ -25,6 +25,19 @@ from tuj.m5_motion.attachment_retarget import (
     POSE_SUBJECT_OBJECT_ID_KEY,
     held_pose_subject,
 )
+from tuj.m5_motion.contact_keyframe_validation import (
+    ContactKeyframeGeometryError,
+    _contact_engagement_tcp_z_m,
+    _contact_tcp_height_limits_m,
+    _held_tool_below_tcp_m,
+    _sweep_target_top_z_m,
+    canonicalize_contact_tcp_height,
+    canonicalize_held_tool_axis_for_contact,
+    canonicalize_sweep_strategy_heights,
+    is_tool_act_contact_geometry_scope,
+    validate_resolved_contact_keyframe,
+    validate_sweep_keyframe_strategy,
+)
 from tuj.m5_motion.geometry import GeometryResolutionError, RelativePoseResolver
 from tuj.m5_motion.schema import (
     AttachedObjectTransform,
@@ -464,10 +477,83 @@ def _held_goal_subject(request: MotionPlanRequest) -> _HeldGoalSubject | None:
     )
 
 
+def _held_sweep_working_height_payload(
+    request: MotionPlanRequest,
+) -> dict[str, Any] | None:
+    """Publish the held-tool engagement band that CONTACT_* keyframes must hit.
+
+    After acquire the EEF sits well above the targets, so a model that anchors
+    CONTACT_* on the current EEF height never touches anything, and one that
+    anchors on bare support drives the tool into the table.  The band is
+    derived from the target tops plus the tool extent below the TCP.
+    """
+
+    if not is_tool_act_contact_geometry_scope(request):
+        return None
+    limits = _contact_tcp_height_limits_m(request)
+    engagement = _contact_engagement_tcp_z_m(request)
+    if limits is None or engagement is None:
+        return None
+    floor_z, ceiling_z = limits
+    payload: dict[str, Any] = {
+        "reference": "target_engagement",
+        "target_engagement_tcp_z_m": round(float(engagement), 4),
+        "contact_tcp_z_min_m": round(float(floor_z), 4),
+        "contact_tcp_z_max_m": round(float(ceiling_z), 4),
+        "held_tool_below_tcp_m": round(float(_held_tool_below_tcp_m(request)), 4),
+        "applies_to": ["CONTACT_START", "CONTACT_SWEEP", "CONTACT_END"],
+        "guidance": (
+            "Put every CONTACT_* TCP inside "
+            "[contact_tcp_z_min_m, contact_tcp_z_max_m] so the held tool face "
+            "meets the targets; keep PRE_CONTACT and RETREAT at or above "
+            "current_eef_z_m."
+        ),
+    }
+    target_top = _sweep_target_top_z_m(request)
+    if target_top is not None:
+        payload["sweep_target_top_z_m"] = round(float(target_top), 4)
+    eef = request.world.robot_state.eef_pose
+    if eef is not None:
+        payload["current_eef_z_m"] = round(float(eef.position_m[2]), 4)
+    return payload
+
+
 def _phase_contract_payload(request: MotionPlanRequest) -> dict[str, Any]:
     """Compact operation-specific phase contract for the VLM payload."""
 
     operation = task_operation(request.task)
+    if is_tool_act_contact_geometry_scope(request):
+        contact = request.task.contact
+        primitive = str(getattr(contact, "primitive", "") or "").strip().lower()
+        return {
+            "operation": operation,
+            "primitive": primitive,
+            "required": (
+                "PRE_CONTACT, CONTACT_START, one or more CONTACT_SWEEP, "
+                "CONTACT_END, then RETREAT"
+            ),
+            "canonical_sequence": [
+                "PRE_CONTACT",
+                "CONTACT_START",
+                "CONTACT_SWEEP",
+                "CONTACT_END",
+                "RETREAT",
+            ],
+            "engagement_height": (
+                "CONTACT_START / CONTACT_SWEEP / CONTACT_END sit at the "
+                "held-tool engagement height published in "
+                "held_sweep_working_height (target top plus the tool extent "
+                "below the TCP). PRE_CONTACT and RETREAT stay at or above the "
+                "current EEF height."
+            ),
+            "invalid": [
+                "two-point TRANSFER from the target straight to the region",
+                "world frame_ref with an origin or center anchor",
+                "CONTACT_* left at the post-grasp lift height, never touching "
+                "the targets",
+                "CONTACT_* pushed below the support surface",
+            ],
+        }
     if is_acquire_task(request.task) and operation != "PICK_TOOL":
         return {
             "operation": operation,
@@ -527,6 +613,9 @@ def _prompt_payload(request: MotionPlanRequest, candidate_count: int) -> dict[st
         # transport.  Omitting it left the model with only TRANSPORT-style
         # TRANSFER guidance and no deposition anchor.
         "held_place_goal": request.task.metadata.get("held_place_goal"),
+        # Contact tool_act only: the TCP band where the held tool actually
+        # engages the targets.
+        "held_sweep_working_height": _held_sweep_working_height_payload(request),
         "phase_contract": _phase_contract_payload(request),
         "allowed_frames_and_anchors": _frame_catalog(request),
         "constraints": {
@@ -611,6 +700,17 @@ Hard rules:
   target the region's center or bottom.
 - PICK_TOOL strategies use GRASP then LIFT/RETREAT; RETURN_TOOL strategies use
   PLACE then RETREAT.
+- When task.operation is TOOL_ACT with contact.primitive "sweep": the tool is
+  already held. Emit PRE_CONTACT → CONTACT_START → CONTACT_SWEEP (one or more)
+  → CONTACT_END → RETREAT. A two-keyframe TRANSFER from the target to the
+  collection region is invalid, and so is any world frame_ref with an origin or
+  center anchor.
+- For that sweep sequence, CONTACT_START / CONTACT_SWEEP / CONTACT_END must be
+  lowered into the engagement band given by held_sweep_working_height, so the
+  held tool face meets the target tops. Do not leave them at the post-grasp
+  lift height (the tool then sweeps empty air) and do not bury them into the
+  support surface. PRE_CONTACT and RETREAT stay at or above the current EEF
+  height.
 - Use CARTESIAN for straight approach/contact/retreat intent, SAMPLING_BASED for
   obstacle-avoiding free-space transit intent, and JOINT only for a joint goal.
 - Diversify approach axes, roll, and standoff where the task geometry allows it.
@@ -965,9 +1065,25 @@ class OpenAIKeyframeProvider:
                         events_after=events,
                         metadata=metadata,
                     )
+                    # Contact tool_act: rewrite an inverted held-tool axis and
+                    # pull the TCP onto the engagement height before judging
+                    # the pose, so a recoverable proposal is repaired instead
+                    # of rejected.
+                    keyframe = canonicalize_held_tool_axis_for_contact(
+                        request, keyframe, resolver=resolver
+                    )
+                    keyframe = canonicalize_contact_tcp_height(
+                        request, keyframe, resolver=resolver
+                    )
                     # Resolve now so unknown frames/anchors never enter the compiler.
-                    resolver.resolve(keyframe)
-                except (ValueError, GeometryResolutionError) as error:
+                    validate_resolved_contact_keyframe(
+                        request, keyframe, resolver.resolve(keyframe)
+                    )
+                except (
+                    ContactKeyframeGeometryError,
+                    ValueError,
+                    GeometryResolutionError,
+                ) as error:
                     axis = getattr(item, "approach_axis_xyz", None)
                     axis_note = ""
                     if (
@@ -995,6 +1111,19 @@ class OpenAIKeyframeProvider:
             if candidate_error is not None:
                 rejected_candidates.append(f"{strategy_id}: {candidate_error}")
                 continue
+            if is_tool_act_contact_geometry_scope(request):
+                # Per-keyframe height fixes can still leave PRE_CONTACT below
+                # the lifted CONTACT plane; settle the whole sequence first.
+                keyframes = canonicalize_sweep_strategy_heights(
+                    request, keyframes, resolver=resolver
+                )
+                try:
+                    validate_sweep_keyframe_strategy(
+                        request, keyframes, resolver=resolver
+                    )
+                except ContactKeyframeGeometryError as error:
+                    rejected_candidates.append(f"{strategy_id}: {error}")
+                    continue
             raw_phases = _phase_labels(keyframes)
             keyframes = _canonicalize_object_pick_phases(request, keyframes)
             keyframes = _canonicalize_place_retreat(request, keyframes)

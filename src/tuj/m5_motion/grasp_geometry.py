@@ -54,15 +54,6 @@ _TABLETOP_ENCLOSURE_PRE_GRASP_OFFSET_M = 0.12
 _TABLETOP_ENCLOSURE_PRE_GRASP_REACH_FALLBACKS_M = (0.10, 0.08, 0.06)
 _TABLETOP_ENCLOSURE_LIFT_OFFSET_M = 0.18
 _TABLETOP_ENCLOSURE_LIFT_REACH_FALLBACKS_M = (0.15, 0.12, 0.10, 0.08, 0.06)
-# Deterministic shorten step implied by the PRE ladder spacing (0.10→0.08).
-# Catalog scripted reach fallback reuses this spacing instead of absolute lists.
-_TABLETOP_ENCLOSURE_REACH_FALLBACK_STEP_M = (
-    _TABLETOP_ENCLOSURE_PRE_GRASP_REACH_FALLBACKS_M[0]
-    - _TABLETOP_ENCLOSURE_PRE_GRASP_REACH_FALLBACKS_M[1]
-)
-_TABLETOP_ENCLOSURE_REACH_FALLBACK_FLOOR_M = min(
-    _TABLETOP_ENCLOSURE_PRE_GRASP_REACH_FALLBACKS_M
-)
 # Conservative downward reach of mounted 3F finger collision geoms below the
 # grip TCP (distal + tip boxes). Shared by tabletop acquire GRASP raise and
 # multi-finger region PLACE raise. Offline HOLDING poses measure tip≈22 mm and
@@ -95,84 +86,6 @@ def multi_finger_tabletop_standoff_candidates(
         if value < preferred - 1e-9:
             candidates.append(value)
     return tuple(candidates)
-
-
-def catalog_reach_fallback_step_m() -> float:
-    """Shorten step reused from tabletop PRE ladder spacing (no new magic)."""
-
-    return float(_TABLETOP_ENCLOSURE_REACH_FALLBACK_STEP_M)
-
-
-def catalog_pre_grasp_reach_minimum_m() -> float:
-    """PRE floor reused from the shortest tabletop PRE reach fallback."""
-
-    return float(_TABLETOP_ENCLOSURE_REACH_FALLBACK_FLOOR_M)
-
-
-def reach_standoff_schedule_m(
-    preferred_offset_m: float,
-    *,
-    step_m: float,
-    minimum_m: float,
-) -> tuple[float, ...]:
-    """Preferred standoff first, then ``preferred - n*step`` while ``>= minimum``.
-
-    Always includes the original preferred distance (even if it is already below
-    ``minimum_m``) so callers try the recipe pose before any shortening.
-    """
-
-    preferred = float(preferred_offset_m)
-    step = float(step_m)
-    minimum = float(minimum_m)
-    if not math.isfinite(preferred) or preferred < 0.0:
-        raise ValueError("preferred_offset_m must be a finite non-negative length")
-    if not math.isfinite(step) or step <= 0.0:
-        raise ValueError("step_m must be a finite positive length")
-    if not math.isfinite(minimum) or minimum < 0.0:
-        raise ValueError("minimum_m must be a finite non-negative length")
-    # Round to nm-scale so binary float drift does not leak into poses/tests.
-    def _clean(value: float) -> float:
-        return float(round(value, 9))
-
-    candidates = [_clean(preferred)]
-    if preferred < minimum - 1e-9:
-        return tuple(candidates)
-    n = 1
-    while n <= 1000:
-        distance = preferred - n * step
-        if distance < minimum - 1e-9:
-            break
-        candidates.append(_clean(distance))
-        n += 1
-    else:
-        raise ValueError("reach standoff schedule did not terminate")
-    return tuple(candidates)
-
-
-def catalog_pre_grasp_reach_standoff_candidates(
-    preferred_offset_m: float,
-) -> tuple[float, ...]:
-    """Recipe PRE distance, then deterministic shorter approach standoffs."""
-
-    return reach_standoff_schedule_m(
-        preferred_offset_m,
-        step_m=catalog_reach_fallback_step_m(),
-        minimum_m=catalog_pre_grasp_reach_minimum_m(),
-    )
-
-
-def catalog_lift_reach_standoff_candidates(
-    preferred_offset_m: float,
-    *,
-    minimum_lift_m: float,
-) -> tuple[float, ...]:
-    """Recipe LIFT height, then shorter climbs down to ``minimum_lift_m``."""
-
-    return reach_standoff_schedule_m(
-        preferred_offset_m,
-        step_m=catalog_reach_fallback_step_m(),
-        minimum_m=float(minimum_lift_m),
-    )
 
 
 def multi_finger_tabletop_pre_grasp_standoff_candidates(
@@ -2816,14 +2729,9 @@ __all__ = [
     "multi_finger_place_retreat_from_place_tcp",
     "multi_finger_place_retreat_standoff_candidates",
     "multi_finger_tabletop_grasp_offset_above_support_m",
-    "catalog_lift_reach_standoff_candidates",
-    "catalog_pre_grasp_reach_minimum_m",
-    "catalog_pre_grasp_reach_standoff_candidates",
-    "catalog_reach_fallback_step_m",
     "multi_finger_tabletop_lift_standoff_candidates",
     "multi_finger_tabletop_pre_grasp_standoff_candidates",
     "multi_finger_tabletop_standoff_candidates",
-    "reach_standoff_schedule_m",
     "opposed_contact_spec",
     "support_clearance_context",
     "support_clearance_context_from_world",

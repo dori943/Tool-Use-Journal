@@ -867,6 +867,7 @@ class MotionPlanningPipeline:
                 start_joint_config=request.world.robot_state.joint_positions_rad,
                 state_validator=effective_state_validator,
                 edge_planner=selected_edge_planner,
+                request=request,
             )
             attempts.extend(current.attempts)
             compilation = StrategyCompilationResult(

@@ -8,6 +8,7 @@ from tuj.m4_taskplanner.models import GraspSpec
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
     AttachedObjectTransform,
+    ContactManipulationSpec,
     GoalType,
     JointDynamicLimit,
     KeyframeEventType,
@@ -912,6 +913,101 @@ def test_initial_ee_attach_binds_bare_flange_as_initial_context() -> None:
         "ee-attached:2F",
     }
     assert compiler.calls[0][1]["default_active_ee"] is None
+
+
+def test_held_tool_sweep_allows_ee_and_tool_to_touch_targets() -> None:
+    """CONTACT_* must allow vac/EE↔target as well as attached-tool↔target."""
+
+    attachment = AttachedObjectTransform(
+        object_id="plate",
+        free_joint_name="plate_free",
+        reference_kind="body",
+        reference_name="robot0_right_hand",
+        position_in_reference_m=(0.0, 0.0, 0.0),
+        orientation_in_reference_xyzw=(0.0, 0.0, 0.0, 1.0),
+    )
+    world = _world(attached=attachment)
+    world.robot_state = world.robot_state.model_copy(
+        update={"held_tool_id": "plate", "attached_object_id": "plate"}
+    )
+    world.objects["plate"] = {
+        "object_id": "plate",
+        "free_joint_name": "plate_free",
+        "pose": {
+            "position_m": [0.3, 0.0, 0.5],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.2, 0.2, 0.01],
+    }
+    world.objects["block_a"] = {
+        "object_id": "block_a",
+        "free_joint_name": "block_a_free",
+        "pose": {
+            "position_m": [0.35, 0.05, 0.2],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.04, 0.04, 0.04],
+    }
+    world.metadata["physical_active_ee"] = "vac"
+    request = MotionPlanRequest(
+        request_id="request-sweep-touch",
+        provenance=ArtifactProvenance(
+            artifact_id="request-artifact",
+            artifact_type="MotionPlanRequest",
+            produced_by=ModuleName.TASK_PLANNER,
+            invocation_id="task-planner",
+        ),
+        world=world,
+        task=MotionTask(
+            task_id="sweep-1",
+            subgoal_id="sg-sweep",
+            action_type="tool_act",
+            ee="vac",
+            tool="plate",
+            target_ids=["block_a"],
+            allowed_touch_objects=["block_a"],
+            contact=ContactManipulationSpec(
+                primitive="sweep",
+                contact_surface="AUTO",
+            ),
+            goal=MotionGoal(
+                goal_type=GoalType.POSE,
+                target_region_id="other",
+            ),
+        ),
+        constraints=_constraints(),
+    )
+    source = _artifact(
+        (
+            RelativeKeyframeSpec(
+                keyframe_id="pre",
+                keyframe_type=KeyframeType.PRE_CONTACT,
+                frame_ref="object:block_a",
+                anchor="center",
+                approach_axis_xyz=(0.0, 0.0, 1.0),
+                offset_along_approach_m=0.15,
+                planner=KeyframePlannerType.CARTESIAN,
+            ),
+            RelativeKeyframeSpec(
+                keyframe_id="contact",
+                keyframe_type=KeyframeType.CONTACT_START,
+                frame_ref="object:block_a",
+                anchor="center",
+                approach_axis_xyz=(0.0, 0.0, 1.0),
+                offset_along_approach_m=0.03,
+                planner=KeyframePlannerType.CARTESIAN,
+            ),
+        )
+    )
+
+    setup = _factory().prepare(request, source)
+    context = setup.collision_contexts[setup.initial_collision_context_id]
+    pairs = {tuple(pair) for pair in context.allowed_collision_pairs}
+
+    assert ("block_a", "plate") in pairs
+    assert ("block_a", "vac") in pairs
+    assert ("bottle", "plate") not in pairs
+    assert ("other", "vac") not in pairs
 
 
 def test_exchange_entry_uses_only_the_current_attached_ee_for_motion() -> None:

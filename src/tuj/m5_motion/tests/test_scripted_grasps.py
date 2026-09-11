@@ -97,6 +97,16 @@ def test_c3_2_plate_vac_and_fork_resolve_multi_instance():
     assert c1_plate.environment == "C1_1_LegoSweep" and c1_plate.ee == "2F"
     assert resolve(request_for(c1_plate)) == c1_plate
     assert c1_plate.recipe().recipe_id == "plate_2f_calibrated_center_v5"
+    # Explicit vac alternative still resolves when M4 selects vac for C1_1.
+    from tuj.m5_motion.scripted_grasps.registry import ALTERNATIVE_ENTRIES
+
+    c1_vac = next(
+        entry
+        for entry in ALTERNATIVE_ENTRIES
+        if entry.object_id == "plate" and entry.ee == "vac"
+    )
+    assert resolve(request_for(c1_vac)) == c1_vac
+    assert c1_vac.module_name == "plate_vac"
 
 
 def test_c3_2_remaining_instances_resolve_and_build_targets():

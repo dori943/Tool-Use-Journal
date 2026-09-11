@@ -16,6 +16,7 @@ contact force and wrench limits can produce ``GRASP_LOST``.
 
 from __future__ import annotations
 
+import gc
 import math
 import time
 from bisect import bisect_right
@@ -2140,7 +2141,24 @@ class ToolUseJournalEERuntime:
         if self._held_tool_id is not None:
             raise ToolUseJournalRuntimeError("release the contact-held object before EE exchange")
         old_env = self._env
+        previous = self._active_ee
         state = _capture_runtime_state(old_env)
+        # Release the previous MjModel before allocating the next one. Holding
+        # both bare and vac (plus collision caches) routinely OOMs on C1_1 TOOL_LOCK.
+        # On failure, rebuild the previous variant from the captured state.
+        released_old = False
+        if self._close_replaced:
+            close = getattr(old_env, "close", None)
+            if callable(close):
+                close()
+            self._env = None
+            del close, old_env
+            old_env = None
+            released_old = True
+            gc.collect()
+        else:
+            gc.collect()
+
         new_env: object | None = None
         try:
             new_env = self._factory(to_ee)
@@ -2186,6 +2204,24 @@ class ToolUseJournalEERuntime:
                 close = getattr(new_env, "close", None)
                 if callable(close):
                     close()
+                del close, new_env
+                new_env = None
+                gc.collect()
+            if released_old:
+                try:
+                    rebuilt = self._factory(previous)
+                    rebuilt.reset()  # type: ignore[attr-defined]
+                    _restore_runtime_state(rebuilt, state)
+                    self._set_declared_active_ee(rebuilt, previous)
+                    self._apply_rack_visibility(rebuilt, previous)
+                    self._env = rebuilt
+                except Exception as restore_error:
+                    self._closed = True
+                    raise ToolUseJournalRuntimeError(
+                        f"failed to build EE runtime state {to_ee!r}: {error}; "
+                        f"also failed to restore prior EE {previous!r}: "
+                        f"{restore_error}"
+                    ) from error
             if isinstance(error, ToolUseJournalRuntimeError):
                 raise
             if isinstance(error, ToolUseJournalCompatibilityError):
@@ -2195,7 +2231,6 @@ class ToolUseJournalEERuntime:
             ) from error
 
         self._env = new_env
-        previous = self._active_ee
         self._active_ee = to_ee
         self._gripper_command = -1.0
         self._grasp_engaged = False
@@ -2209,10 +2244,12 @@ class ToolUseJournalEERuntime:
             hidden_rack_ee=hidden,
         )
         self._transitions.append(transition)
-        if self._close_replaced:
+        if not released_old and self._close_replaced and old_env is not None:
             close = getattr(old_env, "close", None)
             if callable(close):
                 close()
+            del close, old_env
+            gc.collect()
         return transition
 
     def unlock(self, ee: str) -> EERuntimeTransition:

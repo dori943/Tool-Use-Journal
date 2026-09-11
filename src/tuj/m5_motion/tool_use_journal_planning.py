@@ -895,18 +895,36 @@ class ToolUseJournalCollisionContextFactory:
         self,
         request: MotionPlanRequest,
         base: CollisionContext,
+        *,
+        active_ee: str | None = None,
     ) -> CollisionContext:
+        """Allow held tool (and its EE) to touch ``allowed_touch_objects``.
+
+        Attached↔target pairs alone are not enough for contact tool_act: when the
+        held tool engages targets, the vacuum cup / fingertips often clear the
+        same bodies closer than ``collision_margin_m``. Mirror PICK's
+        ``active_ee ↔ touch`` exemptions so CONTACT_* can make intended contact
+        while unrelated obstacles stay blocked.
+        """
+
         if not base.attached_object_ids or not request.task.allowed_touch_objects:
+            return base
+        touch = [
+            selector for selector in request.task.allowed_touch_objects if selector
+        ]
+        if not touch:
             return base
         pairs = {
             *base.allowed_collision_pairs,
             *(
                 tuple(sorted((attached, selector)))
                 for attached in base.attached_object_ids
-                for selector in request.task.allowed_touch_objects
-                if selector
+                for selector in touch
             ),
         }
+        ee = active_ee or base.active_ee
+        if ee:
+            pairs.update(self._contact_pairs(ee, touch))
         return base.model_copy(update={"allowed_collision_pairs": sorted(pairs)})
 
     def _bind_default(
@@ -1560,7 +1578,9 @@ class ToolUseJournalCollisionContextFactory:
                     request, artifact, base, active_ee
                 )
             else:
-                base = self._bind_generic_touch_policy(request, base)
+                base = self._bind_generic_touch_policy(
+                    request, base, active_ee=active_ee
+                )
                 bound, contexts = self._bind_default(request, artifact, base)
             initial_id = base.context_id
             default_ee = active_ee

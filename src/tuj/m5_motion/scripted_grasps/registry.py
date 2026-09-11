@@ -67,9 +67,12 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     ("mug", "C3_2_BreakfastTrayPreparation", "3F", "catalog", "mug_c3_2"),
 ))
 
-# Optional alternatives remain an explicit extension point. The repository does
-# not select object- or scene-specific alternatives in the generic M5 path.
-ALTERNATIVE_ENTRIES: tuple[GraspEntry, ...] = ()
+# Explicitly selected EE alternatives; never retry a failed 2F grasp with vac.
+# C1_1 M4 may choose auto-vac-plate (candidate_id SG*-auto-vac-plate); keep the
+# validated 2F ENTRIES row as default while resolving vac through this list.
+ALTERNATIVE_ENTRIES: tuple[GraspEntry, ...] = (
+    GraspEntry("plate", "C1_1_LegoSweep", "vac", "catalog", "plate_vac"),
+)
 
 # Explicit validator-only feasibility probes. They do not alter M4 choices or
 # the normal M5 registry surface.

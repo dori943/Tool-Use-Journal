@@ -60,6 +60,10 @@ def _segment_type(keyframe_type: KeyframeType) -> SegmentType:
         KeyframeType.PRE_PLACE: SegmentType.PLACE,
         KeyframeType.PLACE: SegmentType.PLACE,
         KeyframeType.RETREAT: SegmentType.RETREAT,
+        KeyframeType.PRE_CONTACT: SegmentType.APPROACH,
+        KeyframeType.CONTACT_START: SegmentType.TRANSFER,
+        KeyframeType.CONTACT_SWEEP: SegmentType.TRANSFER,
+        KeyframeType.CONTACT_END: SegmentType.TRANSFER,
         KeyframeType.EE_UNDOCK_STAGING: SegmentType.EE_UNDOCK,
         KeyframeType.EE_PRE_UNDOCK: SegmentType.EE_UNDOCK,
         KeyframeType.EE_UNDOCK: SegmentType.EE_UNDOCK,
@@ -68,7 +72,12 @@ def _segment_type(keyframe_type: KeyframeType) -> SegmentType:
         KeyframeType.EE_DOCK: SegmentType.EE_DOCK,
         KeyframeType.CUSTOM: SegmentType.CUSTOM,
     }
-    return mapping[keyframe_type]
+    try:
+        return mapping[keyframe_type]
+    except KeyError as error:
+        raise MotionPlanBuildError(
+            f"unsupported keyframe type for segment mapping: {keyframe_type!r}"
+        ) from error
 
 
 def _scene_signature(context: CollisionContext) -> tuple[object, ...]:

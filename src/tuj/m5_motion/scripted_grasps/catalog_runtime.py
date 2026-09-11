@@ -17,7 +17,7 @@ from tuj.m5_motion.scripted_grasps.catalog_types import build_catalog_targets
 from tuj.m5_motion.scripted_grasps.catalog_timing import RUNTIME_VERSION,synchronize_timing,check_control_elapsed,run_timed_hold
 from tuj.m5_motion.scripted_grasps.spoon_runtime import (
     SpoonContext, approach_spoon, grasp_contact_ready, hold_contact_fraction,
-    lift_with_reach_fallback, thin_handle_pinch_event, attach_thin_handle_pinch,
+    thin_handle_pinch_event, attach_thin_handle_pinch,
 )
 
 
@@ -256,15 +256,8 @@ class CatalogContext(SpoonContext):
             self.record_input()
             if recipe.ee_id == 'vac':
                 from tuj.m5_motion.scripted_grasps.catalog_types import build_collision_surface_vacuum_targets
-                vac_recipe=recipe
-                if recipe.object_id=='plate':
-                    # Rim fraction is size-relative; retune to the live AABB so a
-                    # PLATE_SCALE edit cannot seat the cup on the recessed dish.
-                    from tuj.m5_motion.scripted_grasps.objects.plate_vac import (
-                        tune_recipe_to_measured_size)
-                    vac_recipe=tune_recipe_to_measured_size(recipe,self.local_size)
                 targets=build_collision_surface_vacuum_targets(
-                    self.body_pose(),self.center_in_body,self.local_size,vac_recipe,
+                    self.body_pose(),self.center_in_body,self.local_size,recipe,
                     self.object_record)
             else:
                 targets=build_catalog_targets(self.body_pose(),self.center_in_body,self.local_size,recipe)
@@ -372,8 +365,7 @@ class CatalogContext(SpoonContext):
                 q=self.move(targets['LIFT'],'LIFT',hold_opening,cartesian=True)
                 settle_vacuum_arm_tracking(self, q, hold_opening)
             else:
-                q=lift_with_reach_fallback(
-                    self, targets, hold_opening, cartesian=True)
+                q=self.move(targets['LIFT'],'LIFT',hold_opening,cartesian=True)
             if recipe.ee_id=='vac':
                 from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
                     run_kinematic_vacuum_hold,

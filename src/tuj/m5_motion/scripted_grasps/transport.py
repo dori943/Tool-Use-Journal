@@ -34,9 +34,7 @@ HELD_PLACE_GOAL_ANCHOR = 'held_place_goal'
 HELD_PLACE_START_ANCHOR = 'held_place_start'
 # Rim/wall allowance when searching the region interior for a free spot and the
 # fallback floor thickness when the region has no usable collision points.
-# Paired with environments.PLATE_SCALE == 0.17 (~0.167 m AABB): bread+fruit
-# need the free-spot inset small enough that M2 slots remain reachable.
-REGION_WALL_ALLOWANCE_M = 0.005
+REGION_WALL_ALLOWANCE_M = 0.02
 REGION_FLOOR_FALLBACK_M = 0.005
 FREE_SPOT_GRID_M = 0.01
 # Occupants whose tops agree to within this share the load of what is put

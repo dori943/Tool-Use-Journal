@@ -1,11 +1,8 @@
-"""C3_2 fork: 3F thin-handle pinch mirroring the validated c3_2 spoon pose.
+"""C3_2 fork: 3F thin-handle pinch mirroring the validated c3_2 spoon.
 
-Scene layout (top-down): forks sit under the spoons with the same orientation —
-tines toward +Y, dark handle toward -Y. Grasp the wider mid-handle (dark
-section), not the tapered tip or silver neck.
-
-Long axis matches spoon/knife local frames. TCP uses the spoon_3f_c3_2
-yaw-90 / tilt-5 thumb+index station via ``rotation_xyz_deg``.
+Scene layout matches the spoons: long axis vertical, tines away (+Y), handle
+toward the camera (-Y). Same yaw-90 thumb+index station as
+``spoon_3f_c3_2_handle_center_v2``.
 """
 from tuj.m5_motion.scripted_grasps.catalog_types import (
     CatalogRecipe, build_catalog_targets, dispatch_grasp,
@@ -14,13 +11,13 @@ from tuj.m5_motion.scripted_grasps.catalog_types import (
 # Compiled C3_2 fork AABB (fork_a / fork_b share the same asset).
 FORK_EXPECTED_SIZE_M = (0.025003964, 0.153709715, 0.018469741)
 
-# Spoon-matched yaw/tilt on the dark mid-handle (image: forks under spoons,
-# handles toward -Y). Keep lateral on the spoon side so GRASP clears tray_a;
-# height sits between spoon (+14 mm) and the tray-colliding +8 mm seat.
-HANDLE_FRACTION_Y = -0.20
-HEIGHT_OFFSET_M = 0.010
-LATERAL_OFFSET_M = -0.004
-# Catalog euler xyz ≡ spoon Rx(0) @ Rz(90) @ Ry(5) (see spoon_3f_c3_2).
+# Mirror spoon yaw-90 pinch; lateral is more negative than spoon because the
+# fork handle is narrower (~25 mm vs ~45 mm) and needs the thumb+index pair
+# centered on the mesh.
+HANDLE_FRACTION_Y = -0.15
+HEIGHT_OFFSET_M = 0.014
+LATERAL_OFFSET_M = -0.008
+# Catalog xyz euler ≡ spoon Rx(0)@Rz(90)@Ry(5) before the shared diag flip.
 ROTATION_XYZ_DEG = (0.0, 5.0, 90.0)
 
 

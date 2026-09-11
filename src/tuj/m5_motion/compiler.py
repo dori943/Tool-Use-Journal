@@ -10,6 +10,12 @@ from tuj.m5_motion.attachment_retarget import (
     AttachmentRetargetError,
     retarget_resolved_pose,
 )
+from tuj.m5_motion.contact_keyframe_validation import (
+    ContactKeyframeGeometryError,
+    canonicalize_held_tool_axis_for_contact,
+    canonicalize_sweep_strategy_heights,
+    validate_sweep_keyframe_strategy,
+)
 from tuj.m5_motion.geometry import GeometryResolutionError, RelativePoseResolver
 from tuj.m5_motion.grasp_geometry import (
     MULTI_FINGER_PLACE_RETREAT_CLEARANCE,
@@ -22,6 +28,7 @@ from tuj.m5_motion.kinematics import IKSolutionSet, UR5eKinematics
 from tuj.m5_motion.schema import (
     KeyframePlanCandidate,
     KeyframeType,
+    MotionPlanRequest,
     Pose,
     RelativeKeyframeSpec,
     WorldSnapshot,
@@ -128,6 +135,7 @@ class FirstFeasibleStrategyCompiler:
         start_joint_config: Sequence[float],
         state_validator: StateValidator,
         edge_planner: EdgePlanner,
+        request: MotionPlanRequest | None = None,
     ) -> StrategyCompilationResult:
         resolver = RelativePoseResolver(world)
         attempts: list[StrategyAttempt] = []
@@ -138,7 +146,35 @@ class FirstFeasibleStrategyCompiler:
             adapted_keyframes: list[RelativeKeyframeSpec] = []
             failure_code: str | None = None
             failure_detail = ""
-            for keyframe in strategy.keyframes:
+            strategy_keyframes = list(strategy.keyframes)
+            if request is not None:
+                # Contact tool_act (sweep): repair the held-tool attitude and
+                # working height, then reject task-unrelated geometry before
+                # spending an IK search on it.
+                strategy_keyframes = canonicalize_sweep_strategy_heights(
+                    request,
+                    [
+                        canonicalize_held_tool_axis_for_contact(
+                            request, keyframe, resolver=resolver
+                        )
+                        for keyframe in strategy_keyframes
+                    ],
+                    resolver=resolver,
+                )
+                try:
+                    validate_sweep_keyframe_strategy(
+                        request, strategy_keyframes, resolver=resolver
+                    )
+                except ContactKeyframeGeometryError as error:
+                    attempts.append(
+                        StrategyAttempt(
+                            strategy_id=strategy.strategy_id,
+                            failure_code="KEYFRAME_GEOMETRY_INVALID",
+                            detail=str(error),
+                        )
+                    )
+                    continue
+            for keyframe in strategy_keyframes:
                 ik_options = {
                     "position_tolerance_m": self._position_tolerance_m,
                     "orientation_tolerance_rad": self._orientation_tolerance_rad,
@@ -281,7 +317,7 @@ class FirstFeasibleStrategyCompiler:
 
             selection_strategy = (
                 strategy
-                if adapted_keyframes == list(strategy.keyframes)
+                if adapted_keyframes == strategy_keyframes
                 else strategy.model_copy(update={"keyframes": adapted_keyframes})
             )
             selection = self._selector.select(

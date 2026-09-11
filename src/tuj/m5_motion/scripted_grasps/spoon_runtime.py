@@ -43,6 +43,8 @@ def thin_handle_pinch_event(sample):
 
     c3_2 utensil collision meshes are narrow; the third Jaco finger often cannot
     seat. A sustained thumb+secondary pinch with span is enough to lift.
+    Fork handles are ~25 mm wide, so the span floor is below the spoon (~45 mm)
+    threshold while still requiring a real opposed contact pair.
     """
     forces=sample['finger_force_n']
     contacts=set(sample['finger_contacts'])
@@ -52,7 +54,7 @@ def thin_handle_pinch_event(sample):
     if not secondary:
         return False
     other=sum(forces[name] for name in secondary)
-    return (sample['contact_span_m']>=.035 and forces['thumb']>=1.5
+    return (sample['contact_span_m']>=.018 and forces['thumb']>=1.0
             and other>=.2 and sample['normal_opposition']>=.15
             and sum(forces.values())<=12.)
 
@@ -133,104 +135,18 @@ def update_three_finger_commands(commands,measured_forces,recipe):
     return np.clip(np.asarray(commands,dtype=float)+delta,-1.,1.)
 
 
-def _ik_failure_message(exc):
-    message=str(exc)
-    return message.startswith('IK_FAILED:') or message.startswith('CARTESIAN_IK_FAILED:')
-
-
-def _optional_grasp_ik_seed(context, grasp):
-    """Solve GRASP IK without moving; reuse as PRE continuation seed when available."""
-    q=np.asarray(context.data.qpos[context.arm_ids],dtype=float).copy()
-    quat=Rotation.from_matrix(grasp[:3,:3]).as_quat()
-    try:
-        solutions=context.kinematics.solve_all_ik(grasp[:3,3],quat,seed_qpos=q)
-    except Exception:
-        return None
-    if not getattr(solutions,'solutions',None):
-        return None
-    best=min(solutions.solutions,key=lambda s:np.linalg.norm(np.asarray(s.qpos)-q))
-    return np.asarray(best.qpos,dtype=float)
-
-
 def approach_spoon(context, targets, opening=1.):
-    """Use a shorter or elevated entry when the nominal pre-grasp is unreachable.
-
-    Outer UR5e workspace often has a full-pose IK cliff: GRASP is solvable but
-    the preferred PRE standoff is not.  Shorten along the approach ray from the
-    recipe distance before the elevated collision-clearance hop.
-    """
-    from tuj.m5_motion.grasp_geometry import catalog_pre_grasp_reach_standoff_candidates
-
-    grasp=targets['GRASP']
-    axis=np.asarray(grasp[:3,2],dtype=float)
-    preferred=float(np.linalg.norm(
-        np.asarray(targets['PRE_GRASP'][:3,3],dtype=float)-grasp[:3,3]))
-    schedule=catalog_pre_grasp_reach_standoff_candidates(preferred)
-    seed=_optional_grasp_ik_seed(context,grasp)
-    move_kwargs={}
-    if seed is not None:
-        move_kwargs['seed_qpos']=seed
-
+    """Use an elevated entry if the nominal pre-grasp cannot be reached safely."""
     try:
-        context.move(targets['PRE_GRASP'],'PRE_GRASP',opening,**move_kwargs)
-        return
+        context.move(targets['PRE_GRASP'],'PRE_GRASP',opening)
     except GraspFailure as exc:
-        if not _ik_failure_message(exc):
-            if not str(exc).startswith('COLLISION_FREE_PATH_NOT_FOUND'):
-                raise
-            clearance=targets['PRE_GRASP'].copy()
-            clearance[2,3]+=.16
-            context.move(clearance,'PRE_CLEARANCE',opening,**move_kwargs)
-            # Do not descend back to an invalid nominal pre-grasp. The caller
-            # validates a diagonal Cartesian approach to the same grasp goal.
-            return
-        last_exc=exc
-
-    for distance in schedule[1:]:
-        pre=grasp.copy()
-        pre[:3,3]=grasp[:3,3]-axis*distance
-        try:
-            context.move(pre,'PRE_GRASP',opening,**move_kwargs)
-            targets['PRE_GRASP']=pre
-            print('[plan] PRE_GRASP reach fallback standoff_m=',
-                  distance, flush=True)
-            return
-        except GraspFailure as exc:
-            # Keep IK/collision validation strict; only reject this candidate.
-            last_exc=exc
-            continue
-    raise last_exc
-
-
-def lift_with_reach_fallback(context, targets, opening, *, cartesian=True):
-    """Raise to LIFT, shortening the climb when the preferred height has no IK."""
-    from tuj.m5_motion.grasp_geometry import catalog_lift_reach_standoff_candidates
-
-    grasp=targets['GRASP']
-    preferred=float(targets['LIFT'][2,3]-grasp[2,3])
-    minimum=float(getattr(context.recipe,'minimum_lift_m',preferred))
-    schedule=catalog_lift_reach_standoff_candidates(
-        preferred, minimum_lift_m=minimum)
-
-    try:
-        return context.move(targets['LIFT'],'LIFT',opening,cartesian=cartesian)
-    except GraspFailure as exc:
-        if not _ik_failure_message(exc):
+        if not str(exc).startswith('COLLISION_FREE_PATH_NOT_FOUND'):
             raise
-        last_exc=exc
-
-    for height in schedule[1:]:
-        lift=grasp.copy()
-        lift[2,3]=grasp[2,3]+height
-        try:
-            q=context.move(lift,'LIFT',opening,cartesian=cartesian)
-            targets['LIFT']=lift
-            print('[plan] LIFT reach fallback height_m=', height, flush=True)
-            return q
-        except GraspFailure as exc:
-            last_exc=exc
-            continue
-    raise last_exc
+        clearance=targets['PRE_GRASP'].copy()
+        clearance[2,3]+=.16
+        context.move(clearance,'PRE_CLEARANCE',opening)
+        # Do not descend back to an invalid nominal pre-grasp. The caller
+        # validates a diagonal Cartesian approach to the same grasp goal.
 
 
 def preshape_spoon(context,recipe):

@@ -13,6 +13,11 @@ from tuj.m5_motion.task_semantics import (
     is_release_task,
     task_operation,
 )
+from tuj.m5_motion.contact_keyframe_validation import (
+    ContactKeyframeGeometryError,
+    is_tool_act_contact_geometry_scope,
+    validate_sweep_keyframe_strategy,
+)
 
 
 class KeyframePhaseContractError(ValueError):
@@ -66,6 +71,13 @@ def validate_keyframe_phase_contract(
                     f"TRANSPORT strategy {strategy.strategy_id!r} contains PLACE or "
                     f"release effects at {', '.join(forbidden)}"
                 )
+        if is_tool_act_contact_geometry_scope(request):
+            try:
+                validate_sweep_keyframe_strategy(request, keyframes)
+            except ContactKeyframeGeometryError as error:
+                raise KeyframePhaseContractError(
+                    f"sweep strategy {strategy.strategy_id!r}: {error}"
+                ) from error
         if not is_release_task(request.task):
             continue
         place_indices = [
