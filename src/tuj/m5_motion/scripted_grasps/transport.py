@@ -574,7 +574,7 @@ def ground_held_place(request, retention=None):
         release_clearance = max(release_clearance,
                                 float(request.constraints.collision_margin_m) * 2.)
     origin_z = support_z + release_clearance + g.bottom_below_origin()
-    desired_center[2] = g.center[2] + (origin_z - g.T_WB[2, 3])
+    desired_center[2] = origin_z + float(g.destination_rotation[2, :] @ g.center_in_body)
     from .container_orientation import packing_destination_center
     desired_center = packing_destination_center(g, desired_center, place=True)
     destination = g.publish(

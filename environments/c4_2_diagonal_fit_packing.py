@@ -1538,7 +1538,10 @@ class C4_2_DiagonalFitPacking(KitchenBase):
             }
         candidates = _PACKING_ORIENTATION_CANDIDATES.get(object_id)
         if candidates is None:
-            metadata = {}
+            # The packable cartons have stable rectangular faces. Establish a
+            # low base layer before the diagonal objects need the upper volume.
+            metadata = ({"kind": "PACKABLE_OBJECT", "stable_face_policy": "MINIMUM_HEIGHT"}
+                        if object_id in _PACKING_OBJECTS else {})
         else:
             metadata = {
                 "kind": "PACKABLE_OBJECT",
