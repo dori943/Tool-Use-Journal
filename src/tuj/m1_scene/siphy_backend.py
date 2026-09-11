@@ -202,7 +202,9 @@ class SiPhyBackend(PropertyBackend):
                            or str(self.model).startswith("gemini"))
         self._supports_seed = not self._is_gemini
         # Gemini 2.5 계열은 thinking 토큰이 max_tokens 를 잠식 → 500 이면 JSON 이 잘린다.
-        self._max_tokens = 4096 if self._is_gemini else 500
+        # 최신 OpenAI reasoning 계열(gpt-5.x)도 추론 토큰이 completion 예산을 잠식하므로
+        # 500 이면 finish_reason=length 로 빈 응답이 온다. 양쪽 모두 넉넉히 준다.
+        self._max_tokens = 4096
 
     @staticmethod
     def _make_client(api_key, repo_root, model="gpt-4o-mini"):
@@ -257,16 +259,22 @@ class SiPhyBackend(PropertyBackend):
     def _propose(self, crop_rgb) -> dict:
         b64 = _to_b64_png(crop_rgb)
         last_err = None
+        # 최신 OpenAI 모델(gpt-5.x 등)은 chat.completions 에서 legacy `max_tokens`
+        # 를 거부하고 `max_completion_tokens` 를 요구한다. 반면 Gemini 의 OpenAI
+        # 호환 엔드포인트는 여전히 `max_tokens` 만 받는다. provider 기본값에서
+        # 시작하되, API 가 파라미터 이름을 명시적으로 거부하면 한 번 스왑한다.
+        token_param = "max_tokens" if self._is_gemini else "max_completion_tokens"
         for t in range(MAX_TRIES):                      # gpt_wrapper 방식: seed+t 재시도
             try:
                 kwargs = dict(
-                    model=self.model, max_tokens=self._max_tokens,
+                    model=self.model,
                     messages=[
                         {"role": "system", "content": SYS_MSG},
                         {"role": "user", "content": [{
                             "type": "image_url",
                             "image_url": {"url": f"data:image/png;base64,{b64}"}}]},
                     ])
+                kwargs[token_param] = self._max_tokens
                 if self._supports_seed:              # Gemini 는 seed 미지원 → 생략
                     kwargs["seed"] = self.seed + t
                 r = self.client.chat.completions.create(**kwargs)
@@ -284,6 +292,13 @@ class SiPhyBackend(PropertyBackend):
                     raise RuntimeError(f"JSON 파싱 실패: {pe}. 응답 앞부분: {text[:200]!r}") from pe
             except Exception as e:                      # noqa: BLE001
                 last_err = e
+                # 엔드포인트가 토큰 파라미터 이름을 거부하면(예: 400 -
+                # "'max_tokens' is not supported ... Use 'max_completion_tokens'")
+                # 다음 재시도에서 반대 이름으로 한 번 바꿔 시도한다.
+                msg = str(e)
+                if "max_completion_tokens" in msg and "max_tokens" in msg:
+                    token_param = ("max_completion_tokens"
+                                   if token_param == "max_tokens" else "max_tokens")
         raise RuntimeError(f"SiPhy VLM 호출/파싱 {MAX_TRIES}회 실패: {last_err}")
 
     # ── PropertyBackend 인터페이스 ───────────────────

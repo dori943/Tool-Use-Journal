@@ -31,11 +31,24 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     ("bottle", "C1_2_DoughFlatten", "3F", "bottle"),
     ("spatula", "C1_2_DoughFlatten", "3F", "spatula"),
     ("spoon", "C1_2_DoughFlatten", "2F", "spoon"),
+<<<<<<< Updated upstream
     # 0909: C3_1 also picks the spoon with the 2F gripper. Without an entry for
     # this environment the generic path plans the grasp, and its pose put the
     # object 10.6 cm from the grip site: the fingers closed on air (0 contacts,
     # 0.08 mm lift against a 50 mm requirement).
     ("spoon", "C3_1_ObjectSorting", "2F", "spoon"),
+=======
+    # C2_1 reuses the validated object-frame 2F spoon recipe so the tabletop
+    # sorting pick uses the tuned scripted grasp (reliable formation/lift/
+    # retention) instead of a per-run LLM contact-friction grasp.  The plate is
+    # grasped with the vacuum EE (M4 mounts vac for the flat disc in C2_1): the
+    # per-run LLM vacuum grasp kept missing the surface (CONTACT_COUNT=0), so it
+    # uses a dedicated catalog vacuum recipe (objects/plate_vac.py) that presses
+    # the cup onto the top face.  A separate module name keeps it distinct from
+    # the 2F ``plate`` driver used at C1_1 (objects/plate.py / grasp_plate).
+    ("spoon", "C2_1_ObjectSorting", "2F", "spoon"),
+    ("plate", "C2_1_ObjectSorting", "vac", "catalog", "plate_vac"),
+>>>>>>> Stashed changes
     ("apple", "C2_1_ObjectSorting", "3F", "catalog"),
     ("bread", "C2_1_ObjectSorting", "3F", "catalog"),
     ("mug", "C2_1_ObjectSorting", "3F", "catalog"),
@@ -82,8 +95,13 @@ class ScriptedGraspUnavailable(RuntimeError):
 def resolve(request):
     """Return a validated recipe for a supported acquire, otherwise None.
 
-    A known object with a different EE is an input error, not permission to
-    silently execute a different grasp. Unsupported objects retain M5 routing.
+    A scripted recipe is pinned to one EE, but M4 chooses the EE per run and
+    per LLM model, so the mounted EE may differ from the recipe's.  When it
+    does, this is NOT a fatal input error: fall back to the ordinary M5 grasp
+    path (exactly what an unregistered object does) so a registry/M4 EE
+    disagreement never hard-stops the task.  The scripted recipe is used only
+    when the mounted EE matches; otherwise M5 plans the grasp with the mounted
+    EE and the controller preview still physically validates it.
     """
     if not is_acquire_task(request.task):
         return None
@@ -104,5 +122,7 @@ def resolve(request):
             return entry
     if matches:
         supported = '/'.join(e.ee for e in matches)
-        raise ValueError(f"SCRIPTED_GRASP_EE_MISMATCH: {target} requires {supported}, got {task.ee}")
+        print(f"[M5][SCRIPTED_GRASP] EE mismatch for {target}: recipe expects "
+              f"{supported}, M4 mounted {task.ee}; falling back to the M5 grasp "
+              f"path for this object.", flush=True)
     return None

@@ -51,6 +51,7 @@ def configure_environment(env, environment, ee):
         env.scripted_grasp_profile = {"environment": environment, "ee": ee,
             "correction": {"policy": "NATIVE_HAND", "source_assets_changed": False}}
         return env
+<<<<<<< Updated upstream
     if kitchen and ee is not None:
         # Only a run that already carries an EE may start from the scripted
         # kitchen home. A bare start fetches its EE from the rack, and every
@@ -58,6 +59,18 @@ def configure_environment(env, environment, ee):
         # overriding it here put the arm 1.99 rad from that seam and no cached
         # path could start (c3_1: START_STATE_MISMATCH on bare->vac).
         env.robot_configs[0]["initial_qpos"] = [0., -1.8, 1.2, -.97, -1.57, 0.]
+=======
+    # Do NOT override the bare-flange start joint positions here.  Every rack
+    # task -- tabletop (C2_1, ee_rack) *and* RoboCasa kitchen (C1_2, ee_rack_
+    # kitchen) -- drives its EE changes from precomputed rack trajectories, and
+    # BOTH caches were recorded from the commissioned bare home
+    # TOOL_USE_JOURNAL_BARE_HOME_QPOS = (-0.47,-1.735,2.48,-2.275,-1.59,-1.991),
+    # which make_tool_use_journal_env installs on the bare env.  The old
+    # ``if kitchen: initial_qpos = [0,-1.8,1.2,-0.97,-1.57,0]`` line clobbered
+    # that home for kitchens, so the bare->2F path failed its exact start-state
+    # contract (START_STATE_MISMATCH ~1.991 rad on the wrist joint).  Leaving the
+    # installed bare home in place lets both env families satisfy the contract.
+>>>>>>> Stashed changes
     corrected = not (environment == "C1_2_DoughFlatten" and ee == "3F")
     env._load_model()
     _preserve_offscreen_buffer(env)

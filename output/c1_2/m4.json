@@ -125,8 +125,8 @@
         "grasp": null,
         "action_parameters": {
           "suitability": {
-            "overall_suitability": 0.9934432743890323,
-            "known_min_score": 0.9934432743890323,
+            "overall_suitability": 0.9980039920159681,
+            "known_min_score": 0.9980039920159681,
             "applicable_component_count": 1,
             "known_component_count": 1,
             "unknown_component_count": 0,
@@ -135,10 +135,10 @@
             "components": {
               "payload": {
                 "status": "PASS",
-                "score": 0.9934432743890323,
-                "required": 0.033,
+                "score": 0.9980039920159681,
+                "required": 0.01,
                 "capacity": 5.0,
-                "margin": 4.967,
+                "margin": 4.99,
                 "unit": "kg"
               },
               "wrench": {
@@ -157,10 +157,10 @@
           ],
           "?work": "cutting_board"
         },
-        "suitability_score": 0.9934432743890323,
+        "suitability_score": 0.9980039920159681,
         "suitability": {
-          "overall_suitability": 0.9934432743890323,
-          "known_min_score": 0.9934432743890323,
+          "overall_suitability": 0.9980039920159681,
+          "known_min_score": 0.9980039920159681,
           "applicable_component_count": 1,
           "known_component_count": 1,
           "unknown_component_count": 0,
@@ -169,10 +169,10 @@
           "components": {
             "payload": {
               "status": "PASS",
-              "score": 0.9934432743890323,
-              "required": 0.033,
+              "score": 0.9980039920159681,
+              "required": 0.01,
               "capacity": 5.0,
-              "margin": 4.967,
+              "margin": 4.99,
               "unit": "kg"
             },
             "wrench": {
@@ -563,6 +563,59 @@
           },
           {
             "cond_id": "SG1_d1_p3",
+            "type": "graspable_on_support",
+            "args": [
+              "?EE",
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": true,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "graspable_on_support(?EE, ?tool)",
+            "negated": false,
+            "status": "sat",
+            "evidence": [
+              {
+                "node": "obj_spatula_spatula",
+                "graspable_on_support": true,
+                "graspable_ees": [
+                  "2F",
+                  "3F",
+                  "vac"
+                ],
+                "supports": [],
+                "height_mm": 1.8
+              },
+              {
+                "node": "obj_spoon_spoon",
+                "graspable_on_support": true,
+                "graspable_ees": [
+                  "2F",
+                  "3F",
+                  "vac"
+                ],
+                "supports": [],
+                "height_mm": 27.4
+              },
+              {
+                "node": "obj_tongs_tongs",
+                "graspable_on_support": true,
+                "graspable_ees": [
+                  "2F",
+                  "3F",
+                  "vac"
+                ],
+                "supports": [],
+                "height_mm": 21.7
+              }
+            ]
+          },
+          {
+            "cond_id": "SG1_d1_p4",
             "type": "batch_feasible",
             "args": [
               "?EE",
@@ -581,7 +634,7 @@
             "evidence": []
           },
           {
-            "cond_id": "SG1_d1_p4",
+            "cond_id": "SG1_d1_p5",
             "type": "hand_empty",
             "args": [],
             "value": null,
@@ -673,8 +726,8 @@
         "parameters": {
           "action_parameters": {
             "suitability": {
-              "overall_suitability": 0.9934432743890323,
-              "known_min_score": 0.9934432743890323,
+              "overall_suitability": 0.9980039920159681,
+              "known_min_score": 0.9980039920159681,
               "applicable_component_count": 1,
               "known_component_count": 1,
               "unknown_component_count": 0,
@@ -683,10 +736,10 @@
               "components": {
                 "payload": {
                   "status": "PASS",
-                  "score": 0.9934432743890323,
-                  "required": 0.033,
+                  "score": 0.9980039920159681,
+                  "required": 0.01,
                   "capacity": 5.0,
-                  "margin": 4.967,
+                  "margin": 4.99,
                   "unit": "kg"
                 },
                 "wrench": {
@@ -1266,12 +1319,13 @@
         "ee_usable(?EE, ?tool)",
         "flat_face(?tool)",
         "flattened({dough})",
+        "graspable_on_support(?EE, ?tool)",
         "hand_empty()",
         "in(?tool, tool_rest)",
         "reachable(?tool)",
         "top_exposed(?tool)"
       ],
-      "scene_signature": "sym-7039323757071ae3",
+      "scene_signature": "sym-c04414ac76e17b7d",
       "rack_occupancy": null
     },
     "constraint_trace": [

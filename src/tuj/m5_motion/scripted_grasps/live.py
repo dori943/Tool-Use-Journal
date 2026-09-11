@@ -63,12 +63,18 @@ class ScriptedGraspSession:
         # Per-step artifact dirs (``<index>-<token>`` and their ``grasp``/plan
         # subfolders) are created with exist_ok=False, and a re-run reuses the
         # same index+request-hash names, so a prior run's tree collides
-        # (FileExistsError on ``.../grasp``).  Clear the session output once here
+        # (FileExistsError on ``.../grasp``).  Clear those stale step directories
         # so re-runs start clean while the within-run collision guard stays.
+        # Only subdirectories are removed -- any *file* already living in this
+        # dir is left alone, most importantly an ``execution.mp4`` that the video
+        # recorder has already opened here (Windows raises WinError 32 if we try
+        # to delete a file another handle holds open, which aborted the run when
+        # ``--video`` pointed inside the session output directory).
         import shutil
-        if self.output.exists():
-            shutil.rmtree(self.output)
         self.output.mkdir(parents=True, exist_ok=True)
+        for child in self.output.iterdir():
+            if child.is_dir():
+                shutil.rmtree(child, ignore_errors=True)
 
     def execute_request(self, request, *, completed_subgoal=None):
         from .context import execute_grasp
@@ -130,8 +136,15 @@ class ScriptedGraspSession:
                 store.save_request(request, index=0)
                 record["plan"] = str(store.save_plan(plan, index=0))
                 execution_factory = self.executor_factory or ToolUseJournalExecutionAdapter
+                # Render EE transitions and non-scripted (LLM) grasps too when the
+                # session is recording/rendering.  The scripted grasp path renders
+                # via _advance_controller(scripted_render), but the execution
+                # adapter defaults to render=False, so without this the rack
+                # changes and LLM grasps produce no frames and the video freezes
+                # on the last scripted frame for those segments.
                 adapter = execution_factory(self.runtime, compiler=planner.collision_context_factory.compiler,
-                    controller=True, random_seed=self.seed)
+                    controller=True, random_seed=self.seed,
+                    render=getattr(self.runtime, "scripted_render", False))
                 adapter.world_snapshot = lambda req, report: snapshot(self.runtime, req.world)
                 execution = adapter.execute(SelectedPlanPlanningResult((request,), (plan,), request.world),
                     store=SimulationArtifactStore(directory / "simulation"))
