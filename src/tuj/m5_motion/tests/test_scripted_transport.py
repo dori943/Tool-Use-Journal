@@ -41,7 +41,7 @@ def _home_retention(request):
         ENTRIES[4].object_id:held.model_dump(mode='json')}
     context=SimpleNamespace(body_pose=lambda:BODY,grip_pose=lambda:GRIP,
         center_in_body=CENTER_IN_BODY,local_size=LOCAL_SIZE,
-        initial_body=HOME,initial_bottom=HOME_BOTTOM)
+        initial_body=HOME,initial_bottom=HOME_BOTTOM,support_top_z=HOME_BOTTOM)
     return SimpleNamespace(
         context=context,
         entry=ENTRIES[4],
@@ -187,6 +187,37 @@ def test_conceptual_tool_rest_returns_to_measured_pregrasp_home():
         HOME[:3,:3],
         atol=1e-10,
     )
+
+
+@pytest.mark.parametrize('support_delta', [0., .000130453943949, -.001])
+@pytest.mark.parametrize('margin,tolerance', [(.005,.001),(.005,.005),(.008,.002)])
+def test_tool_return_clearance_uses_actual_support_not_contact_penetration(support_delta,margin,tolerance):
+    request=request_for(ENTRIES[4],action='RETURN_TOOL')
+    request.task.goal.target_region_id='tool_rest'
+    request.task.metadata['scripted_m4_implicit_object_pose']=True
+    request.constraints.collision_margin_m=margin
+    request.constraints.position_tolerance_m=tolerance
+    retention=_home_retention(request)
+    retention.context.support_top_z=HOME_BOTTOM+support_delta
+    ground_held_region_goal(request,retention)
+    goal=request.task.goal.target_pose
+    rotation=Rotation.from_quat(goal.orientation_xyzw).as_matrix()
+    center=np.asarray(goal.position_m)+rotation@CENTER_IN_BODY
+    bottom=center[2]-np.abs(rotation[2,:])@LOCAL_SIZE/2.
+    expected_floor=max(HOME_BOTTOM,retention.context.support_top_z)
+    assert bottom==pytest.approx(expected_floor+margin+tolerance,abs=1e-10)
+    assert bottom-tolerance-retention.context.support_top_z>=margin-1e-10
+    np.testing.assert_allclose(goal.position_m[:2],HOME[:2,3],atol=1e-10)
+    np.testing.assert_allclose(rotation,HOME[:3,:3],atol=1e-10)
+
+
+def test_tool_return_rejects_nonfinite_support_height():
+    request=request_for(ENTRIES[4],action='RETURN_TOOL')
+    request.task.goal.target_region_id='tool_rest'
+    retention=_home_retention(request)
+    retention.context.support_top_z=float('nan')
+    with pytest.raises(ValueError,match='TRANSPORT_TOOL_HOME_POSE_REQUIRED'):
+        ground_held_region_goal(request,retention)
 
 
 def test_conceptual_tool_rest_rejects_mismatched_retention_transform():

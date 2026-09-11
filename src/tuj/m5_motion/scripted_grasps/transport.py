@@ -99,6 +99,7 @@ def _materialize_conceptual_tool_home(request, retention):
     center_in_body = np.asarray(getattr(context, 'center_in_body', None), dtype=float)
     local_size = np.asarray(getattr(context, 'local_size', None), dtype=float)
     initial_bottom = float(getattr(context, 'initial_bottom', float('nan')))
+    support_top = float(getattr(context, 'support_top_z', float('nan')))
     if (
         initial_body.shape != (4, 4)
         or center_in_body.shape != (3,)
@@ -108,9 +109,14 @@ def _materialize_conceptual_tool_home(request, retention):
         or not np.all(np.isfinite(local_size))
         or np.any(local_size <= 0.)
         or not math.isfinite(initial_bottom)
+        or not math.isfinite(support_top)
     ):
         raise ValueError('TRANSPORT_TOOL_HOME_POSE_REQUIRED')
     initial_center = (initial_body @ np.r_[center_in_body, 1.])[:3]
+    # Both heights are world-z metres measured by the grasp context. Contact
+    # settling can put the initial object bottom slightly inside its support;
+    # that penetration must not reduce the later collision clearance.
+    home_floor = max(initial_bottom, support_top)
     half_xy = np.abs(initial_body[:2, :3]) @ local_size / 2.
     wall = max(
         REGION_WALL_ALLOWANCE_M,
@@ -123,7 +129,7 @@ def _materialize_conceptual_tool_home(request, retention):
             'position_m': [
                 float(initial_center[0]),
                 float(initial_center[1]),
-                initial_bottom - floor / 2.,
+                home_floor - floor / 2.,
             ],
             'orientation_xyzw': [0., 0., 0., 1.],
         },
@@ -137,6 +143,9 @@ def _materialize_conceptual_tool_home(request, retention):
         'metadata': {
             'conceptual_tool_home': True,
             'object_id': object_id,
+            'initial_bottom_world_z_m': initial_bottom,
+            'support_top_world_z_m': support_top,
+            'support_correction_m': home_floor - initial_bottom,
             'object_orientation_xyzw': Rotation.from_matrix(
                 initial_body[:3, :3]
             ).as_quat().tolist(),
@@ -543,6 +552,15 @@ def ground_held_place(request, retention=None):
     if g is None:
         return
     release_clearance = max(REGION_FLOOR_FALLBACK_M, float(request.constraints.collision_margin_m))
+    if g.task.metadata.get(CONCEPTUAL_TOOL_HOME_GOAL) is True:
+        # A nominal pose exactly on the collision boundary can discard the
+        # continuous IK branch for sub-millimetre solver error. Reserve the
+        # declared positional accuracy above the unchanged collision margin.
+        release_clearance = max(
+            release_clearance,
+            float(request.constraints.collision_margin_m)
+            + float(request.constraints.position_tolerance_m),
+        )
     desired_center = g.region_world.copy()
     desired_center[:2] = g.free_destination_xy()
     support_z, stacked = g.support_top_world_z(desired_center[:2])
