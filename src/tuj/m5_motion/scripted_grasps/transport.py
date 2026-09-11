@@ -500,6 +500,7 @@ class _Grounding:
             'offset_along_approach_m': 0., 'preserve_grasp_orientation': True,
             'pose_subject': ATTACHED_OBJECT_POSE_SUBJECT,
             'object_orientation_xyzw': Rotation.from_matrix(destination[:3, :3]).as_quat().tolist(),
+            'start_object_orientation_xyzw': Rotation.from_matrix(self.T_WB[:3, :3]).as_quat().tolist(),
             'eef_orientation_xyzw': Rotation.from_matrix(self.T_WE[:3, :3]).as_quat().tolist(),
             'object_id': self.object_id, 'source': self.source, **extra}
         return destination

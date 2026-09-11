@@ -697,6 +697,25 @@ def test_held_transport_without_grounded_goal_still_retargets_but_keeps_model_ro
     assert "packing_orientation_xyzw" not in keyframe.metadata
 
 
+def test_measured_start_orientation_is_distinct_from_destination() -> None:
+    from tuj.m5_motion.geometry import RelativePoseResolver
+    request = _held_transport_request()
+    request.task.metadata["held_transport_goal"] = {
+        "frame_ref": "object:tray", "start_anchor": "held_transport_start",
+        "preserve_grasp_orientation": True,
+        "object_orientation_xyzw": [0., 1., 0., 0.],
+        "start_object_orientation_xyzw": [0., 0., 0., 1.],
+    }
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
+        client=_FakeClient(_transfer_batch()),
+    )
+    artifact = provider.generate(request)
+    start, goal = artifact.candidates[0].keyframes
+    assert RelativePoseResolver(request.world).resolve(start).orientation_xyzw == (0., 0., 0., 1.)
+    assert goal.metadata["packing_orientation_xyzw"] == [0., 1., 0., 0.]
+
+
 def test_pick_keyframes_are_never_pose_subject_retargeted() -> None:
     provider = OpenAIKeyframeProvider(
         OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
