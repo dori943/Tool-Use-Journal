@@ -21,8 +21,15 @@ from tuj.m5_motion.scripted_grasps.spoon_runtime import SpoonContext,approach_sp
 class CatalogContext(SpoonContext):
 
     def find_support_geom(self):
+        from .support_geometry import measured_support_geoms
+        self.support_gids = measured_support_geoms(self)
+        if self.support_gids:
+            return min(self.support_gids)
         for name in ('table_collision','island_island_group_top_2'):
-            try:return self.model.geom(name).id
+            try:
+                gid = self.model.geom(name).id
+                self.support_gids = {gid}
+                return gid
             except KeyError:pass
         raise GraspFailure('SUPPORT_GEOMETRY_NOT_FOUND')
 
@@ -66,9 +73,9 @@ class CatalogContext(SpoonContext):
         if stage!='LIFT' or self.support_released:return bad
         height=float(self.body_pose(data)[2,3]-self.initial_body[2,3])
         if not -.002<=height<=.005:return bad
-        support=self.model.geom(self.support_gid).name
+        supports={self.model.geom(g).name for g in getattr(self, 'support_gids', {self.support_gid})}
         object_names={self.model.geom(g).name for g in self.object_geoms}
-        return [c for c in bad if not (support in c['geoms'] and any(n in object_names for n in c['geoms']) and c['penetration_m']<=.002)]
+        return [c for c in bad if not (any(s in c['geoms'] for s in supports) and any(n in object_names for n in c['geoms']) and c['penetration_m']<=.002)]
 
     def sample(self):
         if self.stage=='LIFT' and self.body_pose()[2,3]-self.initial_body[2,3]>.005:self.support_released=True
