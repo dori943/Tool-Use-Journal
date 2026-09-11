@@ -8,7 +8,12 @@ def configure_packing_orientation(g):
     record = g.request.world.objects.get(g.object_id, {})
     metadata = record.get('packing_metadata', {})
     container = g.record.get('packing_metadata', {})
-    if not metadata.get('orientation_candidates') or container.get('kind') != 'CONTAINER':
+    if container.get('kind') != 'CONTAINER':
+        return
+    if metadata.get('stable_face_policy') == 'MINIMUM_HEIGHT':
+        configure_stable_face(g, record, container)
+        return
+    if not metadata.get('orientation_candidates'):
         return
     if metadata.get('orientation_frame') != 'TARGET_REGION':
         raise ValueError('PACKING_ORIENTATION_FRAME_REQUIRED')
@@ -61,3 +66,38 @@ def packing_destination_center(g, desired_center, *, place):
     local[2] = minimum_z if place else max(local[2], minimum_z)
     body = g.T_WR[:3, 3] + g.T_WR[:3, :3] @ local
     return body + g.destination_rotation @ g.center_in_body
+
+
+def configure_stable_face(g, record, container):
+    """Use explicitly declared stable box faces; never infer this for meshes."""
+    from itertools import permutations, product
+    if not np.allclose(g.T_WR[:3, 2], [0., 0., 1.], atol=1e-6):
+        raise ValueError('PACKING_UPRIGHT_CONTAINER_REQUIRED')
+    points = np.asarray(record.get('collision_points_m'), dtype=float)
+    if points.ndim != 2 or points.shape[1] != 3 or not np.isfinite(points).all():
+        raise ValueError('PACKING_COLLISION_VERTICES_REQUIRED')
+    dims = np.asarray(container['interior_dimensions_m'])
+    margin = float(g.request.constraints.collision_margin_m)
+    current = g.T_WR[:3, :3].T @ g.T_WB[:3, :3]
+    choices = []
+    for axes in permutations(range(3)):
+        for signs in product((-1., 1.), repeat=3):
+            local = np.eye(3)[:, axes] @ np.diag(signs)
+            if np.linalg.det(local) < 0.:
+                continue
+            extents = np.ptp(points @ local.T, axis=0)
+            if np.any(extents + 2. * margin > dims):
+                continue
+            rotation = g.T_WR[:3, :3] @ local
+            g.destination_rotation = rotation
+            g.half = np.ptp(points @ rotation.T, axis=0) / 2.
+            xy = g.free_destination_xy()
+            support, _ = g.support_top_world_z(xy)
+            angle = Rotation.from_matrix(current.T @ local).magnitude()
+            # Quantization only breaks floating-point symmetry of equal faces.
+            key = (round(float(extents[2]), 9), round(float(support), 9), angle)
+            choices.append((key, rotation.copy(), g.half.copy(), xy.copy()))
+    if not choices:
+        raise ValueError('PACKING_NO_STABLE_FACE_FITS')
+    _, g.destination_rotation, g.half, g.stable_face_xy = min(choices, key=lambda row: row[0])
+    g.preserve_destination_rotation = True
