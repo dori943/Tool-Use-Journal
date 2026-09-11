@@ -73,5 +73,8 @@ def build_plate_vac_targets(T_WB, center_in_body_m, local_size_m, recipe=None):
 
 def grasp_plate_vac(context, object_id=None, recipe=None):
     object_id = object_id or getattr(context, 'object_id', 'plate')
-    return dispatch_grasp(
-        context, object_id, recipe or plate_vac_recipe(), expected_id='plate')
+    # Prefer the recipe bind_context already installed (C1_1/C2_1 flat vs C3_2
+    # rim). Falling back to plate_vac_recipe() defaults to C3_2 and trips
+    # "Context must be initialized with the same recipe" on C1_1 vac.
+    active = recipe or getattr(context, 'recipe', None) or plate_vac_recipe()
+    return dispatch_grasp(context, object_id, active, expected_id='plate')

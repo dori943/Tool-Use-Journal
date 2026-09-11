@@ -113,6 +113,24 @@ def test_c3_2_plate_vac_and_fork_resolve_multi_instance():
     )
     assert resolve(request_for(c1_vac)) == c1_vac
     assert c1_vac.module_name == "plate_vac"
+    assert c1_vac.recipe().task_id == "c2_1"
+    # grasp_plate_vac must reuse the bound recipe (not default C3_2).
+    from types import SimpleNamespace
+    from tuj.m5_motion.scripted_grasps.objects import plate_vac
+
+    bound = c1_vac.recipe()
+    calls = []
+
+    class _Ctx:
+        object_id = "plate"
+        recipe = bound
+
+        def execute_object(self, recipe):
+            calls.append(recipe)
+            return {"status": "SUCCESS"}
+
+    plate_vac.grasp_plate_vac(_Ctx())
+    assert calls == [bound]
 
 
 def test_c3_2_remaining_instances_resolve_and_build_targets():
