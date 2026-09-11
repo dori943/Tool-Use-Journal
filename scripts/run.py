@@ -451,6 +451,17 @@ def stage_m4(
             str(args.initial_state),
         ]
 
+    # Controller execution uses the validated scripted grasp registry by
+    # default.  Ground that same compatibility contract before M4 searches so
+    # an unsupported EE is not selected and rejected only after M5 starts.
+    if "--no-scripted-grasps" not in args.m5_args:
+        environment = args.m5_environment or TASK_ENV.get(task)
+        if environment:
+            argv += [
+                "--execution-environment",
+                environment,
+            ]
+
     call_main(
         module,
         argv,
