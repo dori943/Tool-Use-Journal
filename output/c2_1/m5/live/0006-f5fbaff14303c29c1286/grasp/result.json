@@ -1,0 +1,129 @@
+{
+  "status": "FAILED",
+  "object_id": "plate",
+  "task_id": "c2_1",
+  "ee_id": "vac",
+  "recipe": {
+    "object_id": "plate",
+    "task_id": "c2_1",
+    "ee_id": "vac",
+    "expected_size_m": [
+      0.182334163,
+      0.181833528,
+      0.011091216
+    ],
+    "offset_fraction": [
+      0.0,
+      0.0,
+      0.5
+    ],
+    "offset_m": [
+      0.0,
+      0.0,
+      -0.0005
+    ],
+    "rotation_xyz_deg": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "contact_region_min": [
+      -0.6,
+      -0.6,
+      -0.6
+    ],
+    "contact_region_max": [
+      0.6,
+      0.6,
+      0.6
+    ],
+    "preshape_aperture_m": 0.05,
+    "preshape_closure_command": 0.16,
+    "approach_distance_m": 0.12,
+    "lift_distance_m": 0.18,
+    "arm_kp": 150.0,
+    "post_grasp_arm_kp": 300.0,
+    "close_duration_s": 4.0,
+    "closure_kp": 20.0,
+    "physics_timestep_s": 0.001,
+    "physics_integrator": "implicitfast",
+    "thin_contact_timeconstant_s": 0.004,
+    "two_finger_parallel_linkage": false,
+    "two_finger_force_target_n": 5.0,
+    "two_finger_force_gain": 0.002,
+    "three_finger_force_targets_n": [
+      6.0,
+      3.0,
+      3.0
+    ],
+    "three_finger_force_gain": 0.002,
+    "prelift_stabilization_s": 0.5,
+    "settle_s": 1.0,
+    "hold_s": 5.0,
+    "joint_speed_rad_s": 0.45,
+    "cartesian_speed_m_s": 0.05,
+    "minimum_lift_m": 0.1,
+    "maximum_slip_m": 0.005,
+    "maximum_slip_deg": 5.0,
+    "contact_ticks": 5,
+    "maximum_joint_limit_error_rad": 0.01,
+    "suction_command": 1.0,
+    "model_class": "VacuumGripper",
+    "recipe_id": "plate_vac_center_v2_attach",
+    "vacuum_attachment_mode": "KINEMATIC"
+  },
+  "scenario": {
+    "seed": 0,
+    "mode": "BORROWED_M5_RUNTIME",
+    "request_id": "motion-request:live:f5fbaff14303c29c1286"
+  },
+  "runtime_version": "catalog_v2_measured_time",
+  "timing": {
+    "physics_timestep_s": 0.001,
+    "control_timestep_s": 0.02,
+    "clock_source": "MUJOCO_DATA_TIME"
+  },
+  "failure_stage": "CLOSE",
+  "failure_reason": "GRASP_CONTACT_NOT_STABLE",
+  "error_type": "GraspFailure",
+  "object_pose_in_gripper": {
+    "position_m": [
+      0.0005162637181296836,
+      0.0012332856972626046,
+      -0.004769209299102628
+    ],
+    "orientation_xyzw": [
+      0.9952393758190138,
+      -0.0024133681663151044,
+      0.0001549773580671767,
+      -0.097430675125918
+    ]
+  },
+  "final_object_pose": {
+    "position_m": [
+      -0.03975857618460452,
+      -0.001223884134251357,
+      0.8153314531415574
+    ],
+    "orientation_xyzw": [
+      0.09747124083692532,
+      0.00017948801249385223,
+      0.0024261553979885485,
+      0.9952353685253295
+    ]
+  },
+  "attachment_used": false,
+  "object_material_inputs": [],
+  "learned_model_calls": 0,
+  "hand_model_correction": {
+    "policy": "NATIVE_HAND",
+    "source_assets_changed": false
+  },
+  "nominal_joint_limit_diagnostics": {
+    "max_violation_rad": 0.0,
+    "allowed_numerical_residual_rad": 0.01,
+    "physics_steps_audited": 17120
+  },
+  "vacuum_policy": "CONTACT_GATED_KINEMATIC_ATTACH",
+  "vacuum_attachment": null
+}
