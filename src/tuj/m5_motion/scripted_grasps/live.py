@@ -111,8 +111,8 @@ class ScriptedGraspSession:
             contact_speed = ContactExecutionProfile().contact_penetration_m / env.control_timestep
             request.constraints.max_cartesian_speed_m_s = min(request.constraints.max_cartesian_speed_m_s or contact_speed, contact_speed)
         if retention is not None:
-            from .transport import ground_held_transport
-            ground_held_transport(request, retention)
+            from .transport import ground_held_region_goal
+            ground_held_region_goal(request, retention)
         token = hashlib.sha256(request.model_dump_json().encode()).hexdigest()[:20]
         request.request_id = f"motion-request:live:{token}"
         request.provenance = request.provenance.model_copy(update={
