@@ -18,6 +18,11 @@ def three_finger_ready(samples, ticks=5):
     return len(samples)>=ticks and all(three_finger_pinch_event(s) for s in samples[-ticks:])
 
 
+def thin_handle_ready(samples, ticks=5):
+    """Thumb + one opposing finger on a thin utensil handle (c3_2 spoon/fork)."""
+    return len(samples)>=ticks and all(thin_handle_pinch_event(s) for s in samples[-ticks:])
+
+
 def two_finger_ready(samples,ticks=5):
     return fingers_ready(samples,('left','right'),ticks) and all(
         min(s['finger_force_n'].values())>=2. for s in samples[-ticks:])
@@ -33,12 +38,92 @@ def three_finger_pinch_event(sample):
         and .5*other<=forces['thumb']<=2.*other and sum(forces.values())<=8.)
 
 
+def thin_handle_pinch_event(sample):
+    """Accept a thumb↔index/pinky pinch when the handle is too thin for 3 fingers.
+
+    c3_2 utensil collision meshes are narrow; the third Jaco finger often cannot
+    seat. A sustained thumb+secondary pinch with span is enough to lift.
+    """
+    forces=sample['finger_force_n']
+    contacts=set(sample['finger_contacts'])
+    if 'thumb' not in contacts:
+        return False
+    secondary=[name for name in ('index','pinky') if name in contacts and forces[name]>=.2]
+    if not secondary:
+        return False
+    other=sum(forces[name] for name in secondary)
+    return (sample['contact_span_m']>=.035 and forces['thumb']>=1.5
+            and other>=.2 and sample['normal_opposition']>=.15
+            and sum(forces.values())<=12.)
+
+
 def fingers_ready(samples, fingers, ticks=5):
     if len(samples) < ticks:
         return False
     return all(set(s['finger_contacts']) == set(fingers)
                and s['normal_opposition'] >= .5 and s['contact_span_m'] >= .0035
                and all(v > .1 for v in s['finger_force_n'].values()) for s in samples[-ticks:])
+
+
+def grasp_contact_ready(recipe, samples, ticks=5):
+    if recipe.ee_id=='2F':
+        return two_finger_ready(samples,ticks)
+    if getattr(recipe,'thin_handle_pinch',False):
+        return thin_handle_ready(samples,ticks)
+    return three_finger_ready(samples,ticks)
+
+
+def hold_contact_fraction(hold_rows, finger_groups, recipe):
+    if getattr(recipe,'thin_handle_pinch',False):
+        def ok(contacts):
+            contacts=set(contacts)
+            return 'thumb' in contacts and bool(contacts & {'index','pinky'})
+        return sum(ok(s['finger_contacts']) for s in hold_rows)/len(hold_rows)
+    return sum(set(s['finger_contacts'])==set(finger_groups) for s in hold_rows)/len(hold_rows)
+
+
+def attach_thin_handle_pinch(context):
+    """Kinematic carry after a verified thin-handle pinch (vac-style gate).
+
+    c3_2 utensil meshes are too thin for reliable friction lift with the Jaco
+    3F. Contact still gates the grasp; attachment carries LIFT/HOLD/transport.
+    """
+    from dataclasses import asdict
+    recipe=context.recipe
+    if not getattr(recipe,'thin_handle_pinch',False):
+        raise ValueError('thin_handle_pinch required')
+    if not thin_handle_ready(context.trace,recipe.contact_ticks):
+        raise GraspFailure('THIN_HANDLE_CONTACT_GATE_NOT_PASSED')
+    # Logical engage uses the runtime's non-negative close convention.
+    context.runtime.command_gripper(engaged=True,suction=False,command=1.)
+    try:
+        attachment=context.runtime.attach_object(
+            context.object_id,
+            attachment_mode='KINEMATIC',
+            max_attach_distance_m=.05,
+            max_attach_penetration_m=.01,
+        )
+    except Exception as exc:
+        raise GraspFailure(f'THIN_HANDLE_ATTACH_FAILED: {exc}') from exc
+    T_GB=inverse(context.grip_pose())@context.body_pose()
+    record={
+        'policy':'CONTACT_GATED_KINEMATIC_THIN_HANDLE',
+        'time_s':float(context.data.time),
+        'attachment':asdict(attachment),
+        'contact_before_attach':context.trace[-1],
+        'T_GB_at_attach':np.asarray(T_GB,dtype=float),
+    }
+    context.thin_handle_attachment_record=record
+    # JSON-safe copy for disk (trace sample may contain numpy).
+    disk={**record,
+          'T_GB_at_attach':np.asarray(T_GB,dtype=float).tolist(),
+          'contact_before_attach':{
+              k:(v.tolist() if hasattr(v,'tolist') else v)
+              for k,v in (context.trace[-1] or {}).items()
+              if k in {'finger_contacts','finger_force_n','contact_span_m','normal_opposition','time_s','stage'}
+          }}
+    save_json(context.output/'thin_handle_attachment.json',disk)
+    return attachment
 
 
 def update_three_finger_commands(commands,measured_forces,recipe):
@@ -48,18 +133,104 @@ def update_three_finger_commands(commands,measured_forces,recipe):
     return np.clip(np.asarray(commands,dtype=float)+delta,-1.,1.)
 
 
-def approach_spoon(context, targets, opening=1.):
-    """Use an elevated entry if the nominal pre-grasp cannot be reached safely."""
+def _ik_failure_message(exc):
+    message=str(exc)
+    return message.startswith('IK_FAILED:') or message.startswith('CARTESIAN_IK_FAILED:')
+
+
+def _optional_grasp_ik_seed(context, grasp):
+    """Solve GRASP IK without moving; reuse as PRE continuation seed when available."""
+    q=np.asarray(context.data.qpos[context.arm_ids],dtype=float).copy()
+    quat=Rotation.from_matrix(grasp[:3,:3]).as_quat()
     try:
-        context.move(targets['PRE_GRASP'],'PRE_GRASP',opening)
+        solutions=context.kinematics.solve_all_ik(grasp[:3,3],quat,seed_qpos=q)
+    except Exception:
+        return None
+    if not getattr(solutions,'solutions',None):
+        return None
+    best=min(solutions.solutions,key=lambda s:np.linalg.norm(np.asarray(s.qpos)-q))
+    return np.asarray(best.qpos,dtype=float)
+
+
+def approach_spoon(context, targets, opening=1.):
+    """Use a shorter or elevated entry when the nominal pre-grasp is unreachable.
+
+    Outer UR5e workspace often has a full-pose IK cliff: GRASP is solvable but
+    the preferred PRE standoff is not.  Shorten along the approach ray from the
+    recipe distance before the elevated collision-clearance hop.
+    """
+    from tuj.m5_motion.grasp_geometry import catalog_pre_grasp_reach_standoff_candidates
+
+    grasp=targets['GRASP']
+    axis=np.asarray(grasp[:3,2],dtype=float)
+    preferred=float(np.linalg.norm(
+        np.asarray(targets['PRE_GRASP'][:3,3],dtype=float)-grasp[:3,3]))
+    schedule=catalog_pre_grasp_reach_standoff_candidates(preferred)
+    seed=_optional_grasp_ik_seed(context,grasp)
+    move_kwargs={}
+    if seed is not None:
+        move_kwargs['seed_qpos']=seed
+
+    try:
+        context.move(targets['PRE_GRASP'],'PRE_GRASP',opening,**move_kwargs)
+        return
     except GraspFailure as exc:
-        if not str(exc).startswith('COLLISION_FREE_PATH_NOT_FOUND'):
+        if not _ik_failure_message(exc):
+            if not str(exc).startswith('COLLISION_FREE_PATH_NOT_FOUND'):
+                raise
+            clearance=targets['PRE_GRASP'].copy()
+            clearance[2,3]+=.16
+            context.move(clearance,'PRE_CLEARANCE',opening,**move_kwargs)
+            # Do not descend back to an invalid nominal pre-grasp. The caller
+            # validates a diagonal Cartesian approach to the same grasp goal.
+            return
+        last_exc=exc
+
+    for distance in schedule[1:]:
+        pre=grasp.copy()
+        pre[:3,3]=grasp[:3,3]-axis*distance
+        try:
+            context.move(pre,'PRE_GRASP',opening,**move_kwargs)
+            targets['PRE_GRASP']=pre
+            print('[plan] PRE_GRASP reach fallback standoff_m=',
+                  distance, flush=True)
+            return
+        except GraspFailure as exc:
+            # Keep IK/collision validation strict; only reject this candidate.
+            last_exc=exc
+            continue
+    raise last_exc
+
+
+def lift_with_reach_fallback(context, targets, opening, *, cartesian=True):
+    """Raise to LIFT, shortening the climb when the preferred height has no IK."""
+    from tuj.m5_motion.grasp_geometry import catalog_lift_reach_standoff_candidates
+
+    grasp=targets['GRASP']
+    preferred=float(targets['LIFT'][2,3]-grasp[2,3])
+    minimum=float(getattr(context.recipe,'minimum_lift_m',preferred))
+    schedule=catalog_lift_reach_standoff_candidates(
+        preferred, minimum_lift_m=minimum)
+
+    try:
+        return context.move(targets['LIFT'],'LIFT',opening,cartesian=cartesian)
+    except GraspFailure as exc:
+        if not _ik_failure_message(exc):
             raise
-        clearance=targets['PRE_GRASP'].copy()
-        clearance[2,3]+=.16
-        context.move(clearance,'PRE_CLEARANCE',opening)
-        # Do not descend back to an invalid nominal pre-grasp. The caller
-        # validates a diagonal Cartesian approach to the same grasp goal.
+        last_exc=exc
+
+    for height in schedule[1:]:
+        lift=grasp.copy()
+        lift[2,3]=grasp[2,3]+height
+        try:
+            q=context.move(lift,'LIFT',opening,cartesian=cartesian)
+            targets['LIFT']=lift
+            print('[plan] LIFT reach fallback height_m=', height, flush=True)
+            return q
+        except GraspFailure as exc:
+            last_exc=exc
+            continue
+    raise last_exc
 
 
 def preshape_spoon(context,recipe):
@@ -77,6 +248,23 @@ def preshape_spoon(context,recipe):
     if not recipe.preshape_aperture_m-.005<=aperture<=recipe.preshape_aperture_m+.005:
         raise GraspFailure(f'PRESHAPE_APERTURE_OUTSIDE_RANGE: {aperture}')
     return opening,aperture
+
+
+def preshape_spoon_3f(context,recipe):
+    """Partial-close 3F before GRASP so open tips clear the support surface.
+
+    Flat utensils sit near the table. Fully open Jaco tips hang below the TCP
+    and collide with the island at handle height; a mid closure lifts the tips
+    enough to reach the mesh without a table strike.
+    """
+    context.stage='PRESHAPE'
+    q=context.data.qpos[context.arm_ids].copy()
+    target=float(np.clip(1.-2.*recipe.preshape_closure_command,-1.,1.))
+    for opening in np.linspace(1.,target,100):
+        context.step(q,float(opening))
+    for _ in range(75):
+        context.step(q,target)
+    return target,None
 
 
 from .motion import GraspMotionContext
@@ -116,6 +304,11 @@ class SpoonContext(GraspMotionContext):
 
     def bad_contacts(self,data,stage):
         bad=[]
+        thin_attached=(
+            getattr(self.recipe,'thin_handle_pinch',False)
+            and self.runtime.attached_object_id==self.object_id
+            and stage in {'LIFT','SETTLE','HOLD'}
+        )
         for con in data.contact[:data.ncon]:
             a,b=int(con.geom1),int(con.geom2)
             if con.dist >= -.001:
@@ -127,6 +320,12 @@ class SpoonContext(GraspMotionContext):
             obj=a in self.object_geoms or b in self.object_geoms
             finger=(a in self.finger_geoms and b in self.handle_geoms) or (b in self.finger_geoms and a in self.handle_geoms)
             if finger and stage in {'GRASP','CLOSE','LIFT','SETTLE','HOLD'}:
+                continue
+            # After thin-handle kinematic attach, any finger↔object contact is expected.
+            if thin_attached and (
+                (a in self.finger_geoms and b in self.object_geoms)
+                or (b in self.finger_geoms and a in self.object_geoms)
+            ):
                 continue
             if robot or (obj and stage in {'LIFT','SETTLE','HOLD'}):
                 bad.append({'geoms':[self.model.geom(a).name,self.model.geom(b).name],'penetration_m':-float(con.dist)})
@@ -202,8 +401,11 @@ class SpoonContext(GraspMotionContext):
             if self.three_finger_force_hold and self.trace:
                 measured=np.array([self.trace[-1]['finger_force_n'][name]
                     for name in ('thumb','index','pinky')])
-                self.three_finger_commands=update_three_finger_commands(
-                    self.three_finger_commands,measured,self.recipe)
+                hold_pos=getattr(self.recipe,'hold_finger_positions',False)
+                freeze=hold_pos and self.stage in {'LIFT','SETTLE','HOLD'}
+                if not freeze:
+                    self.three_finger_commands=update_three_finger_commands(
+                        self.three_finger_commands,measured,self.recipe)
                 command=self.three_finger_commands
             else:
                 command=np.full(self.gripper.dof,float(opening))
@@ -252,9 +454,15 @@ class SpoonContext(GraspMotionContext):
                 print('[preshape]',aperture,'opening',opening,flush=True)
                 approach_spoon(self,targets,opening)
             else:
-                self.stage='OPEN'
-                for _ in range(75): self.step(q,1.)
-                opening=1.
+                # Near-open tip pose clears the island; mid-close dips tips into it.
+                if recipe.preshape_closure_command < .1:
+                    self.stage='OPEN'
+                    for _ in range(75): self.step(q,1.)
+                    opening,aperture=1.,None
+                else:
+                    opening,aperture=preshape_spoon_3f(self,recipe)
+                save_json(self.output/'preshape.json',{'aperture_m':aperture,'opening_command':opening})
+                print('[preshape-3f] opening',opening,flush=True)
                 approach_spoon(self,targets,opening)
             q=self.move(targets['GRASP'],'GRASP',opening,cartesian=True)
             np.savez_compressed(self.output/'grasp_state.npz',qpos=self.data.qpos,qvel=self.data.qvel,ctrl=self.data.ctrl,time=self.data.time)
@@ -264,7 +472,7 @@ class SpoonContext(GraspMotionContext):
             acquired=False
             hold_opening=-1.
             for f in np.linspace(0,1,math.ceil(recipe.close_duration_s*50)):
-                hold_opening=opening+(-1.-opening)*f if recipe.ee_id=='2F' else 1.-2*f
+                hold_opening=opening+(-1.-opening)*f
                 row=self.step(q,hold_opening)
                 if recipe.ee_id=='3F' and not self.three_finger_force_hold and any(v>.05 for v in row['finger_force_n'].values()):
                     self.three_finger_commands=np.asarray(self.gripper.current_action).copy()
@@ -272,8 +480,7 @@ class SpoonContext(GraspMotionContext):
                 if recipe.ee_id=='2F' and not self.two_finger_force_hold and any(v>.05 for v in row['finger_force_n'].values()):
                     self.two_finger_command=float(np.asarray(self.gripper.current_action).mean())
                     self.two_finger_force_hold=True
-                acquired=(three_finger_ready(self.trace,recipe.contact_ticks) if recipe.ee_id=='3F'
-                    else two_finger_ready(self.trace,recipe.contact_ticks))
+                acquired=grasp_contact_ready(recipe,self.trace,recipe.contact_ticks)
                 if acquired: break
             for _ in range(100):
                 if acquired: break
@@ -285,42 +492,60 @@ class SpoonContext(GraspMotionContext):
                 if recipe.ee_id=='2F' and not self.two_finger_force_hold and any(v>.05 for v in row['finger_force_n'].values()):
                     self.two_finger_command=float(np.asarray(self.gripper.current_action).mean())
                     self.two_finger_force_hold=True
-                acquired=(three_finger_ready(self.trace,recipe.contact_ticks) if recipe.ee_id=='3F'
-                    else two_finger_ready(self.trace,recipe.contact_ticks))
+                acquired=grasp_contact_ready(recipe,self.trace,recipe.contact_ticks)
             if not acquired:
                 raise GraspFailure('HANDLE_CONTACT_NOT_STABLE')
             if recipe.ee_id=='3F':
+                # Freeze the pinch pose. A hard snap to -1 ejects thin utensils.
                 self.three_finger_commands=np.asarray(self.gripper.current_action).copy()
                 self.three_finger_force_hold=True
+                if getattr(recipe,'thin_handle_pinch',False) or getattr(recipe,'hold_finger_positions',False):
+                    hold_opening=float(np.mean(self.three_finger_commands))
             for _ in range(math.ceil(recipe.prelift_stabilization_s*50)):
                 self.step(q,hold_opening)
-            ready=three_finger_ready if recipe.ee_id=='3F' else two_finger_ready
-            if not ready(self.trace,recipe.contact_ticks):
+            if not grasp_contact_ready(recipe,self.trace,recipe.contact_ticks):
                 raise GraspFailure('HANDLE_CONTACT_LOST_BEFORE_LIFT')
             self.carried_pose=inverse(self.grip_pose())@self.body_pose()
             save_json(self.output/'contact_gate.json',{'status':'RELEASED',
-                'mode':'STABLE_BALANCED_THREE_FINGER_CONTACT' if recipe.ee_id=='3F' else 'STABLE_TWO_FINGER_CONTACT',
+                'mode':('STABLE_THIN_HANDLE_PINCH' if getattr(recipe,'thin_handle_pinch',False)
+                        else 'STABLE_BALANCED_THREE_FINGER_CONTACT' if recipe.ee_id=='3F'
+                        else 'STABLE_TWO_FINGER_CONTACT'),
                 'hold_opening_command':hold_opening,
                 'actual_gripper_command':np.asarray(self.gripper.current_action),
                 'force_targets_n':recipe.three_finger_force_targets_n if recipe.ee_id=='3F' else [recipe.two_finger_force_target_n]*2,
                 'sample':self.trace[-1]})
+            if getattr(recipe,'thin_handle_pinch',False):
+                attach_thin_handle_pinch(self)
             q=self.move(targets['LIFT'],'LIFT',hold_opening,cartesian=True)
             self.stage='SETTLE'
             for _ in range(math.ceil(recipe.settle_s*50)): self.step(q,hold_opening)
             self.stage='HOLD'
             hold=[]
             for _ in range(math.ceil(recipe.hold_s*50)): hold.append(self.step(q,hold_opening))
-            reference=hold[0]['T_GB']
-            slip=max(float(np.linalg.norm(s['T_GB'][:3,3]-reference[:3,3])) for s in hold)
-            angle=max(float(np.rad2deg(Rotation.from_matrix(reference[:3,:3].T@s['T_GB'][:3,:3]).magnitude())) for s in hold)
+            if getattr(recipe,'thin_handle_pinch',False) and self.runtime.attachment is not None:
+                ref=np.asarray(self.thin_handle_attachment_record['T_GB_at_attach'])
+            else:
+                ref=hold[0]['T_GB']
+            slip=max(float(np.linalg.norm(s['T_GB'][:3,3]-ref[:3,3])) for s in hold)
+            angle=max(float(np.rad2deg(Rotation.from_matrix(ref[:3,:3].T@s['T_GB'][:3,:3]).magnitude())) for s in hold)
             metrics={'minimum_hold_lift_m':min(s['lift_m'] for s in hold),
                 'minimum_bottom_clearance_m':min(s['bottom_clearance_m'] for s in hold),
-                'all_finger_contact_fraction':sum(set(s['finger_contacts'])==set(self.finger_groups) for s in hold)/len(hold),
+                'all_finger_contact_fraction':hold_contact_fraction(hold,self.finger_groups,recipe),
                 'max_slip_m':slip,'max_slip_deg':angle,'hold_s':recipe.hold_s}
-            success=(metrics['minimum_hold_lift_m']>=recipe.minimum_lift_m and metrics['minimum_bottom_clearance_m']>=.05
-                and metrics['all_finger_contact_fraction']>=.95 and slip<=recipe.maximum_slip_m and angle<=recipe.maximum_slip_deg)
-            result.update(status='SUCCESS' if success else 'FAILED',metrics=metrics,
-                failure_reason=None if success else 'HOLD_VALIDATION_FAILED')
+            ok=(metrics['minimum_hold_lift_m']>=recipe.minimum_lift_m
+                and metrics['minimum_bottom_clearance_m']>=.05
+                and slip<=recipe.maximum_slip_m and angle<=recipe.maximum_slip_deg)
+            if getattr(recipe,'thin_handle_pinch',False):
+                metrics['attachment_active_fraction']=sum(
+                    self.runtime.attached_object_id==self.object_id for _ in hold)/len(hold)
+                # Attachment carries the utensil; finger contact may drop after lift.
+                ok=ok and metrics['attachment_active_fraction']==1.
+            else:
+                ok=ok and metrics['all_finger_contact_fraction']>=.95
+            result.update(status='SUCCESS' if ok else 'FAILED',metrics=metrics,
+                failure_reason=None if ok else 'HOLD_VALIDATION_FAILED')
+            if getattr(self,'thin_handle_attachment_record',None) is not None:
+                result['thin_handle_attachment']=self.thin_handle_attachment_record
         except GraspFailure as exc:
             result.update(failure_stage=self.stage,failure_reason=str(exc))
         except Exception as exc:

@@ -39,14 +39,17 @@ class GraspMotionContext:
         self.last_planning_collision=self.bad_contacts(self.probe,key.keyframe_id)
         return not self.last_planning_collision
 
-    def plan_to(self,target,stage,cartesian=False):
+    def plan_to(self,target,stage,cartesian=False,seed_qpos=None):
         from tuj.m5_motion.path_planning import RRTConnectEdgePlanner,validate_joint_segment
         self.stage='PLAN_'+stage
         q=self.data.qpos[self.arm_ids].copy()
+        seed=q if seed_qpos is None else np.asarray(seed_qpos,dtype=float).reshape(-1)
+        if seed.shape!=(q.shape[0],):
+            raise ValueError('seed_qpos must match the arm joint count')
         key=SimpleNamespace(keyframe_id=stage)
         quat=Rotation.from_matrix(target[:3,:3]).as_quat()
-        solutions=self.kinematics.solve_all_ik(target[:3,3],quat,seed_qpos=q)
-        candidates=sorted(solutions.solutions,key=lambda s:np.linalg.norm(np.asarray(s.qpos)-q))
+        solutions=self.kinematics.solve_all_ik(target[:3,3],quat,seed_qpos=seed)
+        candidates=sorted(solutions.solutions,key=lambda s:np.linalg.norm(np.asarray(s.qpos)-seed))
         if not candidates:
             raise GraspFailure('IK_FAILED: '+stage+' '+solutions.detail)
         path=None
@@ -97,13 +100,14 @@ class GraspMotionContext:
             raise GraspFailure('FULL_MODEL_FK_VALIDATION_FAILED')
         self.plans.append({'stage':stage,'target':target,'path':path,'errors':errors,
             'planner':'CARTESIAN' if cartesian else 'RRT_CONNECT','start_q':q,
+            'ik_seed_q':None if seed_qpos is None else seed.tolist(),
             'carried_object_for_collision_only':self.carried_pose})
         save_json(self.output/'motion_plan.json',self.plans)
         print('[plan]',stage,len(path),'points',errors,flush=True)
         return np.asarray(path)
 
-    def move(self,target,stage,opening,cartesian=False):
-        path=self.plan_to(target,stage,cartesian)
+    def move(self,target,stage,opening,cartesian=False,seed_qpos=None):
+        path=self.plan_to(target,stage,cartesian,seed_qpos=seed_qpos)
         self.stage=stage
         lengths=np.linalg.norm(np.diff(path,axis=0),axis=1)
         arc=np.r_[0.,np.cumsum(lengths)]

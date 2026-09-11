@@ -34,6 +34,18 @@ _SURFACE_ANCHOR_NAMES = frozenset(
     {"top", "top_center", "bottom", "bottom_center"}
 )
 _SUCTION_SURFACE_EPS_M = 1e-4
+# Lateral sample radius for approach-facing TARGET collision points around the
+# grasp axis. Matches the mounted vacuum cup outer radius so the binder scores
+# the surface the sealing face can reach.
+_SUCTION_CONTACT_SAMPLE_RADIUS_M = 0.03
+# When the cup disk is empty, search this far laterally for a cup-centered
+# TARGET patch (never copy a neighboring height onto the hollow center XY).
+# Bound is local: about one cup diameter beyond the sealing radius.
+_SUCTION_CONTACT_PATCH_SEARCH_RADIUS_M = 0.08
+# Minimum TARGET collision points inside a relocated cup disk for a reliable
+# surface patch (sparse mesh vertices still qualify at the rim).
+_SUCTION_CONTACT_MIN_PATCH_POINTS = 3
+_SUCTION_PATCH_ANCHOR_PREFIX = "suction_surface_patch"
 _TABLETOP_ENCLOSURE_APPROACH_LOCAL = (0.0, 0.0, 1.0)
 _TABLETOP_ENCLOSURE_PRE_GRASP_OFFSET_M = 0.12
 # Prefer the clearance above; shorter values are only tried when the preferred
@@ -42,6 +54,15 @@ _TABLETOP_ENCLOSURE_PRE_GRASP_OFFSET_M = 0.12
 _TABLETOP_ENCLOSURE_PRE_GRASP_REACH_FALLBACKS_M = (0.10, 0.08, 0.06)
 _TABLETOP_ENCLOSURE_LIFT_OFFSET_M = 0.18
 _TABLETOP_ENCLOSURE_LIFT_REACH_FALLBACKS_M = (0.15, 0.12, 0.10, 0.08, 0.06)
+# Deterministic shorten step implied by the PRE ladder spacing (0.10→0.08).
+# Catalog scripted reach fallback reuses this spacing instead of absolute lists.
+_TABLETOP_ENCLOSURE_REACH_FALLBACK_STEP_M = (
+    _TABLETOP_ENCLOSURE_PRE_GRASP_REACH_FALLBACKS_M[0]
+    - _TABLETOP_ENCLOSURE_PRE_GRASP_REACH_FALLBACKS_M[1]
+)
+_TABLETOP_ENCLOSURE_REACH_FALLBACK_FLOOR_M = min(
+    _TABLETOP_ENCLOSURE_PRE_GRASP_REACH_FALLBACKS_M
+)
 # Conservative downward reach of mounted 3F finger collision geoms below the
 # grip TCP (distal + tip boxes). Shared by tabletop acquire GRASP raise and
 # multi-finger region PLACE raise. Offline HOLDING poses measure tip≈22 mm and
@@ -74,6 +95,84 @@ def multi_finger_tabletop_standoff_candidates(
         if value < preferred - 1e-9:
             candidates.append(value)
     return tuple(candidates)
+
+
+def catalog_reach_fallback_step_m() -> float:
+    """Shorten step reused from tabletop PRE ladder spacing (no new magic)."""
+
+    return float(_TABLETOP_ENCLOSURE_REACH_FALLBACK_STEP_M)
+
+
+def catalog_pre_grasp_reach_minimum_m() -> float:
+    """PRE floor reused from the shortest tabletop PRE reach fallback."""
+
+    return float(_TABLETOP_ENCLOSURE_REACH_FALLBACK_FLOOR_M)
+
+
+def reach_standoff_schedule_m(
+    preferred_offset_m: float,
+    *,
+    step_m: float,
+    minimum_m: float,
+) -> tuple[float, ...]:
+    """Preferred standoff first, then ``preferred - n*step`` while ``>= minimum``.
+
+    Always includes the original preferred distance (even if it is already below
+    ``minimum_m``) so callers try the recipe pose before any shortening.
+    """
+
+    preferred = float(preferred_offset_m)
+    step = float(step_m)
+    minimum = float(minimum_m)
+    if not math.isfinite(preferred) or preferred < 0.0:
+        raise ValueError("preferred_offset_m must be a finite non-negative length")
+    if not math.isfinite(step) or step <= 0.0:
+        raise ValueError("step_m must be a finite positive length")
+    if not math.isfinite(minimum) or minimum < 0.0:
+        raise ValueError("minimum_m must be a finite non-negative length")
+    # Round to nm-scale so binary float drift does not leak into poses/tests.
+    def _clean(value: float) -> float:
+        return float(round(value, 9))
+
+    candidates = [_clean(preferred)]
+    if preferred < minimum - 1e-9:
+        return tuple(candidates)
+    n = 1
+    while n <= 1000:
+        distance = preferred - n * step
+        if distance < minimum - 1e-9:
+            break
+        candidates.append(_clean(distance))
+        n += 1
+    else:
+        raise ValueError("reach standoff schedule did not terminate")
+    return tuple(candidates)
+
+
+def catalog_pre_grasp_reach_standoff_candidates(
+    preferred_offset_m: float,
+) -> tuple[float, ...]:
+    """Recipe PRE distance, then deterministic shorter approach standoffs."""
+
+    return reach_standoff_schedule_m(
+        preferred_offset_m,
+        step_m=catalog_reach_fallback_step_m(),
+        minimum_m=catalog_pre_grasp_reach_minimum_m(),
+    )
+
+
+def catalog_lift_reach_standoff_candidates(
+    preferred_offset_m: float,
+    *,
+    minimum_lift_m: float,
+) -> tuple[float, ...]:
+    """Recipe LIFT height, then shorter climbs down to ``minimum_lift_m``."""
+
+    return reach_standoff_schedule_m(
+        preferred_offset_m,
+        step_m=catalog_reach_fallback_step_m(),
+        minimum_m=float(minimum_lift_m),
+    )
 
 
 def multi_finger_tabletop_pre_grasp_standoff_candidates(
@@ -1203,6 +1302,143 @@ def _approach_facing_surface_offset_from_center_m(
     return float(np.dot(half, np.abs(unit)))
 
 
+@dataclass(frozen=True, slots=True)
+class _SuctionContactSurface:
+    """Approach-facing TARGET contact for a suction GRASP TCP."""
+
+    surface_offset_from_center_m: float
+    source: str
+    grasp_local_m: np.ndarray
+    relocated_laterally: bool
+
+
+def _cup_disk_surface_offset_from_center_m(
+    points: np.ndarray,
+    center: np.ndarray,
+    unit: np.ndarray,
+    grasp_local: np.ndarray,
+    sample_radius_m: float,
+    surface_rank: int = 1,
+) -> tuple[float, int] | None:
+    """Ranked approach projection and count of TARGET points under a cup disk."""
+
+    relative = points - np.asarray(grasp_local, dtype=float)
+    lateral = relative - np.outer(relative @ unit, unit)
+    lateral_dist = np.linalg.norm(lateral, axis=1)
+    in_cup = points[lateral_dist <= float(sample_radius_m) + 1e-12]
+    if in_cup.size == 0:
+        return None
+    along = (in_cup - center) @ unit
+    rank = min(max(int(surface_rank), 1), int(in_cup.shape[0]))
+    return float(np.partition(along, -rank)[-rank]), int(in_cup.shape[0])
+
+
+def _approach_facing_collision_surface_offset_from_center_m(
+    record: Mapping[str, object],
+    approach_local: np.ndarray,
+    grasp_local: np.ndarray,
+    *,
+    sample_radius_m: float = _SUCTION_CONTACT_SAMPLE_RADIUS_M,
+    patch_search_radius_m: float = _SUCTION_CONTACT_PATCH_SEARCH_RADIUS_M,
+    min_patch_points: int = _SUCTION_CONTACT_MIN_PATCH_POINTS,
+    surface_rank: int = 1,
+) -> _SuctionContactSurface | None:
+    """Approach-facing TARGET surface from body-local collision points.
+
+    ``collision_points_m`` on world object records are unique vertices of the
+    object's collision geoms in the body frame.  Priority:
+
+    1. Points inside the cup disk (``sample_radius_m``) under the current
+       grasp axis -- first TARGET surface the sealing face meets.
+    2. Else a bounded nearby lateral search for a cup-sized TARGET patch:
+       relocate the grasp axis onto that patch, then take the approach-facing
+       max under the relocated cup (never copy a neighbor height onto an
+       empty hollow center).
+    3. Else AABB face fallback at the original grasp XY.
+
+    ``None`` only when even the AABB face cannot be recovered.  No fixed
+    immersion is applied.
+    """
+
+    aabb_offset = _approach_facing_surface_offset_from_center_m(
+        record, approach_local
+    )
+    approach = np.asarray(approach_local, dtype=float)
+    norm = float(np.linalg.norm(approach))
+    if not math.isfinite(norm) or norm < 1e-12:
+        return None
+    unit = approach / norm
+    center = _object_center_local(record)
+    origin = np.asarray(grasp_local, dtype=float)
+    points = _finite_points(record.get("collision_points_m"))
+    if (
+        points is None
+        or not math.isfinite(float(sample_radius_m))
+        or sample_radius_m < 0.0
+        or not math.isfinite(float(patch_search_radius_m))
+        or patch_search_radius_m < float(sample_radius_m)
+        or int(min_patch_points) < 1
+    ):
+        if aabb_offset is None:
+            return None
+        return _SuctionContactSurface(
+            float(aabb_offset), "aabb_fallback", origin, False
+        )
+
+    direct = _cup_disk_surface_offset_from_center_m(
+        points, center, unit, origin, sample_radius_m, surface_rank
+    )
+    if direct is not None:
+        surface_offset, _count = direct
+        return _SuctionContactSurface(
+            surface_offset, "collision_points", origin, False
+        )
+
+    relative = points - origin
+    lateral = relative - np.outer(relative @ unit, unit)
+    lateral_dist = np.linalg.norm(lateral, axis=1)
+    seeds = points[
+        (lateral_dist > float(sample_radius_m) + 1e-12)
+        & (lateral_dist <= float(patch_search_radius_m) + 1e-12)
+    ]
+    best: tuple[float, float, np.ndarray, float] | None = None
+    for seed in seeds:
+        lat_vec = (seed - origin) - float(np.dot(seed - origin, unit)) * unit
+        shift = float(np.linalg.norm(lat_vec))
+        if shift <= 1e-12:
+            continue
+        candidate = origin + lat_vec
+        scored = _cup_disk_surface_offset_from_center_m(
+            points, center, unit, candidate, sample_radius_m, surface_rank
+        )
+        if scored is None:
+            continue
+        surface_offset, count = scored
+        if count < int(min_patch_points):
+            continue
+        # Prefer higher approach-facing contact (support clearance), then
+        # smaller lateral shift from the original grasp axis.
+        rank = (surface_offset, -shift)
+        if best is None or rank > (best[0], best[1]):
+            best = (surface_offset, -shift, candidate, surface_offset)
+
+    if best is not None:
+        surface_offset, _neg_shift, candidate, _surf = best
+        return _SuctionContactSurface(
+            float(surface_offset),
+            "nearby_surface_patch",
+            np.asarray(candidate, dtype=float),
+            True,
+        )
+
+    if aabb_offset is None:
+        return None
+    return _SuctionContactSurface(
+        float(aabb_offset), "aabb_fallback", origin, False
+    )
+
+
+
 def _anchor_local_position(
     record: Mapping[str, object], anchor: str
 ) -> np.ndarray | None:
@@ -1232,12 +1468,17 @@ def _anchor_local_position(
 
 @dataclass(frozen=True, slots=True)
 class SuctionSurfaceContactBinder:
-    """Bind vacuum GRASP TCP to the approach-facing object surface.
+    """Bind vacuum GRASP TCP to the approach-facing TARGET collision surface.
 
     Symbolic anchors such as ``center`` remain valid.  Only object-acquire
-    GRASP keyframes for suction EEs are rewritten, and only when the resolved
-    TCP still lies inside the object relative to the free-space face (so
-    ``top`` / ``top_center`` / already-clear standoffs are left unchanged).
+    GRASP keyframes for suction EEs are rewritten.  When the world record
+    carries body-local ``collision_points_m``, the contact plane is the
+    highest TARGET collision point under the cup footprint around the grasp
+    axis.  Empty cup disks relocate laterally onto a nearby cup-covered
+    TARGET patch before falling back to the AABB face.  Matching PRE_GRASP
+    and LIFT keyframes follow the same lateral anchor.  Clear free-space
+    standoffs beyond the AABB face are preserved; there is no fixed
+    immersion past the recovered TARGET surface.
     """
 
     def bind(
@@ -1260,25 +1501,21 @@ class SuctionSurfaceContactBinder:
         candidates: list[KeyframePlanCandidate] = []
         changed = False
         for candidate in artifact.candidates:
-            keyframes: list[RelativeKeyframeSpec] = []
-            candidate_changed = False
-            for keyframe in candidate.keyframes:
-                bound = self._bind_keyframe(
-                    keyframe,
-                    record=record,
-                    frame_ref=frame_ref,
-                )
-                if bound is not keyframe:
-                    candidate_changed = True
-                    changed = True
-                keyframes.append(bound)
-            if not candidate_changed:
+            bound_frames, record = self._bind_candidate(
+                candidate,
+                record=record,
+                request=request,
+                tool_id=str(tool_id),
+                frame_ref=frame_ref,
+            )
+            if bound_frames is None:
                 candidates.append(candidate)
                 continue
+            changed = True
             candidates.append(
                 candidate.model_copy(
                     update={
-                        "keyframes": keyframes,
+                        "keyframes": bound_frames,
                         "rationale": (
                             f"{candidate.rationale} Vacuum GRASP TCP is bound "
                             "to the approach-facing suction contact surface."
@@ -1332,17 +1569,109 @@ class SuctionSurfaceContactBinder:
             return False
         return _request_uses_suction(request)
 
-    def _bind_keyframe(
+    def _bind_candidate(
+        self,
+        candidate: KeyframePlanCandidate,
+        *,
+        record: Mapping[str, object],
+        request: MotionPlanRequest,
+        tool_id: str,
+        frame_ref: str,
+    ) -> tuple[list[RelativeKeyframeSpec] | None, Mapping[str, object]]:
+        grasp = next(
+            (
+                keyframe
+                for keyframe in candidate.keyframes
+                if keyframe.keyframe_type is KeyframeType.GRASP
+                and keyframe.frame_ref == frame_ref
+            ),
+            None,
+        )
+        if grasp is None:
+            return None, record
+        bound_grasp, record = self._bind_grasp_keyframe(
+            grasp,
+            record=record,
+            request=request,
+            tool_id=tool_id,
+            frame_ref=frame_ref,
+            strategy_id=candidate.strategy_id,
+        )
+        if bound_grasp is grasp:
+            return None, record
+        patch_anchor = bound_grasp.anchor
+        relocated = bool(
+            (bound_grasp.metadata or {}).get("suction_lateral_relocation_m")
+        )
+        keyframes: list[RelativeKeyframeSpec] = []
+        for keyframe in candidate.keyframes:
+            if keyframe is grasp:
+                keyframes.append(bound_grasp)
+                continue
+            if (
+                relocated
+                and keyframe.frame_ref == frame_ref
+                and keyframe.keyframe_type
+                in {KeyframeType.PRE_GRASP, KeyframeType.LIFT}
+                and keyframe.anchor == grasp.anchor
+                and keyframe.approach_axis_xyz == grasp.approach_axis_xyz
+            ):
+                keyframes.append(
+                    keyframe.model_copy(
+                        update={
+                            "anchor": patch_anchor,
+                            "metadata": {
+                                **keyframe.metadata,
+                                "suction_follow_grasp_patch": True,
+                                "suction_source_anchor": grasp.anchor,
+                            },
+                        }
+                    )
+                )
+                continue
+            keyframes.append(keyframe)
+        return keyframes, record
+
+    def _inject_patch_anchor(
+        self,
+        *,
+        record: Mapping[str, object],
+        request: MotionPlanRequest,
+        tool_id: str,
+        strategy_id: str,
+        contact_local: np.ndarray,
+    ) -> tuple[str, Mapping[str, object]]:
+        digest = hashlib.sha256(
+            json.dumps(
+                {
+                    "strategy_id": strategy_id,
+                    "contact_local_m": [
+                        round(float(v), 6) for v in contact_local.tolist()
+                    ],
+                },
+                sort_keys=True,
+            ).encode("utf-8")
+        ).hexdigest()[:12]
+        anchor_name = f"{_SUCTION_PATCH_ANCHOR_PREFIX}_{digest}"
+        raw_anchors = record.get("anchors", {})
+        if not isinstance(raw_anchors, Mapping):
+            raw_anchors = {}
+        anchors = dict(raw_anchors)
+        anchors[anchor_name] = [float(v) for v in np.asarray(contact_local, dtype=float)]
+        updated = {**dict(record), "anchors": anchors}
+        request.world.objects[tool_id] = updated
+        return anchor_name, updated
+
+    def _bind_grasp_keyframe(
         self,
         keyframe: RelativeKeyframeSpec,
         *,
         record: Mapping[str, object],
+        request: MotionPlanRequest,
+        tool_id: str,
         frame_ref: str,
-    ) -> RelativeKeyframeSpec:
-        if keyframe.keyframe_type is not KeyframeType.GRASP:
-            return keyframe
-        if keyframe.frame_ref != frame_ref:
-            return keyframe
+        strategy_id: str,
+    ) -> tuple[RelativeKeyframeSpec, Mapping[str, object]]:
         approach = _finite_vector(keyframe.approach_axis_xyz, 3)
         if approach is None:
             self._log_bind(
@@ -1351,7 +1680,7 @@ class SuctionSurfaceContactBinder:
                 applied=False,
                 reason="invalid_approach_axis",
             )
-            return keyframe
+            return keyframe, record
         norm = float(np.linalg.norm(approach))
         if not math.isfinite(norm) or norm < 1e-12:
             self._log_bind(
@@ -1360,20 +1689,8 @@ class SuctionSurfaceContactBinder:
                 applied=False,
                 reason="degenerate_approach_axis",
             )
-            return keyframe
+            return keyframe, record
         unit = approach / norm
-        surface_offset = _approach_facing_surface_offset_from_center_m(
-            record, unit
-        )
-        if surface_offset is None:
-            self._log_bind(
-                frame_ref,
-                keyframe,
-                applied=False,
-                reason="missing_object_dimensions",
-                approach_unit=unit,
-            )
-            return keyframe
         center = _object_center_local(record)
         anchor_local = _anchor_local_position(record, keyframe.anchor)
         if anchor_local is None:
@@ -1383,56 +1700,142 @@ class SuctionSurfaceContactBinder:
                 applied=False,
                 reason="unresolved_anchor",
                 approach_unit=unit,
-                surface_offset_m=surface_offset,
             )
-            return keyframe
-        offset_before = float(keyframe.offset_along_approach_m)
-        current_along = float(
-            np.dot(anchor_local - center, unit)
-        ) + offset_before
-        # Already at/beyond the free-space face: do not double-offset.
-        if current_along + _SUCTION_SURFACE_EPS_M >= surface_offset:
+            return keyframe, record
+        aabb_offset = _approach_facing_surface_offset_from_center_m(record, unit)
+        surface = _approach_facing_collision_surface_offset_from_center_m(
+            record,
+            unit,
+            anchor_local,
+        )
+        if surface is None:
             self._log_bind(
                 frame_ref,
                 keyframe,
                 applied=False,
-                reason="already_at_or_beyond_surface",
+                reason="missing_object_dimensions",
                 approach_unit=unit,
-                surface_offset_m=surface_offset,
-                offset_before=offset_before,
-                offset_after=offset_before,
+                surface_offset_m=aabb_offset,
             )
-            return keyframe
-        # Named surface anchors with non-negative offset are already contact
-        # poses even when dimensions are slightly inconsistent with anchors.
+            return keyframe, record
+        surface_offset = float(surface.surface_offset_from_center_m)
+        surface_source = surface.source
+        offset_before = float(keyframe.offset_along_approach_m)
+        anchor_along = float(np.dot(anchor_local - center, unit))
+        current_along = anchor_along + offset_before
+        lateral_shift = surface.grasp_local_m - np.asarray(anchor_local, dtype=float)
+        lateral_shift = lateral_shift - float(np.dot(lateral_shift, unit)) * unit
+        shift_m = float(np.linalg.norm(lateral_shift))
+        relocated = bool(surface.relocated_laterally and shift_m > _SUCTION_SURFACE_EPS_M)
+
+        # Clear free-space standoff beyond the AABB face: do not pull inward,
+        # and do not laterally relocate an intentional hover pose.
         if (
-            keyframe.anchor.strip().lower() in _SURFACE_ANCHOR_NAMES
-            and offset_before >= -_SUCTION_SURFACE_EPS_M
+            aabb_offset is not None
+            and current_along > float(aabb_offset) + _SUCTION_SURFACE_EPS_M
         ):
             self._log_bind(
                 frame_ref,
                 keyframe,
                 applied=False,
-                reason="named_surface_anchor",
+                reason="already_beyond_aabb_standoff",
                 approach_unit=unit,
                 surface_offset_m=surface_offset,
                 offset_before=offset_before,
                 offset_after=offset_before,
             )
-            return keyframe
-        corrected_offset = surface_offset - float(
-            np.dot(anchor_local - center, unit)
+            return keyframe, record
+
+        if not relocated:
+            # Already on the TARGET contact plane (neither buried nor above it).
+            if abs(current_along - surface_offset) <= _SUCTION_SURFACE_EPS_M:
+                self._log_bind(
+                    frame_ref,
+                    keyframe,
+                    applied=False,
+                    reason="already_on_contact_plane",
+                    approach_unit=unit,
+                    surface_offset_m=surface_offset,
+                    offset_before=offset_before,
+                    offset_after=offset_before,
+                )
+                return keyframe, record
+            if (
+                keyframe.anchor.strip().lower() in _SURFACE_ANCHOR_NAMES
+                and offset_before >= -_SUCTION_SURFACE_EPS_M
+                and abs(current_along - surface_offset) <= _SUCTION_SURFACE_EPS_M
+            ):
+                self._log_bind(
+                    frame_ref,
+                    keyframe,
+                    applied=False,
+                    reason="named_surface_anchor",
+                    approach_unit=unit,
+                    surface_offset_m=surface_offset,
+                    offset_before=offset_before,
+                    offset_after=offset_before,
+                )
+                return keyframe, record
+            corrected_offset = surface_offset - anchor_along
+            bound = keyframe.model_copy(
+                update={
+                    "offset_along_approach_m": corrected_offset,
+                    "metadata": {
+                        **keyframe.metadata,
+                        "contact_geometry_source": SUCTION_SURFACE_CONTACT,
+                        "suction_surface_source": surface_source,
+                        "suction_surface_offset_from_center_m": surface_offset,
+                        "suction_aabb_offset_from_center_m": (
+                            None if aabb_offset is None else float(aabb_offset)
+                        ),
+                        "suction_surface_correction_m": (
+                            corrected_offset - offset_before
+                        ),
+                    },
+                }
+            )
+            self._log_bind(
+                frame_ref,
+                bound,
+                applied=True,
+                reason=f"bound_to_target_{surface_source}_surface",
+                approach_unit=unit,
+                surface_offset_m=surface_offset,
+                offset_before=offset_before,
+                offset_after=corrected_offset,
+            )
+            return bound, record
+
+        # Lateral patch: place a contact anchor on the TARGET surface under the
+        # relocated cup, then keep GRASP offset 0 on that anchor.
+        contact_local = (
+            np.asarray(center, dtype=float)
+            + surface_offset * unit
+            + lateral_shift
+        )
+        patch_anchor, record = self._inject_patch_anchor(
+            record=record,
+            request=request,
+            tool_id=tool_id,
+            strategy_id=strategy_id,
+            contact_local=contact_local,
         )
         bound = keyframe.model_copy(
             update={
-                "offset_along_approach_m": corrected_offset,
+                "anchor": patch_anchor,
+                "offset_along_approach_m": 0.0,
                 "metadata": {
                     **keyframe.metadata,
                     "contact_geometry_source": SUCTION_SURFACE_CONTACT,
+                    "suction_surface_source": surface_source,
                     "suction_surface_offset_from_center_m": surface_offset,
-                    "suction_surface_correction_m": (
-                        corrected_offset - offset_before
+                    "suction_aabb_offset_from_center_m": (
+                        None if aabb_offset is None else float(aabb_offset)
                     ),
+                    "suction_surface_correction_m": 0.0 - offset_before,
+                    "suction_source_anchor": keyframe.anchor,
+                    "suction_lateral_relocation_m": shift_m,
+                    "suction_patch_anchor": patch_anchor,
                 },
             }
         )
@@ -1440,13 +1843,14 @@ class SuctionSurfaceContactBinder:
             frame_ref,
             bound,
             applied=True,
-            reason="bound_to_approach_facing_surface",
+            reason="bound_to_nearby_surface_patch",
             approach_unit=unit,
             surface_offset_m=surface_offset,
             offset_before=offset_before,
-            offset_after=corrected_offset,
+            offset_after=0.0,
         )
-        return bound
+        return bound, record
+
 
     @staticmethod
     def _log_bind(
@@ -2060,11 +2464,157 @@ def multi_finger_place_raise_above_support_m(
 
 
 MULTI_FINGER_PLACE_SUPPORT_CLEARANCE = "MULTI_FINGER_PLACE_SUPPORT_CLEARANCE"
+MULTI_FINGER_PLACE_RETREAT_CLEARANCE = "MULTI_FINGER_PLACE_RETREAT_CLEARANCE"
+# Extra post-detach retreat lengths tried when the preferred TCP clearance is
+# still collision-invalid for the empty EE (finger vs released object).
+_MULTI_FINGER_PLACE_RETREAT_EXTENSIONS_M = (0.0, 0.02, 0.04, 0.06, 0.08)
+
+
+def multi_finger_place_post_detach_retreat_clearance_m(
+    request: MotionPlanRequest,
+) -> float:
+    """Minimum empty-EE retreat along approach after PLACE DETACH."""
+
+    return float(
+        multi_finger_finger_below_tcp_m()
+        + max(0.0, float(request.constraints.collision_margin_m))
+    )
+
+
+def multi_finger_place_retreat_standoff_candidates(
+    preferred_offset_m: float,
+) -> tuple[float, ...]:
+    """Preferred post-detach retreat, then longer bounded extensions."""
+
+    preferred = float(preferred_offset_m)
+    if not math.isfinite(preferred) or preferred < 0.0:
+        raise ValueError("preferred_offset_m must be a finite non-negative length")
+    return tuple(
+        preferred + float(extra) for extra in _MULTI_FINGER_PLACE_RETREAT_EXTENSIONS_M
+    )
+
+
+def _region_pose_rotation(
+    request: MotionPlanRequest, region_id: str
+) -> tuple[np.ndarray, np.ndarray] | None:
+    record = request.world.objects.get(region_id)
+    if not isinstance(record, Mapping):
+        return None
+    pose = record.get("pose")
+    if not isinstance(pose, Mapping):
+        return None
+    position = _finite_vector(pose.get("position_m"), 3)
+    orientation = _finite_vector(pose.get("orientation_xyzw"), 4)
+    if position is None or orientation is None:
+        return None
+    return position, quaternion_matrix_xyzw(orientation)
+
+
+def _publish_region_anchor(
+    request: MotionPlanRequest,
+    *,
+    region_id: str,
+    anchor: str,
+    local_position_m: Sequence[float],
+) -> None:
+    record = request.world.objects.get(region_id)
+    if not isinstance(record, Mapping):
+        raise ValueError(f"place retreat requires region {region_id!r}")
+    raw_anchors = record.get("anchors", {})
+    anchors = dict(raw_anchors) if isinstance(raw_anchors, Mapping) else {}
+    anchors[anchor] = [float(value) for value in local_position_m]
+    request.world.objects[region_id] = {**dict(record), "anchors": anchors}
+
+
+def multi_finger_place_retreat_from_place_tcp(
+    request: MotionPlanRequest,
+    *,
+    place_keyframe: RelativeKeyframeSpec,
+    retreat_keyframe: RelativeKeyframeSpec,
+    anchor_name: str,
+) -> RelativeKeyframeSpec | None:
+    """Rewrite post-DETACH RETREAT as PLACE_TCP + approach * clearance.
+
+    Region PLACE RETREAT is an empty-EE motion. Using the object-origin anchor
+    with a small fixed offset lands near the PLACE TCP (grasp height ≈ 5 cm),
+    so fingertips stay in the just-released body. Anchor the retreat at the
+    PLACE TCP in the region frame and offset along the PLACE approach by
+    ``finger_below + collision_margin``. Does not mutate the PLACE keyframe.
+    """
+
+    if not is_release_task(request.task):
+        return None
+    if not _request_uses_multi_finger(request):
+        return None
+    region_id = request.task.goal.target_region_id
+    if not isinstance(region_id, str) or not region_id:
+        return None
+    if retreat_keyframe.keyframe_type is not KeyframeType.RETREAT:
+        return None
+    if place_keyframe.keyframe_type is not KeyframeType.PLACE:
+        return None
+    region_pose = _region_pose_rotation(request, region_id)
+    if region_pose is None:
+        return None
+    region_position, region_rotation = region_pose
+    try:
+        from tuj.m5_motion.attachment_retarget import retarget_resolved_pose
+
+        place_object = RelativePoseResolver(request.world).resolve(place_keyframe)
+        place_tcp = retarget_resolved_pose(
+            request.world, place_keyframe, place_object
+        )
+    except Exception:
+        return None
+    clearance = multi_finger_place_post_detach_retreat_clearance_m(request)
+    approach_local = np.asarray(place_keyframe.approach_axis_xyz, dtype=float)
+    norm = float(np.linalg.norm(approach_local))
+    if norm <= 1e-12:
+        return None
+    approach_local = approach_local / norm
+    approach_world = region_rotation @ approach_local
+    approach_norm = float(np.linalg.norm(approach_world))
+    if approach_norm <= 1e-12:
+        return None
+    approach_world = approach_world / approach_norm
+    place_tcp_position = np.asarray(place_tcp.position_m, dtype=float)
+    tcp_local = region_rotation.T @ (place_tcp_position - region_position)
+    _publish_region_anchor(
+        request,
+        region_id=region_id,
+        anchor=anchor_name,
+        local_position_m=tcp_local,
+    )
+    metadata = {
+        key: value
+        for key, value in retreat_keyframe.metadata.items()
+        if key not in {"pose_subject", "pose_subject_object_id"}
+    }
+    metadata.update(
+        {
+            "contact_geometry_source": MULTI_FINGER_PLACE_RETREAT_CLEARANCE,
+            "place_retreat_from_place_tcp": True,
+            "place_retreat_clearance_m": clearance,
+            "place_retreat_place_keyframe_id": place_keyframe.keyframe_id,
+            "packing_orientation_xyzw": list(place_tcp.orientation_xyzw),
+        }
+    )
+    return retreat_keyframe.model_copy(
+        update={
+            "frame_ref": f"object:{region_id}",
+            "anchor": anchor_name,
+            "approach_axis_xyz": tuple(float(value) for value in approach_local),
+            "tool_axis_to_align": place_keyframe.tool_axis_to_align,
+            "offset_along_approach_m": clearance,
+            "roll_rad": float(place_keyframe.roll_rad),
+            "metadata": metadata,
+        }
+    )
 
 
 @dataclass(frozen=True, slots=True)
 class MultiFingerPlaceSupportClearanceBinder:
-    """Raise multi-finger PLACE/PRE_PLACE above region floor for fingertip clearance."""
+    """Raise multi-finger PLACE/PRE_PLACE and clear empty-EE RETREAT after DETACH."""
 
     def bind(
         self, artifact: KeyframePlanArtifact, request: MotionPlanRequest
@@ -2081,11 +2631,18 @@ class MultiFingerPlaceSupportClearanceBinder:
             keyframes: list[RelativeKeyframeSpec] = []
             candidate_changed = False
             for keyframe in candidate.keyframes:
-                bound = self._bind_keyframe(keyframe, request=request)
+                bound = self._bind_release_height(keyframe, request=request)
                 if bound is not keyframe:
                     candidate_changed = True
                     changed = True
                 keyframes.append(bound)
+            rewritten = self._bind_post_detach_retreat(
+                keyframes, request=request, strategy_id=candidate.strategy_id
+            )
+            if rewritten is not keyframes:
+                keyframes = list(rewritten)
+                candidate_changed = True
+                changed = True
             if not candidate_changed:
                 candidates.append(candidate)
                 continue
@@ -2095,7 +2652,8 @@ class MultiFingerPlaceSupportClearanceBinder:
                         "keyframes": keyframes,
                         "rationale": (
                             f"{candidate.rationale} Multi-finger place raises "
-                            "release height so fingertips clear the region floor."
+                            "release height so fingertips clear the region floor "
+                            "and retreats the empty EE from PLACE TCP."
                         ),
                         "metadata": {
                             **candidate.metadata,
@@ -2136,7 +2694,7 @@ class MultiFingerPlaceSupportClearanceBinder:
             }
         )
 
-    def _bind_keyframe(
+    def _bind_release_height(
         self,
         keyframe: RelativeKeyframeSpec,
         *,
@@ -2161,6 +2719,52 @@ class MultiFingerPlaceSupportClearanceBinder:
                 },
             }
         )
+
+    def _bind_post_detach_retreat(
+        self,
+        keyframes: Sequence[RelativeKeyframeSpec],
+        *,
+        request: MotionPlanRequest,
+        strategy_id: str,
+    ) -> Sequence[RelativeKeyframeSpec]:
+        place_index = next(
+            (
+                index
+                for index, keyframe in enumerate(keyframes)
+                if keyframe.keyframe_type is KeyframeType.PLACE
+            ),
+            None,
+        )
+        if place_index is None:
+            return keyframes
+        retreat_index = next(
+            (
+                index
+                for index in range(place_index + 1, len(keyframes))
+                if keyframes[index].keyframe_type is KeyframeType.RETREAT
+            ),
+            None,
+        )
+        if retreat_index is None:
+            return keyframes
+        place = keyframes[place_index]
+        retreat = keyframes[retreat_index]
+        anchor = f"mf_place_retreat_{strategy_id}_{retreat.keyframe_id}"
+        # Anchor names are used as MuJoCo-style identifiers; keep them compact.
+        anchor = "".join(ch if ch.isalnum() or ch == "_" else "_" for ch in anchor)[
+            :80
+        ]
+        rewritten = multi_finger_place_retreat_from_place_tcp(
+            request,
+            place_keyframe=place,
+            retreat_keyframe=retreat,
+            anchor_name=anchor,
+        )
+        if rewritten is None or rewritten is retreat:
+            return keyframes
+        updated = list(keyframes)
+        updated[retreat_index] = rewritten
+        return updated
 
 
 def bind_multi_finger_place_support_clearance(
@@ -2189,6 +2793,7 @@ __all__ = [
     "ACQUIRE_WORLD_CONTACT_FRAME",
     "AcquireWorldContactFrameBinder",
     "GraspGeometryBinder",
+    "MULTI_FINGER_PLACE_RETREAT_CLEARANCE",
     "MULTI_FINGER_PLACE_SUPPORT_CLEARANCE",
     "MULTI_FINGER_TABLETOP_ENCLOSURE",
     "MultiFingerPlaceSupportClearanceBinder",
@@ -2206,11 +2811,19 @@ __all__ = [
     "bind_multi_finger_tabletop_enclosure",
     "bind_suction_surface_contact",
     "multi_finger_finger_below_tcp_m",
+    "multi_finger_place_post_detach_retreat_clearance_m",
     "multi_finger_place_raise_above_support_m",
+    "multi_finger_place_retreat_from_place_tcp",
+    "multi_finger_place_retreat_standoff_candidates",
     "multi_finger_tabletop_grasp_offset_above_support_m",
+    "catalog_lift_reach_standoff_candidates",
+    "catalog_pre_grasp_reach_minimum_m",
+    "catalog_pre_grasp_reach_standoff_candidates",
+    "catalog_reach_fallback_step_m",
     "multi_finger_tabletop_lift_standoff_candidates",
     "multi_finger_tabletop_pre_grasp_standoff_candidates",
     "multi_finger_tabletop_standoff_candidates",
+    "reach_standoff_schedule_m",
     "opposed_contact_spec",
     "support_clearance_context",
     "support_clearance_context_from_world",

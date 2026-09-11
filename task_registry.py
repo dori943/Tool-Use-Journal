@@ -31,7 +31,7 @@ TASKS = {
     "c1_1": TaskEnv(
         "c1_1_lego_sweep",
         "C1_1_LegoSweep",
-        instruction="도구를 골라 흩어진 레고 블록을 수집 구역으로 쓸어 담아라",
+        instruction="흩어진 레고 블록을 수집 구역으로 쓸어 담아라",
     ),
 
     "c2_1": TaskEnv(

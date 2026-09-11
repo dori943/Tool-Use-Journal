@@ -326,3 +326,157 @@ def test_a_full_region_stacks_on_the_flat_support_not_astride_a_taller_neighbour
     plate_top=plate_center[2]+.006
     assert carried_center[2]-half_height==pytest.approx(plate_top+.01)
     assert carried_center[2]-half_height<mug_center[2]+.045
+
+
+def _vacuum_place_request(margin=.005, *, object_id='held_vac', support_floor_z=-.029,
+                          local_size=(.16,.16,.01), body_z=.80, grip_z=.795):
+    """World-held vacuum place: thin top-grasp so TCP sits near the object bottom."""
+    from tuj.m5_motion.scripted_grasps.registry import ENTRIES as _ENTRIES
+    vac_entry = next(e for e in _ENTRIES if e.ee == 'vac')
+    request = request_for(vac_entry, action='place', object_id=object_id)
+    request.constraints.collision_margin_m = margin
+    request.task.goal.target_region_id = 'tray'
+    request.task.ee = 'vac'
+    request.world.metadata['physical_active_ee'] = 'vac'
+    request.world.objects['tray'] = {
+        'pose': {'frame_id': 'world', 'position_m': REGION_POSITION,
+                 'orientation_xyzw': Rotation.from_matrix(REGION).as_quat().tolist()},
+        'dimensions_m': [.3, .2, .1], 'anchors': {'center': [.02, 0., 0.]},
+        'collision_points_m': _tray_collision_points(inner_floor_z=support_floor_z),
+    }
+    body = transform([.2, .1, body_z],
+                     rotation=Rotation.from_euler('xyz', [180, 0, 0], degrees=True).as_matrix())
+    grip = transform([.2, .1, grip_z],
+                     rotation=Rotation.from_euler('xyz', [180, 0, 0], degrees=True).as_matrix())
+    size = np.asarray(local_size, dtype=float)
+    center = np.zeros(3)
+    T_GB = inverse(grip) @ body
+    request.world.robot_state.held_tool_id = object_id
+    request.world.robot_state.attached_object_id = object_id
+    request.world.robot_state.eef_pose = Pose(
+        frame_id='world', position_m=tuple(grip[:3, 3]),
+        orientation_xyzw=tuple(Rotation.from_matrix(grip[:3, :3]).as_quat()))
+    payload = {
+        'object_id': object_id, 'free_joint_name': f'{object_id}_joint0',
+        'reference_kind': 'site', 'reference_name': 'gripper0_right_grip_site',
+        'position_in_reference_m': T_GB[:3, 3].tolist(),
+        'orientation_in_reference_xyzw': Rotation.from_matrix(T_GB[:3, :3]).as_quat().tolist(),
+    }
+    request.world.metadata['attached_object_transforms'] = {object_id: payload}
+    request.world.objects[object_id] = {
+        'pose': {'frame_id': 'world', 'position_m': body[:3, 3].tolist(),
+                 'orientation_xyzw': Rotation.from_matrix(body[:3, :3]).as_quat().tolist()},
+        'dimensions_m': size.tolist(), 'anchors': {'center': center.tolist()},
+    }
+    return request, body, grip, size
+
+
+def test_vacuum_held_place_raises_tcp_above_support_by_cup_half_height_and_margin():
+    from tuj.m5_motion.scripted_grasps.transport import (
+        VACUUM_CUP_HALF_HEIGHT_M, ground_held_place, _retargeted_tcp_world_z,
+        _vacuum_place_release_clearance_m,
+    )
+    from types import SimpleNamespace
+    margin = .005
+    request, body, grip, size = _vacuum_place_request(margin)
+    ground_held_place(request)
+    hint = request.task.metadata['held_place_goal']
+    destination = transform(
+        request.task.goal.target_pose.position_m,
+        quaternion_xyzw=request.task.goal.target_pose.orientation_xyzw,
+    )
+    tcp_z = _retargeted_tcp_world_z(grip, body, destination)
+    floor_top_world = REGION_POSITION[2] - 0.029
+    assert tcp_z >= floor_top_world + VACUUM_CUP_HALF_HEIGHT_M + margin - 1e-9
+    half = np.abs(body[:3, :3]) @ (size / 2.)
+    geo = _vacuum_place_release_clearance_m(
+        SimpleNamespace(half=half), margin, margin)
+    assert hint['release_clearance_m'] >= geo - 1e-12
+    assert 'plate_b' not in str(hint)
+    assert 'c3_2' not in str(hint).lower()
+
+
+def test_vacuum_held_place_keeps_object_seating_then_adds_ee_lift_only_when_needed():
+    from tuj.m5_motion.scripted_grasps.transport import (
+        VACUUM_CUP_HALF_HEIGHT_M, ground_held_place, _retargeted_tcp_world_z,
+        _vacuum_place_release_clearance_m,
+    )
+    from types import SimpleNamespace
+    margin = .005
+    # Grip already far above the object: object seating alone must clear EE.
+    request, body, grip, size = _vacuum_place_request(
+        margin, body_z=.90, grip_z=.98, local_size=(.08, .08, .09))
+    ground_held_place(request)
+    hint = request.task.metadata['held_place_goal']
+    destination = transform(
+        request.task.goal.target_pose.position_m,
+        quaternion_xyzw=request.task.goal.target_pose.orientation_xyzw,
+    )
+    floor_top_world = REGION_POSITION[2] - 0.029
+    assert hint.get('vacuum_ee_clearance_lift_m', 0.) == pytest.approx(0.)
+    half = np.abs(body[:3, :3]) @ (size / 2.)
+    geo = _vacuum_place_release_clearance_m(
+        SimpleNamespace(half=half), margin, margin)
+    assert hint['release_clearance_m'] == pytest.approx(geo)
+    tcp_z = _retargeted_tcp_world_z(grip, body, destination)
+    assert tcp_z >= floor_top_world + VACUUM_CUP_HALF_HEIGHT_M + margin - 1e-9
+
+
+def test_vacuum_place_release_clearance_scales_with_held_object_extent():
+    """Bread-like extents need more attached-place gap than thin plates."""
+    from types import SimpleNamespace
+    from tuj.m5_motion.scripted_grasps.transport import (
+        _vacuum_place_release_clearance_m,
+    )
+    margin = .005
+    plate = _vacuum_place_release_clearance_m(
+        SimpleNamespace(half=np.array([.08, .08, .005])), margin, margin)
+    bread = _vacuum_place_release_clearance_m(
+        SimpleNamespace(half=np.array([.032, .05, .027])), margin, margin)
+    assert plate == pytest.approx(margin + 0.15 * np.linalg.norm([.08, .08]))
+    assert bread > plate
+    assert bread == pytest.approx(.027 + 0.15 * np.linalg.norm([.032, .05]))
+    # Live bread place timed out at ~36 mm tracking error with 10 mm seat.
+    assert bread >= .03
+
+
+def test_vacuum_held_place_tracks_higher_support_floor():
+    from tuj.m5_motion.scripted_grasps.transport import (
+        VACUUM_CUP_HALF_HEIGHT_M, ground_held_place, _retargeted_tcp_world_z,
+    )
+    margin = .005
+    raised_floor = -0.010
+    request, body, grip, size = _vacuum_place_request(
+        margin, support_floor_z=raised_floor, body_z=.80, grip_z=.795,
+        local_size=(.16, .16, .01))
+    ground_held_place(request)
+    destination = transform(
+        request.task.goal.target_pose.position_m,
+        quaternion_xyzw=request.task.goal.target_pose.orientation_xyzw,
+    )
+    floor_top_world = REGION_POSITION[2] + raised_floor
+    tcp_z = _retargeted_tcp_world_z(grip, body, destination)
+    assert tcp_z >= floor_top_world + VACUUM_CUP_HALF_HEIGHT_M + margin - 1e-9
+
+
+def test_vacuum_held_place_logic_is_not_tied_to_a_scene_instance_name():
+    from tuj.m5_motion.scripted_grasps.transport import ground_held_place
+    for object_id in ('lid', 'held_vac_a', 'held_vac_b'):
+        request, _body, _grip, _size = _vacuum_place_request(object_id=object_id)
+        ground_held_place(request)
+        hint = request.task.metadata['held_place_goal']
+        assert hint['object_id'] == object_id
+        assert request.task.ee == 'vac'
+
+
+def test_non_vacuum_held_place_ignores_vacuum_ee_clearance_branch():
+    """Existing 2F spoon place seating must not gain vacuum cup lift."""
+    from tuj.m5_motion.scripted_grasps.transport import ground_held_place
+    request = _tray_request(.005)
+    request.task.action_type = 'place'
+    request.world.objects['tray']['collision_points_m'] = _tray_collision_points()
+    _generic_held(request, ENTRIES[4].object_id)
+    ground_held_place(request)
+    hint = request.task.metadata['held_place_goal']
+    assert hint['release_clearance_m'] == pytest.approx(.005)
+    assert 'vacuum_ee_clearance_lift_m' not in hint

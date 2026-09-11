@@ -28,7 +28,8 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     module = import_module(f"{__package__}." + ("runtime" if entry.driver == "plate" else entry.driver + "_runtime"))
     cls = getattr(module, entry.driver.title() + "Context")
     c = cls()
-    c.runtime, c.env, c.recipe, c.object_id = runtime, env, recipe, entry.object_id
+    scene_object_id = entry.scene_object_id
+    c.runtime, c.env, c.recipe, c.object_id = runtime, env, recipe, scene_object_id
     c.output = Path(output)
     c.output.mkdir(parents=True, exist_ok=False)
     c.mj = mujoco
@@ -40,14 +41,15 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
         raise GraspFailure("UNSUPPORTED_EE_MODEL")
     c.arm_ids = np.asarray(c.robot._ref_joint_pos_indexes)
     c.hand_joint_ids = np.array([c.model.joint(n).id for n in c.gripper.joints], dtype=int)
-    c.body_id = int(env.obj_body_id[entry.object_id])
+    c.body_id = int(env.obj_body_id[scene_object_id])
     c.site_id = c.model.site(c.gripper.important_sites["grip_site"]).id
     jid = int(c.model.body_jntadr[c.body_id])
     if jid < 0 or c.model.jnt_type[jid] != mujoco.mjtJoint.mjJNT_FREE:
         raise GraspFailure("TARGET_HAS_NO_FREE_JOINT")
     c.object_qadr = c.plate_qadr = int(c.model.jnt_qposadr[jid])
     c.object_dadr = c.plate_dadr = int(c.model.jnt_dofadr[jid])
-    record = _object_record(c.model, c.data, entry.object_id, c.body_id)
+    record = _object_record(c.model, c.data, scene_object_id, c.body_id)
+    c.object_record = record
     c.center_in_body = np.asarray(record["anchors"]["center"])
     c.local_size = c.collision_local_size = np.asarray(record["dimensions_m"])
     # Plate uses a frozen partial-view calibration; changed visible bbox cannot
@@ -65,7 +67,18 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     c.finger_geoms = set.union(*c.finger_groups.values())
     c.handle_geoms = {i for i in c.object_geoms if c.model.geom_contype[i]}
     if entry.driver in {"spoon", "spatula"}:
-        c.handle_geoms = {i for i in c.handle_geoms if c.model.geom_dataid[i] >= 0 and c.model.mesh(int(c.model.geom_dataid[i])).name.endswith(entry.object_id + "_collision_mesh_0")}
+        mesh_key = entry.scene_object_id
+        c.handle_geoms = {i for i in c.handle_geoms if c.model.geom_dataid[i] >= 0 and c.model.mesh(int(c.model.geom_dataid[i])).name.endswith(mesh_key + "_collision_mesh_0")}
+        if not c.handle_geoms and entry.driver == "spoon":
+            # Asset mesh prefixes are not scene instance ids.  The spoon local
+            # -Y half is the handle, so select collision parts by geometry
+            # position when the legacy mesh-0 naming convention is absent.
+            T_BW = inverse(c.body_pose())
+            center_y = float(c.center_in_body[1])
+            c.handle_geoms = {
+                i for i in c.object_geoms if c.model.geom_contype[i]
+                and float((T_BW @ np.r_[c.data.geom_xpos[i], 1.])[1]) <= center_y
+            }
         if not c.handle_geoms:
             raise GraspFailure("HANDLE_GEOMETRY_NOT_FOUND")
     root = c.model.body(c.robot.robot_model.root_body).id
@@ -97,6 +110,7 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     c.carried_pose = None
     c.support_released = False
     c.vacuum_attachment_record = None
+    c.grasp_T_GB = c.grasp_object_pose = c.grasp_grip_pose = None
     c.three_finger_force_hold, c.two_finger_force_hold = False, False
     c.three_finger_commands, c.two_finger_command = None, 0.
     c.physics_steps_audited, c.maximum_physics_joint_error = 0, 0.
@@ -106,7 +120,8 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
         raise GraspFailure("CONTROL_TIMING_MISMATCH")
 
     def record_input(self):
-        save_json(self.output / "input.json", {"object_id": entry.object_id, "recipe": recipe.to_dict(),
+        save_json(self.output / "input.json", {"object_id": scene_object_id,
+            "recipe_object_id": entry.object_id, "recipe": recipe.to_dict(),
             "scenario": self.scenario, "T_WB": self.body_pose(), "center_in_body_m": self.center_in_body,
             "local_bbox_size_m": self.local_size, "geometry_source": "M5_COMPILED_OBJECT_RECORD",
             "pose_source": "M5_LIVE_RUNTIME", "object_material_inputs": [], "learned_model_calls": 0})
@@ -129,12 +144,12 @@ def execute_grasp(runtime, entry, output, *, seed=0, request=None):
     finally:
         runtime.finish_attachment_step = finish
     if result["status"] != "SUCCESS":
-        raise GraspFailure(f"{entry.object_id}: {result.get('failure_stage')}: {result.get('failure_reason')}")
+        raise GraspFailure(f"{entry.scene_object_id}: {result.get('failure_stage')}: {result.get('failure_reason')}")
     runtime.command_gripper(engaged=True, suction=entry.ee == "vac", command=1.)
     if runtime.attachment is not None:
-        runtime.mark_attached_object_as_tool(entry.object_id)
+        runtime.mark_attached_object_as_tool(entry.scene_object_id)
     else:
-        runtime.mark_contact_friction_object_as_tool(entry.object_id)
+        runtime.mark_contact_friction_object_as_tool(entry.scene_object_id)
     from .retention import GraspRetention
     runtime.scripted_grasp_retention = GraspRetention(c, entry)
     result.update(final_robot_q=c.data.qpos[c.arm_ids].tolist(), object_pose_in_gripper=pose_dict(inverse(c.grip_pose()) @ c.body_pose()))

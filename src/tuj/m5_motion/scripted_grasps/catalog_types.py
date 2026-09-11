@@ -44,6 +44,9 @@ class CatalogRecipe:
     contact_ticks: int = 5
     maximum_joint_limit_error_rad: float = .01
     suction_command: float = 1.
+    # Thin utensil handles: accept thumb+index/pinky pinch instead of full 3F.
+    thin_handle_pinch: bool = False
+    hold_finger_positions: bool = False
 
     @property
     def model_class(self):
@@ -56,7 +59,7 @@ class CatalogRecipe:
 
     def __post_init__(self):
         if self.ee_id not in {'2F','3F','vac'}: raise ValueError('UNSUPPORTED_EE')
-        if self.task_id not in {'c1_1','c1_2','c2_1','c2_2','c4_2'}: raise ValueError('UNSUPPORTED_TASK')
+        if self.task_id not in {'c1_1','c1_2','c2_1','c2_2','c3_2','c4_2'}: raise ValueError('UNSUPPORTED_TASK')
         for name in ('expected_size_m','offset_fraction','offset_m','rotation_xyz_deg','contact_region_min','contact_region_max'):
             value=np.asarray(getattr(self,name),dtype=float)
             if value.shape!=(3,) or not np.isfinite(value).all(): raise ValueError(f'Invalid {name}')
@@ -72,9 +75,15 @@ class CatalogRecipe:
             raise ValueError('Invalid post-grasp arm gain')
         if not 0<=self.suction_command<=1: raise ValueError('Invalid suction command')
         if self.ee_id=='vac' and self.suction_command<.5: raise ValueError('Vacuum attachment requires suction command >= .5')
+        if self.thin_handle_pinch and self.ee_id!='3F':
+            raise ValueError('thin_handle_pinch requires 3F')
+        if self.hold_finger_positions and self.ee_id!='3F':
+            raise ValueError('hold_finger_positions requires 3F')
         if self.physics_timestep_s not in (.0005,.001,.002): raise ValueError('Invalid timestep')
         if self.physics_integrator!='implicitfast': raise ValueError('Invalid integrator')
         if not isinstance(self.contact_ticks,int) or self.contact_ticks<1: raise ValueError('Invalid contact ticks')
+        if not isinstance(self.thin_handle_pinch,bool) or not isinstance(self.hold_finger_positions,bool):
+            raise ValueError('Invalid boolean recipe flag')
 
     def to_dict(self):
         result={**asdict(self),'model_class':self.model_class,'recipe_id':self.recipe_id}
@@ -100,6 +109,51 @@ def build_catalog_targets(T_WB,center_in_body_m,local_size_m,recipe):
     return {'T_BC':T_BC,'T_WC':T_WC,'T_CG':T_CG,'PRE_GRASP':pre,'GRASP':grasp,'LIFT':lift}
 
 
+def build_collision_surface_vacuum_targets(T_WB, center_in_body_m,
+        local_size_m, recipe, object_record):
+    """Retarget a catalog vacuum grasp to the cup-footprint collision crown.
+
+    Reuses the generic M5 suction-surface solver.  No seating offset is added:
+    the returned GRASP lies on the approach-facing target collision surface.
+    """
+    targets = build_catalog_targets(
+        T_WB, center_in_body_m, local_size_m, recipe)
+    if recipe.ee_id != 'vac':
+        return targets
+    from tuj.m5_motion.grasp_geometry import (
+        _approach_facing_collision_surface_offset_from_center_m,
+    )
+    center = np.asarray(center_in_body_m, dtype=float)
+    nominal = center + np.asarray(targets['T_CG'][:3, 3], dtype=float)
+    approach = np.array([0., 0., 1.])
+    surface = _approach_facing_collision_surface_offset_from_center_m(
+        object_record, approach, nominal)
+    if surface is None:
+        return targets
+    candidate = np.asarray(surface.grasp_local_m, dtype=float)
+    lateral = candidate - center
+    lateral -= approach * float(lateral @ approach)
+    contact_relative = lateral + approach * float(
+        surface.surface_offset_from_center_m)
+    targets['T_CG'] = transform(contact_relative, rotation=targets['T_CG'][:3, :3])
+    targets['GRASP'] = targets['T_WC'] @ targets['T_CG']
+    targets['PRE_GRASP'] = targets['GRASP'].copy()
+    targets['PRE_GRASP'][:3, 3] -= (
+        targets['GRASP'][:3, 2] * recipe.approach_distance_m)
+    targets['LIFT'] = targets['GRASP'].copy()
+    targets['LIFT'][2, 3] += recipe.lift_distance_m
+    targets['contact_surface_source'] = surface.source
+    return targets
+
+
+def _instance_matches_type(object_id,expected_id):
+    """Exact type id, or ``type_a`` / ``type_b`` multi-instance scene ids."""
+    if object_id==expected_id:
+        return True
+    return len(object_id)==len(expected_id)+2 and object_id.startswith(expected_id+'_') and object_id[-1] in 'ab' and object_id[-2]=='_'
+
+
 def dispatch_grasp(context,object_id,recipe,expected_id):
-    if object_id!=expected_id or recipe.object_id!=expected_id: raise ValueError('WRONG_TARGET_OBJECT')
+    if recipe.object_id!=expected_id or not _instance_matches_type(object_id,expected_id):
+        raise ValueError('WRONG_TARGET_OBJECT')
     return context.execute_object(recipe)

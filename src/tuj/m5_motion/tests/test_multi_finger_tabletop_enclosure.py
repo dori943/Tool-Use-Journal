@@ -906,6 +906,112 @@ def test_multi_finger_place_raises_release_above_region_floor() -> None:
     assert eef.position_m[2] >= min_tcp - 1e-9
 
 
+def test_multi_finger_place_retreat_uses_place_tcp_clearance() -> None:
+    """Post-DETACH RETREAT must leave PLACE_TCP along approach by finger+margin."""
+
+    import numpy as np
+    from tuj.m5_motion.attachment_retarget import (
+        ATTACHED_OBJECT_POSE_SUBJECT,
+        POSE_SUBJECT_KEY,
+        POSE_SUBJECT_OBJECT_ID_KEY,
+        retarget_resolved_pose,
+    )
+    from tuj.m5_motion.geometry import RelativePoseResolver
+    from tuj.m5_motion.grasp_geometry import (
+        MULTI_FINGER_PLACE_RETREAT_CLEARANCE,
+        bind_multi_finger_place_support_clearance,
+        multi_finger_place_post_detach_retreat_clearance_m,
+        multi_finger_place_retreat_standoff_candidates,
+    )
+    from tuj.m5_motion.schema import KeyframeEventType
+
+    request = _place_request_with_attachment()
+    tray = dict(request.world.objects["tray"])
+    anchors = dict(tray["anchors"])
+    # Object release seat in tray frame (region-local), matching held_place_goal.
+    anchors["held_place_goal"] = [0.05, -0.10, 0.02]
+    request.world.objects["tray"] = {**tray, "anchors": anchors}
+
+    approach = (0.0, 0.0, 1.0)
+    artifact = KeyframePlanArtifact(
+        artifact_id="artifact",
+        provenance=ArtifactProvenance(
+            artifact_id="artifact",
+            artifact_type="KeyframePlanArtifact",
+            produced_by=ModuleName.MOTION_PLANNER,
+            invocation_id="test",
+        ),
+        scene_signature="scene",
+        subgoal_id="sg",
+        candidates=[
+            KeyframePlanCandidate(
+                strategy_id="place",
+                keyframes=[
+                    RelativeKeyframeSpec(
+                        keyframe_id="place",
+                        keyframe_type=KeyframeType.PLACE,
+                        frame_ref="object:tray",
+                        anchor="held_place_goal",
+                        approach_axis_xyz=approach,
+                        tool_axis_to_align="+z",
+                        offset_along_approach_m=0.0,
+                        planner=KeyframePlannerType.CARTESIAN,
+                        events_after=(
+                            KeyframeEventType.DETACH_OBJECT,
+                            KeyframeEventType.GRIPPER_OPEN,
+                        ),
+                        metadata={
+                            POSE_SUBJECT_KEY: ATTACHED_OBJECT_POSE_SUBJECT,
+                            POSE_SUBJECT_OBJECT_ID_KEY: "utensil",
+                            "packing_orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                        },
+                    ),
+                    RelativeKeyframeSpec(
+                        keyframe_id="retreat",
+                        keyframe_type=KeyframeType.RETREAT,
+                        frame_ref="object:tray",
+                        anchor="held_place_goal",
+                        approach_axis_xyz=approach,
+                        tool_axis_to_align="+z",
+                        # Legacy object-origin offset ≈ grasp height → near PLACE TCP.
+                        offset_along_approach_m=0.05,
+                        planner=KeyframePlannerType.CARTESIAN,
+                        metadata={
+                            "packing_orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+                        },
+                    ),
+                ],
+                rationale="fixture",
+                provenance=StrategyGenerationProvenance(
+                    generator_kind=StrategyGeneratorKind.TEMPLATE,
+                    generator_id="fixture",
+                    input_hash="input",
+                ),
+            )
+        ],
+    )
+
+    bound = bind_multi_finger_place_support_clearance(artifact, request)
+    place = bound.candidates[0].keyframes[0]
+    retreat = bound.candidates[0].keyframes[1]
+    assert retreat.metadata["contact_geometry_source"] == (
+        MULTI_FINGER_PLACE_RETREAT_CLEARANCE
+    )
+    clearance = multi_finger_place_post_detach_retreat_clearance_m(request)
+    assert retreat.offset_along_approach_m == pytest.approx(clearance)
+    place_tcp = retarget_resolved_pose(
+        request.world, place, RelativePoseResolver(request.world).resolve(place)
+    )
+    retreat_tcp = RelativePoseResolver(request.world).resolve(retreat)
+    delta = np.asarray(retreat_tcp.position_m) - np.asarray(place_tcp.position_m)
+    assert abs(float(np.linalg.norm(delta)) - clearance) < 1e-6
+    assert float(delta[2]) == pytest.approx(clearance, abs=1e-6)
+    assert place.metadata.get(POSE_SUBJECT_KEY) == ATTACHED_OBJECT_POSE_SUBJECT
+    candidates = multi_finger_place_retreat_standoff_candidates(clearance)
+    assert candidates[0] == pytest.approx(clearance)
+    assert candidates[-1] > clearance
+
+
 def test_multi_finger_place_binder_skips_acquire() -> None:
     from tuj.m5_motion.grasp_geometry import bind_multi_finger_place_support_clearance
 

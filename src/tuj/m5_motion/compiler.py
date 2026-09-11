@@ -12,7 +12,9 @@ from tuj.m5_motion.attachment_retarget import (
 )
 from tuj.m5_motion.geometry import GeometryResolutionError, RelativePoseResolver
 from tuj.m5_motion.grasp_geometry import (
+    MULTI_FINGER_PLACE_RETREAT_CLEARANCE,
     MULTI_FINGER_TABLETOP_ENCLOSURE,
+    multi_finger_place_retreat_standoff_candidates,
     multi_finger_tabletop_lift_standoff_candidates,
     multi_finger_tabletop_pre_grasp_standoff_candidates,
 )
@@ -40,9 +42,15 @@ def _enclosure_standoff_offset_candidates(
     """Preferred enclosure standoff, then shorter reach fallbacks when in scope."""
 
     primary = float(keyframe.offset_along_approach_m)
-    if keyframe.metadata.get("contact_geometry_source") != (
-        MULTI_FINGER_TABLETOP_ENCLOSURE
+    source = keyframe.metadata.get("contact_geometry_source")
+    if (
+        source == MULTI_FINGER_PLACE_RETREAT_CLEARANCE
+        and keyframe.keyframe_type is KeyframeType.RETREAT
     ):
+        # Empty-EE post-DETACH retreat: prefer finger clearance, then longer
+        # bounded extensions if the preferred TCP is still collision-invalid.
+        return multi_finger_place_retreat_standoff_candidates(primary)
+    if source != MULTI_FINGER_TABLETOP_ENCLOSURE:
         return (primary,)
     if keyframe.keyframe_type is KeyframeType.PRE_GRASP:
         return multi_finger_tabletop_pre_grasp_standoff_candidates(primary)

@@ -74,12 +74,20 @@ INSTRUCTION = (
 # 원하는 크기는 여기 숫자만 조절하면 된다.
 #
 TRAY_SCALE = 0.37
-PLATE_SCALE = 0.16
+# Fixed at 0.17. Bread+fruit co-packing then needs the matching wall/gap
+# constants below (and transport.REGION_WALL_ALLOWANCE_M).
+PLATE_SCALE = 0.17
 MUG_SCALE = 1.25
 FORK_SCALE = 0.7
 SPOON_SCALE = 0.8
 BREAD_SCALE = 0.1
 FRUIT_SCALE = 0.08
+# Keep in sync with tuj.m5_motion.scripted_grasps.transport.REGION_WALL_ALLOWANCE_M
+# and the inter-object gap used by free_destination_xy (max(0.01, 2*margin)).
+# At PLATE_SCALE 0.17 the plate AABB is ~0.167 m; bread_short+fruit_short is
+# ~0.145 m, so wall inset must stay small enough for a free XY slot.
+_PLATE_PACKING_WALL_ALLOWANCE_M = 0.005
+_PLATE_PACKING_OBJECT_GAP_M = 0.01
 
 
 # ============================================================
@@ -134,24 +142,24 @@ INITIAL_LAYOUT = {
     # Plate pair
     "plate_a": (
         0.46,
-        0.0,
+        -0.02,
         0.0,
     ),
     "plate_b": (
         0.46,
-        0.19,
+        0.17,
         0.0,
     ),
 
     # Fruit / Apple pair
-    "fruit_a": (
+  "fruit_a": (
         0.39,
-        0.42,
+        0.39,
         0.0,
     ),
     "fruit_b": (
         0.39,
-        0.31,
+        0.295,
         0.0,
     ),
 
@@ -1000,10 +1008,19 @@ class C3_2_BreakfastTrayPreparation(KitchenBase):
             sorted(fruit)
         )
 
+        # Match scripted place packing: wall inset on both sides plus a gap
+        # between bread and fruit.  The previous size-only check reported
+        # plate_holds_bread_fruit=True while free_destination_xy still had
+        # no contact-free slot.
+        plate_pack_padding = (
+            2.0 * _PLATE_PACKING_WALL_ALLOWANCE_M
+            + _PLATE_PACKING_OBJECT_GAP_M
+        )
         plate_ok = (
             (
                 bread_short
                 + fruit_short
+                + plate_pack_padding
             )
             <= float(
                 np.min(plate)
@@ -1014,6 +1031,7 @@ class C3_2_BreakfastTrayPreparation(KitchenBase):
                 bread_long,
                 fruit_long,
             )
+            + 2.0 * _PLATE_PACKING_WALL_ALLOWANCE_M
             <= float(
                 np.max(plate)
             )

@@ -369,6 +369,79 @@ def test_compiler_reuses_variants_with_current_reference_state() -> None:
     assert refreshed.attached_model_versions == compiler.attached_model_versions
 
 
+def test_compiler_compile_reuses_model_for_same_active_ee(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    variants = {
+        active_ee: _fake_env(active_ee)
+        for active_ee in (None, "2F", "3F", "vac")
+    }
+    compiler = ToolUseJournalCollisionModelCompiler.from_environments(
+        variants["2F"], variants, source_revision="fixture"
+    )
+    real_from_xml = mujoco.MjModel.from_xml_string
+    calls = {"count": 0}
+
+    def counting_from_xml(xml: str, *args: object, **kwargs: object):
+        calls["count"] += 1
+        return real_from_xml(xml, *args, **kwargs)
+
+    monkeypatch.setattr(mujoco.MjModel, "from_xml_string", counting_from_xml)
+    first = compiler.compile("3F")
+    second = compiler.compile("3F")
+    assert first is second
+    assert first.model is second.model
+    assert calls["count"] == 1
+
+
+def test_compiler_compile_caches_distinct_active_ee_entries() -> None:
+    variants = {
+        active_ee: _fake_env(active_ee)
+        for active_ee in (None, "2F", "3F", "vac")
+    }
+    compiler = ToolUseJournalCollisionModelCompiler.from_environments(
+        variants["2F"], variants, source_revision="fixture"
+    )
+    bare = compiler.compile(None)
+    three_f = compiler.compile("3F")
+    assert bare is not three_f
+    assert bare.model is not three_f.model
+    assert None in compiler._compiled_models
+    assert "3F" in compiler._compiled_models
+
+
+def test_with_reference_environment_starts_with_empty_compile_cache() -> None:
+    variants = {
+        active_ee: _fake_env(active_ee)
+        for active_ee in (None, "2F", "3F", "vac")
+    }
+    compiler = ToolUseJournalCollisionModelCompiler.from_environments(
+        variants["2F"], variants, source_revision="fixture"
+    )
+    original = compiler.compile("vac")
+    refreshed = compiler.with_reference_environment(variants["2F"])
+    assert refreshed._compiled_models == {}
+    rebuilt = refreshed.compile("vac")
+    assert rebuilt is not original
+    assert rebuilt.model is not original.model
+
+
+def test_make_validator_creates_fresh_mjdata_for_cached_model() -> None:
+    variants = {
+        active_ee: _fake_env(active_ee)
+        for active_ee in (None, "2F", "3F", "vac")
+    }
+    compiler = ToolUseJournalCollisionModelCompiler.from_environments(
+        variants["2F"], variants, source_revision="fixture"
+    )
+    compiled = compiler.compile("2F")
+    first = compiled.make_validator(collision_margin_m=0.005)
+    second = compiled.make_validator(collision_margin_m=0.005)
+    assert first.model is compiled.model
+    assert second.model is compiled.model
+    assert first.data is not second.data
+
+
 def test_exchange_contexts_route_to_target_scene_models() -> None:
     variants = {
         active_ee: _fake_env(active_ee)

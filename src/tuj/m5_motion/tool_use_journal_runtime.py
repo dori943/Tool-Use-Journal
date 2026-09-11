@@ -288,6 +288,26 @@ class AttachmentMode(str, Enum):
     BREAKABLE_WELD = "BREAKABLE_WELD"
 
 
+def scripted_retention_held_object_id(retention: Any) -> str | None:
+    """Scene instance id for a scripted grasp retention, else recipe type id.
+
+    C3_2 multi-instance holds use ``held_tool_id`` / plan attached ids like
+    ``fruit_b`` / ``spoon_b`` / ``fork_b`` / ``mug_b``, while
+    ``GraspEntry.object_id`` stays the recipe type (``fruit``, …). Contact-
+    friction proxy checks and DETACH must match the scene instance.
+    """
+
+    entry = getattr(retention, "entry", None)
+    if entry is None:
+        return None
+    scene_id = getattr(entry, "scene_object_id", None)
+    if isinstance(scene_id, str) and scene_id:
+        return scene_id
+    object_id = getattr(entry, "object_id", None)
+    return object_id if isinstance(object_id, str) and object_id else None
+
+
+
 @dataclass(frozen=True, slots=True)
 class BreakableWeldConfig:
     """6-DoF penalty-weld gains and grasp failure thresholds."""
@@ -2470,8 +2490,9 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             return message
         if event.event_type is EventType.DETACH_OBJECT:
             retention = getattr(self.runtime, "scripted_grasp_retention", None)
+            retention_object_id = scripted_retention_held_object_id(retention)
             if (retention is not None and self.runtime.attachment is None
-                    and target == self.runtime.held_tool_id == retention.entry.object_id):
+                    and target == self.runtime.held_tool_id == retention_object_id):
                 self.runtime.command_gripper(engaged=False, suction=False)
                 return f"opened gripper to release contact-held {target}"
             attachment = self.runtime.detach_object(target)
@@ -2705,8 +2726,8 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             scripted_retention = getattr(
                 self.runtime, "scripted_grasp_retention", None
             )
-            scripted_object_id = getattr(
-                getattr(scripted_retention, "entry", None), "object_id", None
+            scripted_object_id = scripted_retention_held_object_id(
+                scripted_retention
             )
             contact_retention = getattr(
                 self.runtime, "_contact_friction_retention", None

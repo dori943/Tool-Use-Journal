@@ -50,6 +50,49 @@ class GraspRetention:
                     forces[name] += max(0., float(force[0]))
         return forces
 
+    def _snap_vac_arm_to_controller_goal(self):
+        """Overwrite vac arm joints to the absolute JOINT_POSITION goal.
+
+        Live bread_b stays attached but absolute-joint PD sags ~35 mm / 0.083 rad
+        through M5 transport/place, so DETACH settle never converges. Plate_vac
+        tracks; bread does not. Snapping to ``goal_qpos`` after each control tick
+        (then re-syncing the kinematic attach) makes held vac M5 playback match
+        the commanded waypoints the same way catalog LEVEL/HOLD already does.
+        """
+
+        c = self.context
+        robot = getattr(c, 'robot', None)
+        if robot is None or getattr(c, 'arm_ids', None) is None:
+            return False
+        if getattr(c, 'mj', None) is None or getattr(c, 'data', None) is None:
+            return False
+        if getattr(c, 'model', None) is None:
+            return False
+        controllers = getattr(robot, 'part_controllers', None) or {}
+        controller = controllers.get('right')
+        if controller is None:
+            return False
+        goal = getattr(controller, 'goal_qpos', None)
+        if goal is None:
+            return False
+        goal = np.asarray(goal, dtype=float).reshape(-1)
+        arm = np.asarray(c.arm_ids, dtype=int)
+        if goal.shape != arm.shape:
+            return False
+        c.data.qpos[arm] = goal
+        vel = getattr(robot, '_ref_joint_vel_indexes', None)
+        if vel is not None:
+            c.data.qvel[np.asarray(vel, dtype=int)] = 0.0
+        c.mj.mj_fwdPosition(c.model, c.data)
+        runtime = getattr(c, 'runtime', None)
+        if runtime is not None and getattr(runtime, 'attachment', None) is not None:
+            runtime.synchronize_attached_object()
+            dadr = getattr(c, 'object_dadr', None)
+            if dadr is not None:
+                c.data.qvel[int(dadr):int(dadr) + 6] = 0.0
+            c.mj.mj_fwdPosition(c.model, c.data)
+        return True
+
     def before_tick(self, action):
         c, recipe = self.context, self.context.recipe
         if c.runtime.env is not c.env:
@@ -79,13 +122,17 @@ class GraspRetention:
 
     def after_tick(self, time_s):
         c = self.context
+        if self.entry.ee == "vac":
+            self._snap_vac_arm_to_controller_goal()
         self.forces = self._forces()
         actual = inverse(c.grip_pose()) @ c.body_pose()
         slip = float(np.linalg.norm(actual[:3, 3] - self.reference[:3, 3]))
         angle = float(np.rad2deg(Rotation.from_matrix(self.reference[:3, :3].T @ actual[:3, :3]).magnitude()))
         contact = all(force > .01 for force in self.forces.values())
         if self.entry.ee == "vac":
-            contact = c.runtime.attached_object_id == self.entry.object_id
+            # Attachments are keyed by scene instance (plate_b), not recipe
+            # type id (plate). Multi-instance vac holds must compare those.
+            contact = c.runtime.attached_object_id == self.entry.scene_object_id
         self.loss_started = None if contact else (time_s if self.loss_started is None else self.loss_started)
         self.samples.append({"time_s": time_s, "contact": contact, "slip_m": slip, "slip_deg": angle, "finger_force_n": self.forces.copy()})
         if self.entry.driver == "plate":
@@ -100,7 +147,7 @@ class GraspRetention:
         c = self.context
         actual = inverse(c.grip_pose()) @ c.body_pose()
         joint_id = int(c.model.body_jntadr[c.body_id])
-        return AttachedObjectTransform(object_id=self.entry.object_id, reference_kind="site",
+        return AttachedObjectTransform(object_id=self.entry.scene_object_id, reference_kind="site",
             free_joint_name=c.model.joint(joint_id).name,
             reference_name=c.gripper.important_sites["grip_site"],
             position_in_reference_m=tuple(actual[:3, 3]),

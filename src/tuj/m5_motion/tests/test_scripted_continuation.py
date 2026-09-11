@@ -110,7 +110,7 @@ def test_held_motion_limit_never_loosens_a_stricter_task_constraint(monkeypatch,
     monkeypatch.setattr(live,'snapshot',lambda runtime,previous=None:request.world.model_copy(deep=True))
     recipe=SimpleNamespace(post_grasp_velocity_scaling=.1,post_grasp_acceleration_scaling=.1)
     runtime=SimpleNamespace(env=object(),scripted_grasp_retention=SimpleNamespace(
-        context=SimpleNamespace(recipe=recipe),samples=[]))
+        context=SimpleNamespace(recipe=recipe),entry=ENTRIES[4],samples=[]))
     def factory(*args,**kwargs):
         def planner(actual):
             assert actual.constraints.velocity_scaling==.05
@@ -121,3 +121,137 @@ def test_held_motion_limit_never_loosens_a_stricter_task_constraint(monkeypatch,
     with pytest.raises(RuntimeError,match='limits checked'):
         session.execute_request(request)
     assert request.constraints.acceleration_scaling==.5
+
+
+def _vac_plate_entry(*, body_object_id=None):
+    from dataclasses import replace
+    from tuj.m5_motion.tests.test_scripted_grasps import _c3_2_entry
+    return replace(_c3_2_entry("plate"), body_object_id=body_object_id)
+
+
+def _vac_retention(monkeypatch, entry, attached_object_id):
+    from tuj.m5_motion.scripted_grasps.retention import GraspRetention
+    context = SimpleNamespace(
+        grip_pose=lambda: np.eye(4),
+        body_pose=lambda: np.eye(4),
+        runtime=SimpleNamespace(attached_object_id=attached_object_id),
+        recipe=SimpleNamespace(),
+        gripper=SimpleNamespace(
+            current_action=np.zeros(1),
+            important_sites={"grip_site": "gripper0_right_grip_site"},
+        ),
+        body_id=0,
+        model=SimpleNamespace(
+            body_jntadr=np.array([0]),
+            joint=lambda _jid: SimpleNamespace(name=f"{entry.scene_object_id}_joint0"),
+        ),
+    )
+    monkeypatch.setattr(GraspRetention, "_forces", lambda self: {"suction": 100.0})
+    return GraspRetention(context, entry)
+
+
+def test_vac_retention_contact_uses_scene_instance_not_recipe_type(monkeypatch):
+    """Multi-instance vac: attach id must match scene_object_id (plate_b), not type (plate)."""
+    from tuj.m5_motion.scripted_grasps.runtime import GraspFailure
+
+    entry = _vac_plate_entry(body_object_id="plate_b")
+    assert entry.object_id == "plate"
+    assert entry.scene_object_id == "plate_b"
+    retention = _vac_retention(monkeypatch, entry, "plate_b")
+    retention.after_tick(0.0)
+    retention.after_tick(0.20)
+    assert retention.samples[-1]["contact"] is True
+    assert retention.loss_started is None
+
+
+def test_vac_retention_snaps_arm_to_absolute_joint_goal(monkeypatch):
+    """Bread M5 place settle fails at ~35 mm PD lag; retention must snap to goal."""
+    from tuj.m5_motion.scripted_grasps.retention import GraspRetention
+
+    entry = _vac_plate_entry(body_object_id="bread_b")
+    class FakeData:
+        def __init__(self):
+            self.qpos = np.zeros(10)
+            self.qvel = np.zeros(10)
+
+    data = FakeData()
+    synced = {'n': 0}
+    controller = SimpleNamespace(goal_qpos=np.arange(6, dtype=float) * 0.01)
+    context = SimpleNamespace(
+        grip_pose=lambda: np.eye(4),
+        body_pose=lambda: np.eye(4),
+        arm_ids=np.arange(6),
+        object_dadr=6,
+        data=data,
+        model=object(),
+        mj=SimpleNamespace(mj_fwdPosition=lambda *a, **k: None),
+        robot=SimpleNamespace(
+            part_controllers={'right': controller},
+            _ref_joint_vel_indexes=[0, 1, 2, 3, 4, 5],
+        ),
+        runtime=SimpleNamespace(
+            attached_object_id='bread_b',
+            attachment=object(),
+            synchronize_attached_object=lambda: synced.__setitem__('n', synced['n'] + 1),
+        ),
+        recipe=SimpleNamespace(),
+        gripper=SimpleNamespace(
+            current_action=np.zeros(1),
+            important_sites={"grip_site": "gripper0_right_grip_site"},
+        ),
+        body_id=0,
+        finger_groups={},
+    )
+    # model.joint lookup unused when transform not called; after_tick needs forces
+    monkeypatch.setattr(GraspRetention, "_forces", lambda self: {"suction": 100.0})
+    # Minimal model stub for unused paths
+    context.model = SimpleNamespace(
+        body_jntadr=np.array([0]),
+        joint=lambda _jid: SimpleNamespace(name="bread_b_joint0"),
+    )
+    retention = GraspRetention(context, entry)
+    # Pretend PD sagged away from the absolute goal before after_tick.
+    data.qpos[:6] = np.arange(6, dtype=float) * 0.5
+    assert retention._snap_vac_arm_to_controller_goal() is True
+    assert np.allclose(data.qpos[:6], controller.goal_qpos)
+    assert synced['n'] == 1
+    retention.after_tick(0.0)
+    assert np.allclose(data.qpos[:6], controller.goal_qpos)
+
+
+def test_vac_retention_contact_false_for_wrong_instance_keeps_loss_timer(monkeypatch):
+    from tuj.m5_motion.scripted_grasps.runtime import GraspFailure
+
+    entry = _vac_plate_entry(body_object_id="plate_b")
+    retention = _vac_retention(monkeypatch, entry, "plate_a")
+    retention.after_tick(0.0)
+    assert retention.samples[-1]["contact"] is False
+    assert retention.loss_started == 0.0
+    retention.after_tick(0.05)
+    with pytest.raises(GraspFailure, match="SCRIPTED_GRASP_CONTACT_LOST"):
+        retention.after_tick(0.11)
+
+
+def test_vac_retention_single_instance_type_id_still_matches(monkeypatch):
+    """When body_object_id is unset, scene_object_id == object_id (legacy single body)."""
+    entry = _vac_plate_entry(body_object_id=None)
+    assert entry.scene_object_id == "plate"
+    retention = _vac_retention(monkeypatch, entry, "plate")
+    retention.after_tick(0.0)
+    retention.after_tick(0.20)
+    assert retention.samples[-1]["contact"] is True
+    assert retention.loss_started is None
+
+
+@pytest.mark.parametrize("instance", ("plate_a", "plate_b"))
+def test_vac_retention_same_recipe_binds_each_scene_instance(monkeypatch, instance):
+    entry = _vac_plate_entry(body_object_id=instance)
+    assert entry.object_id == "plate"
+    retention = _vac_retention(monkeypatch, entry, instance)
+    retention.after_tick(0.0)
+    assert retention.samples[-1]["contact"] is True
+    assert retention.transform().object_id == instance
+    # Other instance must not count as retained contact for this binding.
+    retention.context.runtime.attached_object_id = "plate_a" if instance == "plate_b" else "plate_b"
+    retention.after_tick(0.01)
+    assert retention.samples[-1]["contact"] is False

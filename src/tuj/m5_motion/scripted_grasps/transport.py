@@ -34,16 +34,90 @@ HELD_PLACE_GOAL_ANCHOR = 'held_place_goal'
 HELD_PLACE_START_ANCHOR = 'held_place_start'
 # Rim/wall allowance when searching the region interior for a free spot and the
 # fallback floor thickness when the region has no usable collision points.
-REGION_WALL_ALLOWANCE_M = 0.02
+# Paired with environments.PLATE_SCALE == 0.17 (~0.167 m AABB): bread+fruit
+# need the free-spot inset small enough that M2 slots remain reachable.
+REGION_WALL_ALLOWANCE_M = 0.005
 REGION_FLOOR_FALLBACK_M = 0.005
 FREE_SPOT_GRID_M = 0.01
 # Occupants whose tops agree to within this share the load of what is put
 # on them; below it only the higher one is touched.
 SUPPORT_LEVEL_TOLERANCE_M = 0.002
+# VacuumGripper ``vac_cup`` cylinder half-height from
+# ``scripts/assets/vacuum_gripper.xml`` (``size="0.03 0.012"``).  The seal
+# face coincides with the grip TCP; held-place still reserves this axial
+# cup size above the support so vac EE collision clears the floor the same
+# way multi-finger place reserves ``finger_below`` — not only the object bbox.
+VACUUM_CUP_HALF_HEIGHT_M = 0.012
 
 
 def _action(task):
     return normalize_action(task.metadata.get('operation') or task.action_type)
+
+
+def _request_uses_vacuum(request):
+    ee = str(request.task.ee or '').strip().lower()
+    return ee in {'vac', 'vacuum'}
+
+
+def _vacuum_cup_half_height_m():
+    """Axial vac-cup collision half-size used for held-place EE clearance."""
+
+    return float(VACUUM_CUP_HALF_HEIGHT_M)
+
+
+def _vacuum_place_release_clearance_m(g, collision_margin_m, base_clearance):
+    """Object↔support gap for vac place while the payload is still attached.
+
+    Thin plates seat with planner margin alone. Thicker/irregular vac payloads
+    (live bread_b on plate_b) still intersect the support during the attached
+    PLACE settle keyframe, so absolute-joint tracking never reaches KF1_2
+    (~0.036 m / 0.083 rad vs 0.005 m / 0.05 rad gates). Pad with the held
+    object's vertical half-extent plus a small tilt term from the lateral
+    footprint — geometry-driven, not object-id specific.
+    """
+
+    margin = float(collision_margin_m)
+    vertical = float(np.asarray(g.half, dtype=float)[2])
+    lateral = float(np.linalg.norm(np.asarray(g.half, dtype=float)[:2]))
+    geometry_pad = vertical + 0.15 * lateral
+    return max(float(base_clearance), margin, geometry_pad)
+
+
+def _retargeted_tcp_world_z(grip_pose, body_pose, destination_body):
+    """World-z of the grip TCP that realizes ``destination_body`` under T_GB."""
+
+    t_gb = inverse(grip_pose) @ body_pose
+    t_we = destination_body @ inverse(t_gb)
+    return float(t_we[2, 3])
+
+
+def _raise_place_for_vacuum_ee_clearance(
+        g, destination, *, support_z, release_clearance, collision_margin_m):
+    """Raise an object-space place pose until the vac TCP clears the support.
+
+    Object seating (bbox above support by ``release_clearance``) is the floor;
+    vacuum EE clearance is applied only as an additional lift when the
+    measured grasp transform would put the cup/TCP inside the planner margin.
+    """
+
+    margin = float(collision_margin_m)
+    tcp_z = _retargeted_tcp_world_z(g.T_WE, g.T_WB, destination)
+    required_tcp_z = (
+        float(support_z) + _vacuum_cup_half_height_m() + max(0., margin)
+    )
+    lift = required_tcp_z - tcp_z
+    if lift <= 1e-12:
+        return destination, float(release_clearance), 0.
+    raised = destination.copy()
+    raised[2, 3] = float(destination[2, 3]) + lift
+    anchors = g.record.setdefault('anchors', {})
+    anchors[HELD_PLACE_GOAL_ANCHOR] = (inverse(g.T_WR) @ raised)[:3, 3].tolist()
+    hint = g.task.metadata.get(HELD_PLACE_GOAL_ANCHOR)
+    if isinstance(hint, dict):
+        hint['release_clearance_m'] = float(release_clearance) + lift
+        hint['vacuum_ee_clearance_lift_m'] = float(lift)
+        hint['vacuum_ee_cup_half_height_m'] = _vacuum_cup_half_height_m()
+    return raised, float(release_clearance) + lift, float(lift)
 
 
 def _is_transport(task):
@@ -359,7 +433,7 @@ class _Grounding:
 def _grounding_for(request, retention, predicate):
     task = request.task
     if retention is not None:
-        object_id = retention.entry.object_id
+        object_id = retention.entry.scene_object_id
         implicit = task.metadata.get('scripted_m4_implicit_object_pose', False)
     else:
         object_id = held_pose_subject(request)
@@ -414,6 +488,9 @@ def ground_held_place(request, retention=None):
             float(multi_finger_finger_below_tcp_m())
             + float(request.constraints.collision_margin_m),
         )
+    if _request_uses_vacuum(request):
+        release_clearance = _vacuum_place_release_clearance_m(
+            g, request.constraints.collision_margin_m, release_clearance)
     desired_center = g.region_world.copy()
     desired_center[:2] = g.free_destination_xy()
     support_z, stacked = g.support_top_world_z(desired_center[:2])
@@ -428,6 +505,13 @@ def ground_held_place(request, retention=None):
     destination = g.publish(
         HELD_PLACE_GOAL_ANCHOR, HELD_PLACE_START_ANCHOR, desired_center,
         {'release_clearance_m': release_clearance})
+    if _request_uses_vacuum(request):
+        destination, release_clearance, _lift = _raise_place_for_vacuum_ee_clearance(
+            g, destination,
+            support_z=support_z,
+            release_clearance=release_clearance,
+            collision_margin_m=request.constraints.collision_margin_m,
+        )
     g.task.goal.target_pose = Pose(
         frame_id='world',
         position_m=tuple(float(v) for v in destination[:3, 3]),

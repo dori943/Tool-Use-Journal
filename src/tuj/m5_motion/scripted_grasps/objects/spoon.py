@@ -5,6 +5,10 @@ from scipy.spatial.transform import Rotation
 from tuj.m5_motion.scripted_grasps.frames import transform
 
 
+# Compiled C3_2 spoon AABB (spoon_a / spoon_b). Used only when asset='c3_2'.
+C3_2_SPOON_EXPECTED_SIZE_M = (0.044984882, 0.137213218, 0.023900813)
+
+
 @dataclass(frozen=True)
 class SpoonRecipe:
     recipe_id: str = 'spoon_2f_handle_center_v2'
@@ -41,6 +45,12 @@ class SpoonRecipe:
     maximum_slip_deg: float = 5.
     contact_ticks: int = 5
     maximum_joint_limit_error_rad: float = .01
+    # None keeps the legacy C1_2 / C3_1 hard size gate in build_spoon_targets.
+    expected_size_m: tuple | None = None
+    # When True, 3F CLOSE/HOLD accept thumb+index/pinky pinch (thin utensils).
+    thin_handle_pinch: bool = False
+    # Freeze finger commands after pinch (spatula pattern); avoids force-servo unload.
+    hold_finger_positions: bool = False
 
     def __post_init__(self):
         values=asdict(self)
@@ -54,11 +64,17 @@ class SpoonRecipe:
             raise ValueError('Target must lie within the handle')
         if abs(self.lateral_offset_m)>.025 or not -.005<=self.height_offset_m<=.07 or abs(self.tilt_deg)>75 or abs(self.handle_roll_deg)>30 or abs(self.approach_yaw_deg)>180:
             raise ValueError('Offset outside spoon calibration range')
+        if self.thin_handle_pinch and self.ee_id!='3F':
+            raise ValueError('thin_handle_pinch requires 3F')
+        if self.hold_finger_positions and self.ee_id!='3F':
+            raise ValueError('hold_finger_positions requires 3F')
         for key in ('approach_distance_m','lift_distance_m','arm_kp','close_duration_s','closure_kp','preshape_aperture_m','thin_contact_timeconstant_s','settle_s','hold_s','prelift_stabilization_s',
                     'joint_speed_rad_s','cartesian_speed_m_s','minimum_lift_m','maximum_slip_m','maximum_slip_deg'):
             if values[key]<=0: raise ValueError(f'{key} must be positive')
         if not isinstance(self.contact_ticks,int) or self.contact_ticks<1:
             raise ValueError('contact_ticks must be a positive integer')
+        if not isinstance(self.thin_handle_pinch,bool) or not isinstance(self.hold_finger_positions,bool):
+            raise ValueError('Invalid boolean recipe flag')
         if not .008<=self.preshape_aperture_m<=.06: raise ValueError('Invalid handle pre-shape aperture')
         if not 0<self.preshape_closure_command<1: raise ValueError('Invalid handle pre-shape command')
         if self.physics_timestep_s not in (.0005,.001,.002): raise ValueError('Unsupported physics timestep')
@@ -73,12 +89,49 @@ class SpoonRecipe:
             raise ValueError('Invalid two-finger force feedback')
         if not 0 < self.maximum_joint_limit_error_rad <= .01:
             raise ValueError('Joint-limit residual tolerance must be at most .01 rad')
+        if self.expected_size_m is not None:
+            size=np.asarray(self.expected_size_m,dtype=float)
+            if size.shape!=(3,) or not np.isfinite(size).all() or np.any(size<=0):
+                raise ValueError('Invalid expected spoon geometry')
 
     def to_dict(self): return asdict(self)
 
 
-def spoon_recipe(ee_id='2F'):
-    """Return the hand-specific pose; validation records identify passed runs."""
+def spoon_recipe(ee_id='2F', *, asset='default'):
+    """Return the hand-specific pose; validation records identify passed runs.
+
+    ``asset='default'`` preserves C1_2 / C3_1 geometry gates. ``asset='c3_2'``
+    selects the breakfast-tray spoon AABB and 3F handle station.
+    """
+    if asset == 'c3_2':
+        if ee_id == '2F':
+            return replace(
+                spoon_recipe('2F'),
+                recipe_id='spoon_2f_c3_2_handle_center_v1_experimental',
+                expected_size_m=C3_2_SPOON_EXPECTED_SIZE_M,
+                handle_fraction=-.20,
+            )
+        if ee_id != '3F':
+            raise ValueError('UNSUPPORTED_EE: c3_2 spoon supports 2F/3F recipes')
+        # c3_2: yaw-90 thumb+index pinch on the single handle collision mesh.
+        # Full 3F enclosure is not achievable on this thin asset; see thin_handle_pinch.
+        return replace(
+            spoon_recipe('3F'),
+            recipe_id='spoon_3f_c3_2_handle_center_v2',
+            expected_size_m=C3_2_SPOON_EXPECTED_SIZE_M,
+            handle_fraction=-.15,
+            height_offset_m=.014,
+            lateral_offset_m=-.004,
+            tilt_deg=5.,
+            handle_roll_deg=0.,
+            approach_yaw_deg=90.,
+            preshape_aperture_m=.025,
+            # Near-open approach: mid-close dips tips into the island.
+            preshape_closure_command=.05,
+            thin_handle_pinch=True,
+            hold_finger_positions=True,
+            three_finger_force_targets_n=(3.0, 1.5, 0.5),
+        )
     if ee_id=='2F': return SpoonRecipe()
     if ee_id=='3F':
         return replace(SpoonRecipe(),recipe_id='spoon_3f_handle_center_v2_unvalidated',
@@ -91,7 +144,13 @@ def spoon_recipe(ee_id='2F'):
 def build_spoon_targets(T_WB,center_in_body_m,local_size_m,recipe=None):
     r=recipe or SpoonRecipe()
     size=np.asarray(local_size_m,dtype=float)
-    if size.shape!=(3,) or not np.isfinite(size).all() or not (.05<size[0]<.065 and .16<size[1]<.185 and .025<size[2]<.035):
+    if size.shape!=(3,) or not np.isfinite(size).all():
+        raise ValueError('UNSUPPORTED_SPOON_GEOMETRY')
+    if r.expected_size_m is not None:
+        expected=np.asarray(r.expected_size_m,dtype=float)
+        if np.any(np.abs(size-expected)>np.maximum(.004,expected*.12)):
+            raise ValueError('UNSUPPORTED_SPOON_GEOMETRY')
+    elif not (.05<size[0]<.065 and .16<size[1]<.185 and .025<size[2]<.035):
         raise ValueError('UNSUPPORTED_SPOON_GEOMETRY')
     center=np.asarray(T_WB)@transform(center_in_body_m,rotation=np.eye(3))
     # Asset +Y is the bowl, -Y is the handle. Approach the narrow handle from
@@ -106,6 +165,9 @@ def build_spoon_targets(T_WB,center_in_body_m,local_size_m,recipe=None):
     return {'T_WC':center,'T_CG':relative,'PRE_GRASP':pre,'GRASP':grasp,'LIFT':lift}
 
 
-def grasp_spoon(context,object_id='spoon',recipe=None):
-    if object_id!='spoon': raise ValueError('This recipe supports the C1_2 spoon')
+def grasp_spoon(context,object_id=None,recipe=None):
+    from tuj.m5_motion.scripted_grasps.catalog_types import _instance_matches_type
+    object_id = object_id or getattr(context, 'object_id', 'spoon')
+    if not _instance_matches_type(object_id, 'spoon'):
+        raise ValueError('This recipe supports the spoon asset (including spoon_a/spoon_b)')
     return context.execute_spoon(recipe or getattr(context,'recipe',None) or SpoonRecipe())

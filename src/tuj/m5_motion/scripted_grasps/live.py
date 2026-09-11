@@ -40,7 +40,7 @@ def snapshot(runtime, previous=None):
     retention = getattr(runtime, "scripted_grasp_retention", None)
     if retention is not None and attachment is None:
         world.metadata["contact_friction_held_objects"] = {
-            retention.entry.object_id: retention.transform().model_dump(mode="json")}
+            retention.entry.scene_object_id: retention.transform().model_dump(mode="json")}
     world.metadata["scripted_grasps"] = True
     return world
 

@@ -15,16 +15,40 @@ from tuj.m5_motion.scripted_grasps.runtime import save_json,GraspFailure
 from tuj.m5_motion.scripted_grasps.ik_continuity import ContinuousIK
 from tuj.m5_motion.scripted_grasps.catalog_types import build_catalog_targets
 from tuj.m5_motion.scripted_grasps.catalog_timing import RUNTIME_VERSION,synchronize_timing,check_control_elapsed,run_timed_hold
-from tuj.m5_motion.scripted_grasps.spoon_runtime import SpoonContext,approach_spoon
+from tuj.m5_motion.scripted_grasps.spoon_runtime import (
+    SpoonContext, approach_spoon, grasp_contact_ready, hold_contact_fraction,
+    lift_with_reach_fallback, thin_handle_pinch_event, attach_thin_handle_pinch,
+)
 
 
 class CatalogContext(SpoonContext):
 
     def find_support_geom(self):
-        for name in ('table_collision','island_island_group_top_2'):
+        for name in (
+            'table_collision',
+            'island_island_group_top_2',
+            'island_island_group_top_1',
+        ):
             try:return self.model.geom(name).id
             except KeyError:pass
         raise GraspFailure('SUPPORT_GEOMETRY_NOT_FOUND')
+
+    def support_geom_names(self):
+        """All known support surfaces present in the compiled scene."""
+        names=[]
+        for name in (
+            'table_collision',
+            'island_island_group_top_2',
+            'island_island_group_top_1',
+        ):
+            try:
+                self.model.geom(name)
+            except KeyError:
+                continue
+            names.append(name)
+        if not names:
+            raise GraspFailure('SUPPORT_GEOMETRY_NOT_FOUND')
+        return names
 
     def geom_top_height(self,gid):
         import itertools
@@ -61,14 +85,39 @@ class CatalogContext(SpoonContext):
         local=((np.asarray(position)-body[:3,3])@body[:3,:3]-self.center_in_body)/self.local_size
         return bool(np.all(local>=self.recipe.contact_region_min) and np.all(local<=self.recipe.contact_region_max))
 
+    def valid_state(self,q,key):
+        """Carry the vac-held object during BREAKAWAY the same way as LIFT."""
+        self.probe.qpos[:]=self.data.qpos
+        self.probe.qpos[self.arm_ids]=q
+        self.mj.mj_fwdPosition(self.model,self.probe)
+        if self.carried_pose is not None and key.keyframe_id in {'LIFT','BREAKAWAY','LEVEL'}:
+            body=self.grip_pose(self.probe)@self.carried_pose
+            self.probe.qpos[self.object_qadr:self.object_qadr+3]=body[:3,3]
+            quat=Rotation.from_matrix(body[:3,:3]).as_quat()
+            self.probe.qpos[self.object_qadr+3:self.object_qadr+7]=quat[[3,0,1,2]]
+            self.mj.mj_fwdPosition(self.model,self.probe)
+        self.last_planning_collision=self.bad_contacts(self.probe,key.keyframe_id)
+        return not self.last_planning_collision
+
     def bad_contacts(self,data,stage):
         bad=super().bad_contacts(data,stage)
+        if stage in {'BREAKAWAY','LEVEL'}:
+            # Spoon exemptions cover GRASP/CLOSE/LIFT/... but not BREAKAWAY /
+            # LEVEL. Vac cup↔held-object contact is expected while attached.
+            return [c for c in bad if not (
+                any(self.model.geom(g).name in c['geoms'] for g in self.finger_geoms)
+                and any(self.model.geom(g).name in c['geoms'] for g in self.handle_geoms)
+            )]
         if stage!='LIFT' or self.support_released:return bad
         height=float(self.body_pose(data)[2,3]-self.initial_body[2,3])
         if not -.002<=height<=.005:return bad
-        support=self.model.geom(self.support_gid).name
+        support_names=set(self.support_geom_names())
         object_names={self.model.geom(g).name for g in self.object_geoms}
-        return [c for c in bad if not (support in c['geoms'] and any(n in object_names for n in c['geoms']) and c['penetration_m']<=.002)]
+        return [c for c in bad if not (
+            any(name in c['geoms'] for name in support_names)
+            and any(n in object_names for n in c['geoms'])
+            and c['penetration_m']<=.002
+        )]
 
     def sample(self):
         if self.stage=='LIFT' and self.body_pose()[2,3]-self.initial_body[2,3]>.005:self.support_released=True
@@ -104,15 +153,19 @@ class CatalogContext(SpoonContext):
             'object_pose':self.body_pose(),'bad_contacts':self.bad_contacts(self.data,self.stage)}
         self.trace.append(row)
         lift_rows=self.trace[-10:]
-        if self.recipe.ee_id=='vac' and self.vacuum_attachment_record is not None and self.stage in {'CLOSE','LIFT','SETTLE','HOLD'}:
+        if self.recipe.ee_id=='vac' and self.vacuum_attachment_record is not None and self.stage in {'CLOSE','BREAKAWAY','LIFT','LEVEL','SETTLE','HOLD'}:
             if not row['attachment_active']:raise GraspFailure('VACUUM_ATTACHMENT_LOST')
             reference=np.asarray(self.vacuum_attachment_record['T_GB_at_attach'])
             row['attachment_position_error_m']=float(np.linalg.norm(row['T_GB'][:3,3]-reference[:3,3]))
             row['attachment_angle_error_deg']=float(np.rad2deg(Rotation.from_matrix(reference[:3,:3].T@row['T_GB'][:3,:3]).magnitude()))
             if row['attachment_position_error_m']>self.recipe.maximum_slip_m or row['attachment_angle_error_deg']>self.recipe.maximum_slip_deg:
                 raise GraspFailure('VACUUM_ATTACHMENT_POSE_ERROR')
-        if self.recipe.ee_id!='vac' and len(lift_rows)==10 and all(s['stage']=='LIFT' and set(s['finger_contacts'])!=set(self.finger_groups) for s in lift_rows):
-            raise GraspFailure('CONTACT_LOST_DURING_LIFT')
+        if self.recipe.ee_id!='vac' and len(lift_rows)==10 and all(s['stage']=='LIFT' for s in lift_rows):
+            if getattr(self.recipe,'thin_handle_pinch',False):
+                if all(not thin_handle_pinch_event(s) for s in lift_rows):
+                    raise GraspFailure('CONTACT_LOST_DURING_LIFT')
+            elif all(set(s['finger_contacts'])!=set(self.finger_groups) for s in lift_rows):
+                raise GraspFailure('CONTACT_LOST_DURING_LIFT')
         if self.max_runtime_s is not None and time.monotonic()-self.execution_started>self.max_runtime_s:
             raise GraspFailure('TIME_BUDGET_EXCEEDED')
         if len(self.trace)%250==0:print('[catalog]',self.object_id,self.stage,f"lift={row['lift_m']:.3f}",row['finger_contacts'],flush=True)
@@ -126,6 +179,8 @@ class CatalogContext(SpoonContext):
 
 
     def ready(self):
+        if getattr(self.recipe,'thin_handle_pinch',False):
+            return grasp_contact_ready(self.recipe,self.trace,self.recipe.contact_ticks)
         if len(self.trace)<self.recipe.contact_ticks:return False
         for row in self.trace[-self.recipe.contact_ticks:]:
             if set(row['finger_contacts'])!=set(self.finger_groups):return False
@@ -171,6 +226,27 @@ class CatalogContext(SpoonContext):
             raise GraspFailure(f'PRESHAPE_APERTURE_OUTSIDE_RANGE: {aperture}')
         return opening,aperture
 
+    def apply_post_grasp_arm_gains(self):
+        """Raise arm tracking gains for post-attach lift (recipe post_grasp_arm_kp)."""
+        gain=self.recipe.post_grasp_arm_kp
+        if gain is None:
+            return
+        controller=self.robot.part_controllers['right']
+        if getattr(self,'_catalog_arm_gains_original',None) is None:
+            self._catalog_arm_gains_original=(
+                controller, controller.kp.copy(), controller.kd.copy())
+        damping_ratio=controller.kd/(2.*np.sqrt(np.maximum(controller.kp,1e-8)))
+        controller.kp=np.full_like(controller.kp,float(gain))
+        controller.kd=2.*np.sqrt(controller.kp)*damping_ratio
+
+    def restore_arm_gains(self):
+        original=getattr(self,'_catalog_arm_gains_original',None)
+        if original is None:
+            return
+        controller,kp,kd=original
+        controller.kp,controller.kd=kp,kd
+        self._catalog_arm_gains_original=None
+
     def execute_object(self,recipe):
         if recipe!=self.recipe:raise ValueError('Context must be initialized with the same recipe')
         self.execution_started=time.monotonic()
@@ -178,10 +254,35 @@ class CatalogContext(SpoonContext):
             'recipe':recipe.to_dict(),'scenario':self.scenario,'runtime_version':RUNTIME_VERSION,'timing':self.timing}
         try:
             self.record_input()
-            targets=build_catalog_targets(self.body_pose(),self.center_in_body,self.local_size,recipe)
+            if recipe.ee_id == 'vac':
+                from tuj.m5_motion.scripted_grasps.catalog_types import build_collision_surface_vacuum_targets
+                vac_recipe=recipe
+                if recipe.object_id=='plate':
+                    # Rim fraction is size-relative; retune to the live AABB so a
+                    # PLATE_SCALE edit cannot seat the cup on the recessed dish.
+                    from tuj.m5_motion.scripted_grasps.objects.plate_vac import (
+                        tune_recipe_to_measured_size)
+                    vac_recipe=tune_recipe_to_measured_size(recipe,self.local_size)
+                targets=build_collision_surface_vacuum_targets(
+                    self.body_pose(),self.center_in_body,self.local_size,vac_recipe,
+                    self.object_record)
+            else:
+                targets=build_catalog_targets(self.body_pose(),self.center_in_body,self.local_size,recipe)
             save_json(self.output/'targets.json',targets)
             q=self.data.qpos[self.arm_ids].copy()
-            if recipe.ee_id=='2F':opening,aperture=self.preshape()
+            if recipe.ee_id=='2F':
+                opening,aperture=self.preshape()
+            elif recipe.ee_id=='3F':
+                # Near-open tip pose clears island/tray; mid-close dips tips into them.
+                if recipe.preshape_closure_command < .1:
+                    self.stage='OPEN';opening=1.
+                    for _ in range(75):self.step(q,opening)
+                else:
+                    self.stage='PRESHAPE'
+                    opening=float(np.clip(1.-2.*recipe.preshape_closure_command,-1.,1.))
+                    for value in np.linspace(1.,opening,100):self.step(q,float(value))
+                    for _ in range(75):self.step(q,opening)
+                aperture=None
             else:
                 self.stage='OPEN';opening=1.
                 for _ in range(75):self.step(q,opening)
@@ -189,7 +290,13 @@ class CatalogContext(SpoonContext):
             save_json(self.output/'preshape.json',{'aperture_m':aperture,'opening_command':opening})
             approach_spoon(self,targets,opening)
             q=self.move(targets['GRASP'],'GRASP',opening,cartesian=True)
-            np.savez_compressed(self.output/'grasp_state.npz',qpos=self.data.qpos,qvel=self.data.qvel,ctrl=self.data.ctrl,time=self.data.time)
+            # Snapshot for vac attach continuity: CLOSE suction can depress the
+            # free body into support; attach must not freeze that crushed pose.
+            self.grasp_grip_pose=self.grip_pose().copy()
+            self.grasp_object_pose=self.body_pose().copy()
+            self.grasp_T_GB=inverse(self.grasp_grip_pose)@self.grasp_object_pose
+            np.savez_compressed(self.output/'grasp_state.npz',qpos=self.data.qpos,qvel=self.data.qvel,ctrl=self.data.ctrl,time=self.data.time,
+                grasp_T_GB=self.grasp_T_GB,grasp_object_pose=self.grasp_object_pose,grasp_grip_pose=self.grasp_grip_pose)
             self.stage='CLOSE'
             if recipe.ee_id=='2F':self.runtime.set_finger_gripper_actuator_gains(kp=recipe.closure_kp)
             acquired=False;hold_opening=-1.
@@ -201,26 +308,107 @@ class CatalogContext(SpoonContext):
                 if acquired:break
                 row=self.step(q,-1.);self.engage_feedback(row);acquired=self.ready();hold_opening=-1.
             if not acquired:raise GraspFailure('GRASP_CONTACT_NOT_STABLE')
+            if recipe.ee_id=='3F' and (
+                getattr(recipe,'thin_handle_pinch',False) or getattr(recipe,'hold_finger_positions',False)
+            ):
+                self.three_finger_commands=np.asarray(self.gripper.current_action).copy()
+                self.three_finger_force_hold=True
+                hold_opening=float(np.mean(self.three_finger_commands))
             if recipe.ee_id=='vac':
-                from tuj.m5_motion.scripted_grasps.catalog_vacuum import attach_vacuum
+                from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
+                    attach_vacuum, finalize_vacuum_grasp_continuity)
                 attach_vacuum(self)
                 hold_opening=1.-2.*recipe.suction_command
             run_timed_hold(self,q,hold_opening,recipe.prelift_stabilization_s)
             if recipe.ee_id=='vac':
                 if self.runtime.attached_object_id!=self.object_id:raise GraspFailure('VACUUM_ATTACHMENT_LOST')
+                # Recover GRASP joint tracking (no Cartesian reseat through the
+                # cup/object pair), then rebind kinematic attach to the GRASP
+                # object world pose so CLOSE depression is not carried into LIFT.
+                self.stage='CLOSE'
+                for _ in range(75):
+                    self.step(q,hold_opening)
+                finalize_vacuum_grasp_continuity(self)
+                save_json(self.output/'grasp_reseat.json',{
+                    'object_pose':pose_dict(self.body_pose()),
+                    'grip_pose':pose_dict(self.grip_pose()),
+                    'T_GB':inverse(self.grip_pose())@self.body_pose(),
+                    'grasp_T_GB':self.grasp_T_GB,
+                })
             elif not self.ready():raise GraspFailure('CONTACT_LOST_BEFORE_LIFT')
+            if getattr(recipe,'thin_handle_pinch',False):
+                attach_thin_handle_pinch(self)
+            self.apply_post_grasp_arm_gains()
+            # Snapshot grasp relative pose before any post-attach breakaway so
+            # BREAKAWAY/LIFT collision probes carry the held object with the TCP.
             self.carried_pose=inverse(self.grip_pose())@self.body_pose()
-            save_json(self.output/'contact_gate.json',{'status':'PASSED','sample':self.trace[-1]})
-            q=self.move(targets['LIFT'],'LIFT',hold_opening,cartesian=True)
-            self.stage='SETTLE'
-            run_timed_hold(self,q,hold_opening,recipe.settle_s)
-            self.stage='HOLD';hold,measured_hold_s=run_timed_hold(self,q,hold_opening,recipe.hold_s)
-            ref=np.asarray(self.vacuum_attachment_record['T_GB_at_attach']) if recipe.ee_id=='vac' else hold[0]['T_GB']
+            breakaway={'applied':False}
+            if recipe.ee_id=='vac':
+                from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
+                    breakaway_vacuum_from_support,
+                    move_vacuum_cartesian_kinematic,
+                    settle_vacuum_arm_tracking)
+                # Clear residual support immersion before the long LIFT path so
+                # early-LIFT controller dip cannot deepen object↔island contacts
+                # past the early-LIFT exemption window.
+                q, breakaway = breakaway_vacuum_from_support(self, q, hold_opening)
+                result['vacuum_support_breakaway'] = breakaway
+                if breakaway.get('applied'):
+                    self.carried_pose=inverse(self.grip_pose())@self.body_pose()
+                    # Re-base early-LIFT height against the cleared pose. Otherwise
+                    # post-breakaway height already exceeds +5 mm and permanently
+                    # disables the early support-contact filter before LIFT dips.
+                    self.initial_body=self.body_pose()
+                    self.initial_bottom=self.bottom_height()
+                    self.support_released=False
+            save_json(self.output/'contact_gate.json',{'status':'PASSED','sample':self.sample()})
+            if recipe.ee_id=='vac' and breakaway.get('applied'):
+                # Impedance LIFT after kinematic breakaway tracks back into the
+                # pre-breakaway pose (~20 mm TCP dip on bread). Climb by FK, then
+                # finish with a normal Cartesian move so absolute joint PD is
+                # tracking before HOLD / transport settle gates.
+                move_vacuum_cartesian_kinematic(
+                    self, targets['LIFT'], 'LIFT', hold_opening, settle_steps=10)
+                q=self.move(targets['LIFT'],'LIFT',hold_opening,cartesian=True)
+                settle_vacuum_arm_tracking(self, q, hold_opening)
+            else:
+                q=lift_with_reach_fallback(
+                    self, targets, hold_opening, cartesian=True)
+            if recipe.ee_id=='vac':
+                from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
+                    run_kinematic_vacuum_hold,
+                    straighten_vacuum_tool_world_down)
+                # Bread-like tilted vac grasps leave ~0.083 rad M5 tracking lag;
+                # level tool -Z to world -Z before HOLD so transport/place settle.
+                q, level = straighten_vacuum_tool_world_down(
+                    self, q, hold_opening)
+                result['vacuum_tool_level'] = level
+                if level.get('applied'):
+                    # Impedance SETTLE/HOLD after LEVEL re-sags bread (~35 mm).
+                    self.stage='SETTLE'
+                    run_kinematic_vacuum_hold(
+                        self, q, hold_opening, recipe.settle_s)
+                    self.stage='HOLD'
+                    hold, measured_hold_s = run_kinematic_vacuum_hold(
+                        self, q, hold_opening, recipe.hold_s)
+                else:
+                    self.stage='SETTLE'
+                    run_timed_hold(self, q, hold_opening, recipe.settle_s)
+                    self.stage='HOLD'
+                    hold, measured_hold_s = run_timed_hold(
+                        self, q, hold_opening, recipe.hold_s)
+            else:
+                self.stage='SETTLE'
+                run_timed_hold(self,q,hold_opening,recipe.settle_s)
+                self.stage='HOLD';hold,measured_hold_s=run_timed_hold(self,q,hold_opening,recipe.hold_s)
+            ref=np.asarray(self.vacuum_attachment_record['T_GB_at_attach']) if recipe.ee_id=='vac' else (
+                np.asarray(self.thin_handle_attachment_record['T_GB_at_attach'])
+                if getattr(self,'thin_handle_attachment_record',None) is not None else hold[0]['T_GB'])
             slip=max(float(np.linalg.norm(s['T_GB'][:3,3]-ref[:3,3])) for s in hold)
             angle=max(float(np.rad2deg(Rotation.from_matrix(ref[:3,:3].T@s['T_GB'][:3,:3]).magnitude())) for s in hold)
             metrics={'minimum_hold_lift_m':min(s['lift_m'] for s in hold),
                 'minimum_bottom_clearance_m':min(s['bottom_clearance_m'] for s in hold),
-                'all_finger_contact_fraction':sum(set(s['finger_contacts'])==set(self.finger_groups) for s in hold)/len(hold),
+                'all_finger_contact_fraction':hold_contact_fraction(hold,self.finger_groups,recipe),
                 'max_slip_m':slip,'max_slip_deg':angle,'hold_s':measured_hold_s,'requested_hold_s':recipe.hold_s}
             ok=metrics['minimum_hold_lift_m']>=recipe.minimum_lift_m and metrics['minimum_bottom_clearance_m']>=.05 and slip<=recipe.maximum_slip_m and angle<=recipe.maximum_slip_deg
             if recipe.ee_id=='vac':
@@ -228,13 +416,21 @@ class CatalogContext(SpoonContext):
                 metrics['validation_basis']='CONTACT_GATED_KINEMATIC_ATTACHMENT'
                 metrics['pose_error_reference']='ATTACH_TIME'
                 ok=ok and metrics['attachment_active_fraction']==1.
+            elif getattr(recipe,'thin_handle_pinch',False):
+                metrics['attachment_active_fraction']=sum(
+                    self.runtime.attached_object_id==self.object_id for _ in hold)/len(hold)
+                metrics['validation_basis']='CONTACT_GATED_KINEMATIC_THIN_HANDLE'
+                ok=ok and metrics['attachment_active_fraction']==1.
             else:ok=ok and metrics['all_finger_contact_fraction']>=.95
             result.update(status='SUCCESS' if ok else 'FAILED',metrics=metrics,failure_reason=None if ok else 'HOLD_VALIDATION_FAILED')
+            if getattr(self,'thin_handle_attachment_record',None) is not None:
+                result['thin_handle_attachment']=self.thin_handle_attachment_record
         except Exception as exc:
             import traceback
             (self.output/'error.txt').write_text(traceback.format_exc(),encoding='utf-8')
             result.update(failure_stage=self.stage,failure_reason=str(exc),error_type=type(exc).__name__)
         finally:
+            self.restore_arm_gains()
             result.update(object_pose_in_gripper=pose_dict(inverse(self.grip_pose())@self.body_pose()),
                 final_object_pose=pose_dict(self.body_pose()),attachment_used=self.runtime.attachment is not None,
                 object_material_inputs=[],learned_model_calls=0,hand_model_correction=self.env.catalog_hand_correction,
