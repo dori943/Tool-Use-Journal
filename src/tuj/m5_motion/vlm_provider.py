@@ -414,6 +414,9 @@ class _HeldGoalSubject:
     object_keyframe_types: frozenset[KeyframeType]
     object_orientation_xyzw: _Quaternion | None
     eef_orientation_xyzw: _Quaternion | None
+    start_object_orientation_xyzw: _Quaternion | None
+    start_frame_ref: str | None
+    start_anchor: str | None
 
 
 def _quaternion(goal: Any, key: str) -> _Quaternion | None:
@@ -466,6 +469,9 @@ def _held_goal_subject(request: MotionPlanRequest) -> _HeldGoalSubject | None:
         object_keyframe_types=kinds,
         object_orientation_xyzw=_quaternion(goal, "object_orientation_xyzw"),
         eef_orientation_xyzw=_quaternion(goal, "eef_orientation_xyzw"),
+        start_object_orientation_xyzw=_quaternion(goal, "start_object_orientation_xyzw"),
+        start_frame_ref=goal.get("frame_ref") if isinstance(goal, dict) else None,
+        start_anchor=goal.get("start_anchor") if isinstance(goal, dict) else None,
     )
 
 
@@ -739,6 +745,17 @@ class OpenAIKeyframeProvider:
                             if held_goal.object_orientation_xyzw is not None:
                                 metadata["packing_orientation_xyzw"] = list(
                                     held_goal.object_orientation_xyzw
+                                )
+                            if (
+                                held_goal.start_object_orientation_xyzw is not None
+                                and item.frame_ref == held_goal.start_frame_ref
+                                and item.anchor == held_goal.start_anchor
+                                and abs(item.offset_along_approach_m) <= 1e-12
+                            ):
+                                # This anchor is the measured start body pose,
+                                # not a request to rotate at the starting point.
+                                metadata["packing_orientation_xyzw"] = list(
+                                    held_goal.start_object_orientation_xyzw
                                 )
                         elif (
                             item.keyframe_type is KeyframeType.RETREAT
