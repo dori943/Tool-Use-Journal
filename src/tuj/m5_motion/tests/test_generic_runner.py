@@ -702,3 +702,19 @@ def test_runtime_render_updates_native_mjviewer() -> None:
     runtime.render()
 
     assert updates == ["updated"]
+
+
+def test_live_viewer_selects_recording_camera() -> None:
+    from tuj.m5_motion.scripted_grasps.cli import _select_live_viewer_camera
+
+    selected: list[int] = []
+    viewer = SimpleNamespace(set_camera=selected.append)
+    model = SimpleNamespace(camera_name2id=lambda name: 7 if name == "agentview" else -1)
+    runtime = SimpleNamespace(
+        env=SimpleNamespace(viewer=viewer, sim=SimpleNamespace(model=model))
+    )
+
+    assert _select_live_viewer_camera(runtime, "agentview") is True
+    assert selected == [7]
+    assert _select_live_viewer_camera(runtime, "missing") is False
+    assert selected == [7]
