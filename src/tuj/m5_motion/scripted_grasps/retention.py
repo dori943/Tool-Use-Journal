@@ -60,7 +60,14 @@ class GraspRetention:
         if c.three_finger_force_hold:
             measured = np.array([self.forces[n] for n in ("thumb", "index", "pinky")])
             from .spatula_runtime import update_three_finger_commands
-            if not getattr(recipe, 'hold_finger_positions', False):
+            attachment = c.runtime.attachment
+            constrained = (attachment is not None
+                and attachment.object_id == self.entry.object_id
+                and attachment.mode == "KINEMATIC")
+            # A kinematically carried body cannot respond to force redistribution.
+            # Preserve its validated closure instead of integrating alternating
+            # finger unloading. Contact, slip and joint audits still run each tick.
+            if not constrained and not getattr(recipe, 'hold_finger_positions', False):
                 self.commands = update_three_finger_commands(self.commands, measured, recipe)
             if self.entry.driver == "catalog":
                 self.commands = bound_spoon_3f_commands(self.commands)
