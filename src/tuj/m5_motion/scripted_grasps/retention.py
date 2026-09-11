@@ -6,6 +6,8 @@ from .frames import inverse
 from .runtime import GraspFailure
 from .spoon_hand_model import bound_spoon_3f_commands
 
+MIN_CONTACT_FORCE_N = .01
+
 
 class GraspRetention:
     def __init__(self, context, entry):
@@ -65,10 +67,13 @@ class GraspRetention:
                 and attachment.object_id == self.entry.object_id
                 and attachment.mode == "KINEMATIC")
             # A kinematically carried body cannot respond to force redistribution.
-            # Preserve its validated closure instead of integrating alternating
-            # finger unloading. Contact, slip and joint audits still run each tick.
-            if not constrained and not getattr(recipe, 'hold_finger_positions', False):
-                self.commands = update_three_finger_commands(self.commands, measured, recipe)
+            # Freeze valid contacts, but recover a missing finger within the
+            # unchanged loss timer. Never open another finger to redistribute load.
+            if not getattr(recipe, 'hold_finger_positions', False):
+                proposed = update_three_finger_commands(self.commands, measured, recipe)
+                self.commands = (np.where(measured <= MIN_CONTACT_FORCE_N,
+                    np.minimum(self.commands, proposed), self.commands)
+                    if constrained else proposed)
             if self.entry.driver == "catalog":
                 self.commands = bound_spoon_3f_commands(self.commands)
         elif c.two_finger_force_hold:
@@ -90,7 +95,7 @@ class GraspRetention:
         actual = inverse(c.grip_pose()) @ c.body_pose()
         slip = float(np.linalg.norm(actual[:3, 3] - self.reference[:3, 3]))
         angle = float(np.rad2deg(Rotation.from_matrix(self.reference[:3, :3].T @ actual[:3, :3]).magnitude()))
-        contact = all(force > .01 for force in self.forces.values())
+        contact = all(force > MIN_CONTACT_FORCE_N for force in self.forces.values())
         if self.entry.ee == "vac":
             contact = c.runtime.attached_object_id == self.entry.object_id
         self.loss_started = None if contact else (time_s if self.loss_started is None else self.loss_started)
