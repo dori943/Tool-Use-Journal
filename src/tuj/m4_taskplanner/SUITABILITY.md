@@ -8,6 +8,8 @@ Task Planner의 기본 suitability는 앞단에서 고정된 Tool과 선택된 E
 EE가 운반해야 하는 object mass와 Tool mass의 합을 EE payload와 비교한다.
 `object_remains_supported=true`인 push/pull 동작은 object 전체 질량을 운반 하중에
 더하지 않는다.
+PICK_TOOL/RETURN_TOOL처럼 같은 물리 자원이 object와 Tool 양쪽에 나타나면 질량을
+한 번만 센다. 두 catalog view의 값이 다르면 알려진 값 중 큰 값을 사용한다.
 
 ## Wrench
 
