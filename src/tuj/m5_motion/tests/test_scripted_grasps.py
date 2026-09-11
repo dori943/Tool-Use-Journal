@@ -62,10 +62,6 @@ def test_excluded_unknown_and_wrong_hand():
     assert resolve(request_for(object_id="tongs")) is None
     request = request_for()
     request.task.ee = "3F"
-    # 0911: #70 (0149c19) 이 EE 불일치를 치명적 오류에서 일반 M5 파지 경로로의
-    # 폴백으로 바꿨는데 이 단언이 함께 갱신되지 않아 그때부터 main 이 빨간불이었다.
-    # 계약은 resolve() 의 docstring 에 있다. 등록된 객체라도 장착 EE 가 레시피와
-    # 다르면 태스크를 멈추지 않고 None 을 돌려주며, 그 사실을 로그로 남긴다.
     assert resolve(request) is None
 
 
@@ -127,6 +123,38 @@ def test_plate_is_routable_but_explicitly_experimental():
     assert plate.object_id not in PENDING_INTEGRATION
     assert integration_status(plate) == "EXPERIMENTAL"
     assert resolve(request_for(plate)) == plate
+
+
+@pytest.mark.parametrize(('object_id','environment','task_id','expected_size'),(
+    ('plate','C1_1_LegoSweep','c1_1',(0.182334163,0.181833528,0.011091216)),
+    ('plate','C2_1_ObjectSorting','c2_1',(0.182334163,0.181833528,0.011091216)),
+    ('plate','C3_1_ObjectSorting','c3_1',(0.182334163,0.181833528,0.011091216)),
+    ('plate_a','C3_2_BreakfastTrayPreparation','c3_2',(0.157261405,0.157261434,0.009592403)),
+    ('plate_b','C3_2_BreakfastTrayPreparation','c3_2',(0.157261405,0.157261434,0.009592403)),
+))
+def test_plate_vac_routes_are_task_and_instance_scoped(
+        object_id,environment,task_id,expected_size):
+    entry=next(e for e in ENTRIES if (e.object_id,e.environment,e.ee)==(
+        object_id,environment,'vac'))
+    assert resolve(request_for(entry))==entry
+    assert entry.function().__name__=='grasp_plate_vac'
+    recipe=entry.recipe()
+    assert (recipe.object_id,recipe.task_id,recipe.ee_id)==(object_id,task_id,'vac')
+    np.testing.assert_allclose(recipe.expected_size_m,expected_size,atol=1e-12)
+    assert recipe.minimum_vacuum_contact_count==1
+    assert recipe.contact_ticks==(3 if task_id=='c1_1' else 5)
+    assert recipe.maximum_vacuum_attach_penetration_m==(
+        .0035 if task_id=='c1_1' else .002)
+    assert recipe.maximum_support_separation_penetration_m==(
+        .0045 if task_id=='c1_1' else .002)
+
+
+def test_plate_vac_recipe_rejects_unregistered_task_and_instance():
+    from tuj.m5_motion.scripted_grasps.objects.plate_vac import plate_vac_recipe
+    with pytest.raises(ValueError,match='UNSUPPORTED_PLATE_VAC_ENVIRONMENT'):
+        plate_vac_recipe('C4_2_DiagonalFitPacking')
+    with pytest.raises(ValueError,match='UNSUPPORTED_PLATE_VAC_OBJECT'):
+        plate_vac_recipe('C3_2_BreakfastTrayPreparation','plate')
 
 
 @pytest.mark.parametrize("entry", [e for e in ENTRIES if e.driver == "catalog"], ids=lambda e: e.object_id)
