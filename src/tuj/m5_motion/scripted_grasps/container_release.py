@@ -58,11 +58,16 @@ def clear_container_rim(grounding, destination, retention):
     if retention is None or metadata.get('kind') != 'CONTAINER':
         return destination, {}
     points, samples = opening_points_in_body(retention.context)
+    # A nominal target on the collision boundary leaves no room for the
+    # request's declared tracking error. This raises the goal, never the gate.
+    goal_margin = (float(grounding.request.constraints.collision_margin_m)
+                   + float(grounding.request.constraints.position_tolerance_m))
     lift = rim_clearance_lift(points, destination, grounding.T_WR,
         metadata['interior_center_m'], metadata['interior_dimensions_m'],
-        metadata['opening_top_z_m'], float(grounding.request.constraints.collision_margin_m))
+        metadata['opening_top_z_m'], goal_margin)
     result = destination.copy()
     result[2, 3] += lift
     return result, {'container_release_lift_m': lift,
+                    'container_goal_clearance_m': goal_margin,
                     'release_geometry_source': 'LIVE_HAND_OPENING_ENVELOPE',
                     'opening_envelope_samples': samples}
