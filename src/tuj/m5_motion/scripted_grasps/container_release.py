@@ -16,8 +16,9 @@ def opening_points_in_body(context):
     probe = c.mj.MjData(c.model)
     probe.qpos[:] = c.data.qpos
     addresses = [int(c.model.jnt_qposadr[c.model.joint(n).id]) for n in c.gripper.joints]
-    configured = getattr(c.env, 'scripted_open_gripper_joint_positions', None)
-    opened = np.array([configured[n] for n in c.gripper.joints]) if configured is not None else np.asarray(c.gripper.init_qpos)
+    from .open_geometry import open_joint_positions
+    configured = open_joint_positions(c)
+    opened = np.array([configured[n] for n in c.gripper.joints])
     closed = c.data.qpos[addresses].copy()
     count = max(2, 1 + math.ceil(float(np.max(np.abs(opened - closed))) / .05))
     body_from_world = inverse(c.body_pose())
