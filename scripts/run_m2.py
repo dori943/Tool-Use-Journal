@@ -156,8 +156,12 @@ def main():
         for line in assign_container_slots(out, m1):
             print(line)
 
+    # 0911: 도구 액션이 없는 서브골(relocate/stack)은 후보가 남아 있어도 확정할
+    # 대상이 아니다. 도구 확보/반납 액션이 실제로 있는 서브골만 막는다.
+    from tuj.m2_subgoal.core import binds_tool
     unresolved = [s["subgoal_id"] for s in out["m2_subgoals"]
-                  if s.get("tool_candidate_ids") and not s.get("selected_tool_id")]
+                  if s.get("tool_candidate_ids") and not s.get("selected_tool_id")
+                  and binds_tool(s.get("details", []))]
     if unresolved:
         print(f"[M2] 경고: 도구 미확정 서브골 {unresolved} — assemble_gk에서 멈춥니다")
     out["m2_stats"]["llm_usage"] = rough.usage

@@ -23,6 +23,8 @@ from __future__ import annotations
 
 import json
 
+from .core import TOOL_KINDS, binds_tool
+
 
 def _node_view(responses: list[dict]) -> dict:
     """같은 노드에 대한 응답 여러 건(intrinsic, ee 등)을 노드별 한 뷰로 합친다."""
@@ -180,8 +182,15 @@ PROMPT_TOOL_BLOCK = """
 공통 기준:
 - 핵심 술어({core})가 false인 후보는 고르지 말 것. 잡을 수 있는 EE가 없는 후보도 제외.
 - 리치 여유는 양수면 충분하며 우열 기준이 아니다. 잡을 수 있는 EE 종류 수도 우열 기준이 아니다.
-- 질량과 재질은 VLM 추정치라 오차가 크다. 크기, 두께, 형상을 우선하라.
+- 질량과 재질은 VLM 추정치라 오차가 크다. 크기, 두께, 형상을 우선하라.{optional}
 JSON 객체에 "selected_tool_id"와 "tool_reason" 필드를 추가하라."""
+
+# 0911: 도구 없이도 되는 서브골에서 억지로 하나를 고르지 않게 하는 선택지.
+# 액션 스키마에 ?tool 이 박혀 있는 TOOL_KINDS 에는 붙이지 않는다.
+TOOL_OPTIONAL_LINE = """
+- 후보 전부가 이 작업에 부적합하거나, 대상을 EE 로 직접 집을 수 있어 도구가
+  불필요하면 selected_tool_id 를 null 로 두고 tool_reason 에 그 이유를 적어라.
+  도구를 쓰는 것 자체는 이득이 아니다. 도구가 있어야 되는 일에만 쓴다."""
 
 
 def _tool_table(measured: list[dict]) -> str:
@@ -210,12 +219,37 @@ def _tool_table(measured: list[dict]) -> str:
     return "\n".join(rows)
 
 
-def _apply_llm_tool_choice(s: dict, obj: dict, logs: list[str]) -> None:
-    """LLM이 고른 도구를 검증해 채택한다. 부적합하면 규칙 선택을 유지한다."""
+def _apply_llm_tool_choice(s: dict, obj: dict, logs: list[str],
+                           optional: bool = False) -> None:
+    """LLM이 고른 도구를 검증해 채택한다. 부적합하면 규칙 선택을 유지한다.
+
+    optional 이면 null(도구 불필요)도 유효한 답이다. 이때는 후보 목록까지 비워야
+    한다. 남겨 두면 뒤 단계가 다시 ?tool 을 바인딩할 대상으로 읽는다.
+    """
     pick = obj.get("selected_tool_id")
     reason = obj.get("tool_reason", "")
     measured = {m["node"]: m for m in s.get("tool_candidates_measured", [])}
     rule = s.get("selected_tool_id")
+    if optional and pick is not None and pick in measured:
+        # 액션 스키마에 ?tool 이 없으므로 여기서 확정하면 뒤 단계가 바인딩할 곳이 없다.
+        # 이 서브골은 도구 사용 형태로 다시 분해되어야 한다는 신호로만 남긴다.
+        s["tool_needed_hint"] = {"tool_id": pick, "reason": reason}
+        s["tool_candidate_ids"] = []
+        s.pop("selected_tool_id", None)
+        s.pop("partition_plan", None)
+        logs.append(f"  [도구 판정] {s['subgoal_id']}: 도구 필요 신호 {pick} ({reason}) — "
+                    f"이 kind({s.get('kind')})에는 도구 액션이 없어 확정하지 않는다")
+        return
+    if optional and pick is None:
+        s["selection_by"] = "llm"
+        s["selection_reason_tool"] = reason
+        s["selected_tool_id_rule"] = rule
+        s["selected_tool_id"] = None
+        s["tool_candidate_ids"] = []
+        s.pop("partition_plan", None)
+        logs.append(f"  [도구 판정] {s['subgoal_id']}: 도구 불필요로 판정 "
+                    f"(규칙 선택 {rule} 기각) ({reason})")
+        return
     if pick not in measured:
         logs.append(f"  [도구 판정] {s['subgoal_id']}: LLM 선택 {pick!r}이 측정된 후보에 없음 — "
                     f"규칙 선택 {rule} 유지")
@@ -302,13 +336,15 @@ def update_confidence(m2_out: dict, client, model: str = "gpt-4o",
         # 0908: 도구 후보 측정표가 있으면 같은 호출에서 도구 판정까지 받는다
         measured = s.get("tool_candidates_measured") or []
         want_tool = bool(measured) and s.get("selected_tool_id") in {m["node"] for m in measured}
+        tool_optional = s.get("kind") not in TOOL_KINDS
         if want_tool:
             # 규칙 선택은 LLM에 알리지 않는다 (앵커링 방지: c1_2에서 "1차 선택 spatula"를
             # 보여주니 2mm 두께가 휜다고 스스로 적으면서도 동의했음). 후보는 id순으로 중립 나열.
             prompt += "\n" + PROMPT_TOOL_BLOCK.format(
                 kind=s.get("kind"),
                 table=_tool_table(sorted(measured, key=lambda m: m["node"])),
-                core=(measured[0].get("core_pred") or "없음"))
+                core=(measured[0].get("core_pred") or "없음"),
+                optional=TOOL_OPTIONAL_LINE if tool_optional else "")
         err = None
         for attempt in (1, 2):
             msg = prompt if attempt == 1 else prompt + f"\n\n이전 출력 문제: {err}. JSON 객체만."
@@ -327,10 +363,12 @@ def update_confidence(m2_out: dict, client, model: str = "gpt-4o",
                     v = obj.get(k)
                     if not isinstance(v, (int, float)) or not 0.0 <= v <= 1.0:
                         raise ValueError(f"{k}가 0~1 숫자가 아님: {v!r}")
-                if want_tool and not obj.get("selected_tool_id"):
+                if want_tool and not tool_optional and not obj.get("selected_tool_id"):
                     raise ValueError("selected_tool_id가 없음 (도구 후보 중 하나를 골라라)")
+                if want_tool and tool_optional and "selected_tool_id" not in obj:
+                    raise ValueError("selected_tool_id가 없음 (도구를 고르거나 null 로 두라)")
                 if want_tool:
-                    _apply_llm_tool_choice(s, obj, logs)
+                    _apply_llm_tool_choice(s, obj, logs, optional=tool_optional)
                 conf["after"] = {k: v for k, v in obj.items()
                                  if k not in ("selected_tool_id", "tool_reason")}
                 conf["delta"] = {k: round(obj[k] - (before.get(k) or 0.0), 3)
@@ -681,10 +719,12 @@ def _apply_responses(m2_out: dict, plan: list[dict], responses: list[dict]) -> l
                 elif p["head"] in ("batch_feasible", "act_space_clear"):
                     status, ev = _judge_group(p["head"], rs)
                 else:
-                    # tool 후보가 있는 서브골(sweep류)은 any, 없는 서브골(relocate
-                    # 그룹)은 원소 전원 충족 의미론 (0828)
+                    # tool 액션이 있는 서브골(sweep류)은 any, 없는 서브골(relocate
+                    # 그룹)은 원소 전원 충족 의미론 (0828). 0911: 기준을 후보 유무에서
+                    # ?tool 바인딩 유무로 바꾼다 — 이제 relocate/stack 도 후보를 받으므로
+                    # 후보 유무로 가르면 쌓기의 대상 판정이 any 로 느슨해진다.
                     status, ev = _judge(p["head"], nodes, view, rels,
-                                        require_all=not s.get("tool_candidate_ids"))
+                                        require_all=not binds_tool(s.get("details", [])))
                 p["status"], p["evidence"] = status, ev
                 n_sat[status] += 1
                 line = f"  {p['id']:14s} {p['expr'][:52]:52s} -> {status}"
