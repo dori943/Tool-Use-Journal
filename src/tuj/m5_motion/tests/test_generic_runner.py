@@ -682,3 +682,39 @@ def test_runtime_render_callback_uses_current_environment() -> None:
     runtime.render()
 
     assert observed == [first, second]
+
+
+def test_runtime_render_updates_native_mjviewer() -> None:
+    from tuj.m5_motion.tool_use_journal_runtime import ToolUseJournalEERuntime
+
+    updates: list[str] = []
+    viewer = SimpleNamespace(update=lambda: updates.append("updated"))
+    env = SimpleNamespace(
+        renderer="mjviewer",
+        viewer=viewer,
+        render=lambda: (_ for _ in ()).throw(AssertionError("mjviewer render is a no-op")),
+    )
+    runtime = object.__new__(ToolUseJournalEERuntime)
+    runtime._closed = False
+    runtime._env = env
+    runtime._render_callback = None
+
+    runtime.render()
+
+    assert updates == ["updated"]
+
+
+def test_live_viewer_selects_recording_camera() -> None:
+    from tuj.m5_motion.scripted_grasps.cli import _select_live_viewer_camera
+
+    selected: list[int] = []
+    viewer = SimpleNamespace(set_camera=selected.append)
+    model = SimpleNamespace(camera_name2id=lambda name: 7 if name == "agentview" else -1)
+    runtime = SimpleNamespace(
+        env=SimpleNamespace(viewer=viewer, sim=SimpleNamespace(model=model))
+    )
+
+    assert _select_live_viewer_camera(runtime, "agentview") is True
+    assert selected == [7]
+    assert _select_live_viewer_camera(runtime, "missing") is False
+    assert selected == [7]
