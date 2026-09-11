@@ -238,6 +238,15 @@ def adapt_gk_m2_output(
                 target_ids=target_ids,
                 selected_tool_id=tool_id,
             )
+            action_parameters = dict(
+                _mapping(detail.get("action_parameters"))
+            )
+            if action_type == "tool_act" and mode in {"flatten", "sweep"}:
+                # These modes manipulate an object while it stays supported
+                # by the work surface. Payload is the carried tool only;
+                # contact force/torque is a separate wrench requirement.
+                action_parameters.setdefault("object_remains_supported", True)
+                action_parameters.setdefault("requires_wrench", True)
             region = binding.get("?r")
             goal_region_id = region if isinstance(region, str) else None
             if (
@@ -266,9 +275,7 @@ def adapt_gk_m2_output(
                     target_ids=target_ids,
                     goal_region_id=goal_region_id,
                     tool_id=tool_id,
-                    action_parameters=dict(
-                        _mapping(detail.get("action_parameters"))
-                    ),
+                    action_parameters=action_parameters,
                     preconditions=preconditions,
                     postconditions=establish,
                     establish=establish,
@@ -892,7 +899,10 @@ def _feasible_ees_for_group(
         if not _mapping(_mapping(nodes.get(owner)).get("ee")):
             continue                       # 접지값이 없는 대상은 제약으로 세지 않는다
         feasible = supported if feasible is None else (feasible & supported)
-    return sorted(feasible) if feasible else list(fallback)
+    # ``None`` means no owner supplied grounded EE evidence, so the caller's
+    # fallback remains valid.  An empty set is different: grounded records
+    # were present and their intersection proved that no EE is feasible.
+    return sorted(feasible) if feasible is not None else list(fallback)
 
 
 def _normalize_partial_order(

@@ -50,6 +50,13 @@ def _parser() -> argparse.ArgumentParser:
         type=Path,
         help="optional normalized initial robot state",
     )
+    parser.add_argument(
+        "--execution-environment",
+        help=(
+            "environment whose enabled scripted-grasp recipes constrain "
+            "the M4 EE candidates"
+        ),
+    )
     parser.add_argument("--id-aliases", type=Path)
     parser.add_argument("--resources", type=Path)
     parser.add_argument("--candidates", type=Path)
@@ -134,6 +141,8 @@ def main(argv: Sequence[str] | None = None) -> int:
     ]
     for flag, path in optional_inputs.items():
         _append_optional(command, flag, path)
+    if args.execution_environment is not None:
+        command.extend(("--execution-environment", args.execution_environment))
 
     print(f"[M4] Task Planner input: {required_inputs['--gk']}")
     exit_code = task_planner_main(command)

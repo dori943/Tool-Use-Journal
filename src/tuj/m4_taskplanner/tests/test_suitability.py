@@ -72,6 +72,26 @@ def test_supported_object_does_not_add_its_full_mass() -> None:
     assert not assessment.failed
 
 
+def test_tool_that_is_also_target_is_counted_once() -> None:
+    raw = catalog().model_dump()
+    raw["objects"]["t1"] = {"mass_kg": 1.0}
+    scorer = PhysicsSuitabilityScorer(ResourceCatalog.model_validate(raw))
+
+    assessment = scorer.score(
+        candidate(tool="t1"),
+        sg(
+            "S",
+            targets=["t1"],
+            tool_id="t1",
+            feasible=["A"],
+            action="PICK_TOOL",
+        ),
+    )
+
+    assert assessment.components["payload"].required == 1.0
+    assert not assessment.failed
+
+
 def test_wrench_capacity_is_checked_independently() -> None:
     scorer = PhysicsSuitabilityScorer(catalog())
     passed = scorer.score(
@@ -84,6 +104,23 @@ def test_wrench_capacity_is_checked_independently() -> None:
     subgoal.required_wrench = 25.0
     failed = scorer.score(candidate(tool="t1"), subgoal)
     assert failed.failure_reason is ReasonCode.WRENCH_INSUFFICIENT
+
+
+def test_contact_action_without_required_wrench_is_unknown() -> None:
+    scorer = PhysicsSuitabilityScorer(catalog())
+    assessment = scorer.score(
+        candidate(
+            tool="t1",
+            object_remains_supported=True,
+            requires_wrench=True,
+        ),
+        sg("S", targets=["heavy"], tool_id="t1", feasible=["A"]),
+    )
+
+    assert assessment.components["payload"].required == 1.0
+    assert assessment.components["wrench"].status is SuitabilityStatus.UNKNOWN
+    assert assessment.overall_score is None
+    assert not assessment.failed
 
 
 def test_missing_payload_data_is_unknown_not_perfect() -> None:
