@@ -892,7 +892,10 @@ def _feasible_ees_for_group(
         if not _mapping(_mapping(nodes.get(owner)).get("ee")):
             continue                       # 접지값이 없는 대상은 제약으로 세지 않는다
         feasible = supported if feasible is None else (feasible & supported)
-    return sorted(feasible) if feasible else list(fallback)
+    # ``None`` means no owner supplied grounded EE evidence, so the caller's
+    # fallback remains valid.  An empty set is different: grounded records
+    # were present and their intersection proved that no EE is feasible.
+    return sorted(feasible) if feasible is not None else list(fallback)
 
 
 def _normalize_partial_order(
