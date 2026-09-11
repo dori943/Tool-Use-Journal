@@ -155,9 +155,10 @@ class PhysicsSuitabilityScorer:
                 f"EE {candidate.ee!r} is not in the resource catalog",
             )
 
-        obj = self._resolve_object(candidate, subgoal)
+        object_id = self._resolve_object_id(candidate, subgoal)
+        obj = self._resolve_object(candidate, object_id)
         components = {
-            "payload": self._payload(candidate, subgoal, ee, obj),
+            "payload": self._payload(candidate, subgoal, ee, object_id, obj),
             "wrench": self._wrench(candidate, subgoal),
         }
         failure = self._first_failure(components)
@@ -177,15 +178,20 @@ class PhysicsSuitabilityScorer:
             overall = min(scores) if scores else None
         return SuitabilityAssessment(overall, components)
 
-    def _resolve_object(
+    def _resolve_object_id(
         self, candidate: Candidate, subgoal: Subgoal
-    ) -> ObjectSpec | None:
+    ) -> str | None:
         object_id = candidate.metadata.get("target_object_id")
         if not isinstance(object_id, str):
             object_id = next(
                 (target for target in subgoal.target_ids if target in self._catalog.objects),
                 subgoal.target_ids[0] if subgoal.target_ids else None,
             )
+        return object_id
+
+    def _resolve_object(
+        self, candidate: Candidate, object_id: str | None
+    ) -> ObjectSpec | None:
         catalog_obj = self._catalog.objects.get(object_id) if object_id else None
         mass = candidate.metadata.get("object_mass_kg")
         if not isinstance(mass, (int, float)):
@@ -204,6 +210,7 @@ class PhysicsSuitabilityScorer:
         candidate: Candidate,
         subgoal: Subgoal,
         ee: EndEffectorSpec,
+        object_id: str | None,
         obj: ObjectSpec | None,
     ) -> SuitabilityComponent:
         needs_object_mass = bool(subgoal.target_ids) and not bool(
@@ -215,12 +222,31 @@ class PhysicsSuitabilityScorer:
             tool_mass = tool.mass if tool is not None else None
         if ee.payload is None:
             return SuitabilityComponent.unknown("EE payload is missing")
-        if tool_mass is None:
-            return SuitabilityComponent.unknown("tool mass is missing")
-        if needs_object_mass and (obj is None or obj.mass_kg is None):
-            return SuitabilityComponent.unknown("object mass is missing")
-        load = (obj.mass_kg or 0.0 if obj is not None and needs_object_mass else 0.0)
-        load += tool_mass
+        object_mass = obj.mass_kg if obj is not None else None
+        object_is_tool = (
+            needs_object_mass
+            and candidate.tool is not None
+            and candidate.tool == object_id
+        )
+        if object_is_tool:
+            # PICK_TOOL / RETURN_TOOL commonly expose the same physical
+            # resource as both target object and tool. Count it once; if the
+            # catalog views disagree, keep the conservative larger known mass.
+            known_masses = [
+                float(mass)
+                for mass in (object_mass, tool_mass)
+                if mass is not None
+            ]
+            if not known_masses:
+                return SuitabilityComponent.unknown("object/tool mass is missing")
+            load = max(known_masses)
+        else:
+            if tool_mass is None:
+                return SuitabilityComponent.unknown("tool mass is missing")
+            if needs_object_mass and object_mass is None:
+                return SuitabilityComponent.unknown("object mass is missing")
+            load = float(object_mass or 0.0) if needs_object_mass else 0.0
+            load += tool_mass
         if not needs_object_mass and candidate.tool is None:
             return SuitabilityComponent.not_applicable("no carried object or tool")
         return _capacity_component(load, ee.payload, "kg")
@@ -233,6 +259,10 @@ class PhysicsSuitabilityScorer:
         if isinstance(meta_required, (int, float)):
             required = max(required or 0.0, float(meta_required))
         if required is None:
+            if candidate.metadata.get("requires_wrench") is True:
+                return SuitabilityComponent.unknown(
+                    "required contact wrench is missing"
+                )
             return SuitabilityComponent.not_applicable(
                 "subgoal has no wrench requirement"
             )

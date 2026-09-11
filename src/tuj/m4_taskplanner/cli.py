@@ -75,6 +75,13 @@ def _build_parser() -> argparse.ArgumentParser:
             "current_ee, held_tool, rack occupancy, and facts"
         ),
     )
+    p_plan.add_argument(
+        "--execution-environment",
+        help=(
+            "optional environment name used to intersect grounded EE choices "
+            "with enabled scripted-grasp recipes"
+        ),
+    )
     p_plan.add_argument("--resources", default=None)
     p_plan.add_argument("--candidates", default=None)
     p_plan.add_argument("--policy", default=None)
@@ -158,7 +165,23 @@ def main(argv: Sequence[str] | None = None) -> int:
                 id_aliases=aliases,
                 initial_state=initial_state,
             )
-            return _finish(plan(request), args.output)
+            contract_changes = []
+            if args.execution_environment is not None:
+                from tuj.m5_motion.scripted_grasps.task_constraints import (
+                    constrain_task_request,
+                )
+
+                request, contract_changes = constrain_task_request(
+                    request, args.execution_environment
+                )
+            result = plan(request)
+            if args.execution_environment is not None:
+                result.task["execution_compatibility"] = {
+                    "source": "scripted_grasp_registry",
+                    "environment": args.execution_environment,
+                    "changes": contract_changes,
+                }
+            return _finish(result, args.output)
         request = TaskPlannerRequest.model_validate(load_json(args.request))
         execution_state = ExecutionState.model_validate(
             load_json(args.execution_state)
