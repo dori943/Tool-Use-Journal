@@ -69,6 +69,13 @@ ROBOT_SPEC_PATH = (
 # 재료끼리 거의 붙도록 하는 수직 간격
 _STACK_CLEARANCE = 0.001  # 1 mm
 _SLICE_UNDERSIDE_CLEARANCE = 0.00  # 3.5 mm
+# 접시 윗면(테두리)에서 음식이 실제로 놓이는 오목한 바닥까지의 거리.
+# 0911 측정: 이 접시는 평판이 아니라 테두리가 솟은 그릇이다. 충돌 점군을
+# 중심거리별로 보면 r 40~60mm 구간의 z 는 -5.55~-3.33mm, r 85~95mm 구간은
+# +2.76~+5.55mm 로, 바닥과 테두리가 약 9mm 차이난다. 이 값을 0 으로 두면
+# 재료를 테두리 높이에 놓고 중력이 바닥까지 떨어뜨릴 뿐이라 최종 위치는
+# 같고 정착 중 흔들리기만 한다. 받침이 평평한 도마인 재료는 아래에서 이
+# 보정을 되돌린다.
 _PLATE_FOOD_SURFACE_OFFSET = -0.01
 
 _SPATULA_THICKNESS = 0.0018
@@ -1042,7 +1049,7 @@ class C2_2_SandwichAssembly(KitchenBase):
         # 빵B 는 마지막 층이라 나중에 집는다. 실행마다 순서가 갈려 같은 장면이
         # 어떤 날은 풀리고 어떤 날은 FRONTIER_EXHAUSTED 로 죽었다. 겹치지 않게
         # 나란히 놓아 두 장 모두 처음부터 노출되게 한다.
-        # 받침이 도마라 접시용 안착 오프셋(-10mm, 오목한 면 안쪽)을 되돌린다.
+        # 받침이 도마라 접시용 안착 오프셋(오목한 바닥까지의 거리)을 되돌린다.
         bread_top = bread_top - _PLATE_FOOD_SURFACE_OFFSET
         for bread_name, dy in (
             ("bread_a", -_BREAD_SIDE_BY_SIDE_DY_M),

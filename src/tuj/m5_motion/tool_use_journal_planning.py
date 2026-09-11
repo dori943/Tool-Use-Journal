@@ -938,12 +938,31 @@ class ToolUseJournalCollisionContextFactory:
             contact_id = f"grasp-contact:{target}:{token}"
             attached_id = f"object-attached:{target}:{token}"
             release_id = f"object-attached-release:{target}:{token}"
+            # 0911: 파지 중 문맥은 [EE, 대상] 만 면제하고 받침에는 5mm 마진을
+            # 그대로 요구했다. 얇은 물체를 집을 때 이 요구는 원리상 만족이
+            # 불가능하다 -- 대상 윗면에 EE 를 대면 받침은 대상 두께만큼 아래에
+            # 있기 때문이다. c2_2 의 turkey_3(두께 2.5mm)은 바로 아래 turkey_2
+            # 와의 여유가 -0.001847 / -0.000082 / +0.000633 m 로 나와 생성된
+            # 전략이 전부 COLLISION_FILTERED_ALL 로 기각됐고, 접시 위 단독
+            # 슬라이스도 같은 벽에 부딪힌다. 파지 후 문맥은 이미 [대상, 받침]
+            # 을 1mm 관통까지 허용하므로 같은 장치를 파지 중에도 건다.
+            # 무제한 면제가 아니라 EE 가 받침을 뚫고 들어가는 것은 계속 막는다.
+            contact_metadata: dict[str, Any] = {}
+            if support_selectors:
+                contact_metadata[_BOUNDED_COLLISION_ALLOWANCES_KEY] = [
+                    {
+                        "selectors": [active_ee, selector],
+                        "minimum_distance_m": -support_penetration_tolerance_m,
+                    }
+                    for selector in support_selectors
+                ]
             contact = base.model_copy(
                 update={
                     "context_id": contact_id,
                     "allowed_collision_pairs": self._contact_pairs(
-                        active_ee, touch_selectors
+                        active_ee, [*touch_selectors, *support_selectors]
                     ),
+                    "metadata": contact_metadata,
                 }
             )
             transform = _relative_attachment(

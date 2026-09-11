@@ -62,8 +62,11 @@ def test_excluded_unknown_and_wrong_hand():
     assert resolve(request_for(object_id="tongs")) is None
     request = request_for()
     request.task.ee = "3F"
-    with pytest.raises(ValueError, match="EE_MISMATCH"):
-        resolve(request)
+    # 0911: #70 (0149c19) 이 EE 불일치를 치명적 오류에서 일반 M5 파지 경로로의
+    # 폴백으로 바꿨는데 이 단언이 함께 갱신되지 않아 그때부터 main 이 빨간불이었다.
+    # 계약은 resolve() 의 docstring 에 있다. 등록된 객체라도 장착 EE 가 레시피와
+    # 다르면 태스크를 멈추지 않고 None 을 돌려주며, 그 사실을 로그로 남긴다.
+    assert resolve(request) is None
 
 
 @pytest.mark.parametrize('environment',(
