@@ -55,3 +55,22 @@ def test_spoon_contract_keeps_both_m4_hand_candidates_and_selected_order():
         'execution_compatibility']
     assert contract['supported_ee']==['2F','3F']
     assert contract['selected_feasible_ee']==['3F','2F']
+
+
+@pytest.mark.parametrize(('environment','tool_id'),(
+    ('C1_1_LegoSweep','plate'),
+    ('C2_1_ObjectSorting','plate'),
+    ('C3_1_ObjectSorting','plate'),
+    ('C3_2_BreakfastTrayPreparation','plate_a'),
+    ('C3_2_BreakfastTrayPreparation','plate_b'),
+))
+def test_plate_vac_contract_is_available_in_all_registered_tasks(environment,tool_id):
+    constrained,changes=constrain_task_request(
+        make_request(['2F','3F','vac'],tool_id=tool_id),environment)
+    expected=['2F','vac'] if environment=='C1_1_LegoSweep' else ['vac']
+    assert [s.feasible_ee for s in constrained.task_graph.subgoals]==[expected,expected]
+    assert len(changes)==2
+    contract=constrained.task_graph.subgoals[0].action_parameters[
+        'execution_compatibility']
+    assert contract['object_id']==tool_id
+    assert contract['supported_ee']==expected
