@@ -29,6 +29,9 @@ def test_scripted_ee_contract_covers_acquire_and_use_without_mutating_input():
     assert all(s.feasible_ee==['2F','3F'] for s in original.task_graph.subgoals)
     assert constrained.task_graph.subgoals[1].target_ids==['dough']
     assert len(changes)==2
+    assert all(c['source']=='scripted_grasp_registry' for c in changes)
+    assert constrained.task_graph.subgoals[0].action_parameters[
+        'execution_compatibility']['supported_ee']==['3F']
 
 
 def test_scripted_ee_contract_does_not_override_grounded_infeasibility():
