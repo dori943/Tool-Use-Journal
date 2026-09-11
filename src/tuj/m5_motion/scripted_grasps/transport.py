@@ -538,7 +538,12 @@ def ground_held_transport(request, retention=None):
     from .container_orientation import packing_destination_center
     desired_center = packing_destination_center(g, desired_center, place=False)
     g.task.goal.target_pose = None
-    g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, {})
+    destination = g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, {})
+    from .container_release import clear_container_rim
+    raised, evidence = clear_container_rim(g, destination, retention)
+    if evidence:
+        desired_center[2] += raised[2, 3] - destination[2, 3]
+        g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, evidence)
 
 
 def ground_held_place(request, retention=None):

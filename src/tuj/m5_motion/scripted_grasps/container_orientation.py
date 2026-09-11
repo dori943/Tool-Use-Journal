@@ -126,6 +126,8 @@ def stable_face_has_ik(g, xy):
     target = np.eye(4)
     target[:3, :3] = g.destination_rotation
     target[:3, 3] = center - g.destination_rotation @ g.center_in_body
+    from .container_release import clear_container_rim
+    target, _ = clear_container_rim(g, target, retention)
     target = target @ inverse(inverse(g.T_WE) @ g.T_WB)
     solved = c.kinematics.solve_all_ik(target[:3, 3], Rotation.from_matrix(target[:3, :3]).as_quat(),
                                        seed_qpos=c.data.qpos[c.arm_ids])
