@@ -69,16 +69,14 @@ ROBOT_SPEC_PATH = (
 # 재료끼리 거의 붙도록 하는 수직 간격
 _STACK_CLEARANCE = 0.001  # 1 mm
 _SLICE_UNDERSIDE_CLEARANCE = 0.00  # 3.5 mm
-# 0911: 이 값이 -10mm 였다. support_top() 이 접시 윗면에서 이만큼 내린 자리에
-# 재료를 놓는데, 접시는 우묵한 그릇이 아니라 두께 11.1mm 짜리 평판이라 재료가
-# 판 두께 안에 파묻혔다. 실측(initial_world.json): tomato_slice 윗면이 접시
-# 윗면보다 5.03mm 아래, turkey_3 은 7.38mm 아래. 그 상태로는 흡착컵이 슬라이스
-# 윗면까지 내려가려면 접시 몸통을 파고들어야 해서 M5 가 SG1_s2a 에서
-# vac_cup <-> tomato_plate_g8 여유 4.680mm (요구 5.0mm) 로 전 전략을 기각했다.
-# 치즈만 멀쩡했던 건 3장 쌓기에 장당 4mm 라 우연히 10mm 를 넘겨서다.
-# 0 으로 두면 세 재료 모두 접시 윗면에 놓인다. 빵은 아래에서 따로 되돌리던
-# 보정을 같이 제거했으므로 결과가 같다.
-_PLATE_FOOD_SURFACE_OFFSET = 0.0
+# 접시 윗면(테두리)에서 음식이 실제로 놓이는 오목한 바닥까지의 거리.
+# 0911 측정: 이 접시는 평판이 아니라 테두리가 솟은 그릇이다. 충돌 점군을
+# 중심거리별로 보면 r 40~60mm 구간의 z 는 -5.55~-3.33mm, r 85~95mm 구간은
+# +2.76~+5.55mm 로, 바닥과 테두리가 약 9mm 차이난다. 이 값을 0 으로 두면
+# 재료를 테두리 높이에 놓고 중력이 바닥까지 떨어뜨릴 뿐이라 최종 위치는
+# 같고 정착 중 흔들리기만 한다. 받침이 평평한 도마인 재료는 아래에서 이
+# 보정을 되돌린다.
+_PLATE_FOOD_SURFACE_OFFSET = -0.01
 
 _SPATULA_THICKNESS = 0.0018
 _HAM_THICKNESS = 0.005
@@ -1051,6 +1049,8 @@ class C2_2_SandwichAssembly(KitchenBase):
         # 빵B 는 마지막 층이라 나중에 집는다. 실행마다 순서가 갈려 같은 장면이
         # 어떤 날은 풀리고 어떤 날은 FRONTIER_EXHAUSTED 로 죽었다. 겹치지 않게
         # 나란히 놓아 두 장 모두 처음부터 노출되게 한다.
+        # 받침이 도마라 접시용 안착 오프셋(오목한 바닥까지의 거리)을 되돌린다.
+        bread_top = bread_top - _PLATE_FOOD_SURFACE_OFFSET
         for bread_name, dy in (
             ("bread_a", -_BREAD_SIDE_BY_SIDE_DY_M),
             ("bread_b", +_BREAD_SIDE_BY_SIDE_DY_M),
