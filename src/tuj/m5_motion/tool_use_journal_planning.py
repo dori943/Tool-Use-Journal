@@ -21,6 +21,8 @@ from tuj.m5_motion.attachment_retarget import (
     ATTACHED_OBJECT_POSE_SUBJECT,
     POSE_SUBJECT_KEY,
     POSE_SUBJECT_OBJECT_ID_KEY,
+    attachment_transform,
+    object_pose_for_end_effector_pose,
 )
 from tuj.m5_motion.ee_exchange import RoutedKeyframeStrategyProvider
 from tuj.m5_motion.ee_exchange_entry import (
@@ -35,6 +37,7 @@ from tuj.m5_motion.move_to_workspace import (
     is_move_to_workspace_request,
 )
 from tuj.m5_motion.geometry import RelativePoseResolver
+from tuj.m5_motion.kinematics import UR5eKinematics
 from tuj.m5_motion.pipeline import (
     CollisionPlanningSetup,
     DebugKeyframeStrategyProvider,
@@ -936,10 +939,29 @@ class ToolUseJournalCollisionContextFactory:
         source = artifact
         bound = artifact.model_copy(deep=True)
         contexts = {base.context_id: base}
+        from .flatten_contact import is_flatten_contact
+        contact_id = None
+        if is_flatten_contact(request.task) and len(request.task.target_ids) == 1:
+            target = request.task.target_ids[0]
+            config = request.world.objects[target].get("flattening_configuration", {})
+            if config.get("allow_active_ee_contact") is True:
+                contact_id = base.context_id + ":material-contact"
+                contexts[contact_id] = base.model_copy(update={
+                    "context_id": contact_id,
+                    "allowed_collision_pairs": sorted({
+                        *base.allowed_collision_pairs,
+                        tuple(sorted((base.active_ee, target))),
+                    }),
+                })
         for candidate in bound.candidates:
             current_id = base.context_id
             for keyframe in candidate.keyframes:
                 selected = keyframe.collision_context_id or current_id
+                if contact_id is not None:
+                    # Incoming engagement and withdrawal edges include intentional
+                    # contact. Hover and subsequent unrelated edges retain the base.
+                    selected = (contact_id if keyframe.metadata.get("flatten_stage")
+                                in {"engage", "press", "unload"} else base.context_id)
                 if selected not in contexts:
                     raise ToolUseJournalCollisionBindingError(
                         f"strategy {candidate.strategy_id!r} supplies unknown "
@@ -973,6 +995,9 @@ class ToolUseJournalCollisionContextFactory:
         if not target:
             raise ToolUseJournalCollisionBindingError("PICK has no target object")
         _free_joint_name(request.world, target)
+        from tuj.m5_motion.support_distance import refine_support_request
+
+        request = refine_support_request(request, self.compiler)
         from tuj.m5_motion.physical_grasp import uses_contact_friction
 
         if uses_contact_friction(request):
@@ -1213,7 +1238,7 @@ class ToolUseJournalCollisionContextFactory:
                 KeyframeType.PLACE,
             )
             token = _short_digest((candidate.strategy_id, place.keyframe_id))
-            detached_target_pose = target_pose
+            resolved_place = RelativePoseResolver(request.world).resolve(place)
             if (
                 str(place.metadata.get(POSE_SUBJECT_KEY, "")).upper()
                 == ATTACHED_OBJECT_POSE_SUBJECT
@@ -1223,9 +1248,13 @@ class ToolUseJournalCollisionContextFactory:
                 # desired pose.  Freeze the newly detached collision body at
                 # that candidate-specific pose, not at the stale task goal
                 # pose captured before keyframe generation.
-                detached_target_pose = RelativePoseResolver(
-                    request.world
-                ).resolve(place)
+                detached_target_pose = resolved_place
+            else:
+                # Untagged generated keyframes describe the grasp reference,
+                # not the object. Keep geometry continuous across DETACH.
+                detached_target_pose = object_pose_for_end_effector_pose(
+                    resolved_place, attachment_transform(request.world, target)
+                )
             contact_id = f"place-contact:{target}:{token}"
             detached_id = f"object-detached:{target}:{token}"
             contact = base.model_copy(
@@ -1281,6 +1310,9 @@ class ToolUseJournalCollisionContextFactory:
                     if withdrawal_pending:
                         current_id = detached_id
                         withdrawal_pending = False
+        from tuj.m5_motion.release_separation import bind_release_separation
+
+        bind_release_separation(self.compiler, request, bound, contexts, target)
         return _stamp_bound_artifact(request, source, bound), contexts
 
     def _bind_ee_exchange(

@@ -6,7 +6,7 @@
 
 | 상태 | 객체와 EE |
 |---|---|
-| 검증됨: 파지·유지와 후속 이동·release 통과 | bottle(3F), spatula(3F), spoon(2F), apple(3F), bread(3F), mug(3F), knife(2F), rolling_pin(2F), baguette(2F), whisk(2F), cereal(2F), milk(3F), lid(vac attach) |
+| 검증됨: 파지·유지와 후속 이동·release 통과 | bottle(3F), spatula(3F), spoon(2F/3F), apple(3F), bread(3F), mug(3F), knife(2F), rolling_pin(2F), baguette(2F), whisk(2F), cereal(2F), milk(3F), lid(vac attach) |
 | 실험 연결: 함수는 호출하지만 성공 미검증 | plate(2F): 현재 runtime에서 lift 전 접촉 안정성 실패 |
 | 이식·등록 제외 | tongs, ladle |
 
@@ -35,7 +35,7 @@
 6. 그다음 요청은 기존 M5 계획기로 전달한다. LLM이 생성한 키프레임을 기존 IK, 경로 계획, 충돌 검사, 컨트롤러로 실행한다.
 7. 실패하면 해당 단계에서 멈추고 실제 실패 상태와 원인을 저장한다. plate는 연결 상태와 검증 상태를 구분하기 위해 `EXPERIMENTAL`로 기록한다. 실패한 파지를 성공으로 처리하거나 다른 파지 방식으로 자동 재시도하지 않는다.
 
-지원하지 않는 객체와 일반 동작은 기존 M5로 전달한다. 알려진 보정 보류 항목은 registry의 명시적 상태를 따른다. EE가 다른 경우 임의로 바꾸지 않고 입력 오류를 반환한다.
+지원하지 않는 객체와 일반 동작은 기존 M5로 전달한다. 알려진 보정 보류 항목은 registry의 명시적 상태를 따른다. EE가 다른 경우 임의로 바꾸지 않고 입력 오류를 반환한다. 스푼은 `C1_2_DoughFlatten`, `C2_1_ObjectSorting`, `C3_1_ObjectSorting`에서 2F와 3F를 모두 등록하며, M4가 선택한 EE와 정확히 일치하는 레시피로 분기한다.
 
 전체 동작을 먼저 계획한 뒤 재생하는 기존 모드와 달리, 이 모드는 **계획 → 실행 → 실제 상태 읽기**를 요청마다 반복한다. 따라서 파지 결과와 다른 예측 상태에서 다음 경로를 시작하지 않는다.
 
@@ -91,9 +91,9 @@ M5 계획기에 이미 사용하는 provider가 있으면 `provider=...`로 전�
 
 ## 물체를 들고 있는 동안
 
-- 2F/3F 물체에는 attachment나 weld를 만들지 않는다.
-- `held_tool_id`와 `world.metadata.contact_friction_held_objects`에 **측정된** 상대 자세를 기록한다.
-- 충돌 검사에서만 이 상대 자세로 물체가 그리퍼를 따라가는 모델을 사용한다. 실행 시 실제 물체 qpos를 따라 쓰지 않는다.
+- 2F/3F의 기존 파지 함수는 접촉과 마찰로 lift/hold를 검증한다. 성공 후 기존 runtime의 `KINEMATIC` attachment를 적용한다. 접촉 거리와 침투 검사를 유지하며 현재 상대 자세를 저장한다.
+- `acquisition_attachment_used`는 파지 함수 안의 attachment 사용 여부이고, `attachment_used`와 `attachment_mode`는 통합 후 실제 runtime 상태다. 파지 또는 attach가 실패하면 후속 동작으로 진행하지 않는다.
+- 파지 이후 충돌 검사와 실행은 runtime attachment의 측정된 상대 자세를 사용한다. KINEMATIC 실행은 물체 qpos를 그 자세로 동기화한다. 이후 운반 성공을 마찰만으로 유지한 물리 파지 성공으로 해석하지 않는다.
 - 일반 M5 컨트롤러에서도 파지에 사용한 손가락 힘 피드백을 유지한다. 접촉 손실과 미끄러짐이 허용치를 넘으면 중단한다.
 - 물체를 놓으면 손가락 제어 유지와 held 상태를 해제한다. 물체를 든 채 EE 교체를 시도하면 거부한다.
 - bread/lid는 물체를 들고 있는 동안에만 팔 제어 강성을 높이고 release 때 기존 kp/kd를 복원한다. 현재 관절값에 가까운 IK 동치각을 각 요청마다 다시 선택한다.
@@ -121,7 +121,7 @@ M5 계획기에 이미 사용하는 provider가 있으면 `provider=...`로 전�
 객체별 회귀 실행:
 
 ```powershell
-python -m tuj.m5_motion.examples.scripted_grasp_smoke apple --output <new-output-dir> --followup
+python -m tuj.m5_motion.examples.scripted_grasp_smoke spoon --ee 3F --environment C1_2_DoughFlatten --output <new-output-dir> --followup
 ```
 
 `--followup`은 고정된 테스트 키프레임을 기존 M5 계획기에 넣어 2cm 이동과 release를 검사한다. LLM 품질이나 전체 task 성공률을 측정하는 테스트가 아니다. 검증된 배치 범위 밖의 위치·방향은 새 경로와 접촉 검증을 통과해야 한다.

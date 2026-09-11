@@ -1,15 +1,9 @@
-"""C3_2 plate vacuum recipe: rim-annulus cup contact (not the hollow center).
+"""Vacuum plate recipes: C2_1 flat-top seating and C3_2 rim-annulus seating.
 
-Uses the catalog vac path (lid-style PRE→GRASP→attach→LIFT). Lateral contact
-is derived from the plate bbox and an explicit cup-clearance parameter so the
-TCP is not aimed at the recessed dish center.
-
-Vertical seating: the VacuumGripper ``vac_cup`` is a cylinder whose contact
-face coincides with the grip site (cup center sits one half-height along the
-site axis away from the object, half-height ≈ 0.012 m). Commanding the grip
-site below the plate AABB top therefore immerses the cup into the plate and
-presses the free plate into the island. Keep vertical seating at the top face
-(no negative z), unlike lid's small immersion on a thicker free body.
+C2_1 / C1_1 vac alternatives use the flat disc top face (lid-style catalog vac
+path). C3_2 breakfast plates are shallow dishes: lateral contact is derived from
+the plate bbox and an explicit cup-clearance so the TCP is not aimed at the
+recessed center.
 """
 from tuj.m5_motion.scripted_grasps.catalog_types import (
     CatalogRecipe, build_catalog_targets, dispatch_grasp,
@@ -19,14 +13,13 @@ from tuj.m5_motion.scripted_grasps.catalog_types import (
 PLATE_EXPECTED_SIZE_M = (0.157694411, 0.157261429, 0.009592404)
 
 # VacuumGripper cup outer contact radius used to keep the seal on solid rim.
-# Physical validation may refine this; do not hide it inside unrelated recipes.
 CUP_CLEARANCE_RADIUS_M = 0.030
-# Keep the cup inside the outer rim after subtracting cup radius from half-width.
 RIM_EDGE_MARGIN_M = 0.005
-# Cup contact face ≡ grip site (see module docstring). Do not seat below the
-# AABB top: negative values push the plate into island_island_group_top_2 and
-# fail LIFT with ~1 mm residual support penetration after attach.
+# Cup contact face ≡ grip site. Do not seat below the AABB top on C3_2.
 SEATING_OFFSET_Z_M = 0.0
+
+# C2_1 sorting plate (same flat asset family as C1_1 plate).
+C2_1_PLATE_EXPECTED_SIZE_M = (0.182334163, 0.181833528, 0.011091216)
 
 
 def _rim_offset_fraction(size_m=PLATE_EXPECTED_SIZE_M):
@@ -35,11 +28,23 @@ def _rim_offset_fraction(size_m=PLATE_EXPECTED_SIZE_M):
     radial_m = half_min - CUP_CLEARANCE_RADIUS_M - RIM_EDGE_MARGIN_M
     if radial_m <= 0:
         raise ValueError('PLATE_TOO_SMALL_FOR_VACUUM_CUP')
-    # Prefer +X; plate is nearly square so either lateral axis is a rim patch.
     return (radial_m / sx, 0.0, 0.5)
 
 
-def plate_vac_recipe():
+def plate_vac_c2_1_recipe():
+    """Flat top-face vac contact for C2_1 / C1_1 vac alternatives."""
+    return CatalogRecipe(
+        'plate', 'c2_1', 'vac',
+        C2_1_PLATE_EXPECTED_SIZE_M,
+        offset_fraction=(0., 0., .5),
+        offset_m=(0., 0., -.0005),
+        two_finger_parallel_linkage=False,
+        post_grasp_arm_kp=300.,
+    )
+
+
+def plate_vac_c3_2_recipe():
+    """Rim-annulus vac contact for C3_2 breakfast plates."""
     fx, fy, fz = _rim_offset_fraction()
     return CatalogRecipe(
         'plate', 'c3_2', 'vac', PLATE_EXPECTED_SIZE_M,
@@ -47,10 +52,18 @@ def plate_vac_recipe():
         offset_m=(0.0, 0.0, SEATING_OFFSET_Z_M),
         two_finger_parallel_linkage=False,
         post_grasp_arm_kp=300.0,
-        # Restrict contact credit to the upper face (cup seal), not the underside.
         contact_region_min=(-0.95, -0.95, 0.0),
         contact_region_max=(0.95, 0.95, 0.6),
     )
+
+
+def plate_vac_recipe(task_id=None):
+    """Dispatch by task id; default remains the C3_2 rim recipe used by local tests."""
+    if task_id in (None, 'c3_2'):
+        return plate_vac_c3_2_recipe()
+    if task_id in {'c2_1', 'c1_1'}:
+        return plate_vac_c2_1_recipe()
+    raise ValueError(f'UNSUPPORTED_PLATE_VAC_TASK: {task_id!r}')
 
 
 def build_plate_vac_targets(T_WB, center_in_body_m, local_size_m, recipe=None):

@@ -30,12 +30,49 @@ class GeometryEvidenceError(ValueError):
 def _xyz(value: Any, *, positive: bool = False) -> np.ndarray:
     if not isinstance(value, Sequence) or isinstance(value, (str, bytes)):
         raise GeometryEvidenceError("expected a three-element numeric vector")
-    result = np.asarray(value, dtype=float)
+    try:
+        result = np.asarray(value, dtype=float)
+    except (TypeError, ValueError) as error:
+        raise GeometryEvidenceError(
+            "expected a finite three-element numeric vector"
+        ) from error
     if result.shape != (3,) or not np.all(np.isfinite(result)):
         raise GeometryEvidenceError("expected a finite three-element numeric vector")
     if positive and not np.all(result > 0.0):
         raise GeometryEvidenceError("bbox dimensions must be positive")
     return result
+
+
+def _aabb_dimensions(value: Any, *, allow_planar: bool) -> np.ndarray:
+    """Validate an observed-surface AABB without inventing object thickness.
+
+    A surface-only depth observation can have one rounded zero extent.  Inputs
+    that span fewer than two AABB axes, or contain a negative extent, are not
+    enough evidence to align a required object safely.
+    """
+
+    result = _xyz(value)
+    if np.any(result < 0.0):
+        raise GeometryEvidenceError("bbox dimensions must be non-negative")
+    positive_axes = int(np.count_nonzero(result > 0.0))
+    if positive_axes < 2:
+        raise GeometryEvidenceError("bbox dimensions must span at least two axes")
+    if positive_axes < 3 and not allow_planar:
+        raise GeometryEvidenceError(
+            "planar bbox requires an observed-surfaces-only geometry contract"
+        )
+    return result
+
+
+def _allows_planar_aabb(m1: Mapping[str, Any]) -> bool:
+    metadata = m1.get("geometry_metadata")
+    return bool(
+        isinstance(metadata, Mapping)
+        and metadata.get("schema") == "M1_GEOMETRY_V2"
+        and metadata.get("bbox_kind")
+        == "WORLD_AXIS_ALIGNED_OBSERVED_ENVELOPE"
+        and metadata.get("completeness") == "OBSERVED_SURFACES_ONLY"
+    )
 
 
 def _frame_transform_m(
@@ -147,6 +184,7 @@ def integrate_m1_geometry(
     meters_per_unit, frame_rotation, translation, source_frame_id = (
         _frame_transform_m(m1)
     )
+    allow_planar_aabb = _allows_planar_aabb(m1)
     aliases = aliases or {}
     required = {str(value) for value in required_object_ids if value}
     result = world.model_copy(deep=True)
@@ -167,9 +205,9 @@ def integrate_m1_geometry(
                     f"M1 node {raw_id!r} has no explicit geometry record"
                 )
             source_center = _xyz(geometry.get("center")) * meters_per_unit
-            source_dimensions = (
-                _xyz(geometry.get("aabb_size"), positive=True) * meters_per_unit
-            )
+            source_dimensions = _aabb_dimensions(
+                geometry.get("aabb_size"), allow_planar=allow_planar_aabb
+            ) * meters_per_unit
             source_lower = source_center - source_dimensions / 2.0
             source_upper = source_center + source_dimensions / 2.0
             observed_corners = (

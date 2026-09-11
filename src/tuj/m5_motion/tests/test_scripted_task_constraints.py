@@ -15,10 +15,10 @@ def test_scene_aliases_preserve_full_class_and_instance_names():
         'obj_bread_a_bread_a':'bread_a','obj_plate_dinner_plate':'dinner_plate'}
 
 
-def make_request(ee):
+def make_request(ee,tool_id='spatula'):
     return TaskPlannerRequest(task_graph=TaskGraph(initial_state=InitialState(),subgoals=[
-        Subgoal(subgoal_id='pick',action_type='PICK_TOOL',tool_id='spatula',target_ids=['spatula'],feasible_ee=ee),
-        Subgoal(subgoal_id='flatten',action_type='tool_act',tool_id='spatula',target_ids=['dough'],feasible_ee=ee),
+        Subgoal(subgoal_id='pick',action_type='PICK_TOOL',tool_id=tool_id,target_ids=[tool_id],feasible_ee=ee),
+        Subgoal(subgoal_id='flatten',action_type='tool_act',tool_id=tool_id,target_ids=['dough'],feasible_ee=ee),
     ]),resource_catalog=ResourceCatalog())
 
 
@@ -43,3 +43,15 @@ def test_scripted_ee_contract_is_environment_scoped():
     constrained,changes=constrain_task_request(make_request(['2F','3F']),'C2_1_ObjectSorting')
     assert not changes
     assert constrained.task_graph.subgoals[0].feasible_ee==['2F','3F']
+
+
+def test_spoon_contract_keeps_both_m4_hand_candidates_and_selected_order():
+    constrained,changes=constrain_task_request(
+        make_request(['3F','2F'],tool_id='spoon'),'C2_1_ObjectSorting')
+    assert [s.feasible_ee for s in constrained.task_graph.subgoals]==[
+        ['3F','2F'],['3F','2F']]
+    assert len(changes)==2
+    contract=constrained.task_graph.subgoals[0].action_parameters[
+        'execution_compatibility']
+    assert contract['supported_ee']==['2F','3F']
+    assert contract['selected_feasible_ee']==['3F','2F']

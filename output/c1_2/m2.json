@@ -3,7 +3,7 @@
   "m2_subgoals": [
     {
       "subgoal_id": "SG1",
-      "goal": "도마 위의 반죽을 평평하게 펴라.",
+      "goal": "도마 위의 반죽을 평평하게 편다.",
       "kind": "flatten",
       "target_ids": [
         "obj_dough_dough"
@@ -22,24 +22,27 @@
         "obj_spoon_spoon",
         "obj_tongs_tongs"
       ],
-      "selection_reason": "반죽을 평평하게 펴기 위해 도마 위의 반죽과 도구로 사용할 수 있는 물체들을 선택했다.",
+      "selection_reason": "반죽을 평평하게 펴는 동작에는 반죽과 받침인 도마가 필요하고, 장면의 도구 후보인 주걱·숟가락·집게는 모두 평평하게 펴는 데 쓰일 가능성을 배제할 수 없다.",
       "confidence": {
         "before": {
-          "decomposition": 0.8,
-          "object_selection": 0.7,
+          "decomposition": 0.93,
+          "object_selection": 0.74,
           "uncertain_about": [
-            "어떤 도구가 반죽을 평평하게 펴기에 가장 적합한지"
+            "세 도구 중 실제로 반죽을 펴는 데 적합한 도구가 무엇인지",
+            "도마 위 반죽을 직접 누르거나 밀어야 하는지 여부"
           ]
         },
         "after": {
-          "decomposition": 0.8,
-          "object_selection": 0.9,
-          "uncertain_about": [],
-          "reason": "측정 결과를 통해 obj_spatula_spatula가 작업에 적합한 도구임이 확인되었고, 불확실성이 해소되었습니다."
+          "decomposition": 0.93,
+          "object_selection": 0.92,
+          "uncertain_about": [
+            "도마 위 반죽을 직접 누르거나 밀어야 하는지 여부"
+          ],
+          "reason": "서브골 분해는 그대로 타당하고, 실측 결과 주걱이 도구 조건을 충족하며 다른 후보는 형상상 부적합해 도구 선택 신뢰도를 높였다."
         },
         "delta": {
           "decomposition": 0.0,
-          "object_selection": 0.2
+          "object_selection": 0.18
         }
       },
       "details": [
@@ -133,6 +136,48 @@
             },
             {
               "id": "SG1_d1_p3",
+              "expr": "graspable_on_support(?EE, ?tool)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_spatula_spatula",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 1.8
+                },
+                {
+                  "node": "obj_spoon_spoon",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 27.4
+                },
+                {
+                  "node": "obj_tongs_tongs",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 21.7
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p4",
               "expr": "batch_feasible(?EE, ?tool)",
               "head": "batch_feasible",
               "eval_by": "m3",
@@ -140,7 +185,7 @@
               "evidence": []
             },
             {
-              "id": "SG1_d1_p4",
+              "id": "SG1_d1_p5",
               "expr": "hand_empty",
               "head": "hand_empty",
               "eval_by": "m2"
@@ -362,20 +407,30 @@
               246.6,
               44.1
             ],
-            "height_mm": 1.8
+            "height_mm": 1.8,
+            "center": [
+              679.6,
+              59.3,
+              924.3
+            ],
+            "aabb_size": [
+              246.6,
+              44.1,
+              1.8
+            ]
           },
           "material": "wood",
-          "density_kgm3": 838.1,
+          "density_kgm3": 650.0,
           "mass_kg": 0.006,
-          "youngs_gpa": 18.33,
+          "youngs_gpa": 12.0,
           "mu": {
             "mu": 0.476,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.03
           },
-          "confidence": 0.429,
-          "caption": "Wooden cooking utensil with a patterned design",
+          "confidence": 0.529,
+          "caption": "A wooden paddle or utensil handle",
           "ee": {
             "2F": {
               "feasible": true,
@@ -489,26 +544,36 @@
               110.6,
               51.4
             ],
-            "height_mm": 27.4
+            "height_mm": 27.4,
+            "center": [
+              708.2,
+              -61.2,
+              934.9
+            ],
+            "aabb_size": [
+              110.6,
+              51.4,
+              27.4
+            ]
           },
           "material": "wood",
-          "density_kgm3": 600.0,
-          "mass_kg": 0.014,
-          "youngs_gpa": 12.5,
+          "density_kgm3": 650.0,
+          "mass_kg": 0.007,
+          "youngs_gpa": 12.0,
           "mu": {
             "mu": 0.484,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.37
           },
-          "confidence": 0.421,
-          "caption": "Wooden ladle with a round bowl",
+          "confidence": 0.562,
+          "caption": "A wooden spoon with round bowl",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.986,
+              "margin": 4.993,
               "margin_unit": "kg",
-              "reason": "질량 0.014 vs 페이로드 5.0kg",
+              "reason": "질량 0.007 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -518,13 +583,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.014,
+                  "value": 0.007,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.142,
+                  "value": 0.071,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -532,9 +597,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.486,
+              "margin": 2.493,
               "margin_unit": "kg",
-              "reason": "질량 0.014 vs 페이로드 2.5kg",
+              "reason": "질량 0.007 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -544,13 +609,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.014,
+                  "value": 0.007,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.142,
+                  "value": 0.071,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -570,7 +635,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.014,
+                  "value": 0.007,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -616,26 +681,36 @@
               253.0,
               29.0
             ],
-            "height_mm": 21.7
+            "height_mm": 21.7,
+            "center": [
+              679.7,
+              -180.2,
+              934.0
+            ],
+            "aabb_size": [
+              253.0,
+              29.0,
+              21.7
+            ]
           },
           "material": "stainless steel",
-          "density_kgm3": 3968.8,
-          "mass_kg": 0.037,
-          "youngs_gpa": 97.26,
+          "density_kgm3": 6429.8,
+          "mass_kg": 0.044,
+          "youngs_gpa": 158.83,
           "mu": {
             "mu": 0.442,
             "stage": 0,
             "material": "stainless steel",
             "rms_mm": 0.63
           },
-          "confidence": 0.375,
-          "caption": "metal tongs",
+          "confidence": 0.429,
+          "caption": "A pair of metal tongs or kitchen scissors",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.963,
+              "margin": 4.956,
               "margin_unit": "kg",
-              "reason": "질량 0.037 vs 페이로드 5.0kg",
+              "reason": "질량 0.044 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -645,13 +720,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.037,
+                  "value": 0.044,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.411,
+                  "value": 0.488,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -659,9 +734,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.463,
+              "margin": 2.456,
               "margin_unit": "kg",
-              "reason": "질량 0.037 vs 페이로드 2.5kg",
+              "reason": "질량 0.044 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -671,13 +746,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.037,
+                  "value": 0.044,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.411,
+                  "value": 0.488,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -697,7 +772,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.037,
+                  "value": 0.044,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -770,20 +845,30 @@
               246.6,
               44.1
             ],
-            "height_mm": 1.8
+            "height_mm": 1.8,
+            "center": [
+              679.6,
+              59.3,
+              924.3
+            ],
+            "aabb_size": [
+              246.6,
+              44.1,
+              1.8
+            ]
           },
           "material": "wood",
-          "density_kgm3": 838.1,
+          "density_kgm3": 650.0,
           "mass_kg": 0.006,
-          "youngs_gpa": 18.33,
+          "youngs_gpa": 12.0,
           "mu": {
             "mu": 0.476,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.03
           },
-          "confidence": 0.429,
-          "caption": "Wooden cooking utensil with a patterned design",
+          "confidence": 0.529,
+          "caption": "A wooden paddle or utensil handle",
           "ee": {
             "2F": {
               "feasible": true,
@@ -897,26 +982,36 @@
               110.6,
               51.4
             ],
-            "height_mm": 27.4
+            "height_mm": 27.4,
+            "center": [
+              708.2,
+              -61.2,
+              934.9
+            ],
+            "aabb_size": [
+              110.6,
+              51.4,
+              27.4
+            ]
           },
           "material": "wood",
-          "density_kgm3": 600.0,
-          "mass_kg": 0.014,
-          "youngs_gpa": 12.5,
+          "density_kgm3": 650.0,
+          "mass_kg": 0.007,
+          "youngs_gpa": 12.0,
           "mu": {
             "mu": 0.484,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.37
           },
-          "confidence": 0.421,
-          "caption": "Wooden ladle with a round bowl",
+          "confidence": 0.562,
+          "caption": "A wooden spoon with round bowl",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.986,
+              "margin": 4.993,
               "margin_unit": "kg",
-              "reason": "질량 0.014 vs 페이로드 5.0kg",
+              "reason": "질량 0.007 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -926,13 +1021,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.014,
+                  "value": 0.007,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.142,
+                  "value": 0.071,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -940,9 +1035,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.486,
+              "margin": 2.493,
               "margin_unit": "kg",
-              "reason": "질량 0.014 vs 페이로드 2.5kg",
+              "reason": "질량 0.007 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -952,13 +1047,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.014,
+                  "value": 0.007,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.142,
+                  "value": 0.071,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -978,7 +1073,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.014,
+                  "value": 0.007,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -1024,26 +1119,36 @@
               253.0,
               29.0
             ],
-            "height_mm": 21.7
+            "height_mm": 21.7,
+            "center": [
+              679.7,
+              -180.2,
+              934.0
+            ],
+            "aabb_size": [
+              253.0,
+              29.0,
+              21.7
+            ]
           },
           "material": "stainless steel",
-          "density_kgm3": 3968.8,
-          "mass_kg": 0.037,
-          "youngs_gpa": 97.26,
+          "density_kgm3": 6429.8,
+          "mass_kg": 0.044,
+          "youngs_gpa": 158.83,
           "mu": {
             "mu": 0.442,
             "stage": 0,
             "material": "stainless steel",
             "rms_mm": 0.63
           },
-          "confidence": 0.375,
-          "caption": "metal tongs",
+          "confidence": 0.429,
+          "caption": "A pair of metal tongs or kitchen scissors",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.963,
+              "margin": 4.956,
               "margin_unit": "kg",
-              "reason": "질량 0.037 vs 페이로드 5.0kg",
+              "reason": "질량 0.044 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -1053,13 +1158,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.037,
+                  "value": 0.044,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.411,
+                  "value": 0.488,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -1067,9 +1172,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.463,
+              "margin": 2.456,
               "margin_unit": "kg",
-              "reason": "질량 0.037 vs 페이로드 2.5kg",
+              "reason": "질량 0.044 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -1079,13 +1184,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.037,
+                  "value": 0.044,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.411,
+                  "value": 0.488,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -1105,7 +1210,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.037,
+                  "value": 0.044,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -1129,6 +1234,132 @@
             "reach_mm": 850,
             "reachable": true,
             "margin_mm": 146.8
+          }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p3",
+          "node_id": "obj_spatula_spatula",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 1.8,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 1.8,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 1.8,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p3",
+          "node_id": "obj_spoon_spoon",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 27.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 27.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 27.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p3",
+          "node_id": "obj_tongs_tongs",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 21.7,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 21.7,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 21.7,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
           }
         },
         {
@@ -1223,7 +1454,7 @@
           ],
           "length_mm": 253.0,
           "cylinder_like": false,
-          "mass_kg": 0.037,
+          "mass_kg": 0.044,
           "material": "stainless steel",
           "feasible_ees": [
             "2F",
@@ -1244,7 +1475,7 @@
           ],
           "length_mm": 109.3,
           "cylinder_like": false,
-          "mass_kg": 0.014,
+          "mass_kg": 0.007,
           "material": "wood",
           "feasible_ees": [
             "2F",
@@ -1257,7 +1488,7 @@
           "core_value": false
         }
       ],
-      "selection_reason_tool": "obj_spatula_spatula는 flat_face가 true이며, 두께가 얇아 힘을 주면 휘어 부적합하지만, 다른 후보들은 flat_face가 false이므로 선택되었습니다."
+      "selection_reason_tool": "주걱은 flat_face가 참이고 얇지만 반죽을 눌러 펴는 데 필요한 넓고 평평한 면을 제공하며, 다른 후보인 숟가락과 집게는 flat_face가 거짓이라 flatten 작업에 부적합하다."
     }
   ],
   "m2_partial_order": [
@@ -1308,29 +1539,29 @@
     "llm_usage": {
       "서브골 분해": {
         "calls": 1,
-        "prompt_tokens": 978,
-        "completion_tokens": 87,
-        "tokens": 1065,
-        "seconds": 2.2
+        "prompt_tokens": 977,
+        "completion_tokens": 62,
+        "tokens": 1039,
+        "seconds": 2.11
       },
       "객체 선택": {
-        "calls": 1,
-        "prompt_tokens": 675,
-        "completion_tokens": 181,
-        "tokens": 856,
-        "seconds": 2.08
+        "calls": 2,
+        "prompt_tokens": 1389,
+        "completion_tokens": 298,
+        "tokens": 1687,
+        "seconds": 4.17
       },
       "confidence_update": {
         "calls": 1,
-        "prompt_tokens": 1352,
-        "completion_tokens": 138,
-        "tokens": 1490,
-        "seconds": 2.94
+        "prompt_tokens": 1429,
+        "completion_tokens": 171,
+        "tokens": 1600,
+        "seconds": 1.75
       }
     },
-    "n_evaluations": 12,
+    "n_evaluations": 15,
     "m3_predicates": {
-      "sat": 4,
+      "sat": 5,
       "unsat": 0,
       "unknown": 0,
       "not_queried": 3

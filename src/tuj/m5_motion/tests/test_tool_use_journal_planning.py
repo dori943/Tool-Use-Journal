@@ -793,7 +793,7 @@ def test_place_binds_detach_and_stationary_target_pose_for_retreat(release_conta
     setup = _factory().prepare(request, source)
     transfer, place, retreat, *clear = setup.keyframe_artifact.candidates[0].keyframes
 
-    assert transfer.collision_context_id == setup.initial_collision_context_id
+    assert transfer.collision_context_id == place.collision_context_id
     assert place.collision_context_id.startswith("place-contact:bottle:")
     assert place.collision_context_after_events_id.startswith(
         "object-release-contact:bottle:" if release_contact else "object-detached:bottle:"
@@ -804,7 +804,10 @@ def test_place_binds_detach_and_stationary_target_pose_for_retreat(release_conta
     bottle = next(
         item for item in detached.free_object_poses if item.object_id == "bottle"
     )
-    assert bottle.pose == target_pose
+    # The untagged keyframe puts the reference at bottle center (.4, 0, .2).
+    # Its captured +.1m attachment offset survives release; goal pose is stale.
+    assert bottle.pose.position_m == pytest.approx((0.4, 0.0, 0.3))
+    assert bottle.pose.orientation_xyzw == pytest.approx((0.0, 0.0, 0.0, 1.0))
     if release_contact:
         assert detached.allowed_collision_pairs
         assert clear[0].collision_context_id != retreat.collision_context_id
@@ -857,7 +860,7 @@ def test_contact_friction_place_uses_collision_proxy_then_opens_gripper() -> Non
     initial = setup.collision_contexts[setup.initial_collision_context_id]
     assert initial.metadata["attachment_proxy"] == "CONTACT_FRICTION"
     assert initial.attached_object_ids == ["bottle"]
-    assert transfer.collision_context_id == setup.initial_collision_context_id
+    assert transfer.collision_context_id == place.collision_context_id
     assert place.collision_context_id.startswith("place-contact:bottle:")
     assert place.collision_context_after_events_id.startswith(
         "object-detached:bottle:"

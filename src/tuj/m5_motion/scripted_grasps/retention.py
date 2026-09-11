@@ -105,6 +105,10 @@ class GraspRetention:
             from .spatula_runtime import update_three_finger_commands
             if not getattr(recipe, 'hold_finger_positions', False):
                 self.commands = update_three_finger_commands(self.commands, measured, recipe)
+                command_min=getattr(c,'three_finger_hold_command_min',None)
+                if command_min is not None:
+                    self.commands=np.clip(self.commands,command_min,
+                        c.three_finger_hold_command_max)
             if self.entry.driver == "catalog":
                 self.commands = bound_spoon_3f_commands(self.commands)
         elif c.two_finger_force_hold:
@@ -152,3 +156,19 @@ class GraspRetention:
             reference_name=c.gripper.important_sites["grip_site"],
             position_in_reference_m=tuple(actual[:3, 3]),
             orientation_in_reference_xyzw=tuple(Rotation.from_matrix(actual[:3, :3]).as_quat()))
+
+    def reference_transform(self):
+        """Return the immutable transform captured when retention began."""
+        from tuj.m5_motion.schema import AttachedObjectTransform
+        c = self.context
+        joint_id = int(c.model.body_jntadr[c.body_id])
+        return AttachedObjectTransform(
+            object_id=self.entry.object_id,
+            reference_kind="site",
+            free_joint_name=c.model.joint(joint_id).name,
+            reference_name=c.gripper.important_sites["grip_site"],
+            position_in_reference_m=tuple(self.reference[:3, 3]),
+            orientation_in_reference_xyzw=tuple(
+                Rotation.from_matrix(self.reference[:3, :3]).as_quat()
+            ),
+        )

@@ -275,6 +275,38 @@ def _restore_runtime_state(env: object, state: _RuntimeState) -> None:
     mujoco.mj_forward(model, data)
 
 
+def _release_offscreen_render_context(env: object) -> bool:
+    """Release an EE variant's GL context before constructing its replacement."""
+
+    sim = getattr(env, "sim", None)
+    context = getattr(sim, "_render_context_offscreen", None)
+    if context is None:
+        return False
+    sim._render_context_offscreen = None
+    del context
+    gc.collect()
+    return True
+
+
+def _initialize_offscreen_render_context(env: object) -> None:
+    """Restore rendering after a failed EE swap leaves the old env active."""
+
+    if not getattr(env, "has_offscreen_renderer", False):
+        return
+    sim = getattr(env, "sim", None)
+    if sim is None or getattr(sim, "_render_context_offscreen", None) is not None:
+        return
+    from robosuite.utils.binding_utils import MjRenderContextOffscreen
+
+    MjRenderContextOffscreen(
+        sim,
+        device_id=int(getattr(env, "render_gpu_device_id", -1)),
+    )
+    context = sim._render_context_offscreen
+    context.vopt.geomgroup[0] = 1 if env.render_collision_mesh else 0
+    context.vopt.geomgroup[1] = 1 if env.render_visual_mesh else 0
+
+
 @dataclass(frozen=True, slots=True)
 class EERuntimeTransition:
     from_ee: str | None
@@ -750,6 +782,12 @@ class ToolUseJournalEERuntime:
         if callback is not None:
             callback(self.env)
             return
+        viewer = getattr(self.env, "viewer", None)
+        if getattr(self.env, "renderer", None) == "mjviewer" and viewer is not None:
+            update = getattr(viewer, "update", None)
+            if callable(update):
+                update()
+                return
         render = getattr(self.env, "render", None)
         if callable(render):
             render()
@@ -2147,6 +2185,7 @@ class ToolUseJournalEERuntime:
         # both bare and vac (plus collision caches) routinely OOMs on C1_1 TOOL_LOCK.
         # On failure, rebuild the previous variant from the captured state.
         released_old = False
+        old_offscreen_released = False
         if self._close_replaced:
             close = getattr(old_env, "close", None)
             if callable(close):
@@ -2157,6 +2196,12 @@ class ToolUseJournalEERuntime:
             released_old = True
             gc.collect()
         else:
+            # Keep the previous env; free its offscreen buffer before allocating
+            # the next variant (origin/main), then restore it if the swap fails.
+            if old_env is not None:
+                old_offscreen_released = bool(
+                    _release_offscreen_render_context(old_env)
+                )
             gc.collect()
 
         new_env: object | None = None
@@ -2221,6 +2266,14 @@ class ToolUseJournalEERuntime:
                         f"failed to build EE runtime state {to_ee!r}: {error}; "
                         f"also failed to restore prior EE {previous!r}: "
                         f"{restore_error}"
+                    ) from error
+            elif old_offscreen_released and old_env is not None:
+                try:
+                    _initialize_offscreen_render_context(old_env)
+                except Exception as restore_error:
+                    raise ToolUseJournalRuntimeError(
+                        "EE transition failed and the previous offscreen "
+                        f"renderer could not be restored: {restore_error}"
                     ) from error
             if isinstance(error, ToolUseJournalRuntimeError):
                 raise
@@ -3710,6 +3763,9 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 sim.step()
             self.runtime.synchronize_attached_object()
             self.runtime.finish_attachment_step()
+            after_physics = getattr(env, "after_physics_step", None)
+            if callable(after_physics):
+                after_physics()
             if retention is not None:
                 retention.audit_substep()
             update_observables = getattr(env, "_update_observables", None)
@@ -3788,6 +3844,11 @@ class ToolUseJournalControllerTrajectoryPlayer(
         failure: _PlaybackFailure | None = None
         settle_states: dict[str, dict[str, Any]] = {}
         segment_tracking: list[dict[str, Any]] = []
+        release_wait = None
+        released_targets: set[str] = set()
+        scripted_release_targets: set[str] = set()
+        released_segments: set[str] = set()
+        release_waits: list[dict[str, Any]] = []
 
         def add_runtime_metadata(report: ExecutionReport) -> ExecutionReport:
             report.metadata["collision_check_stride"] = (
@@ -3801,6 +3862,9 @@ class ToolUseJournalControllerTrajectoryPlayer(
             )
             report.metadata["segment_tracking"] = segment_tracking
             self._playback_plan = None
+            report.metadata["gripper_release_waits"] = release_waits
+            if release_wait is not None:
+                report.metadata['gripper_release_pending'] = release_wait.observation
             return report
 
         def failed_report(
@@ -3880,6 +3944,12 @@ class ToolUseJournalControllerTrajectoryPlayer(
                         break
                     event = sorted_events[next_event_index]
                     try:
+                        retained = getattr(self.runtime, 'scripted_grasp_retention', None)
+                        scripted_release = (
+                            event.event_type is EventType.DETACH_OBJECT
+                            and retained is not None
+                            and retained.entry.object_id == event.target_id
+                            and retained.entry.ee == self.runtime.active_ee)
                         message = self._execute_event(event)
                         if event.event_type in {
                             EventType.GRIPPER_OPEN,
@@ -3888,6 +3958,37 @@ class ToolUseJournalControllerTrajectoryPlayer(
                             EventType.SUCTION_OFF,
                         }:
                             self._prime_gripper_command(plan, desired_now)
+                        if event.event_type is EventType.DETACH_OBJECT and event.target_id:
+                            released_targets.add(event.target_id)
+                            if scripted_release:
+                                scripted_release_targets.add(event.target_id)
+                        elif event.event_type is EventType.ATTACH_OBJECT and event.target_id:
+                            released_targets.discard(event.target_id)
+                            scripted_release_targets.discard(event.target_id)
+                        if (event.event_type is EventType.GRIPPER_OPEN
+                                and event.target_id in released_targets):
+                            gripper = self.runtime.env.robots[0].gripper['right']
+                            if not getattr(gripper, 'action_is_absolute', False):
+                                from .gripper_release import GripperReleaseWait, open_action_endpoint
+                                endpoint, opening_ticks = open_action_endpoint(
+                                    gripper, self.runtime.gripper_command)
+                                boundary = self._segment_at_time(plan, plan_time)
+                                released_segments.add(boundary.segment_id)
+                                settings = self._tracking_settle_config(boundary) or {}
+                                release_wait = GripperReleaseWait(
+                                    target=endpoint, started_at_s=executed_time,
+                                    max_wait_s=opening_ticks * control_timestep
+                                    + float(settings.get('max_wait_s', 2.0)),
+                                    required_ticks=int(settings.get('required_consecutive_ticks', 3)),
+                                    object_id=event.target_id,
+                                    absolute_target=event.target_id in scripted_release_targets,
+                                )
+                                if release_wait.absolute_target:
+                                    # Scripted retention already controls normalized
+                                    # finger position targets directly. Keep that
+                                    # interface for opening; actuator dynamics and
+                                    # measured contact release still run normally.
+                                    self.runtime._captured_gripper_action = endpoint.copy()
                     except Exception as error:  # noqa: BLE001
                         executed_events.append(
                             ExecutedEvent(
@@ -4016,6 +4117,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 final_settle_config = self._tracking_settle_config(segment)
                 if (
                     plan_time >= plan.duration_s - self._TIME_TOLERANCE_S
+                    and release_wait is None
                     and (
                         final_settle_config is None
                         or bool(
@@ -4046,7 +4148,11 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     >= motion_end_time - self._TIME_TOLERANCE_S
                     and not bool(settle_state["settled"])
                 )
-                if settling:
+                waiting_for_release = release_wait is not None
+                if waiting_for_release:
+                    target_plan_time = plan_time
+                    desired = self._desired_joint_position(timeline, plan_time)
+                elif settling:
                     settle_state.setdefault("started_at_execution_s", executed_time)
                     target_plan_time = plan_time
                     desired = np.asarray(
@@ -4111,6 +4217,43 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     step_joint_error,
                 )
                 actual_eef_position = self._eef_position(self.runtime.env)
+                if release_wait is not None:
+                    release_model, _ = _raw_model_data(self.runtime.env)
+                    body_id = int(self.runtime.env.obj_body_id[release_wait.object_id])
+                    object_bodies = {body_id}
+                    for candidate in range(int(release_model.nbody)):
+                        ancestor = candidate
+                        while ancestor > 0 and ancestor not in object_bodies:
+                            ancestor = int(release_model.body_parentid[ancestor])
+                        if ancestor in object_bodies:
+                            object_bodies.add(candidate)
+                    gripper = self.runtime.env.robots[0].gripper['right']
+                    contact_count = 0
+                    for contact in current_data.contact[:current_data.ncon]:
+                        a, b = int(contact.geom1), int(contact.geom2)
+                        if a < 0 or b < 0 or contact.dist > 0:
+                            continue
+                        a_object = int(release_model.geom_bodyid[a]) in object_bodies
+                        b_object = int(release_model.geom_bodyid[b]) in object_bodies
+                        a_hand = (release_model.geom(a).name or '').startswith(gripper.naming_prefix)
+                        b_hand = (release_model.geom(b).name or '').startswith(gripper.naming_prefix)
+                        contact_count += int((a_object and b_hand) or (b_object and a_hand))
+                    try:
+                        released = release_wait.update(
+                            executed_time, gripper.current_action, contact_count)
+                    except TimeoutError as error:
+                        if release_wait.absolute_target:
+                            self.runtime._captured_gripper_action = None
+                        release_waits.append(dict(release_wait.observation, succeeded=False))
+                        failure = _PlaybackFailure(
+                            code='GRIPPER_RELEASE_NOT_SETTLED', message=str(error),
+                            observed=release_wait.observation)
+                        return failed_report()
+                    if released:
+                        if release_wait.absolute_target:
+                            self.runtime._captured_gripper_action = None
+                        release_waits.append(dict(release_wait.observation, succeeded=True))
+                        release_wait = None
                 if settling:
                     target_waypoint = segment.waypoints[-1]
                     target_eef_error: float | None = None
@@ -4287,15 +4430,21 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     or target_plan_time
                     >= plan.duration_s - self._TIME_TOLERANCE_S
                 )
+                # Release events already ran even though nominal time stays at
+                # the PLACE boundary. Use its existing post-event contact
+                # context (free object, opening hand), not the attached context.
+                step_collision_context = (
+                    segment.collision_context_after if segment.segment_id in released_segments
+                    else segment.collision_context_before)
                 if (
                     self._collision_probe is not None
-                    and segment.collision_context_before is not None
+                    and step_collision_context is not None
                     and check_collision_now
                 ):
                     collision_check_count += 1
                     collision = self._check_collision(
                         actual,
-                        context=segment.collision_context_before,
+                        context=step_collision_context,
                     )
                     if not collision.valid:
                         collision_count += 1

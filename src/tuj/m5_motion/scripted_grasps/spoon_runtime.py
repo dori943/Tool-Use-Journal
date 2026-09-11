@@ -1,4 +1,4 @@
-"""Physical C1_2 spoon grasp; independent of the validated object runtimes."""
+"""Physical scene-relative spoon grasp for either supported finger hand."""
 from pathlib import Path
 from types import SimpleNamespace
 import importlib.util
@@ -15,7 +15,23 @@ from tuj.m5_motion.scripted_grasps.spoon_hand_model import bound_spoon_3f_comman
 
 
 def three_finger_ready(samples, ticks=5):
-    return len(samples)>=ticks and all(three_finger_pinch_event(s) for s in samples[-ticks:])
+    if len(samples)<ticks:
+        return False
+    window=samples[-ticks:]
+    # Geometry must remain valid at every 50 Hz policy tick. Contact-force
+    # constraints are stiff enough to produce alternating sample ripple, so
+    # evaluate their short-window mean instead of accepting or rejecting the
+    # grasp on one solver phase.
+    if not all(set(s['finger_contacts'])=={'thumb','index','pinky'}
+            and s['normal_opposition']>=.8 and s['contact_span_m']>=.020
+            for s in window):
+        return False
+    forces={name:float(np.mean([s['finger_force_n'][name] for s in window]))
+        for name in ('thumb','index','pinky')}
+    other=forces['index']+forces['pinky']
+    return (forces['thumb']>=1.5 and forces['index']>=.75
+        and forces['pinky']>=.75 and .5*other<=forces['thumb']<=2.*other
+        and sum(forces.values())<=8.)
 
 
 def thin_handle_ready(samples, ticks=5):
@@ -32,10 +48,24 @@ def three_finger_pinch_event(sample):
     """Require opposed, balanced contacts rather than one heavily loaded finger."""
     forces=sample['finger_force_n']
     other=forces['index']+forces['pinky']
+    return (three_finger_contact_established(sample)
+        and sum(forces.values())<=8.)
+
+
+def three_finger_contact_established(sample):
+    """Recognize a real three-way pinch before regulating its force.
+
+    Starting independent force control after only one finger touches can move
+    the other two away from a thin handle.  Wait for opposed three-finger
+    contact first; the bounded controller can then reduce an initially high
+    total force to the stricter steady-state gate used above.
+    """
+    forces=sample['finger_force_n']
+    other=forces['index']+forces['pinky']
     return (set(sample['finger_contacts'])=={'thumb','index','pinky'}
         and sample['normal_opposition']>=.8 and sample['contact_span_m']>=.020
         and forces['thumb']>=1.5 and forces['index']>=.75 and forces['pinky']>=.75
-        and .5*other<=forces['thumb']<=2.*other and sum(forces.values())<=8.)
+        and .5*other<=forces['thumb']<=2.*other)
 
 
 def thin_handle_pinch_event(sample):
@@ -131,6 +161,8 @@ def attach_thin_handle_pinch(context):
 def update_three_finger_commands(commands,measured_forces,recipe):
     """A bounded force integrator: positive command opens the Jaco finger."""
     error=np.asarray(measured_forces,dtype=float)-np.asarray(recipe.three_finger_force_targets_n)
+    deadband=recipe.three_finger_force_deadband_n
+    error=np.sign(error)*np.maximum(np.abs(error)-deadband,0.)
     delta=np.clip(recipe.three_finger_force_gain*error,-.01,.01)
     return np.clip(np.asarray(commands,dtype=float)+delta,-1.,1.)
 
@@ -187,6 +219,67 @@ from .motion import GraspMotionContext
 
 
 class SpoonContext(GraspMotionContext):
+
+
+    def stabilize_three_finger_joint_limits(self):
+        """Make the native Jaco limit response stiff enough for a thin handle.
+
+        The source hand uses compliant limits on its passive distal joints.
+        During a spoon pinch their inertial overshoot can exceed the declared
+        zero-radian lower bound even though the actuator command is valid.
+        Change only the borrowed simulator model for this spoon execution;
+        joint ranges, tendon coupling, geometry, and source assets stay intact.
+        """
+        ids=self.hand_joint_ids
+        dofs=self.model.jnt_dofadr[ids]
+        original={
+            'joint_solref':self.model.jnt_solref[ids].copy().tolist(),
+            'joint_solimp':self.model.jnt_solimp[ids].copy().tolist(),
+            'dof_armature':self.model.dof_armature[dofs].copy().tolist(),
+        }
+        self.model.jnt_solref[ids]=[
+            self.recipe.three_finger_joint_limit_timeconstant_s,1.]
+        self.model.jnt_solimp[ids]=self.recipe.three_finger_joint_limit_impedance
+        self.model.dof_armature[dofs]=np.maximum(
+            self.model.dof_armature[dofs],
+            self.recipe.three_finger_joint_armature_kg_m2)
+        tendon_profile=None
+        correction=getattr(self.env,'spoon_hand_correction',{}) or {}
+        if correction.get('policy')=='TENDON_REFERENCE_ALIGNED_TO_DECLARED_REST_AND_INIT':
+            # Other 3F objects in this environment retain their commissioned
+            # stiff coupling. The correction's -0.44 polynomial offset already
+            # compensates for the assembled model's 0.64 tendon length0, so the
+            # physical target remains 0.20. Restore only the native response
+            # time here; zeroing the offset would create an impossible 0.64
+            # target and pin every proximal joint near its upper limit.
+            records=[]
+            for item in correction['couplings']:
+                eid=self.model.eq(item['name']).id
+                before={
+                    'name':item['name'],
+                    'data':self.model.eq_data[eid].copy().tolist(),
+                    'solref':self.model.eq_solref[eid].copy().tolist(),
+                }
+                self.model.eq_solref[eid]=[.02,1.]
+                records.append({**before,
+                    'native_data':self.model.eq_data[eid].copy().tolist(),
+                    'native_solref':self.model.eq_solref[eid].copy().tolist()})
+            tendon_profile={
+                'policy':'SPOON_ONLY_NATIVE_JACO_TENDON_RESPONSE',
+                'equalities':records,
+            }
+        return {
+            'policy':'SPOON_ONLY_STIFF_NATIVE_JACO_JOINT_LIMITS',
+            'joint_names':list(self.gripper.joints),
+            'joint_limit_timeconstant_s':self.recipe.three_finger_joint_limit_timeconstant_s,
+            'joint_limit_impedance':list(self.recipe.three_finger_joint_limit_impedance),
+            'joint_armature_floor_kg_m2':self.recipe.three_finger_joint_armature_kg_m2,
+            'joint_ranges_changed':False,
+            'tendon_coupling_changed':tendon_profile is not None,
+            'tendon_profile':tendon_profile,
+            'source_assets_changed':False,
+            'original':original,
+        }
 
 
     def audit_hand_range(self):
@@ -322,6 +415,11 @@ class SpoonContext(GraspMotionContext):
                 if not freeze:
                     self.three_finger_commands=update_three_finger_commands(
                         self.three_finger_commands,measured,self.recipe)
+                    if self.three_finger_hold_command_min is not None:
+                        self.three_finger_commands=np.clip(
+                            self.three_finger_commands,
+                            self.three_finger_hold_command_min,
+                            self.three_finger_hold_command_max)
                 command=self.three_finger_commands
             else:
                 command=np.full(self.gripper.dof,float(opening))
@@ -350,14 +448,20 @@ class SpoonContext(GraspMotionContext):
         self.recipe=recipe
         self.three_finger_force_hold=False
         self.three_finger_commands=None
+        self.three_finger_hold_command_min=None
+        self.three_finger_hold_command_max=None
         self.two_finger_force_hold=False
         self.two_finger_command=0.
-        result={'status':'FAILED','object_id':'spoon','environment':'C1_2_DoughFlatten',
+        result={'status':'FAILED','object_id':'spoon',
+                'environment':self.env.scripted_grasp_profile['environment'],
                 'controller':'NATIVE_JOINT_PD_WITH_HANDLE_CONTACT_FORCE_HOLD',
                 'recipe':recipe.to_dict(),'scenario':self.scenario}
         try:
             if type(self.gripper).__name__!=recipe.model_class:
                 raise GraspFailure('UNSUPPORTED_EE')
+            self.spoon_hand_numerical_profile=(
+                self.stabilize_three_finger_joint_limits()
+                if recipe.ee_id=='3F' else None)
             self.record_input()
             targets=build_spoon_targets(self.body_pose(),self.center_in_body,self.local_size,recipe)
             save_json(self.output/'targets.json',targets)
@@ -390,30 +494,38 @@ class SpoonContext(GraspMotionContext):
             for f in np.linspace(0,1,math.ceil(recipe.close_duration_s*50)):
                 hold_opening=opening+(-1.-opening)*f
                 row=self.step(q,hold_opening)
-                if recipe.ee_id=='3F' and not self.three_finger_force_hold and any(v>.05 for v in row['finger_force_n'].values()):
-                    self.three_finger_commands=np.asarray(self.gripper.current_action).copy()
-                    self.three_finger_force_hold=True
                 if recipe.ee_id=='2F' and not self.two_finger_force_hold and any(v>.05 for v in row['finger_force_n'].values()):
                     self.two_finger_command=float(np.asarray(self.gripper.current_action).mean())
                     self.two_finger_force_hold=True
+                if recipe.ee_id=='3F' and not self.three_finger_force_hold and three_finger_contact_established(row):
+                    self.three_finger_commands=np.asarray(
+                        self.gripper.current_action).copy()
+                    self.three_finger_force_hold=True
                 acquired=grasp_contact_ready(recipe,self.trace,recipe.contact_ticks)
                 if acquired: break
             for _ in range(100):
                 if acquired: break
                 hold_opening=-1.
                 row=self.step(q,-1.)
-                if recipe.ee_id=='3F' and not self.three_finger_force_hold and any(v>.05 for v in row['finger_force_n'].values()):
-                    self.three_finger_commands=np.asarray(self.gripper.current_action).copy()
-                    self.three_finger_force_hold=True
                 if recipe.ee_id=='2F' and not self.two_finger_force_hold and any(v>.05 for v in row['finger_force_n'].values()):
                     self.two_finger_command=float(np.asarray(self.gripper.current_action).mean())
                     self.two_finger_force_hold=True
+                if recipe.ee_id=='3F' and not self.three_finger_force_hold and three_finger_contact_established(row):
+                    self.three_finger_commands=np.asarray(
+                        self.gripper.current_action).copy()
+                    self.three_finger_force_hold=True
                 acquired=grasp_contact_ready(recipe,self.trace,recipe.contact_ticks)
             if not acquired:
                 raise GraspFailure('HANDLE_CONTACT_NOT_STABLE')
             if recipe.ee_id=='3F':
                 # Freeze the pinch pose. A hard snap to -1 ejects thin utensils.
                 self.three_finger_commands=np.asarray(self.gripper.current_action).copy()
+                self.three_finger_hold_command_min=np.clip(
+                    self.three_finger_commands
+                    - recipe.three_finger_hold_close_margin,-1.,1.)
+                self.three_finger_hold_command_max=np.clip(
+                    self.three_finger_commands
+                    + recipe.three_finger_hold_open_margin,-1.,1.)
                 self.three_finger_force_hold=True
                 if getattr(recipe,'thin_handle_pinch',False) or getattr(recipe,'hold_finger_positions',False):
                     hold_opening=float(np.mean(self.three_finger_commands))
@@ -482,6 +594,8 @@ class SpoonContext(GraspMotionContext):
                 'physics_steps_audited':self.physics_steps_audited,
                 'hardware_joint_limits_validated':False}
             result['hand_model_correction']=self.env.spoon_hand_correction
+            result['spoon_hand_numerical_profile']=getattr(
+                self,'spoon_hand_numerical_profile',None)
             result['validation_scope']='SIMULATOR_CONTACT_LIFT_HOLD_AND_JOINT_RANGE_TOLERANCE'
             save_json(self.output/'result.json',result)
             save_json(self.output/'trace.json',self.trace)

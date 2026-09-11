@@ -56,7 +56,8 @@ def configure_environment(env, environment, ee):
         # kitchen home. A bare start fetches its EE from the rack, and every
         # commissioned rack path begins at TOOL_USE_JOURNAL_BARE_HOME_QPOS --
         # overriding it here put the arm 1.99 rad from that seam and no cached
-        # path could start (c3_1: START_STATE_MISMATCH on bare->vac).
+        # path could start (c3_1: START_STATE_MISMATCH on bare->vac). Tabletop
+        # and kitchen rack caches both expect that bare home when ee is None.
         env.robot_configs[0]["initial_qpos"] = [0., -1.8, 1.2, -.97, -1.57, 0.]
     corrected = not (environment == "C1_2_DoughFlatten" and ee == "3F")
     env._load_model()
@@ -138,6 +139,10 @@ def settle_tool_use_journal_free_objects(
         dof_address = int(model.jnt_dofadr[joint_id])
         free_qpos[qpos_address : qpos_address + 7] = True
         free_dofs[dof_address : dof_address + 6] = True
+    materials = tuple(getattr(env, "deformable_runtimes", {}).values())
+    for material in materials:
+        free_qpos[material.qpos] = True
+        free_dofs[material.dofs] = True
     fixed_qpos = ~free_qpos
     fixed_dofs = ~free_dofs
     fixed_positions = np.asarray(data.qpos[fixed_qpos], dtype=float).copy()
@@ -145,7 +150,13 @@ def settle_tool_use_journal_free_objects(
     data.ctrl[:] = 0.0
     try:
         for _ in range(steps):
-            mujoco.mj_step(model, data)
+            if materials:
+                mujoco.mj_step1(model, data)
+                for material in materials:
+                    material.prepare_forces()
+                mujoco.mj_step2(model, data)
+            else:
+                mujoco.mj_step(model, data)
             data.qpos[fixed_qpos] = fixed_positions
             data.qvel[fixed_dofs] = 0.0
         mujoco.mj_forward(model, data)

@@ -163,6 +163,27 @@ def end_effector_pose_for_object_pose(
     )
 
 
+def object_pose_for_end_effector_pose(
+    reference_pose: Pose,
+    transform: AttachedObjectTransform,
+) -> Pose:
+    """Apply ``T_world_object = T_world_ref * T_ref_object`` at release."""
+    if reference_pose.frame_id != "world":
+        raise AttachmentRetargetError("release reference pose must use the world frame")
+    reference_rotation = quaternion_matrix_xyzw(reference_pose.orientation_xyzw)
+    object_position = np.asarray(reference_pose.position_m) + reference_rotation @ np.asarray(
+        transform.position_in_reference_m
+    )
+    object_rotation = reference_rotation @ quaternion_matrix_xyzw(
+        transform.orientation_in_reference_xyzw
+    )
+    return Pose(
+        frame_id="world",
+        position_m=tuple(float(value) for value in object_position),
+        orientation_xyzw=matrix_quaternion_xyzw(object_rotation),
+    )
+
+
 def retarget_resolved_pose(
     world: WorldSnapshot,
     keyframe: RelativeKeyframeSpec,

@@ -7,6 +7,7 @@ equal-radius layout + separate robot pedestal.
 from __future__ import annotations
 
 import json
+import xml.etree.ElementTree as ET
 from pathlib import Path
 
 import numpy as np
@@ -27,6 +28,8 @@ from environments.objects import (
 )
 from environments.robot_pedestal import add_robot_pedestal, remove_robot_pedestal
 from environments.task_camera import add_standard_task_camera
+from environments.deformable_runtime import FlexMaterialRuntime, check_native_contact
+from environments.objects.deformable_dough import DeformableDoughObject
 
 
 ROBOT_SPEC_PATH = (
@@ -105,6 +108,9 @@ class C1_2_DoughFlatten(KitchenBase):
         self._island_surface_z = None
         self._island_bounds = None
         self._layout_meta = {}
+        self.deformable_runtimes = {}
+        with (ROBOT_SPEC_PATH.parent / "dough_material.json").open(encoding="utf-8") as stream:
+            self.dough_material_config = json.load(stream)
 
         super().__init__(
             robots=robots,
@@ -173,7 +179,7 @@ class C1_2_DoughFlatten(KitchenBase):
 
         builders = {
             "cutting_board": CuttingBoardObject,
-            "dough": DoughObject,
+            "dough": lambda name: DeformableDoughObject(name, self.dough_material_config["material"]),
             "bottle": BottleObject,
             "spatula": SpatulaObject,
             "spoon": SpoonObject,
@@ -192,6 +198,12 @@ class C1_2_DoughFlatten(KitchenBase):
             }
             self.objects[model.name] = model
             self.model.merge_objects([model])
+            if isinstance(model, DeformableDoughObject):
+                model.flattening_config = self.dough_material_config
+                deformable = self.model.root.find("deformable")
+                if deformable is None:
+                    deformable = ET.SubElement(self.model.root, "deformable")
+                deformable.append(model.flex)
             setattr(self, name, model)
 
     def _fixed_island_placement(self, pos, rotation=0.0):
@@ -382,8 +394,38 @@ class C1_2_DoughFlatten(KitchenBase):
 
     def _setup_references(self):
         super()._setup_references()
+        self.deformable_runtimes = {
+            name: FlexMaterialRuntime(self.sim.model._model, self.sim.data._data, obj)
+            for name, obj in self.objects.items() if isinstance(obj, DeformableDoughObject)
+        }
         if self.ee_rack_info:
             self.ee_rack_body_id = self.sim.model.body_name2id("ee_rack")
+
+    def initialize_time(self, control_freq):
+        super().initialize_time(control_freq)
+        self.model_timestep = float(self.dough_material_config["physics_timestep_s"])
+        self.sim.model.opt.timestep = self.model_timestep
+        # External constitutive forces require the verified fine physics step.
+        self.sim.model.opt.integrator = 3  # MuJoCo implicitfast; control frequency unchanged.
+
+    def _pre_action(self, action, policy_step=False):
+        super()._pre_action(action, policy_step)
+        for runtime in self.deformable_runtimes.values():
+            runtime.prepare_forces()
+
+    def check_contact(self, geoms_1, geoms_2=None):
+        return check_native_contact(self.sim.model._model, self.sim.data._data, geoms_1, geoms_2)
+
+    def after_physics_step(self):
+        for runtime in self.deformable_runtimes.values():
+            runtime.observe_contacts()
+
+    def _place_object_state(self, obj, position, quaternion):
+        runtime = self.deformable_runtimes.get(obj.name)
+        if runtime is not None:
+            runtime.reset(position, quaternion)
+        else:
+            self.sim.data.set_joint_qpos(obj.joints[0], np.concatenate([position, quaternion]))
 
     def _yaw_quat_wxyz(self, yaw: float) -> np.ndarray:
         quat_xyzw = T.mat2quat(T.euler2mat(np.array([0.0, 0.0, float(yaw)])))
@@ -424,18 +466,9 @@ class C1_2_DoughFlatten(KitchenBase):
                 ]
             ),
         )
-        self.sim.data.set_joint_qpos(
-            dough.joints[0],
-            np.concatenate(
-                [
-                    np.array(
-                        [work[0]+ _BOARD_FORWARD_OFFSET, work[1], self._object_place_z(dough, board_top)],
-                        dtype=float,
-                    ),
-                    self._yaw_quat_wxyz(0.0),
-                ]
-            ),
-        )
+        self._place_object_state(dough,
+            np.array([work[0]+ _BOARD_FORWARD_OFFSET, work[1], self._object_place_z(dough, board_top)]),
+            self._yaw_quat_wxyz(0.0))
         self.sim.forward()
 
     def _reset_internal(self):
@@ -447,10 +480,7 @@ class C1_2_DoughFlatten(KitchenBase):
             object_placements = self.object_placements
             self._update_sliding_fxtr_obj_placement()
             for obj_pos, obj_quat, obj in object_placements.values():
-                self.sim.data.set_joint_qpos(
-                    obj.joints[0],
-                    np.concatenate([np.array(obj_pos), np.array(obj_quat)]),
-                )
+                self._place_object_state(obj, np.array(obj_pos), np.array(obj_quat))
 
         if self._robot_base_xy is not None:
             self.init_robot_base_pos = np.array(
@@ -477,7 +507,9 @@ class C1_2_DoughFlatten(KitchenBase):
         self._align_tools_on_row()
 
     def _check_success(self):
-        return False
+        from tuj.m5_motion.flatten_contact import flattening_outcome
+        runtime = self.deformable_runtimes.get('dough')
+        return runtime is not None and flattening_outcome(runtime.geometry_record())[0]
 
     def get_evaluation_material_gt(self):
         """평가 전용 GT. 관측 및 LLM/M3 입력 경로에서는 호출하지 않는다."""
