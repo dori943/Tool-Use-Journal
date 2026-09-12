@@ -153,10 +153,27 @@ def _ensure_placement_sites(root: ET.Element) -> None:
     _add_site("horizontal_radius_site", horiz)
 
 
+def _apply_density(root: ET.Element, density: float) -> None:
+    """본체 geom 의 density 를 덮어쓴다.
+
+    자산이 선언한 값이 실물과 크게 다를 때 쓴다. cutting_board 는 100 kg/m3
+    으로 나무(600~800)의 1/7 이고, scale 로 부피를 줄이면 질량이 세제곱으로
+    줄어 흡착을 뗄 때 생기는 힘에 그대로 날아간다 (c2_2 에서 재료 도마가
+    터키와 함께 12cm 튀어 올랐다).
+    """
+    body = root.find("./worldbody/body")
+    if body is None:
+        return
+    for geom in body.iter("geom"):
+        if geom.get("density") is not None:
+            geom.set("density", _fmt_floats([density]))
+
+
 def make_resolved_object_xml(
     asset_dir: Path,
     xml_name: str = "model.xml",
     scale: float | None = None,
+    density: float | None = None,
 ) -> str:
     """로컬 model.xml을 읽어 절대경로·스케일·배치 사이트를 반영한 임시 XML 경로를 반환한다."""
     xml_path = asset_dir / xml_name
@@ -185,6 +202,8 @@ def make_resolved_object_xml(
 
     if scale is not None:
         _apply_absolute_scale(root, scale)
+    if density is not None:
+        _apply_density(root, density)
 
     _ensure_placement_sites(root)
 
