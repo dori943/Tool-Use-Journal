@@ -438,6 +438,14 @@ class _Grounding:
         floor height then drives the object through what is already there.
         """
         floor = self.floor_top_world_z()
+        container = self.record.get('packing_metadata', {})
+        if _action(self.task) == 'PLACE_ON' and container.get('kind') == 'CONTAINER':
+            # Rest on the container's opening plane, not its interior contents.
+            # Use the same explicit rim metadata as PackingBinding.
+            rim = float(container['opening_top_z_m'])
+            if not math.isfinite(rim) or not np.allclose(self.T_WR[:3, 2], [0., 0., 1.], atol=1e-6):
+                raise ValueError('PLACE_ON_UPRIGHT_CONTAINER_RIM_REQUIRED')
+            floor = max(floor, float(self.T_WR[2, 3] + rim))
         mine = self.half[:2]
         tops = [t for c, h, t in self._occupants()
                 if np.all(np.abs(np.asarray(xy, dtype=float) - c) < h + mine)]
