@@ -1,6 +1,7 @@
 """Explicit, scene-scoped dispatch. Importing this module creates no simulator."""
 from dataclasses import dataclass
 from importlib import import_module
+from inspect import signature
 
 from tuj.m5_motion.task_semantics import is_acquire_task
 
@@ -17,9 +18,18 @@ class GraspEntry:
         name = self.module_name or self.object_id
         module = import_module(f"{__package__}.objects.{name}")
         if self.driver == "catalog":
-            if name == "plate_vac":
-                return module.plate_vac_recipe(self.environment, self.object_id)
-            return getattr(module, name + "_recipe")()
+            # 0912: plate_vac 만 특수 케이스로 환경을 넘기고 있었는데, 같은 자산을
+            # 여러 환경에 등록하는 레시피가 늘면 특수 케이스도 같이 늘어난다.
+            # 팩토리가 받는 인자만 골라 넘긴다. 인자를 안 받는 기존 레시피는
+            # 그대로 호출되고, environment/object_id 를 선언한 레시피는 자기
+            # 환경을 알게 되어 실행 기록의 task_id 가 실제 태스크와 맞는다.
+            factory = getattr(module, name + "_recipe")
+            accepted = signature(factory).parameters
+            arguments = {key: value for key, value in
+                         (("environment", self.environment),
+                          ("object_id", self.object_id))
+                         if key in accepted}
+            return factory(**arguments)
         if self.driver == "spoon":
             # Spoon has independently calibrated 2F and 3F recipes.  The EE
             # chosen by M4 is part of the dispatch key, so recipe selection
@@ -65,9 +75,34 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # 그대로 재사용한다. plate_vac_recipe().task_id 는 'c2_1' 고정이라 실행 기록에
     # C3_1 작업도 c2_1 로 남지만 동작에는 영향 없다 (C1_1 항목과 동일).
     ("plate", "C3_1_ObjectSorting", "vac", "catalog", "plate_vac"),
+    # 0912: 아래 네 줄은 main 에서 사라져 있었다. 테스트는 그대로 남아 있어
+    # (test_excluded_unknown_and_wrong_hand 의 스푼 6개 경로,
+    # test_plate_vac_routes_are_task_and_instance_scoped 의 plate_a/plate_b)
+    # main 단독으로도 빨간 상태였다. PR #71 이 스푼 4줄을 날린 것과 같은 사고다.
+    ("spoon", "C3_1_ObjectSorting", "2F", "spoon"),
+    ("spoon", "C3_1_ObjectSorting", "3F", "spoon"),
+    ("plate_a", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac"),
+    ("plate_b", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac"),
     ("apple", "C2_1_ObjectSorting", "3F", "catalog"),
     ("bread", "C2_1_ObjectSorting", "3F", "catalog"),
     ("mug", "C2_1_ObjectSorting", "3F", "catalog"),
+    # 0912: C3_1 은 C2_1 과 같은 씬인데 이 세 물체의 항목이 없어서, M4 가 고른 EE
+    # (교체 최소화로 2F)에 맞는 레시피가 없어 일반 파지 경로로 떨어졌다. 거기서는
+    # GRIPPER_CLOSE 와 ATTACH_OBJECT 가 같은 시각에 발행돼 손가락이 닫히기 전에
+    # 용접 접촉을 검사하므로 CONTACT_COUNT=0 으로 멈춘다.
+    #
+    # 2F 와 3F 를 모두 등록하는 이유는 실행을 통과시키기 위해서만이 아니다.
+    # constrain_task_request 는 feasible_ee 를 등록된 EE 로 좁히므로, 한쪽만
+    # 등록하면 M4 에게 선택지가 하나뿐이고 EE 선택 정확도를 측정할 수 없다.
+    # c2_1 이 정답표와 5/5 일치한 것도 빵/사과/머그가 3F 단독 등록이라 선택의
+    # 여지가 없었던 결과다 (실제로 고른 것은 스푼 하나뿐이다). 두 EE 를 모두
+    # 등록해야 2F 시도가 진짜 시도가 되고, 미끄러져 실패하면 그것이 "2F 는
+    # 차선" 의 물리적 근거가 된다.
+    ("apple", "C3_1_ObjectSorting", "3F", "catalog"),
+    ("bread", "C3_1_ObjectSorting", "2F", "catalog", "bread_2f"),
+    ("bread", "C3_1_ObjectSorting", "3F", "catalog"),
+    ("mug", "C3_1_ObjectSorting", "2F", "catalog", "mug_2f"),
+    ("mug", "C3_1_ObjectSorting", "3F", "catalog"),
     # 0912: C3_1 mounts the 2F gripper for the apple (C2_1 used 3F). Without a
     # 2F entry the grasp fell back to the generic M5 path, which closed on the
     # apple but left the grip site 20.4 mm from centre - past the 20 mm attach

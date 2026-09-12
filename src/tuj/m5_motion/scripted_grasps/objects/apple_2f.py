@@ -7,18 +7,29 @@ from the apple centre - just past the 20 mm post-grasp attach limit
 (ATTACHMENT_TOO_FAR).  The apple is a ~76 mm sphere that fits inside the 85 mm
 Robotiq opening, so a centred parallel-jaw grip lands the grip site within a few
 mm of the centre.  Pre-shape wide open to clear the equator, close across the
-widest section a touch above centre, firm 8 N hold.  task_id stays 'c2_1' (the
-whitelist has no c3_1; dispatch keys on object_id, so this is inert - same trick
-as plate_vac / the C1_1 plate entry).
+widest section a touch above centre, firm 8 N hold.
 """
 from tuj.m5_motion.scripted_grasps.catalog_types import (
     CatalogRecipe, build_catalog_targets, dispatch_grasp,
 )
 
+# 0912: task_id 를 'c2_1' 로 고정해 두면 C3_1 실행이 전부 c2_1 로 기록돼 채점
+# 때 섞인다. catalog_types 의 허용 목록에는 'c3_1' 이 이미 들어 있고(76행),
+# 레지스트리가 환경을 넘겨 주므로 같은 자산의 apple/bread/mug 와 같은 방식으로
+# 매핑한다.
+_TASK_IDS = {'C2_1_ObjectSorting': 'c2_1', 'C3_1_ObjectSorting': 'c3_1'}
 
-def apple_2f_recipe():
+
+def _task(environment):
+    try:
+        return _TASK_IDS[environment]
+    except KeyError as error:
+        raise ValueError(f'UNSUPPORTED_ENVIRONMENT: {environment}') from error
+
+
+def apple_2f_recipe(environment='C3_1_ObjectSorting'):
     return CatalogRecipe(
-        'apple', 'c2_1', '2F',
+        'apple', _task(environment), '2F',
         (.075783, .075419, .075519),
         offset_fraction=(0., 0., .08),
         offset_m=(0., 0., 0.),

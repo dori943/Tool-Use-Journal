@@ -109,8 +109,11 @@ def test_held_motion_limit_never_loosens_a_stricter_task_constraint(monkeypatch,
     request.constraints.acceleration_scaling=.5
     monkeypatch.setattr(live,'snapshot',lambda runtime,previous=None:request.world.model_copy(deep=True))
     recipe=SimpleNamespace(post_grasp_velocity_scaling=.1,post_grasp_acceleration_scaling=.1)
+    # 0912: transport._grounding_for 가 retention.entry.object_id 를 읽는다.
+    # 실제 GraspRetention 은 entry 를 들고 있는데 이 스텁에만 없어서 MOVE 경로가
+    # AttributeError 로 죽었다. 같은 항목을 그대로 넘긴다.
     runtime=SimpleNamespace(env=object(),scripted_grasp_retention=SimpleNamespace(
-        context=SimpleNamespace(recipe=recipe),samples=[]))
+        context=SimpleNamespace(recipe=recipe),samples=[],entry=ENTRIES[4]))
     def factory(*args,**kwargs):
         def planner(actual):
             assert actual.constraints.velocity_scaling==.05

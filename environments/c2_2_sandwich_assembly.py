@@ -78,6 +78,25 @@ _SLICE_UNDERSIDE_CLEARANCE = 0.00  # 3.5 mm
 # 보정을 되돌린다.
 _PLATE_FOOD_SURFACE_OFFSET = -0.01
 
+# 0911: 재료 받침을 평평한 도마로 바꾼다. 이 접시는 테두리가 바닥보다 약 9mm
+# 솟은 그릇인데, 파이프라인 곳곳이 "bbox 윗면 = 물건이 놓이는 면"을 가정한다.
+# 재료는 테두리가 아니라 9.8mm 아래 바닥에 놓이므로 두 가지가 어긋났다.
+#  1) support_clearance_context_from_world 는 받침 bbox 윗면과 대상 메시 바닥의
+#     간격이 5mm 를 넘으면 받침으로 보지 않는다. tomato_slice 는 간격이
+#     -9.76mm 라 접시가 받침 후보에서 탈락했고, 받침 기준 충돌 면제가 걸리지
+#     않았다.
+#  2) 흡착컵이 재료 윗면까지 내려가려면 9mm 테두리 안으로 들어가야 해서
+#     vac_cup <-> tomato_plate 여유가 4.68mm 로 5mm 마진에 걸렸다.
+# 도마는 테두리가 없어 bbox 윗면이 곧 놓이는 면이다 (빵은 이미 이 받침으로
+# 바꿔 두었고 실측 +0.05mm 로 정확히 올라간다). 접시 자리 간격이 220mm 라
+# 기본 크기(147 x 245mm)로는 이웃과 겹쳐 축소해서 쓴다.
+_INGREDIENT_BOARD_SCALE = 0.19  # 약 112 x 187 x 11 mm
+
+
+def _ingredient_board(name):
+    return CuttingBoardObject(name=name, scale=_INGREDIENT_BOARD_SCALE)
+
+
 _SPATULA_THICKNESS = 0.0018
 _HAM_THICKNESS = 0.005
 _CHEESE_THICKNESS = 0.004
@@ -109,15 +128,21 @@ _SANDWICH_STACK_XY_TOL_M = 0.09
 # 와 겹치므로 축은 y 로 고정한다 (도마의 긴 축도 로컬 y 다).
 _BREAD_SIDE_BY_SIDE_DY_M = 0.06
 
+# 0912: 터키와 치즈를 세 장씩 쌓아 두었는데, 샌드위치는 각 한 장만 쓰므로
+# 나머지 두 장은 실패 경로만 늘렸다. 두 가지가 겹쳤다.
+#  1) 분해가 흔들린다. 시각 언어 모델이 실행마다 터키를 한 층으로도, 두 층으로도
+#     나눴다. 두 층으로 나눈 실행에서는 아래 깔린 turkey_1 이 대상이 되는데
+#     top_exposed 가 unsat 이라 M4 가 그룹 공통 EE 를 못 찾고 EMPTY_FEASIBLE_EE
+#     로 멈췄다.
+#  2) 맨 위 한 장만 집는 것이 기하적으로 불가능했다. 2.5mm 슬라이스가 0.2mm
+#     간격으로 쌓여 있으면 흡착컵이 바로 아래 장과 5mm 마진을 지킬 수 없다
+#     (실측 여유 -1.85 ~ +0.63mm).
+# 한 장씩 두면 두 문제가 동시에 사라지고 태스크 의미는 그대로다.
 _SANDWICH_ITEMS = (
     "bread_a",
     "bread_b",
     "turkey_1",
-    "turkey_2",
-    "turkey_3",
     "cheese_1",
-    "cheese_2",
-    "cheese_3",
     "tomato_slice",
 )
 
@@ -394,33 +419,21 @@ class C2_2_SandwichAssembly(KitchenBase):
 
             # Turkey
             "turkey_plate":
-                PlateObject,
+                _ingredient_board,
 
             "turkey_1":
                 TurkeySliceObject,
 
-            "turkey_2":
-                TurkeySliceObject,
-
-            "turkey_3":
-                TurkeySliceObject,
-
             # Cheese
             "cheese_plate":
-                PlateObject,
+                _ingredient_board,
 
             "cheese_1":
                 CheeseObject,
 
-            "cheese_2":
-                CheeseObject,
-
-            "cheese_3":
-                CheeseObject,
-
             # Tomato
             "tomato_plate":
-                PlateObject,
+                _ingredient_board,
 
             "tomato_slice":
                 TomatoSliceObject,
@@ -455,11 +468,7 @@ class C2_2_SandwichAssembly(KitchenBase):
             target_thickness = {
                 "spatula": _SPATULA_THICKNESS,
                 "turkey_1": _HAM_THICKNESS,
-                "turkey_2": _HAM_THICKNESS,
-                "turkey_3": _HAM_THICKNESS,
                 "cheese_1": _CHEESE_THICKNESS,
-                "cheese_2": _CHEESE_THICKNESS,
-                "cheese_3": _CHEESE_THICKNESS,
             }.get(name)
 
             if target_thickness is not None:
@@ -568,14 +577,10 @@ class C2_2_SandwichAssembly(KitchenBase):
             # Turkey
             "turkey_plate",
             "turkey_1",
-            "turkey_2",
-            "turkey_3",
 
             # Cheese
             "cheese_plate",
             "cheese_1",
-            "cheese_2",
-            "cheese_3",
 
             # Tomato
             "tomato_plate",
@@ -1012,6 +1017,9 @@ class C2_2_SandwichAssembly(KitchenBase):
                 dtype=float,
             )
 
+            # 오목 보정은 테두리가 있는 접시에만 해당한다. 평평한 도마는
+            # bbox 윗면이 곧 놓이는 면이라 보정하면 오히려 파묻힌다.
+            rimmed = getattr(obj, "asset_id", "") != "cutting_board"
             top = (
                 float(
                     pos[2]
@@ -1021,7 +1029,7 @@ class C2_2_SandwichAssembly(KitchenBase):
                         obj.top_offset
                     )[-1]
                 )
-                + _PLATE_FOOD_SURFACE_OFFSET
+                + (_PLATE_FOOD_SURFACE_OFFSET if rimmed else 0.0)
             )
 
             return (
@@ -1049,8 +1057,6 @@ class C2_2_SandwichAssembly(KitchenBase):
         # 빵B 는 마지막 층이라 나중에 집는다. 실행마다 순서가 갈려 같은 장면이
         # 어떤 날은 풀리고 어떤 날은 FRONTIER_EXHAUSTED 로 죽었다. 겹치지 않게
         # 나란히 놓아 두 장 모두 처음부터 노출되게 한다.
-        # 받침이 도마라 접시용 안착 오프셋(오목한 바닥까지의 거리)을 되돌린다.
-        bread_top = bread_top - _PLATE_FOOD_SURFACE_OFFSET
         for bread_name, dy in (
             ("bread_a", -_BREAD_SIDE_BY_SIDE_DY_M),
             ("bread_b", +_BREAD_SIDE_BY_SIDE_DY_M),
@@ -1078,8 +1084,6 @@ class C2_2_SandwichAssembly(KitchenBase):
             turkey_top,
             [
                 "turkey_1",
-                "turkey_2",
-                "turkey_3",
             ],
             clearance=0.0002,
             underside_clearance=_SLICE_UNDERSIDE_CLEARANCE,
@@ -1101,8 +1105,6 @@ class C2_2_SandwichAssembly(KitchenBase):
             cheese_top,
             [
                 "cheese_1",
-                "cheese_2",
-                "cheese_3",
             ],
             clearance=0.0002,
             underside_clearance=_SLICE_UNDERSIDE_CLEARANCE,
@@ -1493,11 +1495,7 @@ class C2_2_SandwichAssembly(KitchenBase):
             "bread_a",
             "bread_b",
             "turkey_1",
-            "turkey_2",
-            "turkey_3",
             "cheese_1",
-            "cheese_2",
-            "cheese_3",
             "tomato_slice",
             "knife",
             "spatula",
@@ -1527,25 +1525,13 @@ class C2_2_SandwichAssembly(KitchenBase):
                 "Turkey Plate",
 
             "turkey_1":
-                "Turkey Slice 1",
-
-            "turkey_2":
-                "Turkey Slice 2",
-
-            "turkey_3":
-                "Turkey Slice 3",
+                "Turkey Slice",
 
             "cheese_plate":
                 "Cheese Plate",
 
             "cheese_1":
-                "Cheese 1",
-
-            "cheese_2":
-                "Cheese 2",
-
-            "cheese_3":
-                "Cheese 3",
+                "Cheese",
 
             "tomato_plate":
                 "Tomato Plate",

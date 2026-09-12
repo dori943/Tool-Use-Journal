@@ -1,0 +1,204 @@
+{
+  "status": "SUCCESS",
+  "object_id": "bread",
+  "task_id": "c3_1",
+  "ee_id": "2F",
+  "recipe": {
+    "object_id": "bread",
+    "task_id": "c3_1",
+    "ee_id": "2F",
+    "expected_size_m": [
+      0.083472,
+      0.129975,
+      0.069446
+    ],
+    "offset_fraction": [
+      0.0,
+      0.0,
+      0.12
+    ],
+    "offset_m": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation_xyz_deg": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "contact_region_min": [
+      -0.6,
+      -0.25,
+      -0.6
+    ],
+    "contact_region_max": [
+      0.6,
+      0.25,
+      0.6
+    ],
+    "preshape_aperture_m": 0.0845,
+    "preshape_closure_command": -0.74,
+    "approach_distance_m": 0.12,
+    "lift_distance_m": 0.18,
+    "linear_lift_start": false,
+    "arm_kp": 150.0,
+    "post_grasp_arm_kp": 300.0,
+    "close_duration_s": 4.0,
+    "closure_kp": 20.0,
+    "physics_timestep_s": 0.001,
+    "physics_integrator": "implicitfast",
+    "thin_contact_timeconstant_s": 0.004,
+    "two_finger_parallel_linkage": true,
+    "two_finger_force_target_n": 5.0,
+    "two_finger_force_gain": 0.002,
+    "three_finger_force_targets_n": [
+      6.0,
+      3.0,
+      3.0
+    ],
+    "three_finger_force_gain": 0.002,
+    "three_finger_force_deadband_n": 0.5,
+    "prelift_stabilization_s": 0.5,
+    "settle_s": 1.0,
+    "hold_s": 5.0,
+    "joint_speed_rad_s": 0.45,
+    "cartesian_speed_m_s": 0.05,
+    "minimum_lift_m": 0.1,
+    "maximum_slip_m": 0.005,
+    "maximum_slip_deg": 5.0,
+    "contact_ticks": 5,
+    "minimum_vacuum_contact_count": 3,
+    "maximum_vacuum_attach_penetration_m": 0.002,
+    "maximum_support_separation_penetration_m": 0.002,
+    "maximum_joint_limit_error_rad": 0.01,
+    "suction_command": 1.0,
+    "vacuum_min_contacts": 3,
+    "model_class": "Robotiq85Gripper",
+    "recipe_id": "bread_2f_center_v1"
+  },
+  "scenario": {
+    "seed": 0,
+    "mode": "BORROWED_M5_RUNTIME",
+    "request_id": "motion-request:live:cc036c3990bdff8f1d9b"
+  },
+  "runtime_version": "catalog_v2_measured_time",
+  "timing": {
+    "physics_timestep_s": 0.001,
+    "control_timestep_s": 0.02,
+    "clock_source": "MUJOCO_DATA_TIME"
+  },
+  "metrics": {
+    "minimum_hold_lift_m": 0.1665857549223041,
+    "minimum_bottom_clearance_m": 0.12104461951666146,
+    "all_finger_contact_fraction": 1.0,
+    "max_slip_m": 0.0008818529971581673,
+    "max_slip_deg": 0.4571155182217248,
+    "hold_s": 4.999999999881766,
+    "requested_hold_s": 5.0
+  },
+  "failure_reason": null,
+  "object_pose_in_gripper": {
+    "position_m": [
+      -0.0002459496786775678,
+      -0.008786192663234896,
+      0.016838089763393516
+    ],
+    "orientation_xyzw": [
+      0.8443463173552276,
+      0.0040143261281278255,
+      -0.015172357324355353,
+      -0.5355679052441664
+    ]
+  },
+  "final_object_pose": {
+    "position_m": [
+      -0.04653322029026234,
+      0.19777100427094058,
+      0.9994391879188731
+    ],
+    "orientation_xyzw": [
+      0.5461112438627632,
+      -0.06277223286080309,
+      0.027281898929587958,
+      0.8349118840327586
+    ]
+  },
+  "attachment_used": true,
+  "object_material_inputs": [],
+  "learned_model_calls": 0,
+  "hand_model_correction": {
+    "policy": "CALIBRATED_PARALLEL_2F_LINKAGE",
+    "removed_spring_tendons": [
+      "<fixed name=\"gripper0_right_finger2_12_cpl\" range=\"-1 1\" stiffness=\"0.4\" springlength=\"0.001\" limited=\"true\">\n\t\t\t<joint joint=\"gripper0_right_finger_joint\" coef=\"1\" />\n\t\t\t<joint joint=\"gripper0_right_left_inner_finger_joint\" coef=\"-3\" />\n\t\t\t<joint joint=\"gripper0_right_left_inner_knuckle_joint\" coef=\"1\" />\n\t\t</fixed>\n\n\t\t\n        ",
+      "<fixed name=\"gripper0_right_finger1_12_cpl\" range=\"-1 1\" stiffness=\"0.4\" springlength=\"0.001\" limited=\"true\">\n\t\t\t<joint joint=\"gripper0_right_right_outer_knuckle_joint\" coef=\"1\" />\n\t\t\t<joint joint=\"gripper0_right_right_inner_finger_joint\" coef=\"-3\" />\n\t\t\t<joint joint=\"gripper0_right_right_inner_knuckle_joint\" coef=\"1\" />\n\t\t</fixed>\n\t"
+    ],
+    "added_joint_couplings": [
+      {
+        "name": "gripper0_right_left_inner_finger_joint_parallel",
+        "joint1": "gripper0_right_left_inner_finger_joint",
+        "joint2": "gripper0_right_finger_joint",
+        "polycoef": "0 -1 0 0 0",
+        "solref": ".004 1",
+        "solimp": ".99 .999 .001"
+      },
+      {
+        "name": "gripper0_right_left_inner_knuckle_joint_parallel",
+        "joint1": "gripper0_right_left_inner_knuckle_joint",
+        "joint2": "gripper0_right_finger_joint",
+        "polycoef": "0 1 0 0 0",
+        "solref": ".004 1",
+        "solimp": ".99 .999 .001"
+      },
+      {
+        "name": "gripper0_right_right_inner_finger_joint_parallel",
+        "joint1": "gripper0_right_right_inner_finger_joint",
+        "joint2": "gripper0_right_right_outer_knuckle_joint",
+        "polycoef": "0 -1 0 0 0",
+        "solref": ".004 1",
+        "solimp": ".99 .999 .001"
+      },
+      {
+        "name": "gripper0_right_right_inner_knuckle_joint_parallel",
+        "joint1": "gripper0_right_right_inner_knuckle_joint",
+        "joint2": "gripper0_right_right_outer_knuckle_joint",
+        "polycoef": "0 1 0 0 0",
+        "solref": ".004 1",
+        "solimp": ".99 .999 .001"
+      }
+    ],
+    "joint_armature_kg_m2": 0.0001,
+    "joint_ranges_changed": false,
+    "mass_or_friction_changed": false,
+    "source_assets_changed": false,
+    "object_attachment": false,
+    "scene_collision_masks_changed": false,
+    "excluded_linkage_contacts": [
+      [
+        "gripper0_right_left_inner_finger",
+        "gripper0_right_left_inner_knuckle"
+      ],
+      [
+        "gripper0_right_right_inner_finger",
+        "gripper0_right_right_inner_knuckle"
+      ]
+    ]
+  },
+  "nominal_joint_limit_diagnostics": {
+    "max_violation_rad": 0.0,
+    "allowed_numerical_residual_rad": 0.01,
+    "physics_steps_audited": 33500
+  },
+  "acquisition_status": "SUCCESS",
+  "acquisition_attachment_used": false,
+  "attachment_mode": "KINEMATIC",
+  "attachment_phase": "POST_VALIDATED_GRASP",
+  "final_robot_q": [
+    0.0787051431096998,
+    -1.1155515432892082,
+    1.683964650037258,
+    -2.255281605873817,
+    -1.55318524216208,
+    0.07761635641477994
+  ]
+}

@@ -159,18 +159,33 @@ class CatalogContext(SpoonContext):
     def preshape(self):
         self.stage='PRESHAPE';q=self.data.qpos[self.arm_ids].copy()
         opening=-self.recipe.preshape_closure_command
-        for value in np.linspace(1.,opening,100):self.step(q,float(value))
-        for _ in range(75):
-            aperture=self.runtime.fingerpad_separation_m()
-            correction=np.clip(10.*(self.recipe.preshape_aperture_m-aperture),-.025,.025)
-            opening=float(np.clip(opening+correction,-1.,1.))
-            self.step(q,opening)
+        # 0912: 한계값(1.)에서 목표로 직행하고 정착 구간이 없었다. Robotiq 85 는
+        # 패시브 링키지라 직전 동작이 남긴 과도 상태를 안고 들어오면 그 구간에서
+        # 관절이 한계를 타고 넘고, 모든 물리 서브스텝을 보는 audit_hand_range 가
+        # 이를 잡는다 (c3_1 머그 PRESHAPE 0.011472 rad, 허용 0.01). 파지 하나만
+        # 도는 스모크는 과도 상태가 작아 표가 안 났다.
+        #
+        # spoon_runtime.preshape_spoon 이 같은 문제를 이미 풀어 두었고 (주석:
+        # "Stabilize at the half-range controller target before arm travel"),
+        # 6개 경로에서 검증됐다. 중간(0.)을 거쳐 거기서 멈춰 링키지를 안정시킨
+        # 뒤 목표로 가고 다시 멈추는 그 순서를 그대로 쓴다.
+        for value in np.linspace(1.,0.,150):self.step(q,float(value))
+        for _ in range(100):self.step(q,0.)
+        for value in np.linspace(0.,opening,100):self.step(q,float(value))
+        for _ in range(150):self.step(q,opening)
+        # 0912: 여기에 이득 10, 틱당 +-0.025 짜리 빠른 루프가 75틱 먼저 돌았다.
+        # 명령이 손가락 응답보다 빠르게 움직여 목표 개구를 지나치고 기계적
+        # 스토퍼를 파고들었다 (c3_1 머그: 명령이 +0.60 에서 -0.7733 까지 가고
+        # 개구 86.87mm, Robotiq 85 최대 행정 85mm, 관절이 하한 0 을 0.010987 rad
+        # 침범해 audit_hand_range 가 중단). 아래 느린 루프는 그 빠른 루프가
+        # 오실레이션으로 끝나는 것을 수습하려고 이미 있던 것이고, 이득 1 에
+        # 틱당 +-0.005, 도달을 20틱 연속으로 요구한다. 빠른 단계를 없애고
+        # 처음부터 이쪽으로 수렴시킨다. 스푼 2F 는 애초에 피드백 루프 없이
+        # 열린 루프 명령과 정착만으로 개구를 맞춘다 (preshape_spoon).
         aperture=self.runtime.fingerpad_separation_m()
         if abs(aperture-self.recipe.preshape_aperture_m)>.005:
-            # The original fixed wait can end during a finger oscillation.
-            # Recover with a slower aperture loop and require sustained arrival.
             recovery=[];stable=0;start=float(self.data.time)
-            for _ in range(200):
+            for _ in range(300):
                 correction=np.clip(self.recipe.preshape_aperture_m-aperture,-.005,.005)
                 opening=float(np.clip(opening+correction,-1.,1.))
                 self.step(q,opening)

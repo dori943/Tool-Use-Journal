@@ -657,6 +657,14 @@ class MotionPlanBuilder:
                     "eef_orientation_tolerance_rad": (
                         request.constraints.orientation_tolerance_rad
                     ),
+                    # An arm carrying an object lags its commanded pose, and
+                    # the default two seconds cut the final descent off 10.6 mm
+                    # short with no collision anywhere -- the whole task then
+                    # failed on its last release (c3_1 apple).  The wait is
+                    # simulated time and ends as soon as the pose converges, so
+                    # a longer budget costs nothing when tracking is good.
+                    # (0912: bad7410 이 넣은 줄인데 머지에서 사라져 복구한다.)
+                    "max_wait_s": 5.0,
                 }
             tracking_settle: dict[str, float | int] | None = None
             if raw_tracking_settle is not None:
