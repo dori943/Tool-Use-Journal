@@ -101,6 +101,11 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     c.vacuum_attachment_record = None
     c.three_finger_force_hold, c.two_finger_force_hold = False, False
     c.three_finger_commands, c.two_finger_command = None, 0.
+    # Shared 3F force-hold clamp bounds. The runtime step reads these, but only
+    # the spoon path (execute_spoon) initialised them; a catalog 3F grasp (bread
+    # /apple/mug) hit AttributeError. Initialise here for every context; the
+    # step leaves the clamp inactive while they stay None.
+    c.three_finger_hold_command_min = c.three_finger_hold_command_max = None
     c.physics_steps_audited, c.maximum_physics_joint_error = 0, 0.
     c.max_runtime_s = c.execution_started = None
     c.timing = {"physics_timestep_s": float(c.model.opt.timestep), "control_timestep_s": float(env.control_timestep), "clock_source": "MUJOCO_DATA_TIME"}

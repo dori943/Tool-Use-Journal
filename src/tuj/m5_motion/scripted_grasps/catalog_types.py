@@ -34,6 +34,11 @@ class CatalogRecipe:
     two_finger_force_gain: float = .002
     three_finger_force_targets_n: tuple = (6.,3.,3.)
     three_finger_force_gain: float = .002
+    # Force-integrator deadband (N) shared by the 3F force hold
+    # (update_three_finger_commands).  Upstream added this to the spoon recipe
+    # but not to CatalogRecipe, so a catalog 3F grasp (e.g. bread) raised
+    # AttributeError at CLOSE.  Same default as the spoon recipe.
+    three_finger_force_deadband_n: float = .5
     prelift_stabilization_s: float = .5
     settle_s: float = 1.
     hold_s: float = 5.
@@ -48,6 +53,14 @@ class CatalogRecipe:
     maximum_support_separation_penetration_m: float = .002
     maximum_joint_limit_error_rad: float = .01
     suction_command: float = 1.
+    # Minimum simultaneous cup-object contacts for the vacuum contact gate.
+    # A multi-finger grasp naturally makes several contacts, but a single
+    # suction cup pressed flat on a flat surface makes only ONE MuJoCo contact
+    # point, so the historical hard-coded >=3 could never arm for a flat disc
+    # (plate: contact_count=1 with suction_alignment=0.999 and 40 N of force).
+    # Default stays 3 so existing recipes are unchanged; a flat single-cup
+    # target sets this to 1.
+    vacuum_min_contacts: int = 3
 
     @property
     def model_class(self):
