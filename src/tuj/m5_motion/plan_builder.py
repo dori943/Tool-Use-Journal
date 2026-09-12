@@ -51,6 +51,21 @@ class MotionPlanBuildError(ValueError):
     pass
 
 
+# Contact-sensitive settle EEF tolerance used when the arm is carrying an
+# attached object.  The absolute joint-position controller holds a
+# steady-state tracking error under the object's gravitational load that the
+# tight free-arm default (constraints.position_tolerance_m, 5 mm) cannot reach
+# even at the maximum retention stiffness (post_grasp_arm_kp caps at kp=300):
+# a vacuum-held plate placed first into an empty tray settled with joint
+# velocities ~1e-6 (fully stopped) yet a 9.2 mm EEF residual, so the
+# contact-sensitive place gate timed out (TRACKING_NOT_SETTLED) although the
+# arm was not going to move any closer.  A region place lowers the object into
+# a large tray, not a precision insertion, so held-object convergence keyframes
+# use this looser tolerance; free-arm approaches and grasp descents keep the
+# tight default.
+HELD_OBJECT_SETTLE_EEF_TOLERANCE_M = 0.015
+
+
 def _segment_type(keyframe_type: KeyframeType) -> SegmentType:
     mapping = {
         KeyframeType.PRE_GRASP: SegmentType.APPROACH,
@@ -621,18 +636,27 @@ class MotionPlanBuilder:
                 requires_endpoint_convergence(event_type)
                 for event_type in node.keyframe.events_after
             ):
+                # A held object loads the arm; relax only the EEF position
+                # tolerance for these carried-object convergence gates (see
+                # HELD_OBJECT_SETTLE_EEF_TOLERANCE_M).  Free-arm motions keep
+                # the tight default.
+                convergence_eef_tolerance_m = (
+                    request.constraints.position_tolerance_m
+                )
+                carrying_object = (
+                    request.world.robot_state.attached_object_id is not None
+                    or request.world.robot_state.held_tool_id is not None
+                )
+                if carrying_object:
+                    convergence_eef_tolerance_m = max(
+                        convergence_eef_tolerance_m,
+                        HELD_OBJECT_SETTLE_EEF_TOLERANCE_M,
+                    )
                 raw_tracking_settle = {
-                    "eef_tolerance_m": request.constraints.position_tolerance_m,
+                    "eef_tolerance_m": convergence_eef_tolerance_m,
                     "eef_orientation_tolerance_rad": (
                         request.constraints.orientation_tolerance_rad
                     ),
-                    # An arm carrying an object lags its commanded pose, and
-                    # the default two seconds cut the final descent off 10.6 mm
-                    # short with no collision anywhere -- the whole task then
-                    # failed on its last release (c3_1 apple).  The wait is
-                    # simulated time and ends as soon as the pose converges, so
-                    # a longer budget costs nothing when tracking is good.
-                    "max_wait_s": 5.0,
                 }
             tracking_settle: dict[str, float | int] | None = None
             if raw_tracking_settle is not None:

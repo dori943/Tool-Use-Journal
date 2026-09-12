@@ -1225,6 +1225,50 @@ class ToolUseJournalCollisionContextFactory:
         from tuj.m5_motion.release_separation import bind_release_separation
 
         bind_release_separation(self.compiler, request, bound, contexts, target)
+        # Withdrawal from a crowded region.  After the held object is released,
+        # the empty gripper retreats past objects already packed into the same
+        # region.  The descent already tolerates the HELD object contacting
+        # those occupants (the task packs everything into one region and permits
+        # overlap); extend the identical tolerance to the withdrawing GRIPPER so
+        # a post-release retreat that grazes a neighbour -- e.g. an open 2F
+        # finger passing 2.5 mm from an already-placed spoon while lifting away
+        # -- is not collision-filtered.  Scoped to the release/retreat contexts
+        # of this place only (every keyframe after the PLACE); approach,
+        # transport and free-space margins are unchanged, and a single-object
+        # region has no occupants so those tasks are untouched.
+        occupants = self._region_occupant_ids(request, target)
+        occupant_pairs = self._contact_pairs(active_ee, occupants) if occupants else []
+        if occupant_pairs:
+            for candidate in bound.candidates:
+                place_kf = next(
+                    (
+                        keyframe
+                        for keyframe in candidate.keyframes
+                        if keyframe.keyframe_type is KeyframeType.PLACE
+                    ),
+                    None,
+                )
+                if place_kf is None:
+                    continue
+                start = candidate.keyframes.index(place_kf) + 1
+                retreat_context_ids = {
+                    context_id
+                    for keyframe in candidate.keyframes[start:]
+                    for context_id in (
+                        keyframe.collision_context_id,
+                        keyframe.collision_context_after_events_id,
+                    )
+                    if context_id in contexts
+                }
+                for context_id in retreat_context_ids:
+                    ctx = contexts[context_id]
+                    merged = list(ctx.allowed_collision_pairs)
+                    for pair in occupant_pairs:
+                        if pair not in merged:
+                            merged.append(pair)
+                    contexts[context_id] = ctx.model_copy(
+                        update={"allowed_collision_pairs": merged}
+                    )
         return _stamp_bound_artifact(request, source, bound), contexts
 
     def _bind_ee_exchange(
