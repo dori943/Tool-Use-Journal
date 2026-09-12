@@ -45,3 +45,17 @@ def test_unsupported_transmission_fails_explicitly():
     c=context();c.model.actuator_gear[0,0]=2.
     with pytest.raises(ValueError,match='UNSUPPORTED_POSITION_TRANSMISSION'):
         open_joint_positions(c)
+
+
+@pytest.mark.parametrize('boundary', ['lower', 'upper'])
+def test_open_linkage_converges_at_joint_boundary_from_grasped_state(boundary):
+    c=context(.5 if boundary == 'upper' else 1.)
+    c.data.qpos[:]=[.8,.4]
+    if boundary == 'lower':
+        c.model.actuator_ctrlrange[0]=[-1.,0.]
+    before=c.data.qpos.copy()
+    result=open_joint_positions(c)
+    expected=0. if boundary == 'lower' else .5
+    assert result['passive']==pytest.approx(expected,abs=1e-8)
+    assert result['passive']==pytest.approx(.5*result['active'],abs=1e-8)
+    np.testing.assert_array_equal(c.data.qpos,before)

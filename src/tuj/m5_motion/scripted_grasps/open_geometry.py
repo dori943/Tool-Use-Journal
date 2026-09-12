@@ -51,8 +51,10 @@ def open_joint_positions(context):
         initial = np.clip(probe.qpos[addresses], lower, upper)
         if not len(residual(initial)):
             raise ValueError('OPEN_GEOMETRY_PASSIVE_CONSTRAINT_REQUIRED')
+        # At a joint bound, the scaled gradient can vanish before the linkage
+        # residual meets our geometric tolerance. Keep the residual gate below.
         solved = least_squares(residual, initial, bounds=(lower, upper), max_nfev=100,
-                               ftol=1e-12, xtol=1e-12, gtol=1e-12)
+                               ftol=1e-12, xtol=1e-12, gtol=None)
         if not solved.success or np.max(np.abs(residual(solved.x))) > 1e-8:
             raise ValueError('OPEN_GEOMETRY_LINKAGE_NOT_SOLVED')
     result = {name: float(probe.qpos[model.jnt_qposadr[model.joint(name).id]])
