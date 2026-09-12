@@ -1,0 +1,1145 @@
+{
+  "subgoal_id": "SG1_s3",
+  "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라.",
+  "goal": "대상 1개를 obj_tray_a_tray_a로 옮긴다 (3/4)",
+  "subgoal_kind": "relocate",
+  "nodes": {
+    "obj_fork_a_fork_a": {
+      "id": "obj_fork_a_fork_a",
+      "canonical_id": "fork_a",
+      "class": "fork_a",
+      "source_name": "fork_a",
+      "center_mm": [
+        585.7,
+        -130.4,
+        926.7
+      ],
+      "bbox_mm": [
+        86.5,
+        20.5,
+        5.2
+      ],
+      "geometry": {
+        "length_mm": 86.4,
+        "diameter_mm": null,
+        "extents_mm": [
+          86.4,
+          20.5,
+          5.5
+        ],
+        "height_z_mm": 5.2,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.07,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          86.5,
+          20.5
+        ],
+        "height_mm": 5.2,
+        "center": [
+          585.7,
+          -130.4,
+          926.7
+        ],
+        "aabb_size": [
+          86.5,
+          20.5,
+          5.2
+        ]
+      },
+      "material": "stainless steel",
+      "density_kgm3": 4327.1,
+      "mass_kg": 0.006,
+      "youngs_gpa": 104.69,
+      "mu": {
+        "mu": 0.43,
+        "stage": 0,
+        "material": "stainless steel",
+        "rms_mm": 0.07
+      },
+      "confidence": 0.257,
+      "geometry_source": "current_observation",
+      "intrinsic_source": "memory",
+      "mass_source": "shell_mass_integral",
+      "mass_range_kg": [
+        0.003,
+        0.009
+      ],
+      "materials_topk": [
+        {
+          "name": "stainless steel",
+          "prob": 0.257,
+          "density_kgm3": [
+            7750.0,
+            8050.0
+          ],
+          "thickness_cm": [
+            0.2,
+            0.5
+          ]
+        },
+        {
+          "name": "wood",
+          "prob": 0.229,
+          "density_kgm3": [
+            500.0,
+            900.0
+          ],
+          "thickness_cm": [
+            1.0,
+            2.0
+          ]
+        },
+        {
+          "name": "aluminum",
+          "prob": 0.143,
+          "density_kgm3": [
+            2700.0,
+            2700.0
+          ],
+          "thickness_cm": [
+            0.2,
+            0.5
+          ]
+        },
+        {
+          "name": "plastic",
+          "prob": 0.171,
+          "density_kgm3": [
+            950.0,
+            1150.0
+          ],
+          "thickness_cm": [
+            1.0,
+            2.0
+          ]
+        },
+        {
+          "name": "carbon steel",
+          "prob": 0.2,
+          "density_kgm3": [
+            7850.0,
+            7850.0
+          ],
+          "thickness_cm": [
+            0.2,
+            0.5
+          ]
+        }
+      ],
+      "caption": "Metal fork with wooden handle",
+      "grounding_source": "memory",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.994,
+          "margin_unit": "kg",
+          "reason": "질량 0.006 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 20.5,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.006,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.068,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.494,
+          "margin_unit": "kg",
+          "reason": "질량 0.006 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 20.5,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.006,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.068,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": -98.4,
+          "margin_unit": "mm",
+          "reason": "접촉면 폭 20 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.07,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.006,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 20.5,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 600.0,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 250.0
+      },
+      "predicates": {
+        "top_exposed": {
+          "type": "top_exposed",
+          "value": true,
+          "blockers": [],
+          "pass": true
+        },
+        "clear": {
+          "type": "clear",
+          "value": true,
+          "occupants": [],
+          "pass": true
+        },
+        "flat_face": {
+          "type": "flat_face",
+          "value": false,
+          "pass": false,
+          "face_mm": 20.5,
+          "check": "rms_0.07<=2.0 & patch_99.9<=1.5 & face_20.5>=40.0"
+        }
+      }
+    },
+    "obj_tray_a_tray_a": {
+      "id": "obj_tray_a_tray_a",
+      "canonical_id": "tray_a",
+      "class": "tray_a",
+      "source_name": "tray_a",
+      "center_mm": [
+        359.7,
+        -81.7,
+        937.8
+      ],
+      "bbox_mm": [
+        204.9,
+        315.6,
+        25.7
+      ],
+      "geometry": {
+        "length_mm": 319.7,
+        "diameter_mm": null,
+        "extents_mm": [
+          319.7,
+          213.6,
+          29.2
+        ],
+        "height_z_mm": 25.7,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.47,
+        "seal_patch_rms_mm": 1.79,
+        "footprint_mm": [
+          204.9,
+          315.6
+        ],
+        "height_mm": 25.7,
+        "center": [
+          359.7,
+          -81.7,
+          937.8
+        ],
+        "aabb_size": [
+          204.9,
+          315.6,
+          25.7
+        ]
+      },
+      "material": "ceramic",
+      "density_kgm3": 2389.1,
+      "mass_kg": 1.17,
+      "youngs_gpa": 55.73,
+      "mu": {
+        "mu": 0.439,
+        "stage": 0,
+        "material": "ceramic",
+        "rms_mm": 0.47
+      },
+      "confidence": 0.25,
+      "geometry_source": "current_observation",
+      "intrinsic_source": "memory",
+      "mass_source": "shell_mass_integral",
+      "mass_range_kg": [
+        0.379,
+        1.961
+      ],
+      "materials_topk": [
+        {
+          "name": "ceramic",
+          "prob": 0.25,
+          "density_kgm3": [
+            1800.0,
+            2400.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.5
+          ]
+        },
+        {
+          "name": "glass",
+          "prob": 0.219,
+          "density_kgm3": [
+            2400.0,
+            2800.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.5
+          ]
+        },
+        {
+          "name": "metal",
+          "prob": 0.156,
+          "density_kgm3": [
+            2700.0,
+            8000.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.5
+          ]
+        },
+        {
+          "name": "silicone",
+          "prob": 0.188,
+          "density_kgm3": [
+            1100.0,
+            1500.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.5
+          ]
+        },
+        {
+          "name": "plastic",
+          "prob": 0.188,
+          "density_kgm3": [
+            800.0,
+            1500.0
+          ],
+          "thickness_cm": [
+            0.5,
+            1.5
+          ]
+        }
+      ],
+      "caption": "Rectangular baking dish with handles.",
+      "grounding_source": "memory",
+      "ee": {
+        "2F": {
+          "feasible": false,
+          "margin": -119.9,
+          "margin_unit": "mm",
+          "reason": "치수 205 vs 개구 85mm",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 204.9,
+              "limit": 85.0,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 1.17,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 13.073,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": false,
+          "margin": -64.9,
+          "margin_unit": "mm",
+          "reason": "치수 205 vs 개구 140mm",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 204.9,
+              "limit": 140.0,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 1.17,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 13.073,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": -0.67,
+          "margin_unit": "kg",
+          "reason": "질량 1.17 vs 페이로드 0.5kg; 흡착 패치 RMS 1.79 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.47,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 1.17,
+              "limit": 0.5,
+              "pass": false
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 213.6,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 1.79,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 368.9,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 481.1
+      },
+      "predicates": {
+        "top_exposed": {
+          "type": "top_exposed",
+          "value": true,
+          "blockers": [],
+          "pass": true
+        },
+        "clear": {
+          "type": "clear",
+          "value": true,
+          "occupants": [],
+          "pass": true
+        },
+        "flat_face": {
+          "type": "flat_face",
+          "value": false,
+          "pass": false,
+          "face_mm": 204.9,
+          "check": "rms_0.47<=2.0 & patch_1.79<=1.5 & face_204.9>=40.0"
+        }
+      }
+    }
+  },
+  "edges": [
+    {
+      "from": "obj_fork_a_fork_a",
+      "to": "obj_tray_a_tray_a",
+      "type": "near",
+      "gap_mm": 80.3
+    }
+  ],
+  "roles": {
+    "target": [
+      "obj_fork_a_fork_a"
+    ],
+    "container": "obj_tray_a_tray_a",
+    "tool_candidates": [],
+    "selected_tool": null,
+    "selection_evidence": null
+  },
+  "details": [
+    {
+      "detail_id": "SG1_s3_d1",
+      "action_type": "acquire",
+      "binding": {
+        "?o": "obj_fork_a_fork_a"
+      },
+      "group_id": "G_SG1_s3",
+      "pre": [
+        {
+          "id": "SG1_s3_d1_p0",
+          "expr": "reachable(obj_fork_a_fork_a)",
+          "head": "reachable",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_fork_a_fork_a",
+              "reachable": true,
+              "margin_mm": 250.0
+            }
+          ]
+        },
+        {
+          "id": "SG1_s3_d1_p1",
+          "expr": "top_exposed(obj_fork_a_fork_a)",
+          "head": "top_exposed",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_fork_a_fork_a",
+              "top_exposed": true,
+              "blockers": []
+            }
+          ]
+        },
+        {
+          "id": "SG1_s3_d1_p2",
+          "expr": "ee_usable(?EE, obj_fork_a_fork_a)",
+          "head": "ee_usable",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_fork_a_fork_a",
+              "feasible_ees": [
+                "2F",
+                "3F"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SG1_s3_d1_p3",
+          "expr": "graspable_on_support(?EE, obj_fork_a_fork_a)",
+          "head": "graspable_on_support",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_fork_a_fork_a",
+              "graspable_on_support": true,
+              "graspable_ees": [
+                "2F",
+                "3F",
+                "vac"
+              ],
+              "supports": [],
+              "height_mm": 5.2
+            }
+          ]
+        },
+        {
+          "id": "SG1_s3_d1_p4",
+          "expr": "batch_feasible(?EE, obj_fork_a_fork_a)",
+          "head": "batch_feasible",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "actor": {
+                "type": "ee_pool"
+              },
+              "feasible": true,
+              "binding_check": "ee_pool_one_per_grasp",
+              "partition": [
+                [
+                  "obj_fork_a_fork_a"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SG1_s3_d1_p5",
+          "expr": "hand_empty",
+          "head": "hand_empty",
+          "eval_by": "m2"
+        }
+      ],
+      "establish": [
+        "holding(obj_fork_a_fork_a)"
+      ],
+      "destroy": [
+        "hand_empty"
+      ]
+    },
+    {
+      "detail_id": "SG1_s3_d2",
+      "action_type": "transport",
+      "binding": {
+        "?o": "obj_fork_a_fork_a",
+        "?r": "obj_tray_a_tray_a"
+      },
+      "group_id": "G_SG1_s3",
+      "action_parameters": {
+        "placement_slot": {
+          "region": "obj_tray_a_tray_a",
+          "target": "obj_fork_a_fork_a",
+          "uv": [
+            0.0,
+            0.9522
+          ],
+          "offset_mm": [
+            0.0,
+            146.4
+          ],
+          "row": 2,
+          "source": "m2_container_layout"
+        }
+      },
+      "pre": [
+        {
+          "id": "SG1_s3_d2_p0",
+          "expr": "holding(obj_fork_a_fork_a)",
+          "head": "holding",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG1_s3_d2_p1",
+          "expr": "act_space_clear(?EE, obj_fork_a_fork_a, obj_tray_a_tray_a)",
+          "head": "act_space_clear",
+          "eval_by": "motion"
+        },
+        {
+          "id": "SG1_s3_d2_p2",
+          "expr": "path_clear(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+          "head": "path_clear",
+          "eval_by": "motion"
+        }
+      ],
+      "establish": [
+        "above(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+      ],
+      "destroy": []
+    },
+    {
+      "detail_id": "SG1_s3_d3",
+      "action_type": "place",
+      "binding": {
+        "?o": "obj_fork_a_fork_a",
+        "?r": "obj_tray_a_tray_a"
+      },
+      "group_id": "G_SG1_s3",
+      "action_parameters": {
+        "placement_slot": {
+          "region": "obj_tray_a_tray_a",
+          "target": "obj_fork_a_fork_a",
+          "uv": [
+            0.0,
+            0.9522
+          ],
+          "offset_mm": [
+            0.0,
+            146.4
+          ],
+          "row": 2,
+          "source": "m2_container_layout"
+        }
+      },
+      "pre": [
+        {
+          "id": "SG1_s3_d3_p0",
+          "expr": "holding(obj_fork_a_fork_a)",
+          "head": "holding",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG1_s3_d3_p1",
+          "expr": "above(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+          "head": "above",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG1_s3_d3_p2",
+          "expr": "fits(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+          "head": "fits",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_fork_a_fork_a",
+              "check": "opening_196.9[bbox-2*wall(4.0)] - footprint_20.5",
+              "value_mm": 176.4,
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "SG1_s3_d3_p3",
+          "expr": "clear(obj_tray_a_tray_a)",
+          "head": "clear",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_tray_a_tray_a",
+              "check": null,
+              "value_mm": null,
+              "pass": true
+            }
+          ]
+        }
+      ],
+      "establish": [
+        "in(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+        "hand_empty"
+      ],
+      "destroy": [
+        "holding(obj_fork_a_fork_a)",
+        "above(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+      ]
+    }
+  ],
+  "partial_order": [
+    {
+      "from": "SG1_s3_d1",
+      "to": "SG1_s3_d2",
+      "why": "causal_link: holding(obj_fork_a_fork_a)"
+    },
+    {
+      "from": "SG1_s3_d1",
+      "to": "SG1_s3_d3",
+      "why": "causal_link: holding(obj_fork_a_fork_a)"
+    },
+    {
+      "from": "SG1_s3_d2",
+      "to": "SG1_s3_d3",
+      "why": "causal_link: above(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+    }
+  ],
+  "mutex": [],
+  "invariants": [
+    {
+      "id": "INV_SG1_s3",
+      "expr": "in(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+      "check_at": "final"
+    }
+  ],
+  "measurements": [
+    {
+      "subgoal_id": "SG1_s3",
+      "queried_by": "SG1_s3_d1_p0",
+      "node_id": "obj_fork_a_fork_a",
+      "geometry": {
+        "length_mm": 86.4,
+        "diameter_mm": null,
+        "extents_mm": [
+          86.4,
+          20.5,
+          5.5
+        ],
+        "height_z_mm": 5.2,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.07,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          86.5,
+          20.5
+        ],
+        "height_mm": 5.2,
+        "center": [
+          585.7,
+          -130.4,
+          926.7
+        ],
+        "aabb_size": [
+          86.5,
+          20.5,
+          5.2
+        ]
+      },
+      "material": "stainless steel",
+      "density_kgm3": 4327.1,
+      "mass_kg": 0.006,
+      "youngs_gpa": 104.69,
+      "mu": {
+        "mu": 0.43,
+        "stage": 0,
+        "material": "stainless steel",
+        "rms_mm": 0.07
+      },
+      "confidence": 0.257,
+      "caption": "Metal fork with wooden handle",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.994,
+          "margin_unit": "kg",
+          "reason": "질량 0.006 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 20.5,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.006,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.068,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.494,
+          "margin_unit": "kg",
+          "reason": "질량 0.006 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 20.5,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.006,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.068,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": -98.4,
+          "margin_unit": "mm",
+          "reason": "접촉면 폭 20 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.07,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.006,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 20.5,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 600.0,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 250.0
+      }
+    },
+    {
+      "subgoal_id": "SG1_s3",
+      "queried_by": "SG1_s3_d1_p1",
+      "node_id": "obj_fork_a_fork_a",
+      "type": "top_exposed",
+      "value": true,
+      "pass": true,
+      "blockers": []
+    },
+    {
+      "subgoal_id": "SG1_s3",
+      "queried_by": "SG1_s3_d1_p2",
+      "node_id": "obj_fork_a_fork_a",
+      "geometry": {
+        "length_mm": 86.4,
+        "diameter_mm": null,
+        "extents_mm": [
+          86.4,
+          20.5,
+          5.5
+        ],
+        "height_z_mm": 5.2,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.07,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          86.5,
+          20.5
+        ],
+        "height_mm": 5.2,
+        "center": [
+          585.7,
+          -130.4,
+          926.7
+        ],
+        "aabb_size": [
+          86.5,
+          20.5,
+          5.2
+        ]
+      },
+      "material": "stainless steel",
+      "density_kgm3": 4327.1,
+      "mass_kg": 0.006,
+      "youngs_gpa": 104.69,
+      "mu": {
+        "mu": 0.43,
+        "stage": 0,
+        "material": "stainless steel",
+        "rms_mm": 0.07
+      },
+      "confidence": 0.257,
+      "caption": "Metal fork with wooden handle",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.994,
+          "margin_unit": "kg",
+          "reason": "질량 0.006 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 20.5,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.006,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.068,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.494,
+          "margin_unit": "kg",
+          "reason": "질량 0.006 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 20.5,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.006,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.068,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": -98.4,
+          "margin_unit": "mm",
+          "reason": "접촉면 폭 20 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.07,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.006,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 20.5,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 600.0,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 250.0
+      }
+    },
+    {
+      "subgoal_id": "SG1_s3",
+      "queried_by": "SG1_s3_d1_p3",
+      "node_id": "obj_fork_a_fork_a",
+      "type": "graspable_on_support",
+      "value": true,
+      "pass": true,
+      "graspable_ees": [
+        "2F",
+        "3F",
+        "vac"
+      ],
+      "per_ee": {
+        "2F": {
+          "type": "graspable_on_support",
+          "ee_id": "2F",
+          "supports": [],
+          "height_mm": 5.2,
+          "value": true,
+          "pass": true,
+          "check": "no_support_node"
+        },
+        "3F": {
+          "type": "graspable_on_support",
+          "ee_id": "3F",
+          "supports": [],
+          "height_mm": 5.2,
+          "value": true,
+          "pass": true,
+          "check": "no_support_node"
+        },
+        "vac": {
+          "type": "graspable_on_support",
+          "ee_id": "vac",
+          "supports": [],
+          "height_mm": 5.2,
+          "value": true,
+          "pass": true,
+          "check": "no_support_node"
+        }
+      }
+    },
+    {
+      "subgoal_id": "SG1_s3",
+      "queried_by": "SG1_s3_d1_p4",
+      "kind": "batch",
+      "actor": {
+        "type": "ee_pool"
+      },
+      "feasible": true,
+      "checks": [
+        {
+          "rule": "ee_pool_one_per_grasp",
+          "capacity": 1,
+          "demand": 1,
+          "unit": "count",
+          "margin": 0,
+          "pass": true
+        }
+      ],
+      "binding_check": "ee_pool_one_per_grasp",
+      "partition": [
+        [
+          "obj_fork_a_fork_a"
+        ]
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3",
+      "queried_by": "SG1_s3_d3_p2",
+      "from": "obj_fork_a_fork_a",
+      "to": "obj_tray_a_tray_a",
+      "type": "fits_inside",
+      "value_mm": 176.4,
+      "check": "opening_196.9[bbox-2*wall(4.0)] - footprint_20.5",
+      "pass": true
+    },
+    {
+      "subgoal_id": "SG1_s3",
+      "queried_by": "SG1_s3_d3_p3",
+      "node_id": "obj_tray_a_tray_a",
+      "type": "clear",
+      "value": true,
+      "pass": true,
+      "occupants": [],
+      "depth_clearance": [
+        {
+          "type": "clearance",
+          "value_mm": 176.4,
+          "check": "floor_fit(open_196.9[bbox-2*wall(4.0)]-base_20.5) & walled(container_25.7>=h/2_2.6)",
+          "pass": true
+        }
+      ],
+      "unfit_members": []
+    }
+  ],
+  "split_from": "SG1",
+  "split_index": 3
+}

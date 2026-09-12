@@ -32,12 +32,29 @@ def _rim_offset_fraction(size_m=PLATE_EXPECTED_SIZE_M):
 
 
 def plate_vac_c2_1_recipe():
-    """Flat top-face vac contact for C2_1 / C1_1 vac alternatives."""
+    """Flat top-face vac contact for C2_1 sorting plates."""
     return CatalogRecipe(
         'plate', 'c2_1', 'vac',
         C2_1_PLATE_EXPECTED_SIZE_M,
         offset_fraction=(0., 0., .5),
         offset_m=(0., 0., -.0005),
+        two_finger_parallel_linkage=False,
+        post_grasp_arm_kp=300.,
+    )
+
+
+def plate_vac_c1_1_recipe():
+    """Flat top-face vac contact for C1_1 LegoSweep plates.
+
+    Do not use a negative seating offset: C1_1 plates rest on ``table_collision``,
+    and immersing the cup presses the free plate into the table. CLOSE then
+    reports ~1 cm depression and early-LIFT fails on residual table penetration.
+    """
+    return CatalogRecipe(
+        'plate', 'c1_1', 'vac',
+        C2_1_PLATE_EXPECTED_SIZE_M,
+        offset_fraction=(0., 0., .5),
+        offset_m=(0., 0., 0.),
         two_finger_parallel_linkage=False,
         post_grasp_arm_kp=300.,
     )
@@ -61,7 +78,9 @@ def plate_vac_recipe(task_id=None):
     """Dispatch by task id; default remains the C3_2 rim recipe used by local tests."""
     if task_id in (None, 'c3_2'):
         return plate_vac_c3_2_recipe()
-    if task_id in {'c2_1', 'c1_1'}:
+    if task_id == 'c1_1':
+        return plate_vac_c1_1_recipe()
+    if task_id == 'c2_1':
         return plate_vac_c2_1_recipe()
     raise ValueError(f'UNSUPPORTED_PLATE_VAC_TASK: {task_id!r}')
 

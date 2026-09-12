@@ -590,6 +590,7 @@ class ToolUseJournalEERuntime:
         self._contact_friction_retention: Any | None = None
         self._breakable_runtime: _BreakableAttachmentRuntime | None = None
         self._last_attachment_break: AttachmentBreakObservation | None = None
+        self._vac_attach_diag_logged: set[tuple[str, str]] = set()
         self._render_callback: Callable[[object], None] | None = None
         self._set_declared_active_ee(env, self._active_ee)
         self._hidden_rack_ee = self._apply_rack_visibility(
@@ -712,6 +713,147 @@ class ToolUseJournalEERuntime:
     @property
     def attached_object_id(self) -> str | None:
         return self._attachment.object_id if self._attachment is not None else None
+
+    @property
+    def native_adhesion_suppressed(self) -> bool:
+        """True when vac holds an attached body via weld/kinematic lock.
+
+        Native MuJoCo adhesion pulls *every* geom contacting the vacuum body.
+        After the intended target is attached, adhesion must stay off so nearby
+        free bodies (e.g. sweep targets under a thin plate) are not sucked onto
+        the cup; retention is the attachment, not the adhesion actuator.
+        """
+
+        return self._active_ee == "vac" and self._attachment is not None
+
+    def vac_gripper_action_for_command(self, command: float) -> float:
+        """Map a logical suction command to the robosuite vac gripper action.
+
+        Logical ``gripper_command`` / ``grasp_engaged`` may remain suction-on
+        while the native adhesion actuator action is forced to ``-1`` (off)
+        once an attachment lock is active.
+        """
+
+        if self.native_adhesion_suppressed:
+            return -1.0
+        return float(command)
+
+    def suppress_native_adhesion_actuators(self) -> None:
+        """Zero vac adhesion actuator ctrl while an attachment lock is active."""
+
+        if not self.native_adhesion_suppressed:
+            return
+        model, data = _raw_model_data(self.env)
+        for actuator_id in range(int(model.nu)):
+            if int(model.actuator_trntype[actuator_id]) != int(
+                mujoco.mjtTrn.mjTRN_BODY
+            ):
+                continue
+            data.ctrl[actuator_id] = 0.0
+
+    def diagnose_vac_cup_contacts(self) -> list[dict[str, Any]]:
+        """Return vac-cup contacts against free bodies (diagnostic)."""
+
+        if self._active_ee != "vac":
+            return []
+        model, data = _raw_model_data(self.env)
+        cup_geoms: set[int] = set()
+        for geom_id in range(int(model.ngeom)):
+            name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+            if name is None:
+                continue
+            lowered = str(name).lower()
+            if "vac_cup" in lowered or "cup_collision" in lowered:
+                cup_geoms.add(int(geom_id))
+        if not cup_geoms:
+            return []
+        attached_body = None
+        if self._attachment is not None:
+            try:
+                attached_body, _, _ = self._object_free_joint(
+                    self.env, self._attachment.object_id
+                )
+            except ToolUseJournalRuntimeError:
+                attached_body = None
+        rows: list[dict[str, Any]] = []
+        for contact_index in range(int(data.ncon)):
+            contact = data.contact[contact_index]
+            geom1 = int(contact.geom1)
+            geom2 = int(contact.geom2)
+            if geom1 in cup_geoms:
+                other_geom = geom2
+            elif geom2 in cup_geoms:
+                other_geom = geom1
+            else:
+                continue
+            other_body = int(model.geom_bodyid[other_geom])
+            other_name = mujoco.mj_id2name(
+                model, mujoco.mjtObj.mjOBJ_GEOM, other_geom
+            )
+            body_name = mujoco.mj_id2name(
+                model, mujoco.mjtObj.mjOBJ_BODY, other_body
+            )
+            rows.append(
+                {
+                    "candidate_geom": str(other_name or other_geom),
+                    "candidate_body": str(body_name or other_body),
+                    "candidate_body_id": other_body,
+                    "penetration_m": float(-contact.dist)
+                    if float(contact.dist) < 0.0
+                    else 0.0,
+                    "is_attached_target": (
+                        attached_body is not None and other_body == attached_body
+                    ),
+                }
+            )
+        return rows
+
+    def log_vac_attach_diagnostic(
+        self,
+        *,
+        action: str,
+        intended_target: str | None = None,
+        candidate_body: str | None = None,
+        candidate_geom: str | None = None,
+        reason: str = "",
+    ) -> None:
+        """Emit a compact suction-attachment diagnostic line."""
+
+        attached = self.attached_object_id
+        intended = intended_target if intended_target is not None else attached
+        key = (action, str(candidate_body or ""), str(reason))
+        if action == "REJECT" and key in self._vac_attach_diag_logged:
+            return
+        if action == "REJECT":
+            self._vac_attach_diag_logged.add(key)
+        print(
+            "[M5][VAC_ATTACH]"
+            f" intended_target={intended!r}"
+            f" current_attached_body={attached!r}"
+            f" candidate_body={candidate_body!r}"
+            f" candidate_geom={candidate_geom!r}"
+            f" action={action}"
+            f" reason={reason}"
+        )
+
+    def log_vac_non_target_cup_contacts(self) -> None:
+        """Log cup contacts that are not the locked attachment target."""
+
+        if not self.native_adhesion_suppressed:
+            return
+        for row in self.diagnose_vac_cup_contacts():
+            if row.get("is_attached_target"):
+                continue
+            self.log_vac_attach_diagnostic(
+                action="REJECT",
+                intended_target=self.attached_object_id,
+                candidate_body=str(row.get("candidate_body")),
+                candidate_geom=str(row.get("candidate_geom")),
+                reason=(
+                    "attachment_locked_native_adhesion_suppressed;"
+                    f"penetration_m={float(row.get('penetration_m', 0.0)):.6f}"
+                ),
+            )
 
     @property
     def captured_gripper_action(self) -> tuple[float, ...] | None:
@@ -1812,6 +1954,15 @@ class ToolUseJournalEERuntime:
                 "cannot attach an object to a bare flange"
             )
         if self._attachment is not None:
+            self.log_vac_attach_diagnostic(
+                action="REJECT",
+                intended_target=object_id,
+                candidate_body=object_id,
+                reason=(
+                    "attachment_locked;"
+                    f"current_attached_body={self._attachment.object_id!r}"
+                ),
+            )
             raise ToolUseJournalRuntimeError(
                 f"object {self._attachment.object_id!r} is already attached"
             )
@@ -1894,6 +2045,14 @@ class ToolUseJournalEERuntime:
         )
         self._attachment = attachment
         self._last_attachment_break = None
+        self._vac_attach_diag_logged.clear()
+        self.log_vac_attach_diagnostic(
+            action="ATTACH",
+            intended_target=object_id,
+            candidate_body=object_id,
+            candidate_geom=None,
+            reason=f"mode={mode.value};attach_distance_m={distance:.6f}",
+        )
         if mode is AttachmentMode.BREAKABLE_WELD:
             contact = self._attachment_contact_metrics(attachment)
             if breakable_weld is None:  # pragma: no cover - guarded above
@@ -1918,6 +2077,15 @@ class ToolUseJournalEERuntime:
         else:
             self._breakable_runtime = None
             self.synchronize_attached_object()
+        # Intended-target lock: keep logical suction engaged, but kill native
+        # adhesion so non-target cup contacts cannot be pulled in.
+        self.suppress_native_adhesion_actuators()
+        self.log_vac_attach_diagnostic(
+            action="KEEP_EXISTING",
+            intended_target=object_id,
+            candidate_body=object_id,
+            reason="native_adhesion_suppressed_after_attach",
+        )
         return attachment
 
     def restore_logical_state(
@@ -2115,6 +2283,8 @@ class ToolUseJournalEERuntime:
         data.qpos[qpos_start + 3 : qpos_start + 7] = quaternion_wxyz
         data.qvel[qvel_start : qvel_start + 6] = 0.0
         mujoco.mj_forward(model, data)
+        self.suppress_native_adhesion_actuators()
+        self.log_vac_non_target_cup_contacts()
 
     def detach_object(self, object_id: str | None = None) -> AttachedObjectState:
         """Release the attached object while preserving its current world pose."""
@@ -2140,6 +2310,7 @@ class ToolUseJournalEERuntime:
             data.qvel[qvel_start : qvel_start + 6] = 0.0
         self._attachment = None
         self._captured_gripper_action = None
+        self._vac_attach_diag_logged.clear()
         if self._held_tool_id == attachment.object_id:
             self._held_tool_id = None
         self._breakable_runtime = None
@@ -3523,6 +3694,10 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 action[gripper_start:gripper_end] = 0.0
                 return action
             command = float(self.runtime.gripper_command)
+            if hasattr(self.runtime, "vac_gripper_action_for_command"):
+                command = float(
+                    self.runtime.vac_gripper_action_for_command(command)
+                )
             if getattr(robot.gripper["right"], "action_is_absolute", False):
                 self._gripper_rate_credit = 0.0
                 gripper_action = command
@@ -3540,6 +3715,16 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 else:
                     gripper_action = 0.0
             action[gripper_start:gripper_end] = gripper_action
+            suppress = getattr(
+                self.runtime, "suppress_native_adhesion_actuators", None
+            )
+            if callable(suppress):
+                suppress()
+            log_contacts = getattr(
+                self.runtime, "log_vac_non_target_cup_contacts", None
+            )
+            if callable(log_contacts):
+                log_contacts()
         return action
 
     def preshape_finger_gripper(

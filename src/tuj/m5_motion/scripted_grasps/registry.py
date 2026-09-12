@@ -49,9 +49,10 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # 있으면 M4 의 constrain_task_request 가 SCRIPTED_GRASP_EE_INFEASIBLE 로 멈춘다.
     # C2_1 에서 검증된 흡착 레시피를 그대로 쓴다 (같은 접시 자산). resolve() 가
     # EE 로 매칭하므로 위 2F 항목과 공존한다.
-    # 주의: C1_1/C2_1 vac 는 plate_vac_c2_1_recipe (flat) 를 명시한다. 기본
-    # plate_vac_recipe() 는 C3_2 rim 이므로 recipe_name 없이 호출하면 안 된다.
-    ("plate", "C1_1_LegoSweep", "vac", "catalog", "plate_vac", None, "plate_vac_c2_1_recipe"),
+    # 주의: C1_1 vac 는 plate_vac_c1_1_recipe (flat, zero seating immersion) 를
+    # 쓴다. C2_1 의 -0.5 mm 좌석은 table_collision 위에서 접시를 눌러 LIFT 시
+    # early-support 면제 한도(~2 mm)를 넘긴다. 기본 plate_vac_recipe() 는 C3_2 rim.
+    ("plate", "C1_1_LegoSweep", "vac", "catalog", "plate_vac", None, "plate_vac_c1_1_recipe"),
     ("bottle", "C1_2_DoughFlatten", "3F", "bottle"),
     ("spatula", "C1_2_DoughFlatten", "3F", "spatula"),
     ("spoon", "C1_2_DoughFlatten", "2F", "spoon"),
@@ -90,8 +91,7 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     ("mug", "C3_2_BreakfastTrayPreparation", "3F", "catalog", "mug_c3_2"),
 ))
 
-# Explicitly selected EE alternatives; never retry a failed 2F grasp with vac.
-# C1_1 plate+vac is a primary ENTRIES row (same flat recipe as C2_1) so M4's
+# C1_1 plate+vac is a primary ENTRIES row (flat zero-immersion seating) so M4's
 # EE feasibility check can select it alongside the validated 2F plate entry.
 ALTERNATIVE_ENTRIES: tuple[GraspEntry, ...] = ()
 

@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "c:\Users\yebin\tool-use-robosuite\Tool-Use-Journal-Latest\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 298, in execute_object
+    row=self.step(q,hold_opening);self.engage_feedback(row)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\yebin\tool-use-robosuite\Tool-Use-Journal-Latest\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 69, in step
+    if self.recipe.ee_id!='vac':return super().step(q,opening)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\yebin\tool-use-robosuite\Tool-Use-Journal-Latest\src\tuj\m5_motion\scripted_grasps\spoon_runtime.py", line 340, in step
+    return self.sample()
+           ^^^^^^^^^^^^^
+  File "c:\Users\yebin\tool-use-robosuite\Tool-Use-Journal-Latest\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 171, in sample
+    if len(self.trace)%250==0:print('[catalog]',self.object_id,self.stage,f"lift={row['lift_m']:.3f}",row['finger_contacts'],flush=True)
+                              ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+OSError: [Errno 22] Invalid argument

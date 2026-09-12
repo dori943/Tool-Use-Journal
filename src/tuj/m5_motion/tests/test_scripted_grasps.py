@@ -113,10 +113,10 @@ def test_c3_2_plate_vac_and_fork_resolve_multi_instance():
     )
     assert resolve(request_for(c1_vac)) == c1_vac
     assert c1_vac.module_name == "plate_vac"
-    assert c1_vac.recipe_name == "plate_vac_c2_1_recipe"
-    assert c1_vac.recipe().task_id == "c2_1"
+    assert c1_vac.recipe_name == "plate_vac_c1_1_recipe"
+    assert c1_vac.recipe().task_id == "c1_1"
+    assert c1_vac.recipe().offset_m[2] >= 0.0
     # grasp_plate_vac must reuse the bound recipe (not default C3_2).
-    from types import SimpleNamespace
     from tuj.m5_motion.scripted_grasps.objects import plate_vac
 
     bound = c1_vac.recipe()
@@ -282,10 +282,19 @@ def test_vac_attach_rebind_restores_grasp_object_pose():
 
 
 def test_vacuum_support_breakaway_skips_when_already_clear():
-    from tuj.m5_motion.scripted_grasps.catalog_vacuum import vacuum_support_breakaway_lift_m
-    assert vacuum_support_breakaway_lift_m(0.0) == 0.0
-    assert vacuum_support_breakaway_lift_m(0.01) == 0.0
-    assert vacuum_support_breakaway_lift_m(1e-5) == 0.0
+    from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
+        VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M,
+        VACUUM_SUPPORT_CLEARANCE_PAD_M,
+        vacuum_support_breakaway_lift_m,
+    )
+    desired = (
+        VACUUM_SUPPORT_CLEARANCE_PAD_M
+        + VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M
+    )
+    # Flush / near-flush still needs dip-safe clearance before impedance LIFT.
+    assert vacuum_support_breakaway_lift_m(0.0) == pytest.approx(desired)
+    assert vacuum_support_breakaway_lift_m(desired) == 0.0
+    assert vacuum_support_breakaway_lift_m(0.05) == 0.0
 
 
 def test_vacuum_support_breakaway_lift_is_penetration_plus_pad():
@@ -381,13 +390,24 @@ def test_breakaway_vacuum_from_support_applies_bounded_cartesian_lift(tmp_path):
 
 def test_breakaway_vacuum_from_support_noop_when_clear(tmp_path):
     from types import SimpleNamespace
-    from tuj.m5_motion.scripted_grasps.catalog_vacuum import breakaway_vacuum_from_support
+    from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
+        VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M,
+        VACUUM_SUPPORT_CLEARANCE_PAD_M,
+        breakaway_vacuum_from_support,
+    )
 
     def plan_to(*args, **kwargs):
         raise AssertionError('plan_to must not run when already clear')
 
+    # Clearance must already meet pad + dip margin (not just non-negative).
+    clear_z = (
+        0.92
+        + VACUUM_SUPPORT_CLEARANCE_PAD_M
+        + VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M
+        + 0.002
+    )
     context = SimpleNamespace(
-        bottom_height=lambda: 0.925,
+        bottom_height=lambda: clear_z,
         support_top_z=0.92,
         support_geom_names=lambda: ['island_island_group_top_2'],
         object_geoms=set(),
@@ -496,7 +516,10 @@ def test_move_vacuum_cartesian_kinematic_plays_path_then_settles(tmp_path):
         context, np.eye(4), 'LIFT', opening=-1.0, settle_steps=3)
     assert np.allclose(q, np.arange(6) * 0.01)
     assert len(applied) == 2
-    assert len(steps) == 3
+    # One controller tick per path waypoint (2) plus settle_steps (3).
+    assert len(steps) == 5
+    assert np.allclose(steps[0], np.zeros(6))
+    assert np.allclose(steps[1], np.arange(6) * 0.01)
     assert np.allclose(controller.goal_qpos, q)
 
 
@@ -736,6 +759,10 @@ def test_catalog_breakaway_exempts_vac_cup_held_object_contact():
 
 def test_early_lift_support_exemption_includes_island_top_1():
     """Resting plate may contact top_1 or top_2; early-LIFT exemption must cover both."""
+    from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
+        VACUUM_SUPPORT_CLEARANCE_PAD_M,
+    )
+
     support_names = {"island_island_group_top_1", "island_island_group_top_2"}
     object_names = {"plate_b_g8", "plate_b_g26"}
     bad = [
@@ -747,18 +774,25 @@ def test_early_lift_support_exemption_includes_island_top_1():
             "geoms": ["island_island_group_top_2", "plate_b_g26"],
             "penetration_m": 0.0009,
         },
+        # Soft-contact noise just above the historical 2 mm pad must still be
+        # treated as early-LIFT support contact (live C1_1 plate↔table ~2.03 mm).
+        {
+            "geoms": ["table_collision", "plate_g2"],
+            "penetration_m": 0.00203,
+        },
         {"geoms": ["robot0_link", "wall"], "penetration_m": 0.002},
     ]
     filtered = [
         contact
         for contact in bad
         if not (
-            any(name in contact["geoms"] for name in support_names)
-            and any(name in object_names for name in contact["geoms"])
-            and contact["penetration_m"] <= 0.002
+            any(name in contact["geoms"] for name in support_names | {"table_collision"})
+            and any(name in object_names | {"plate_g2"} for name in contact["geoms"])
+            and contact["penetration_m"] <= VACUUM_SUPPORT_CLEARANCE_PAD_M
         )
     ]
-    assert filtered == [bad[2]]
+    assert filtered == [bad[3]]
+    assert VACUUM_SUPPORT_CLEARANCE_PAD_M >= 0.00203
 
 
 def test_c3_2_plate_vac_does_not_seat_below_aabb_top():

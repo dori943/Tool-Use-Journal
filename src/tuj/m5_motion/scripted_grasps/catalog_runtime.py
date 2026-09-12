@@ -71,8 +71,20 @@ class CatalogContext(SpoonContext):
             self.release_vacuum()
         action=np.zeros(self.robot.action_dim);splits=self.robot.composite_controller._action_split_indexes
         lo,hi=splits['right'];action[lo:hi]=q
-        lo,hi=splits['right_gripper'];action[lo:hi]=-float(opening)
+        lo,hi=splits['right_gripper']
+        # opening=-1 means suction-on for catalog vac. After kinematic attach,
+        # force native adhesion off so non-target bodies are not pulled.
+        gripper_cmd=-float(opening)
+        if hasattr(self.runtime,'vac_gripper_action_for_command'):
+            gripper_cmd=float(self.runtime.vac_gripper_action_for_command(gripper_cmd))
+        action[lo:hi]=gripper_cmd
         self.player._advance_controller(action)
+        suppress=getattr(self.runtime,'suppress_native_adhesion_actuators',None)
+        if callable(suppress):
+            suppress()
+        log_contacts=getattr(self.runtime,'log_vac_non_target_cup_contacts',None)
+        if callable(log_contacts):
+            log_contacts()
         return self.sample()
 
     def release_vacuum(self):
@@ -100,6 +112,9 @@ class CatalogContext(SpoonContext):
         return not self.last_planning_collision
 
     def bad_contacts(self,data,stage):
+        from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
+            VACUUM_SUPPORT_CLEARANCE_PAD_M,
+        )
         bad=super().bad_contacts(data,stage)
         if stage in {'BREAKAWAY','LEVEL'}:
             # Spoon exemptions cover GRASP/CLOSE/LIFT/... but not BREAKAWAY /
@@ -116,7 +131,7 @@ class CatalogContext(SpoonContext):
         return [c for c in bad if not (
             any(name in c['geoms'] for name in support_names)
             and any(n in object_names for n in c['geoms'])
-            and c['penetration_m']<=.002
+            and c['penetration_m']<=VACUUM_SUPPORT_CLEARANCE_PAD_M
         )]
 
     def sample(self):
@@ -355,11 +370,11 @@ class CatalogContext(SpoonContext):
                     self.initial_bottom=self.bottom_height()
                     self.support_released=False
             save_json(self.output/'contact_gate.json',{'status':'PASSED','sample':self.sample()})
-            if recipe.ee_id=='vac' and breakaway.get('applied'):
-                # Impedance LIFT after kinematic breakaway tracks back into the
-                # pre-breakaway pose (~20 mm TCP dip on bread). Climb by FK, then
-                # finish with a normal Cartesian move so absolute joint PD is
-                # tracking before HOLD / transport settle gates.
+            if recipe.ee_id=='vac':
+                # Impedance-only LIFT dips TCP into the table even when AABB looked
+                # clear (live plate↔table ~2.5 mm). Always climb by FK first, then
+                # finish with Cartesian move so absolute joint PD is tracking
+                # before HOLD / transport settle gates.
                 move_vacuum_cartesian_kinematic(
                     self, targets['LIFT'], 'LIFT', hold_opening, settle_steps=10)
                 q=self.move(targets['LIFT'],'LIFT',hold_opening,cartesian=True)

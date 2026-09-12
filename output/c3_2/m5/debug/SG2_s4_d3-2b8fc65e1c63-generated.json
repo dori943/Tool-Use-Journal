@@ -1,0 +1,1230 @@
+{
+  "stage": "VLM_GENERATED",
+  "request_id": "motion-request:0:c6850c1f48fdad56f42d",
+  "subgoal_id": "SG2_s4_d3",
+  "artifact": {
+    "schema_version": "3.2.0",
+    "artifact_id": "keyframe-plan:14bbff4f689ce08c11dc1439",
+    "provenance": {
+      "artifact_id": "keyframe-plan-artifact:14bbff4f689ce08c11dc1439",
+      "artifact_type": "KeyframePlanArtifact",
+      "produced_by": "MOTION_PLANNER",
+      "invocation_id": "openai-keyframes:motion-request:0:c6850c1f48fdad56f42d",
+      "input_artifact_ids": [
+        "motion-request-artifact:c6850c1f48fdad56f42d1ef0"
+      ],
+      "attempt": 1,
+      "metadata": {
+        "model": "gpt-4o",
+        "prompt_version": "OPENAI_KEYFRAME_STRATEGY_V9",
+        "provider": "openai",
+        "provider_request_id": "resp_0005ecab54319c64016aa36ca133d487d08843e4650fd734f1",
+        "generation_attempt": 1,
+        "rejected_candidate_count": 0,
+        "rejected_candidates": []
+      }
+    },
+    "scene_signature": "predicted:d2cd0a0f528b80b603b9ff5177db992141fbf50fbee2e6f900a56c0848f2c0b9",
+    "subgoal_id": "SG2_s4_d3",
+    "candidates": [
+      {
+        "strategy_id": "SG2_s4_d3:strategy_001",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_001:1:kf_001",
+            "keyframe_type": "PRE_PLACE",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.05,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "spoon_b",
+              "packing_orientation_xyzw": [
+                0.07690170518166667,
+                -0.006671828671427054,
+                0.0017961803056070753,
+                0.9970147381952991
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_001:2:kf_002",
+            "keyframe_type": "PLACE",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "DETACH_OBJECT",
+              "GRIPPER_OPEN"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "spoon_b",
+              "allow_release_contact": true,
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "spoon_b",
+              "packing_orientation_xyzw": [
+                0.07690170518166667,
+                -0.006671828671427054,
+                0.0017961803056070753,
+                0.9970147381952991
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_001:3:kf_003",
+            "keyframe_type": "RETREAT",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.1,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "packing_orientation_xyzw": [
+                0.7047027503036494,
+                0.7052877475499371,
+                0.05905938660763187,
+                -0.049751539915253475
+              ]
+            }
+          }
+        ],
+        "rationale": "Direct approach to the place location with minimal tool travel, emphasizing a straightforward deposit and retreat.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "5e79e647031fac35445647159359b563f22d5055488357f6baa47459be3420cf",
+          "model_id": "gpt-4o",
+          "prompt_hash": "5e79e647031fac35445647159359b563f22d5055488357f6baa47459be3420cf",
+          "temperature": null,
+          "provider_request_id": "resp_0005ecab54319c64016aa36ca133d487d08843e4650fd734f1",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG2_s4_d3:strategy_002",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_002:1:kf_004",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_start",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.12,
+            "roll_rad": 0.004608193847438619,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "spoon_b",
+              "packing_orientation_xyzw": [
+                0.07690170518166667,
+                -0.006671828671427054,
+                0.0017961803056070753,
+                0.9970147381952991
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_002:2:kf_005",
+            "keyframe_type": "PRE_PLACE",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.06,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "spoon_b",
+              "packing_orientation_xyzw": [
+                0.07690170518166667,
+                -0.006671828671427054,
+                0.0017961803056070753,
+                0.9970147381952991
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_002:3:kf_006",
+            "keyframe_type": "PLACE",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "DETACH_OBJECT",
+              "GRIPPER_OPEN"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "spoon_b",
+              "allow_release_contact": true,
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "spoon_b",
+              "packing_orientation_xyzw": [
+                0.07690170518166667,
+                -0.006671828671427054,
+                0.0017961803056070753,
+                0.9970147381952991
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_002:4:kf_007",
+            "keyframe_type": "RETREAT",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.15,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "packing_orientation_xyzw": [
+                0.7047027503036494,
+                0.7052877475499371,
+                0.05905938660763187,
+                -0.049751539915253475
+              ]
+            }
+          }
+        ],
+        "rationale": "Provides an initial offset through a transfer keyframe, allowing alignment to the approach axis before transitioning to the place operation.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "5e79e647031fac35445647159359b563f22d5055488357f6baa47459be3420cf",
+          "model_id": "gpt-4o",
+          "prompt_hash": "5e79e647031fac35445647159359b563f22d5055488357f6baa47459be3420cf",
+          "temperature": null,
+          "provider_request_id": "resp_0005ecab54319c64016aa36ca133d487d08843e4650fd734f1",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG2_s4_d3:strategy_003",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_003:1:kf_008",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_start",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.1,
+            "roll_rad": 0.004608193847438619,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "spoon_b",
+              "packing_orientation_xyzw": [
+                0.07690170518166667,
+                -0.006671828671427054,
+                0.0017961803056070753,
+                0.9970147381952991
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_003:2:kf_009",
+            "keyframe_type": "PRE_PLACE",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.07,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "spoon_b",
+              "packing_orientation_xyzw": [
+                0.07690170518166667,
+                -0.006671828671427054,
+                0.0017961803056070753,
+                0.9970147381952991
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_003:3:kf_010",
+            "keyframe_type": "PLACE",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "DETACH_OBJECT",
+              "GRIPPER_OPEN"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "spoon_b",
+              "allow_release_contact": true,
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "spoon_b",
+              "packing_orientation_xyzw": [
+                0.07690170518166667,
+                -0.006671828671427054,
+                0.0017961803056070753,
+                0.9970147381952991
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_003:4:kf_011",
+            "keyframe_type": "RETREAT",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.2,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "packing_orientation_xyzw": [
+                0.7047027503036494,
+                0.7052877475499371,
+                0.05905938660763187,
+                -0.049751539915253475
+              ]
+            }
+          }
+        ],
+        "rationale": "Consumes additional space for a gradual transition by increasing standoff in retreat, offering refined movement.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "5e79e647031fac35445647159359b563f22d5055488357f6baa47459be3420cf",
+          "model_id": "gpt-4o",
+          "prompt_hash": "5e79e647031fac35445647159359b563f22d5055488357f6baa47459be3420cf",
+          "temperature": null,
+          "provider_request_id": "resp_0005ecab54319c64016aa36ca133d487d08843e4650fd734f1",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG2_s4_d3:strategy_004",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_004:1:kf_012",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_start",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.12,
+            "roll_rad": 0.004608193847438619,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "spoon_b",
+              "packing_orientation_xyzw": [
+                0.07690170518166667,
+                -0.006671828671427054,
+                0.0017961803056070753,
+                0.9970147381952991
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_004:2:kf_013",
+            "keyframe_type": "PRE_PLACE",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.08,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "spoon_b",
+              "packing_orientation_xyzw": [
+                0.07690170518166667,
+                -0.006671828671427054,
+                0.0017961803056070753,
+                0.9970147381952991
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_004:3:kf_014",
+            "keyframe_type": "PLACE",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "DETACH_OBJECT",
+              "GRIPPER_OPEN"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "spoon_b",
+              "allow_release_contact": true,
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "spoon_b",
+              "packing_orientation_xyzw": [
+                0.07690170518166667,
+                -0.006671828671427054,
+                0.0017961803056070753,
+                0.9970147381952991
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s4_d3:strategy_004:4:kf_015",
+            "keyframe_type": "RETREAT",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.013844183405979451,
+              0.15285818937690293,
+              0.9881511587435582
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.13,
+            "roll_rad": 0.004608193847438619,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "packing_orientation_xyzw": [
+                0.7047027503036494,
+                0.7052877475499371,
+                0.05905938660763187,
+                -0.049751539915253475
+              ]
+            }
+          }
+        ],
+        "rationale": "Exploits a comprehensive retreat technique post-release, supplementing stability and gentle object finalization.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "5e79e647031fac35445647159359b563f22d5055488357f6baa47459be3420cf",
+          "model_id": "gpt-4o",
+          "prompt_hash": "5e79e647031fac35445647159359b563f22d5055488357f6baa47459be3420cf",
+          "temperature": null,
+          "provider_request_id": "resp_0005ecab54319c64016aa36ca133d487d08843e4650fd734f1",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      }
+    ]
+  },
+  "strategies": [
+    {
+      "strategy_id": "SG2_s4_d3:strategy_001",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s4_d3:strategy_001:1:kf_001",
+          "phase": "PRE_PLACE",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.05,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "spoon_b",
+            "packing_orientation_xyzw": [
+              0.07690170518166667,
+              -0.006671828671427054,
+              0.0017961803056070753,
+              0.9970147381952991
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.272698242819048,
+              -2.8197265685222455,
+              1.0145241822540538
+            ],
+            "orientation_xyzw": [
+              0.07690170518166668,
+              -0.006671828671427055,
+              0.0017961803056070755,
+              0.9970147381952992
+            ]
+          },
+          "raw_position_world_m": [
+            2.272698242819048,
+            -2.8197265685222455,
+            1.0145241822540538
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s4_d3:strategy_001:2:kf_002",
+          "phase": "PLACE",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "spoon_b",
+            "allow_release_contact": true,
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "spoon_b",
+            "packing_orientation_xyzw": [
+              0.07690170518166667,
+              -0.006671828671427054,
+              0.0017961803056070753,
+              0.9970147381952991
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2733496210378292,
+              -2.812058156795672,
+              0.9651200208098206
+            ],
+            "orientation_xyzw": [
+              0.07690170518166668,
+              -0.006671828671427055,
+              0.0017961803056070755,
+              0.9970147381952992
+            ]
+          },
+          "raw_position_world_m": [
+            2.2733496210378292,
+            -2.812058156795672,
+            0.9651200208098206
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG2_s4_d3:strategy_001:3:kf_003",
+          "phase": "RETREAT",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.1,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "packing_orientation_xyzw": [
+              0.7047027503036494,
+              0.7052877475499371,
+              0.05905938660763187,
+              -0.049751539915253475
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.272046864600267,
+              -2.8273949802488185,
+              1.063928343698287
+            ],
+            "orientation_xyzw": [
+              -0.7047027503036494,
+              -0.7052877475499371,
+              -0.05905938660763187,
+              0.049751539915253475
+            ]
+          },
+          "raw_position_world_m": [
+            2.272046864600267,
+            -2.8273949802488185,
+            1.063928343698287
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG2_s4_d3:strategy_002",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s4_d3:strategy_002:1:kf_004",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_start",
+          "raw_offset_m": 0.12,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "spoon_b",
+            "packing_orientation_xyzw": [
+              0.07690170518166667,
+              -0.006671828671427054,
+              0.0017961803056070753,
+              0.9970147381952991
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.247878644181468,
+              -2.847231993465559,
+              1.2788151948245141
+            ],
+            "orientation_xyzw": [
+              0.07690170518166668,
+              -0.006671828671427055,
+              0.0017961803056070755,
+              0.9970147381952992
+            ]
+          },
+          "raw_position_world_m": [
+            2.247878644181468,
+            -2.847231993465559,
+            1.2788151948245141
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s4_d3:strategy_002:2:kf_005",
+          "phase": "PRE_PLACE",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.06,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "spoon_b",
+            "packing_orientation_xyzw": [
+              0.07690170518166667,
+              -0.006671828671427054,
+              0.0017961803056070753,
+              0.9970147381952991
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.272567967175292,
+              -2.82126025086756,
+              1.0244050145429004
+            ],
+            "orientation_xyzw": [
+              0.07690170518166668,
+              -0.006671828671427055,
+              0.0017961803056070755,
+              0.9970147381952992
+            ]
+          },
+          "raw_position_world_m": [
+            2.272567967175292,
+            -2.82126025086756,
+            1.0244050145429004
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG2_s4_d3:strategy_002:3:kf_006",
+          "phase": "PLACE",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "spoon_b",
+            "allow_release_contact": true,
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "spoon_b",
+            "packing_orientation_xyzw": [
+              0.07690170518166667,
+              -0.006671828671427054,
+              0.0017961803056070753,
+              0.9970147381952991
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2733496210378292,
+              -2.812058156795672,
+              0.9651200208098206
+            ],
+            "orientation_xyzw": [
+              0.07690170518166668,
+              -0.006671828671427055,
+              0.0017961803056070755,
+              0.9970147381952992
+            ]
+          },
+          "raw_position_world_m": [
+            2.2733496210378292,
+            -2.812058156795672,
+            0.9651200208098206
+          ]
+        },
+        {
+          "index": 3,
+          "keyframe_id": "SG2_s4_d3:strategy_002:4:kf_007",
+          "phase": "RETREAT",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.15,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "packing_orientation_xyzw": [
+              0.7047027503036494,
+              0.7052877475499371,
+              0.05905938660763187,
+              -0.049751539915253475
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.271395486381486,
+              -2.835063391975392,
+              1.11333250514252
+            ],
+            "orientation_xyzw": [
+              -0.7047027503036494,
+              -0.7052877475499371,
+              -0.05905938660763187,
+              0.049751539915253475
+            ]
+          },
+          "raw_position_world_m": [
+            2.271395486381486,
+            -2.835063391975392,
+            1.11333250514252
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG2_s4_d3:strategy_003",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s4_d3:strategy_003:1:kf_008",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_start",
+          "raw_offset_m": 0.1,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "spoon_b",
+            "packing_orientation_xyzw": [
+              0.07690170518166667,
+              -0.006671828671427054,
+              0.0017961803056070753,
+              0.9970147381952991
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2481391954689807,
+              -2.8441646287749296,
+              1.2590535302468209
+            ],
+            "orientation_xyzw": [
+              0.07690170518166668,
+              -0.006671828671427055,
+              0.0017961803056070755,
+              0.9970147381952992
+            ]
+          },
+          "raw_position_world_m": [
+            2.2481391954689807,
+            -2.8441646287749296,
+            1.2590535302468209
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s4_d3:strategy_003:2:kf_009",
+          "phase": "PRE_PLACE",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.07,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "spoon_b",
+            "packing_orientation_xyzw": [
+              0.07690170518166667,
+              -0.006671828671427054,
+              0.0017961803056070753,
+              0.9970147381952991
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2724376915315356,
+              -2.8227939332128744,
+              1.034285846831747
+            ],
+            "orientation_xyzw": [
+              0.07690170518166668,
+              -0.006671828671427055,
+              0.0017961803056070755,
+              0.9970147381952992
+            ]
+          },
+          "raw_position_world_m": [
+            2.2724376915315356,
+            -2.8227939332128744,
+            1.034285846831747
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG2_s4_d3:strategy_003:3:kf_010",
+          "phase": "PLACE",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "spoon_b",
+            "allow_release_contact": true,
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "spoon_b",
+            "packing_orientation_xyzw": [
+              0.07690170518166667,
+              -0.006671828671427054,
+              0.0017961803056070753,
+              0.9970147381952991
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2733496210378292,
+              -2.812058156795672,
+              0.9651200208098206
+            ],
+            "orientation_xyzw": [
+              0.07690170518166668,
+              -0.006671828671427055,
+              0.0017961803056070755,
+              0.9970147381952992
+            ]
+          },
+          "raw_position_world_m": [
+            2.2733496210378292,
+            -2.812058156795672,
+            0.9651200208098206
+          ]
+        },
+        {
+          "index": 3,
+          "keyframe_id": "SG2_s4_d3:strategy_003:4:kf_011",
+          "phase": "RETREAT",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.2,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "packing_orientation_xyzw": [
+              0.7047027503036494,
+              0.7052877475499371,
+              0.05905938660763187,
+              -0.049751539915253475
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2707441081627047,
+              -2.8427318037019655,
+              1.1627366665867531
+            ],
+            "orientation_xyzw": [
+              -0.7047027503036494,
+              -0.7052877475499371,
+              -0.05905938660763187,
+              0.049751539915253475
+            ]
+          },
+          "raw_position_world_m": [
+            2.2707441081627047,
+            -2.8427318037019655,
+            1.1627366665867531
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG2_s4_d3:strategy_004",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s4_d3:strategy_004:1:kf_012",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_start",
+          "raw_offset_m": 0.12,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "spoon_b",
+            "packing_orientation_xyzw": [
+              0.07690170518166667,
+              -0.006671828671427054,
+              0.0017961803056070753,
+              0.9970147381952991
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.247878644181468,
+              -2.847231993465559,
+              1.2788151948245141
+            ],
+            "orientation_xyzw": [
+              0.07690170518166668,
+              -0.006671828671427055,
+              0.0017961803056070755,
+              0.9970147381952992
+            ]
+          },
+          "raw_position_world_m": [
+            2.247878644181468,
+            -2.847231993465559,
+            1.2788151948245141
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s4_d3:strategy_004:2:kf_013",
+          "phase": "PRE_PLACE",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.08,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "spoon_b",
+            "packing_orientation_xyzw": [
+              0.07690170518166667,
+              -0.006671828671427054,
+              0.0017961803056070753,
+              0.9970147381952991
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2723074158877794,
+              -2.824327615558189,
+              1.0441666791205937
+            ],
+            "orientation_xyzw": [
+              0.07690170518166668,
+              -0.006671828671427055,
+              0.0017961803056070755,
+              0.9970147381952992
+            ]
+          },
+          "raw_position_world_m": [
+            2.2723074158877794,
+            -2.824327615558189,
+            1.0441666791205937
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG2_s4_d3:strategy_004:3:kf_014",
+          "phase": "PLACE",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "spoon_b",
+            "allow_release_contact": true,
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "spoon_b",
+            "packing_orientation_xyzw": [
+              0.07690170518166667,
+              -0.006671828671427054,
+              0.0017961803056070753,
+              0.9970147381952991
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2733496210378292,
+              -2.812058156795672,
+              0.9651200208098206
+            ],
+            "orientation_xyzw": [
+              0.07690170518166668,
+              -0.006671828671427055,
+              0.0017961803056070755,
+              0.9970147381952992
+            ]
+          },
+          "raw_position_world_m": [
+            2.2733496210378292,
+            -2.812058156795672,
+            0.9651200208098206
+          ]
+        },
+        {
+          "index": 3,
+          "keyframe_id": "SG2_s4_d3:strategy_004:4:kf_015",
+          "phase": "RETREAT",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.13,
+          "approach_axis_xyz": [
+            0.013844183405979451,
+            0.15285818937690293,
+            0.9881511587435582
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.004608193847438619,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "packing_orientation_xyzw": [
+              0.7047027503036494,
+              0.7052877475499371,
+              0.05905938660763187,
+              -0.049751539915253475
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2716560376689983,
+              -2.8319960272847626,
+              1.0935708405648268
+            ],
+            "orientation_xyzw": [
+              -0.7047027503036494,
+              -0.7052877475499371,
+              -0.05905938660763187,
+              0.049751539915253475
+            ]
+          },
+          "raw_position_world_m": [
+            2.2716560376689983,
+            -2.8319960272847626,
+            1.0935708405648268
+          ]
+        }
+      ]
+    }
+  ],
+  "raw_position_note": "VLM emits frame/anchor/offset, not absolute XYZ; raw_position_world_m is the first resolver result."
+}

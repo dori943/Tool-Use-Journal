@@ -1,0 +1,260 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0004:c76c4948969fbc765460:execution-report",
+  "run_id": "simulation-run:0004:c76c4948969fbc765460",
+  "plan_id": "motion-plan:08d32547e73e9189e48665b7",
+  "provenance": {
+    "artifact_id": "simulation-run:0004:c76c4948969fbc765460:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0004:c76c4948969fbc765460",
+    "input_artifact_ids": [
+      "simulation-run-artifact:c76c4948969fbc765460289c",
+      "motion-plan-artifact:08d32547e73e9189e48665b7"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "SUCCESS",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      -0.7775155982509937,
+      -1.3581078418363048,
+      1.582680374271991,
+      -1.2089264098338801,
+      -0.934601150649556,
+      -2.3983203087466194
+    ],
+    "joint_velocities_rad_s": [
+      -0.03319938866405588,
+      0.006539843120203068,
+      -0.06278883086621362,
+      0.08119755761168185,
+      -0.005208992890661808,
+      -0.04314517147715404
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        2.3693921280781582,
+        -3.4418475815059044,
+        1.1701323900958316
+      ],
+      "orientation_xyzw": [
+        -0.9112670942003377,
+        0.06763741908143926,
+        -0.024534196847423733,
+        0.40548185625589533
+      ]
+    },
+    "gripper": {
+      "mode": "HOLDING",
+      "command": 1.0
+    },
+    "attached_object_id": "bread_b",
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 25.37999999994085,
+    "max_joint_tracking_error_rad": 0.08269021183908398,
+    "max_eef_tracking_error_m": 0.028867153920595967,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG4_s1_d1:strategy_a:2:strategy_a_k2:event:0:SUCTION_ON",
+      "scheduled_time_s": 20.685727770809237,
+      "actual_time_s": 20.759999999951617,
+      "status": "SUCCESS",
+      "message": "vacuum suction enabled with command 1.000"
+    },
+    {
+      "event_id": "SG4_s1_d1:strategy_a:2:strategy_a_k2:event:1:ATTACH_OBJECT",
+      "scheduled_time_s": 20.685727770809237,
+      "actual_time_s": 20.759999999951617,
+      "status": "SUCCESS",
+      "message": "attached bread_b in KINEMATIC mode to site gripper0_right_grip_site at -0.0006 m"
+    }
+  ],
+  "failure": null,
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "vac",
+    "final_attached_object_id": "bread_b",
+    "final_held_tool_id": null,
+    "final_gripper_command": 1.0,
+    "ee_transition_count": 1,
+    "attachment_mode": "KINEMATIC",
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 1269,
+    "nominal_plan_duration_s": 25.29813483604904,
+    "final_plan_time_s": 25.29813483604904,
+    "adaptive_settle_extra_duration_s": 0.08186516389180909,
+    "segment_tracking": [
+      {
+        "segment_id": "SG4_s1_d1:strategy_a:0:SG4_s1_d1:strategy_a:1:strategy_a_k1",
+        "keyframe_id": "SG4_s1_d1:strategy_a:1:strategy_a_k1",
+        "target_block_id": null,
+        "nominal_end_time_s": 18.088991898964647,
+        "actual_execution_time_s": 18.099999999957816,
+        "max_joint_error_rad": 0.030360112012138174,
+        "eef_position_error_m": 0.00438858525341418,
+        "eef_orientation_error_rad": 0.020176539204407592,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG4_s1_d1:strategy_a:1:SG4_s1_d1:strategy_a:2:strategy_a_k2",
+        "keyframe_id": "SG4_s1_d1:strategy_a:2:strategy_a_k2",
+        "target_block_id": null,
+        "nominal_end_time_s": 20.685727770809237,
+        "actual_execution_time_s": 20.759999999951617,
+        "max_joint_error_rad": 0.020715594837857898,
+        "eef_position_error_m": 0.016178451152356717,
+        "eef_orientation_error_rad": 0.026605688698714925,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.059999999999860165,
+        "custom_settle": {
+          "mode": "ACQUIRE_CONTACT_SETTLE",
+          "succeeded": true,
+          "target_object_id": "bread_b",
+          "intended_target_contact": true,
+          "orientation_ok": true,
+          "foreign_object_ok": true,
+          "environment_ok": true,
+          "target_contact_count": 18,
+          "target_contact_groups": [],
+          "target_contact_pairs": [
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ],
+            [
+              "gripper0_right_vac_cup",
+              "bread_b"
+            ]
+          ],
+          "foreign_object_contact_pairs": [],
+          "environment_contact_pairs": [],
+          "ee_contact_geoms": [
+            "gripper0_right_vac_cup"
+          ],
+          "eef_position_error_m": 0.016170800275376564,
+          "eef_orientation_error_rad": 0.026503830893731532
+        }
+      },
+      {
+        "segment_id": "SG4_s1_d1:strategy_a:2:SG4_s1_d1:strategy_a:3:strategy_a_k3",
+        "keyframe_id": "SG4_s1_d1:strategy_a:3:strategy_a_k3",
+        "target_block_id": null,
+        "nominal_end_time_s": 25.29813483604904,
+        "actual_execution_time_s": 25.37999999994085,
+        "max_joint_error_rad": 0.024078456435254747,
+        "eef_position_error_m": 0.013583726132973246,
+        "eef_orientation_error_rad": 0.013685439717280676,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      }
+    ],
+    "goal_evaluation": {
+      "request_id": "motion-request:0:3a11679e902030243495",
+      "goal_type": "POSE",
+      "status": "SATISFIED",
+      "detail": "target 'bread_b' is attached",
+      "position_error_m": null,
+      "orientation_error_rad": null,
+      "joint_error_rad": null,
+      "observed": {
+        "attached_object_id": "bread_b"
+      }
+    }
+  }
+}

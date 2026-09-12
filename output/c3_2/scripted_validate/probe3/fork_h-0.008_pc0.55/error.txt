@@ -1,0 +1,10 @@
+Traceback (most recent call last):
+  File "c:\Users\yebin\tool-use-robosuite\Tool-Use-Journal-Latest\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 273, in execute_object
+    q=self.move(targets['GRASP'],'GRASP',opening,cartesian=True)
+      ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\yebin\tool-use-robosuite\Tool-Use-Journal-Latest\src\tuj\m5_motion\scripted_grasps\motion.py", line 106, in move
+    path=self.plan_to(target,stage,cartesian)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "c:\Users\yebin\tool-use-robosuite\Tool-Use-Journal-Latest\src\tuj\m5_motion\scripted_grasps\motion.py", line 69, in plan_to
+    raise GraspFailure('CARTESIAN_COLLISION: '+stage+' '+edge.detail+' '+str(self.last_planning_collision[:1]))
+tuj.m5_motion.scripted_grasps.runtime.GraspFailure: CARTESIAN_COLLISION: GRASP invalid swept sample 1/1:  [{'geoms': ['gripper0_right_thumb_tip_collision', 'island_island_group_top_2'], 'penetration_m': 0.0016222995617404985}]

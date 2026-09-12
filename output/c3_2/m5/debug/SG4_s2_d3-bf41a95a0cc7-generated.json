@@ -1,0 +1,1230 @@
+{
+  "stage": "VLM_GENERATED",
+  "request_id": "motion-request:0:54d341427fa0cce663dc",
+  "subgoal_id": "SG4_s2_d3",
+  "artifact": {
+    "schema_version": "3.2.0",
+    "artifact_id": "keyframe-plan:796b1d3075289d0f66f3261a",
+    "provenance": {
+      "artifact_id": "keyframe-plan-artifact:796b1d3075289d0f66f3261a",
+      "artifact_type": "KeyframePlanArtifact",
+      "produced_by": "MOTION_PLANNER",
+      "invocation_id": "openai-keyframes:motion-request:0:54d341427fa0cce663dc",
+      "input_artifact_ids": [
+        "motion-request-artifact:54d341427fa0cce663dcf528"
+      ],
+      "attempt": 1,
+      "metadata": {
+        "model": "gpt-4o",
+        "prompt_version": "OPENAI_KEYFRAME_STRATEGY_V9",
+        "provider": "openai",
+        "provider_request_id": "resp_0913e3b725374d57016aa365a89f4487d08e09537e5e70346f",
+        "generation_attempt": 1,
+        "rejected_candidate_count": 0,
+        "rejected_candidates": []
+      }
+    },
+    "scene_signature": "predicted:59c1f9f82ce81974c2ba163381ffca673a237e027d6c19a0d227c5796413695d",
+    "subgoal_id": "SG4_s2_d3",
+    "candidates": [
+      {
+        "strategy_id": "SG4_s2_d3:strategy_1",
+        "keyframes": [
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_1:1:kf_1_pre_place",
+            "keyframe_type": "PRE_PLACE",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.05,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fruit_b",
+              "packing_orientation_xyzw": [
+                -0.048093945700032725,
+                0.01867797862185761,
+                0.7068342937641554,
+                0.705495135816351
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_1:2:kf_1_place",
+            "keyframe_type": "PLACE",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "DETACH_OBJECT",
+              "GRIPPER_OPEN"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "fruit_b",
+              "allow_release_contact": true,
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fruit_b",
+              "packing_orientation_xyzw": [
+                -0.048093945700032725,
+                0.01867797862185761,
+                0.7068342937641554,
+                0.705495135816351
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_1:3:kf_1_retreat",
+            "keyframe_type": "RETREAT",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.1,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "packing_orientation_xyzw": [
+                0.7070276044805964,
+                0.7053035754572581,
+                -0.01856011734279057,
+                0.04810774359559136
+              ]
+            }
+          }
+        ],
+        "rationale": "Direct approach to the goal with a simple Cartesian retreat.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "164fdb8b9cba41eaeb1917921c5f9d98cb60b7b8b51286505eaeee7d1ad60610",
+          "model_id": "gpt-4o",
+          "prompt_hash": "164fdb8b9cba41eaeb1917921c5f9d98cb60b7b8b51286505eaeee7d1ad60610",
+          "temperature": null,
+          "provider_request_id": "resp_0913e3b725374d57016aa365a89f4487d08e09537e5e70346f",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG4_s2_d3:strategy_2",
+        "keyframes": [
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_2:1:kf_2_transfer",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:fruit_b",
+            "anchor": "top_center",
+            "approach_axis_xyz": [
+              0.9954906949716019,
+              0.0004259379999878494,
+              -0.094858287997294
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.15,
+            "roll_rad": 0.0,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fruit_b",
+              "packing_orientation_xyzw": [
+                -0.048093945700032725,
+                0.01867797862185761,
+                0.7068342937641554,
+                0.705495135816351
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_2:2:kf_2_pre_place",
+            "keyframe_type": "PRE_PLACE",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.05,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fruit_b",
+              "packing_orientation_xyzw": [
+                -0.048093945700032725,
+                0.01867797862185761,
+                0.7068342937641554,
+                0.705495135816351
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_2:3:kf_2_place",
+            "keyframe_type": "PLACE",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "DETACH_OBJECT",
+              "GRIPPER_OPEN"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "fruit_b",
+              "allow_release_contact": true,
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fruit_b",
+              "packing_orientation_xyzw": [
+                -0.048093945700032725,
+                0.01867797862185761,
+                0.7068342937641554,
+                0.705495135816351
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_2:4:kf_2_retreat",
+            "keyframe_type": "RETREAT",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.1,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "packing_orientation_xyzw": [
+                0.7070276044805964,
+                0.7053035754572581,
+                -0.01856011734279057,
+                0.04810774359559136
+              ]
+            }
+          }
+        ],
+        "rationale": "Uses a sampling-based transfer to avoid potential obstacles, followed by a Cartesian approach and retreat.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "164fdb8b9cba41eaeb1917921c5f9d98cb60b7b8b51286505eaeee7d1ad60610",
+          "model_id": "gpt-4o",
+          "prompt_hash": "164fdb8b9cba41eaeb1917921c5f9d98cb60b7b8b51286505eaeee7d1ad60610",
+          "temperature": null,
+          "provider_request_id": "resp_0913e3b725374d57016aa365a89f4487d08e09537e5e70346f",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG4_s2_d3:strategy_3",
+        "keyframes": [
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_3:1:kf_3_transfer",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "world",
+            "anchor": "origin",
+            "approach_axis_xyz": [
+              0.0,
+              0.7071067811865476,
+              0.7071067811865476
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.1,
+            "roll_rad": 0.0,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fruit_b",
+              "packing_orientation_xyzw": [
+                -0.048093945700032725,
+                0.01867797862185761,
+                0.7068342937641554,
+                0.705495135816351
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_3:2:kf_3_pre_place",
+            "keyframe_type": "PRE_PLACE",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.05,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fruit_b",
+              "packing_orientation_xyzw": [
+                -0.048093945700032725,
+                0.01867797862185761,
+                0.7068342937641554,
+                0.705495135816351
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_3:3:kf_3_place",
+            "keyframe_type": "PLACE",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "DETACH_OBJECT",
+              "GRIPPER_OPEN"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "fruit_b",
+              "allow_release_contact": true,
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fruit_b",
+              "packing_orientation_xyzw": [
+                -0.048093945700032725,
+                0.01867797862185761,
+                0.7068342937641554,
+                0.705495135816351
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_3:4:kf_3_retreat",
+            "keyframe_type": "RETREAT",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.1,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "packing_orientation_xyzw": [
+                0.7070276044805964,
+                0.7053035754572581,
+                -0.01856011734279057,
+                0.04810774359559136
+              ]
+            }
+          }
+        ],
+        "rationale": "Incorporates a different route in the world frame to increase approach angle diversity.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "164fdb8b9cba41eaeb1917921c5f9d98cb60b7b8b51286505eaeee7d1ad60610",
+          "model_id": "gpt-4o",
+          "prompt_hash": "164fdb8b9cba41eaeb1917921c5f9d98cb60b7b8b51286505eaeee7d1ad60610",
+          "temperature": null,
+          "provider_request_id": "resp_0913e3b725374d57016aa365a89f4487d08e09537e5e70346f",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG4_s2_d3:strategy_4",
+        "keyframes": [
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_4:1:kf_4_transfer",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:fruit_b",
+            "anchor": "bottom_center",
+            "approach_axis_xyz": [
+              0.9954906949716019,
+              0.0004259379999878494,
+              -0.094858287997294
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.2,
+            "roll_rad": 0.0,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fruit_b",
+              "packing_orientation_xyzw": [
+                -0.048093945700032725,
+                0.01867797862185761,
+                0.7068342937641554,
+                0.705495135816351
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_4:2:kf_4_pre_place",
+            "keyframe_type": "PRE_PLACE",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.05,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fruit_b",
+              "packing_orientation_xyzw": [
+                -0.048093945700032725,
+                0.01867797862185761,
+                0.7068342937641554,
+                0.705495135816351
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_4:3:kf_4_place",
+            "keyframe_type": "PLACE",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "DETACH_OBJECT",
+              "GRIPPER_OPEN"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "fruit_b",
+              "allow_release_contact": true,
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fruit_b",
+              "packing_orientation_xyzw": [
+                -0.048093945700032725,
+                0.01867797862185761,
+                0.7068342937641554,
+                0.705495135816351
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG4_s2_d3:strategy_4:4:kf_4_retreat",
+            "keyframe_type": "RETREAT",
+            "frame_ref": "object:plate_b",
+            "anchor": "held_place_goal",
+            "approach_axis_xyz": [
+              0.09575288799100075,
+              0.042004773578099175,
+              0.9945184681231594
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.1,
+            "roll_rad": 1.5707234350440797,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "packing_orientation_xyzw": [
+                0.7070276044805964,
+                0.7053035754572581,
+                -0.01856011734279057,
+                0.04810774359559136
+              ]
+            }
+          }
+        ],
+        "rationale": "Utilizes a longer offset in the sampling-based transfer to provide clearance from unpredictable obstacles.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "164fdb8b9cba41eaeb1917921c5f9d98cb60b7b8b51286505eaeee7d1ad60610",
+          "model_id": "gpt-4o",
+          "prompt_hash": "164fdb8b9cba41eaeb1917921c5f9d98cb60b7b8b51286505eaeee7d1ad60610",
+          "temperature": null,
+          "provider_request_id": "resp_0913e3b725374d57016aa365a89f4487d08e09537e5e70346f",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      }
+    ]
+  },
+  "strategies": [
+    {
+      "strategy_id": "SG4_s2_d3:strategy_1",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG4_s2_d3:strategy_1:1:kf_1_pre_place",
+          "phase": "PRE_PLACE",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.05,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fruit_b",
+            "packing_orientation_xyzw": [
+              -0.048093945700032725,
+              0.01867797862185761,
+              0.7068342937641554,
+              0.705495135816351
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.211159720743437,
+              -2.9805242809018644,
+              1.1223375899544148
+            ],
+            "orientation_xyzw": [
+              -0.04809394570003274,
+              0.01867797862185761,
+              0.7068342937641555,
+              0.7054951358163509
+            ]
+          },
+          "raw_position_world_m": [
+            2.211159720743437,
+            -2.9805242809018644,
+            1.1223375899544148
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG4_s2_d3:strategy_1:2:kf_1_place",
+          "phase": "PLACE",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "fruit_b",
+            "allow_release_contact": true,
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fruit_b",
+            "packing_orientation_xyzw": [
+              -0.048093945700032725,
+              0.01867797862185761,
+              0.7068342937641554,
+              0.705495135816351
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.213241443451298,
+              -2.9852375089600356,
+              1.0726037794042544
+            ],
+            "orientation_xyzw": [
+              -0.04809394570003274,
+              0.01867797862185761,
+              0.7068342937641555,
+              0.7054951358163509
+            ]
+          },
+          "raw_position_world_m": [
+            2.213241443451298,
+            -2.9852375089600356,
+            1.0726037794042544
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG4_s2_d3:strategy_1:3:kf_1_retreat",
+          "phase": "RETREAT",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.1,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "packing_orientation_xyzw": [
+              0.7070276044805964,
+              0.7053035754572581,
+              -0.01856011734279057,
+              0.04810774359559136
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2090779980355757,
+              -2.975811052843693,
+              1.1720714005045751
+            ],
+            "orientation_xyzw": [
+              0.7070276044805964,
+              0.7053035754572581,
+              -0.01856011734279057,
+              0.04810774359559136
+            ]
+          },
+          "raw_position_world_m": [
+            2.2090779980355757,
+            -2.975811052843693,
+            1.1720714005045751
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG4_s2_d3:strategy_2",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG4_s2_d3:strategy_2:1:kf_2_transfer",
+          "phase": "TRANSFER",
+          "frame_ref": "object:fruit_b",
+          "anchor": "top_center",
+          "raw_offset_m": 0.15,
+          "approach_axis_xyz": [
+            0.9954906949716019,
+            0.0004259379999878494,
+            -0.094858287997294
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.0,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fruit_b",
+            "packing_orientation_xyzw": [
+              -0.048093945700032725,
+              0.01867797862185761,
+              0.7068342937641554,
+              0.705495135816351
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.6948600091433743,
+              -2.9071934442336778,
+              0.9707051234384114
+            ],
+            "orientation_xyzw": [
+              -0.04809394570003274,
+              0.01867797862185761,
+              0.7068342937641555,
+              0.7054951358163509
+            ]
+          },
+          "raw_position_world_m": [
+            2.6948600091433743,
+            -2.9071934442336778,
+            0.9707051234384114
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG4_s2_d3:strategy_2:2:kf_2_pre_place",
+          "phase": "PRE_PLACE",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.05,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fruit_b",
+            "packing_orientation_xyzw": [
+              -0.048093945700032725,
+              0.01867797862185761,
+              0.7068342937641554,
+              0.705495135816351
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.211159720743437,
+              -2.9805242809018644,
+              1.1223375899544148
+            ],
+            "orientation_xyzw": [
+              -0.04809394570003274,
+              0.01867797862185761,
+              0.7068342937641555,
+              0.7054951358163509
+            ]
+          },
+          "raw_position_world_m": [
+            2.211159720743437,
+            -2.9805242809018644,
+            1.1223375899544148
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG4_s2_d3:strategy_2:3:kf_2_place",
+          "phase": "PLACE",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "fruit_b",
+            "allow_release_contact": true,
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fruit_b",
+            "packing_orientation_xyzw": [
+              -0.048093945700032725,
+              0.01867797862185761,
+              0.7068342937641554,
+              0.705495135816351
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.213241443451298,
+              -2.9852375089600356,
+              1.0726037794042544
+            ],
+            "orientation_xyzw": [
+              -0.04809394570003274,
+              0.01867797862185761,
+              0.7068342937641555,
+              0.7054951358163509
+            ]
+          },
+          "raw_position_world_m": [
+            2.213241443451298,
+            -2.9852375089600356,
+            1.0726037794042544
+          ]
+        },
+        {
+          "index": 3,
+          "keyframe_id": "SG4_s2_d3:strategy_2:4:kf_2_retreat",
+          "phase": "RETREAT",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.1,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "packing_orientation_xyzw": [
+              0.7070276044805964,
+              0.7053035754572581,
+              -0.01856011734279057,
+              0.04810774359559136
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2090779980355757,
+              -2.975811052843693,
+              1.1720714005045751
+            ],
+            "orientation_xyzw": [
+              0.7070276044805964,
+              0.7053035754572581,
+              -0.01856011734279057,
+              0.04810774359559136
+            ]
+          },
+          "raw_position_world_m": [
+            2.2090779980355757,
+            -2.975811052843693,
+            1.1720714005045751
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG4_s2_d3:strategy_3",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG4_s2_d3:strategy_3:1:kf_3_transfer",
+          "phase": "TRANSFER",
+          "frame_ref": "world",
+          "anchor": "origin",
+          "raw_offset_m": 0.1,
+          "approach_axis_xyz": [
+            0.0,
+            0.7071067811865476,
+            0.7071067811865476
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.0,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fruit_b",
+            "packing_orientation_xyzw": [
+              -0.048093945700032725,
+              0.01867797862185761,
+              0.7068342937641554,
+              0.705495135816351
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              0.0,
+              0.07071067811865477,
+              0.07071067811865477
+            ],
+            "orientation_xyzw": [
+              -0.04809394570003274,
+              0.01867797862185761,
+              0.7068342937641555,
+              0.7054951358163509
+            ]
+          },
+          "raw_position_world_m": [
+            0.0,
+            0.07071067811865477,
+            0.07071067811865477
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG4_s2_d3:strategy_3:2:kf_3_pre_place",
+          "phase": "PRE_PLACE",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.05,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fruit_b",
+            "packing_orientation_xyzw": [
+              -0.048093945700032725,
+              0.01867797862185761,
+              0.7068342937641554,
+              0.705495135816351
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.211159720743437,
+              -2.9805242809018644,
+              1.1223375899544148
+            ],
+            "orientation_xyzw": [
+              -0.04809394570003274,
+              0.01867797862185761,
+              0.7068342937641555,
+              0.7054951358163509
+            ]
+          },
+          "raw_position_world_m": [
+            2.211159720743437,
+            -2.9805242809018644,
+            1.1223375899544148
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG4_s2_d3:strategy_3:3:kf_3_place",
+          "phase": "PLACE",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "fruit_b",
+            "allow_release_contact": true,
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fruit_b",
+            "packing_orientation_xyzw": [
+              -0.048093945700032725,
+              0.01867797862185761,
+              0.7068342937641554,
+              0.705495135816351
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.213241443451298,
+              -2.9852375089600356,
+              1.0726037794042544
+            ],
+            "orientation_xyzw": [
+              -0.04809394570003274,
+              0.01867797862185761,
+              0.7068342937641555,
+              0.7054951358163509
+            ]
+          },
+          "raw_position_world_m": [
+            2.213241443451298,
+            -2.9852375089600356,
+            1.0726037794042544
+          ]
+        },
+        {
+          "index": 3,
+          "keyframe_id": "SG4_s2_d3:strategy_3:4:kf_3_retreat",
+          "phase": "RETREAT",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.1,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "packing_orientation_xyzw": [
+              0.7070276044805964,
+              0.7053035754572581,
+              -0.01856011734279057,
+              0.04810774359559136
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2090779980355757,
+              -2.975811052843693,
+              1.1720714005045751
+            ],
+            "orientation_xyzw": [
+              0.7070276044805964,
+              0.7053035754572581,
+              -0.01856011734279057,
+              0.04810774359559136
+            ]
+          },
+          "raw_position_world_m": [
+            2.2090779980355757,
+            -2.975811052843693,
+            1.1720714005045751
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG4_s2_d3:strategy_4",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG4_s2_d3:strategy_4:1:kf_4_transfer",
+          "phase": "TRANSFER",
+          "frame_ref": "object:fruit_b",
+          "anchor": "bottom_center",
+          "raw_offset_m": 0.2,
+          "approach_axis_xyz": [
+            0.9954906949716019,
+            0.0004259379999878494,
+            -0.094858287997294
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.0,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fruit_b",
+            "packing_orientation_xyzw": [
+              -0.048093945700032725,
+              0.01867797862185761,
+              0.7068342937641554,
+              0.705495135816351
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.736327235538831,
+              -2.91065148564996,
+              0.8811423679939975
+            ],
+            "orientation_xyzw": [
+              -0.04809394570003274,
+              0.01867797862185761,
+              0.7068342937641555,
+              0.7054951358163509
+            ]
+          },
+          "raw_position_world_m": [
+            2.736327235538831,
+            -2.91065148564996,
+            0.8811423679939975
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG4_s2_d3:strategy_4:2:kf_4_pre_place",
+          "phase": "PRE_PLACE",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.05,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fruit_b",
+            "packing_orientation_xyzw": [
+              -0.048093945700032725,
+              0.01867797862185761,
+              0.7068342937641554,
+              0.705495135816351
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.211159720743437,
+              -2.9805242809018644,
+              1.1223375899544148
+            ],
+            "orientation_xyzw": [
+              -0.04809394570003274,
+              0.01867797862185761,
+              0.7068342937641555,
+              0.7054951358163509
+            ]
+          },
+          "raw_position_world_m": [
+            2.211159720743437,
+            -2.9805242809018644,
+            1.1223375899544148
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG4_s2_d3:strategy_4:3:kf_4_place",
+          "phase": "PLACE",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "fruit_b",
+            "allow_release_contact": true,
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fruit_b",
+            "packing_orientation_xyzw": [
+              -0.048093945700032725,
+              0.01867797862185761,
+              0.7068342937641554,
+              0.705495135816351
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.213241443451298,
+              -2.9852375089600356,
+              1.0726037794042544
+            ],
+            "orientation_xyzw": [
+              -0.04809394570003274,
+              0.01867797862185761,
+              0.7068342937641555,
+              0.7054951358163509
+            ]
+          },
+          "raw_position_world_m": [
+            2.213241443451298,
+            -2.9852375089600356,
+            1.0726037794042544
+          ]
+        },
+        {
+          "index": 3,
+          "keyframe_id": "SG4_s2_d3:strategy_4:4:kf_4_retreat",
+          "phase": "RETREAT",
+          "frame_ref": "object:plate_b",
+          "anchor": "held_place_goal",
+          "raw_offset_m": 0.1,
+          "approach_axis_xyz": [
+            0.09575288799100075,
+            0.042004773578099175,
+            0.9945184681231594
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.5707234350440797,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "packing_orientation_xyzw": [
+              0.7070276044805964,
+              0.7053035754572581,
+              -0.01856011734279057,
+              0.04810774359559136
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2090779980355757,
+              -2.975811052843693,
+              1.1720714005045751
+            ],
+            "orientation_xyzw": [
+              0.7070276044805964,
+              0.7053035754572581,
+              -0.01856011734279057,
+              0.04810774359559136
+            ]
+          },
+          "raw_position_world_m": [
+            2.2090779980355757,
+            -2.975811052843693,
+            1.1720714005045751
+          ]
+        }
+      ]
+    }
+  ],
+  "raw_position_note": "VLM emits frame/anchor/offset, not absolute XYZ; raw_position_world_m is the first resolver result."
+}

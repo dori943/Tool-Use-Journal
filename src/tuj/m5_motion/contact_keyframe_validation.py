@@ -21,6 +21,7 @@ from tuj.m5_motion.geometry import (
     GeometryResolutionError,
     RelativePoseResolver,
     _anchor_local,
+    _matrix_quaternion_xyzw,
     _pose_from_record,
 )
 from tuj.m5_motion.schema import (
@@ -48,8 +49,9 @@ _TASK_RELEVANCE_RADIUS_M = 1.25
 # tabletop reach without touching IK tolerances.
 _MAX_EEF_DISTANCE_M = 1.6
 
-# Held-tool contact must not flip the TCP approach axis vs the live grasp.
-_MIN_HELD_TOOL_AXIS_DOT = 0.0
+# Held-tool contact must keep TCP tool-z near the live grasp attitude.
+# Cos(60°)≈0.5: near-horizontal proposals after height XY-retarget fail IK.
+_MIN_HELD_TOOL_AXIS_DOT = 0.5
 
 # Held-tool CONTACT_* TCP is the height where the tool face meets target tops
 # (engagement), not the post-acquire lift height. After grasp the EEF is high;
@@ -59,12 +61,37 @@ _CONTACT_BELOW_ENGAGEMENT_SLACK_M = 0.05
 _CONTACT_ABOVE_ENGAGEMENT_SLACK_M = 0.08
 # Keep the held-tool underside clear of the support by this margin.
 _CONTACT_TOOL_ABOVE_SUPPORT_CLEARANCE_M = 0.005
+# Shallow soft-contact press into sweep targets (not a zero-penetration kiss).
+# Deep press tunnels free bodies through thin held tools; keep this small.
+# Matches the physical C1 rim-push profile (~1 mm).
+_CONTACT_SWEEP_PRESS_M = 0.0015
+# Never press more than this fraction of held-tool thickness (anti-tunnel).
+_CONTACT_SWEEP_PRESS_THICKNESS_FRAC = 0.15
+# When sweeping targets that rest on the support, allow the tool underside this
+# close to the bare table while clamping max press.
+_CONTACT_SWEEP_SUPPORT_CLEARANCE_M = 0.001
+# Held-tool collision cloud is treated as hollow when few points lie inside this
+# fraction of the cloud's max radius (live C1 plate: empty disk r<~42 mm).
+_HOLLOW_INNER_RADIUS_FRAC = 0.45
+_HOLLOW_MIN_INNER_POINT_FRAC = 0.05
+_HOLLOW_RIM_Z_BAND_M = 0.002
+# Side-push contact height for hollow tools: fraction from support→target top.
+_HOLLOW_RIM_CONTACT_HEIGHT_FRAC = 0.50
 # Fallback band width when only the support surface is known.
 _CONTACT_MAX_ABOVE_SUPPORT_M = 0.18
+# If CONTACT_START is farther than this from the target-cluster centroid, snap
+# it onto the centroid so the plate covers the group before the lateral push.
+_CONTACT_START_CENTROID_SNAP_M = 0.04
 _HOVER_MIN_ABOVE_SUPPORT_M = 0.06
 _MIN_SWEEP_KEYFRAMES = 5
 # Live eef_z - held-tool-bottom must lie in this range to be trusted.
 _HELD_TOOL_BELOW_TCP_MAX_M = 0.45
+# Minimum horizontal CONTACT_START → CONTACT_END travel. Zero-length sweeps
+# (VLM collapses all CONTACT_* onto one block top) cannot move targets.
+_MIN_SWEEP_LATERAL_M = 0.08
+# Require this fraction of the start→region distance as forward progress when a
+# goal region is known (generic; not task-id specific).
+_MIN_SWEEP_REGION_PROGRESS_FRAC = 0.35
 
 _CONTACT_PHASE_TYPES = frozenset(
     {
@@ -198,6 +225,7 @@ def validate_sweep_keyframe_strategy(
                     f"z={hover_z:.3f}m must stay at/above the contact working "
                     f"height (floor={hover_floor:.3f}m)"
                 )
+    _reject_degenerate_sweep_lateral(request, keyframes, active_resolver)
 
 
 def canonicalize_held_tool_axis_for_contact(
@@ -266,6 +294,53 @@ def canonicalize_held_tool_axis_for_contact(
     if flipped_dot < _MIN_HELD_TOOL_AXIS_DOT or flipped_dot <= current_dot + 1e-6:
         return keyframe
     return candidate
+
+
+def canonicalize_held_tool_orientation_for_contact(
+    request: MotionPlanRequest,
+    keyframe: RelativeKeyframeSpec,
+    *,
+    resolver: RelativePoseResolver | None = None,
+) -> RelativeKeyframeSpec:
+    """Lock held-tool contact TCP attitude to the live grasp orientation.
+
+    Height XY-retarget can rewrite ``approach_axis`` to a near-horizontal delta
+    and freeze ``packing_orientation_xyzw`` from that attitude. Full-pose IK then
+    fails even when the XY is reachable. After acquire, vac/gripper sweeps keep
+    tool-z and only apply ``roll_rad`` about that axis.
+    """
+
+    del resolver  # API symmetry with sibling canonicalize helpers
+    if not is_tool_act_contact_geometry_scope(request):
+        return keyframe
+    if keyframe.keyframe_type not in _CONTACT_PATH_TYPES:
+        return keyframe
+    packing = _live_held_tool_packing_xyzw(
+        request, roll_rad=float(keyframe.roll_rad or 0.0)
+    )
+    if packing is None:
+        return keyframe
+    existing = keyframe.metadata.get("packing_orientation_xyzw")
+    if (
+        isinstance(existing, Sequence)
+        and not isinstance(existing, (str, bytes))
+        and len(existing) == 4
+        and np.allclose(
+            np.asarray(existing, dtype=float),
+            np.asarray(packing, dtype=float),
+            atol=1e-6,
+        )
+    ):
+        return keyframe
+    return keyframe.model_copy(
+        update={
+            "metadata": {
+                **keyframe.metadata,
+                "packing_orientation_xyzw": packing,
+                "held_tool_orientation_locked": True,
+            },
+        }
+    )
 
 
 def contact_keyframe_geometry_errors(
@@ -385,14 +460,116 @@ def _sweep_target_top_z_m(request: MotionPlanRequest) -> float | None:
     return max(tops)
 
 
+def _held_tool_thickness_m(request: MotionPlanRequest) -> float | None:
+    """Vertical thickness of the held tool from world snapshot dimensions."""
+
+    for object_id in sorted(_held_object_ids(request)):
+        record = request.world.objects.get(object_id)
+        if not isinstance(record, Mapping):
+            continue
+        dims = _finite_vector(record.get("dimensions_m"), 3)
+        if dims is not None and float(dims[2]) > 0.0:
+            return float(dims[2])
+        top = _object_top_z(record)
+        bottom = _object_bottom_z(record)
+        if top is not None and bottom is not None and top > bottom:
+            return float(top - bottom)
+    return None
+
+
+def _held_tool_collision_points_body_m(
+    request: MotionPlanRequest,
+) -> np.ndarray | None:
+    for object_id in sorted(_held_object_ids(request)):
+        record = request.world.objects.get(object_id)
+        if not isinstance(record, Mapping):
+            continue
+        points = record.get("collision_points_m")
+        if not isinstance(points, Sequence) or isinstance(points, (str, bytes)):
+            continue
+        array = np.asarray(points, dtype=float)
+        if array.ndim != 2 or array.shape[1] != 3 or array.shape[0] < 8:
+            continue
+        if not np.all(np.isfinite(array)):
+            continue
+        return array
+    return None
+
+
+def _held_tool_hollow_rim_inner_radius_m(
+    request: MotionPlanRequest,
+) -> float | None:
+    """Inner rim radius for a hollow held-tool underside, else ``None``.
+
+    Uses body-frame ``collision_points_m``. Flat slabs that fill the AABB disk
+    return ``None`` so sweep keeps AABB top-press engagement.
+    """
+
+    points = _held_tool_collision_points_body_m(request)
+    if points is None:
+        return None
+    radii = np.linalg.norm(points[:, :2], axis=1)
+    r_max = float(np.max(radii))
+    if not math.isfinite(r_max) or r_max < 1e-3:
+        return None
+    inner = float(_HOLLOW_INNER_RADIUS_FRAC) * r_max
+    inner_count = int(np.count_nonzero(radii <= inner + 1e-12))
+    if inner_count > max(3, int(_HOLLOW_MIN_INNER_POINT_FRAC * len(points))):
+        return None
+    z_min = float(np.min(points[:, 2]))
+    rim = points[points[:, 2] <= z_min + float(_HOLLOW_RIM_Z_BAND_M)]
+    if rim.shape[0] >= 4:
+        return float(np.min(np.linalg.norm(rim[:, :2], axis=1)))
+    return float(np.min(radii))
+
+
+def _sweep_engagement_press_m(request: MotionPlanRequest) -> float:
+    press = float(_CONTACT_SWEEP_PRESS_M)
+    thickness = _held_tool_thickness_m(request)
+    if thickness is not None and thickness > 0.0:
+        press = min(
+            press, float(thickness) * float(_CONTACT_SWEEP_PRESS_THICKNESS_FRAC)
+        )
+    return max(0.0, press)
+
+
 def _contact_engagement_tcp_z_m(request: MotionPlanRequest) -> float | None:
-    """TCP z where the held-tool underside meets the tallest sweep target top."""
+    """TCP z for held-tool sweep engagement.
+
+    Flat tools: shallow underside press into target tops.
+    Hollow dishes (empty collision disk): put the rim underside near mid-target
+    height so the rim wall side-pushes instead of hovering a bowl over tops.
+    """
 
     tool_below = _held_tool_below_tcp_m(request)
     target_top = _sweep_target_top_z_m(request)
-    if target_top is not None:
-        return float(target_top + tool_below)
     support_z = _support_surface_z_m(request)
+    press = _sweep_engagement_press_m(request)
+    rim_r = _held_tool_hollow_rim_inner_radius_m(request)
+    if (
+        target_top is not None
+        and support_z is not None
+        and rim_r is not None
+        and rim_r > 1e-4
+    ):
+        mid_z = float(support_z) + float(_HOLLOW_RIM_CONTACT_HEIGHT_FRAC) * (
+            float(target_top) - float(support_z)
+        )
+        underside = mid_z - press
+        underside = max(
+            underside, float(support_z) + float(_CONTACT_SWEEP_SUPPORT_CLEARANCE_M)
+        )
+        return float(underside + tool_below)
+    if target_top is not None:
+        if support_z is not None:
+            max_press = max(
+                0.0,
+                float(target_top)
+                - float(support_z)
+                - float(_CONTACT_SWEEP_SUPPORT_CLEARANCE_M),
+            )
+            press = min(press, max_press)
+        return float(target_top + tool_below - press)
     if support_z is None:
         return None
     return float(
@@ -416,9 +593,15 @@ def _contact_tcp_height_limits_m(
     floor_z = engagement - _CONTACT_BELOW_ENGAGEMENT_SLACK_M
     ceiling_z = engagement + _CONTACT_ABOVE_ENGAGEMENT_SLACK_M
     if support_z is not None:
-        support_floor = (
-            support_z + tool_below + _CONTACT_TOOL_ABOVE_SUPPORT_CLEARANCE_M
+        # Bare-support clearance keeps tools off the table. With sweep targets
+        # present, allow a deeper floor so engagement press is not lifted back
+        # into a zero-penetration kiss.
+        clearance = (
+            _CONTACT_SWEEP_SUPPORT_CLEARANCE_M
+            if _sweep_target_top_z_m(request) is not None
+            else _CONTACT_TOOL_ABOVE_SUPPORT_CLEARANCE_M
         )
+        support_floor = support_z + tool_below + clearance
         floor_z = max(floor_z, support_floor)
         ceiling_z = max(ceiling_z, support_floor + 0.02)
     return floor_z, ceiling_z
@@ -509,6 +692,9 @@ def canonicalize_contact_tcp_height(
         anchor_world=anchor_world,
         frame_rotation=frame_rotation,
         target_z=target_z,
+        preferred_packing_xyzw=_live_held_tool_packing_xyzw(
+            request, roll_rad=float(keyframe.roll_rad or 0.0)
+        ),
     )
     if candidate is None:
         return keyframe
@@ -549,6 +735,7 @@ def _retarget_tcp_height(
     anchor_world: np.ndarray,
     frame_rotation: np.ndarray,
     target_z: float,
+    preferred_packing_xyzw: Sequence[float] | None = None,
 ) -> RelativeKeyframeSpec | None:
     z_m = float(pose.position_m[2])
     axis_local = np.asarray(keyframe.approach_axis_xyz, dtype=float)
@@ -594,6 +781,8 @@ def _retarget_tcp_height(
     axis_world = delta / dist
     axis_local = frame_rotation.T @ axis_world
     packing = keyframe.metadata.get("packing_orientation_xyzw")
+    if packing is None and preferred_packing_xyzw is not None:
+        packing = list(preferred_packing_xyzw)
     if packing is None:
         packing = list(pose.orientation_xyzw)
     return keyframe.model_copy(
@@ -659,33 +848,400 @@ def canonicalize_sweep_strategy_heights(
             else max(hover_floor, support_hover)
         )
     if hover_floor is None:
-        return lifted
-
-    result: list[RelativeKeyframeSpec] = []
-    for keyframe in lifted:
-        if keyframe.keyframe_type not in _HOVER_PHASE_TYPES:
-            result.append(keyframe)
-            continue
-        try:
-            pose = active_resolver.resolve(keyframe)
-            anchor_world, frame_rotation = _frame_anchor_world(
-                active_resolver, keyframe
+        result = lifted
+    else:
+        result = []
+        for keyframe in lifted:
+            if keyframe.keyframe_type not in _HOVER_PHASE_TYPES:
+                result.append(keyframe)
+                continue
+            try:
+                pose = active_resolver.resolve(keyframe)
+                anchor_world, frame_rotation = _frame_anchor_world(
+                    active_resolver, keyframe
+                )
+            except GeometryResolutionError:
+                result.append(keyframe)
+                continue
+            if float(pose.position_m[2]) >= hover_floor - 1e-6:
+                result.append(keyframe)
+                continue
+            raised = _retarget_tcp_height(
+                keyframe,
+                pose=pose,
+                anchor_world=anchor_world,
+                frame_rotation=frame_rotation,
+                target_z=hover_floor,
+                preferred_packing_xyzw=_live_held_tool_packing_xyzw(
+                    request, roll_rad=float(keyframe.roll_rad or 0.0)
+                ),
             )
-        except GeometryResolutionError:
-            result.append(keyframe)
-            continue
-        if float(pose.position_m[2]) >= hover_floor - 1e-6:
-            result.append(keyframe)
-            continue
-        raised = _retarget_tcp_height(
-            keyframe,
-            pose=pose,
-            anchor_world=anchor_world,
-            frame_rotation=frame_rotation,
-            target_z=hover_floor,
+            result.append(keyframe if raised is None else raised)
+    result = canonicalize_sweep_contact_start_over_targets(
+        request, result, resolver=active_resolver
+    )
+    result = canonicalize_sweep_lateral_toward_region(
+        request, result, resolver=active_resolver
+    )
+    return [
+        canonicalize_held_tool_orientation_for_contact(
+            request, keyframe, resolver=active_resolver
         )
-        result.append(keyframe if raised is None else raised)
+        for keyframe in result
+    ]
+
+
+def _sweep_target_centroid_xy_m(request: MotionPlanRequest) -> np.ndarray | None:
+    held_ids = _held_object_ids(request)
+    points: list[np.ndarray] = []
+    for target_id in request.task.target_ids:
+        if not isinstance(target_id, str) or not target_id.strip():
+            continue
+        object_id = target_id.strip()
+        if object_id in held_ids:
+            continue
+        record = request.world.objects.get(object_id)
+        if not isinstance(record, Mapping):
+            continue
+        pose = record.get("pose")
+        if not isinstance(pose, Mapping):
+            continue
+        position = _finite_vector(pose.get("position_m"), 3)
+        if position is None:
+            continue
+        points.append(np.asarray(position[:2], dtype=float))
+    if not points:
+        return None
+    return np.mean(np.stack(points, axis=0), axis=0)
+
+
+def canonicalize_sweep_contact_start_over_targets(
+    request: MotionPlanRequest,
+    keyframes: Sequence[RelativeKeyframeSpec],
+    *,
+    resolver: RelativePoseResolver | None = None,
+) -> list[RelativeKeyframeSpec]:
+    """Snap CONTACT_START onto a sweep-ready XY over the target cluster.
+
+    Flat tools: start on the target centroid so the face covers the group.
+    Hollow dishes: shift the start away from the goal region by the rim inner
+    radius so the trailing rim begins at the cluster and can side-plow toward
+    the region (AABB-centered starts leave blocks in the empty disk).
+    """
+
+    if not is_tool_act_contact_geometry_scope(request) or not keyframes:
+        return list(keyframes)
+    centroid = _sweep_target_centroid_xy_m(request)
+    if centroid is None:
+        return list(keyframes)
+    desired_xy = np.asarray(centroid, dtype=float)
+    metadata_flag = "sweep_contact_start_centroid"
+    rim_r = _held_tool_hollow_rim_inner_radius_m(request)
+    region_xy = _goal_region_center_xy_m(request)
+    if rim_r is not None and region_xy is not None and float(rim_r) > 1e-4:
+        away = desired_xy - np.asarray(region_xy, dtype=float)
+        away_norm = float(np.linalg.norm(away))
+        if away_norm > 1e-6:
+            desired_xy = desired_xy + (away / away_norm) * float(rim_r)
+            metadata_flag = "sweep_hollow_rim_plow_start"
+
+    active_resolver = resolver or RelativePoseResolver(request.world)
+    start_index = next(
+        (
+            index
+            for index, keyframe in enumerate(keyframes)
+            if keyframe.keyframe_type is KeyframeType.CONTACT_START
+        ),
+        None,
+    )
+    if start_index is None:
+        return list(keyframes)
+    try:
+        start_pose = active_resolver.resolve(keyframes[start_index])
+    except GeometryResolutionError:
+        return list(keyframes)
+    start_xy = np.asarray(start_pose.position_m[:2], dtype=float)
+    if float(np.linalg.norm(start_xy - desired_xy)) < _CONTACT_START_CENTROID_SNAP_M:
+        return list(keyframes)
+
+    engagement = _contact_engagement_tcp_z_m(request)
+    start_z = (
+        float(engagement)
+        if engagement is not None
+        else float(start_pose.position_m[2])
+    )
+    packing = _live_held_tool_packing_xyzw(
+        request, roll_rad=float(keyframes[start_index].roll_rad or 0.0)
+    )
+    if packing is None:
+        packing = list(start_pose.orientation_xyzw)
+
+    result = list(keyframes)
+    retargeted = _retarget_tcp_world_xy(
+        result[start_index],
+        resolver=active_resolver,
+        target_xy=desired_xy,
+        target_z=start_z,
+        packing_xyzw=packing,
+        metadata_flag=metadata_flag,
+    )
+    if retargeted is None:
+        return result
+    result[start_index] = retargeted
+
+    hover_z = _hover_working_floor_z_m(request)
+    if hover_z is None:
+        hover_z = start_z + _HOVER_MIN_ABOVE_SUPPORT_M
+    hover_z = max(float(hover_z), start_z + _HOVER_MIN_ABOVE_SUPPORT_M)
+    for index, keyframe in enumerate(result):
+        if keyframe.keyframe_type is not KeyframeType.PRE_CONTACT:
+            continue
+        packing_pre = _live_held_tool_packing_xyzw(
+            request, roll_rad=float(keyframe.roll_rad or 0.0)
+        )
+        if packing_pre is None:
+            packing_pre = packing
+        raised = _retarget_tcp_world_xy(
+            keyframe,
+            resolver=active_resolver,
+            target_xy=desired_xy,
+            target_z=hover_z,
+            packing_xyzw=packing_pre,
+            metadata_flag="sweep_pre_contact_follow_start",
+        )
+        if raised is not None:
+            result[index] = raised
     return result
+
+
+def canonicalize_sweep_lateral_toward_region(
+    request: MotionPlanRequest,
+    keyframes: Sequence[RelativeKeyframeSpec],
+    *,
+    resolver: RelativePoseResolver | None = None,
+) -> list[RelativeKeyframeSpec]:
+    """Stretch a collapsed CONTACT path toward the goal region in XY.
+
+    VLMs often emit CONTACT_START/SWEEP/END on the same target top (zero lateral
+    travel). That plans and executes but cannot move footprints into
+    ``target_region_id``. When a region exists, rewrite SWEEP/END (and RETREAT
+    XY) along start→region while keeping the engagement height.
+    """
+
+    if not is_tool_act_contact_geometry_scope(request) or not keyframes:
+        return list(keyframes)
+    region_xy = _goal_region_center_xy_m(request)
+    if region_xy is None:
+        return list(keyframes)
+
+    active_resolver = resolver or RelativePoseResolver(request.world)
+    start_index = next(
+        (
+            index
+            for index, keyframe in enumerate(keyframes)
+            if keyframe.keyframe_type is KeyframeType.CONTACT_START
+        ),
+        None,
+    )
+    if start_index is None:
+        return list(keyframes)
+    try:
+        start_pose = active_resolver.resolve(keyframes[start_index])
+    except GeometryResolutionError:
+        return list(keyframes)
+    start_xy = np.asarray(start_pose.position_m[:2], dtype=float)
+    start_z = float(start_pose.position_m[2])
+    to_region = region_xy - start_xy
+    dist_region = float(np.linalg.norm(to_region))
+    if not math.isfinite(dist_region) or dist_region < _MIN_SWEEP_LATERAL_M:
+        return list(keyframes)
+    direction = to_region / dist_region
+
+    end_index = next(
+        (
+            index
+            for index, keyframe in enumerate(keyframes)
+            if keyframe.keyframe_type is KeyframeType.CONTACT_END
+        ),
+        None,
+    )
+    if end_index is None:
+        return list(keyframes)
+    try:
+        end_pose = active_resolver.resolve(keyframes[end_index])
+    except GeometryResolutionError:
+        return list(keyframes)
+    end_xy = np.asarray(end_pose.position_m[:2], dtype=float)
+    lateral = float(np.linalg.norm(end_xy - start_xy))
+    progress = float(np.dot(end_xy - start_xy, direction))
+    min_progress = max(
+        _MIN_SWEEP_LATERAL_M,
+        _MIN_SWEEP_REGION_PROGRESS_FRAC * dist_region,
+    )
+    if lateral >= _MIN_SWEEP_LATERAL_M and progress >= min_progress:
+        return list(keyframes)
+
+    move_indices = [
+        index
+        for index, keyframe in enumerate(keyframes)
+        if keyframe.keyframe_type
+        in {KeyframeType.CONTACT_SWEEP, KeyframeType.CONTACT_END}
+    ]
+    if not move_indices:
+        return list(keyframes)
+
+    packing = _live_held_tool_packing_xyzw(
+        request, roll_rad=float(keyframes[start_index].roll_rad or 0.0)
+    )
+    if packing is None:
+        packing = list(start_pose.orientation_xyzw)
+
+    result = list(keyframes)
+    for step, index in enumerate(move_indices, start=1):
+        frac = float(step) / float(len(move_indices))
+        target_xy = start_xy + direction * (dist_region * frac)
+        retargeted = _retarget_tcp_world_xy(
+            result[index],
+            resolver=active_resolver,
+            target_xy=target_xy,
+            target_z=start_z,
+            packing_xyzw=packing,
+            metadata_flag="sweep_lateral_canonicalized",
+        )
+        if retargeted is not None:
+            result[index] = retargeted
+
+    # Keep RETREAT above the final contact XY so withdraw does not fly back
+    # over the pre-sweep cluster.
+    try:
+        end_pose = active_resolver.resolve(result[end_index])
+        end_xy = np.asarray(end_pose.position_m[:2], dtype=float)
+        end_z = float(end_pose.position_m[2])
+    except GeometryResolutionError:
+        return result
+    hover_z = _hover_working_floor_z_m(request)
+    if hover_z is None:
+        hover_z = end_z + _HOVER_MIN_ABOVE_SUPPORT_M
+    hover_z = max(float(hover_z), end_z + _HOVER_MIN_ABOVE_SUPPORT_M)
+    for index, keyframe in enumerate(result):
+        if keyframe.keyframe_type is not KeyframeType.RETREAT:
+            continue
+        packing_retreat = _live_held_tool_packing_xyzw(
+            request, roll_rad=float(keyframe.roll_rad or 0.0)
+        )
+        if packing_retreat is None:
+            packing_retreat = packing
+        retargeted = _retarget_tcp_world_xy(
+            keyframe,
+            resolver=active_resolver,
+            target_xy=end_xy,
+            target_z=hover_z,
+            packing_xyzw=packing_retreat,
+            metadata_flag="sweep_lateral_retreat_follow",
+        )
+        if retargeted is not None:
+            result[index] = retargeted
+    return result
+
+
+def _retarget_tcp_world_xy(
+    keyframe: RelativeKeyframeSpec,
+    *,
+    resolver: RelativePoseResolver,
+    target_xy: np.ndarray,
+    target_z: float,
+    packing_xyzw: Sequence[float],
+    metadata_flag: str,
+) -> RelativeKeyframeSpec | None:
+    try:
+        anchor_world, frame_rotation = _frame_anchor_world(resolver, keyframe)
+    except GeometryResolutionError:
+        return None
+    desired = np.asarray(
+        (float(target_xy[0]), float(target_xy[1]), float(target_z)),
+        dtype=float,
+    )
+    delta = desired - anchor_world
+    dist = float(np.linalg.norm(delta))
+    if not math.isfinite(dist) or dist < 1e-6:
+        return None
+    axis_world = delta / dist
+    axis_local = frame_rotation.T @ axis_world
+    return keyframe.model_copy(
+        update={
+            "approach_axis_xyz": tuple(float(v) for v in axis_local),
+            "offset_along_approach_m": dist,
+            "metadata": {
+                **keyframe.metadata,
+                "packing_orientation_xyzw": list(packing_xyzw),
+                metadata_flag: True,
+                "sweep_lateral_target_xy_m": [
+                    float(target_xy[0]),
+                    float(target_xy[1]),
+                ],
+            },
+        }
+    )
+
+
+def _goal_region_center_xy_m(request: MotionPlanRequest) -> np.ndarray | None:
+    region_id = request.task.goal.target_region_id
+    if not region_id:
+        return None
+    record = request.world.objects.get(str(region_id))
+    if not isinstance(record, Mapping):
+        return None
+    pose = record.get("pose")
+    if not isinstance(pose, Mapping):
+        return None
+    position = _finite_vector(pose.get("position_m"), 3)
+    if position is None:
+        return None
+    return np.asarray(position[:2], dtype=float)
+
+
+def _reject_degenerate_sweep_lateral(
+    request: MotionPlanRequest,
+    keyframes: Sequence[RelativeKeyframeSpec],
+    resolver: RelativePoseResolver,
+) -> None:
+    start_pose = None
+    end_pose = None
+    for keyframe in keyframes:
+        if keyframe.keyframe_type is KeyframeType.CONTACT_START:
+            start_pose = resolver.resolve(keyframe)
+        elif keyframe.keyframe_type is KeyframeType.CONTACT_END:
+            end_pose = resolver.resolve(keyframe)
+    if start_pose is None or end_pose is None:
+        return
+    start_xy = np.asarray(start_pose.position_m[:2], dtype=float)
+    end_xy = np.asarray(end_pose.position_m[:2], dtype=float)
+    lateral = float(np.linalg.norm(end_xy - start_xy))
+    if lateral < _MIN_SWEEP_LATERAL_M:
+        raise ContactKeyframeGeometryError(
+            f"sweep CONTACT_START→CONTACT_END lateral travel "
+            f"{lateral:.3f}m is below {_MIN_SWEEP_LATERAL_M:.3f}m "
+            "(collapsed contact path cannot move targets)"
+        )
+    region_xy = _goal_region_center_xy_m(request)
+    if region_xy is None:
+        return
+    to_region = region_xy - start_xy
+    dist_region = float(np.linalg.norm(to_region))
+    if dist_region < _MIN_SWEEP_LATERAL_M:
+        return
+    direction = to_region / dist_region
+    progress = float(np.dot(end_xy - start_xy, direction))
+    min_progress = max(
+        _MIN_SWEEP_LATERAL_M,
+        _MIN_SWEEP_REGION_PROGRESS_FRAC * dist_region,
+    )
+    if progress < min_progress:
+        raise ContactKeyframeGeometryError(
+            f"sweep CONTACT_END progress toward region "
+            f"{progress:.3f}m is below {min_progress:.3f}m "
+            f"(region={request.task.goal.target_region_id!r})"
+        )
 
 
 def _is_trivial_two_point_transfer(
@@ -793,6 +1349,41 @@ def _pose_tool_z_world(
     if not math.isfinite(norm) or norm < 1e-12:
         return None
     return axis / norm
+
+
+def _live_held_tool_packing_xyzw(
+    request: MotionPlanRequest,
+    *,
+    roll_rad: float = 0.0,
+) -> list[float] | None:
+    """Live EEF quaternion, optionally rolled about tool +z."""
+
+    if not (
+        request.world.robot_state.held_tool_id
+        or request.world.robot_state.attached_object_id
+    ):
+        return None
+    eef = request.world.robot_state.eef_pose
+    if eef is None:
+        return None
+    live_q = _finite_vector(eef.orientation_xyzw, 4)
+    if live_q is None:
+        return None
+    rotation = _quaternion_matrix_xyzw(live_q)
+    roll = float(roll_rad)
+    if abs(roll) > 1e-9 and math.isfinite(roll):
+        cos_r = math.cos(roll)
+        sin_r = math.sin(roll)
+        roll_m = np.asarray(
+            (
+                (cos_r, -sin_r, 0.0),
+                (sin_r, cos_r, 0.0),
+                (0.0, 0.0, 1.0),
+            ),
+            dtype=float,
+        )
+        rotation = rotation @ roll_m
+    return list(_matrix_quaternion_xyzw(rotation))
 
 
 def _reject_outside_workspace(
@@ -1018,6 +1609,9 @@ __all__ = [
     "ContactKeyframeGeometryError",
     "canonicalize_contact_tcp_height",
     "canonicalize_held_tool_axis_for_contact",
+    "canonicalize_held_tool_orientation_for_contact",
+    "canonicalize_sweep_contact_start_over_targets",
+    "canonicalize_sweep_lateral_toward_region",
     "canonicalize_sweep_strategy_heights",
     "contact_keyframe_geometry_errors",
     "is_tool_act_contact_geometry_scope",

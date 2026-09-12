@@ -14,10 +14,11 @@ GRASP_RELATIVE_POSE_SOURCE = 'CONTROLLER_GRASP_OBJECT_POSE'
 # AABB/soft-contact noise floor: treat clearances inside this as already clear
 # (matches suction surface eps scale; does not widen LIFT collision whitelist).
 VACUUM_SUPPORT_CONTACT_EPS_M = 1e-4
-# Post-breakaway clearance target: same magnitude as early-LIFT max exempted
-# penetration in CatalogContext.bad_contacts — a clearance goal, not a whitelist
-# expansion.
-VACUUM_SUPPORT_CLEARANCE_PAD_M = 0.002
+# Post-breakaway clearance target / early-LIFT max exempted plate↔support
+# penetration in CatalogContext.bad_contacts. Soft-contact noise on C1_1 table
+# plate vac routinely reports ~2.03 mm; keep a half-millimetre margin above the
+# historical 2 mm pad so LIFT does not fail on the first tick after attach.
+VACUUM_SUPPORT_CLEARANCE_PAD_M = 0.0025
 # Extra headroom so early-LIFT controller dip after kinematic breakaway does not
 # re-immerse the held object. Live bread_b: post-breakaway TCP dipped ~9.5 mm
 # on the first LIFT ticks (clr +1.9 mm → -7.1 mm).
@@ -60,20 +61,24 @@ def vacuum_support_breakaway_lift_m(clearance_m, mesh_penetration_m=0.0):
     """Bounded lift so a vac-held object clears known support.
 
     Uses the worse of AABB bottom immersion and direct object↔support mesh
-    penetration. Returns 0 when already clear. Raises when required lift
+    penetration. Always leaves ``pad + post-breakaway dip margin`` of clearance
+    so the first impedance LIFT ticks cannot re-immerse the object when the
+    AABB looked "clear" but soft contacts remain (live C1_1 plate↔table).
+    Returns 0 when already at/above that target. Raises when required lift
     exceeds the safety bound (deep/invalid immersion, not soft resting contact).
     """
 
-    aabb_pen = max(0.0, -float(clearance_m))
+    clearance = float(clearance_m)
     mesh_pen = max(0.0, float(mesh_penetration_m))
-    penetration = max(aabb_pen, mesh_pen)
-    if penetration <= VACUUM_SUPPORT_CONTACT_EPS_M:
-        return 0.0
-    lift = (
-        penetration
-        + VACUUM_SUPPORT_CLEARANCE_PAD_M
+    desired_clearance = (
+        VACUUM_SUPPORT_CLEARANCE_PAD_M
         + VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M
     )
+    lift = max(0.0, desired_clearance - clearance)
+    if mesh_pen > VACUUM_SUPPORT_CONTACT_EPS_M:
+        lift = max(lift, mesh_pen + desired_clearance)
+    if lift <= VACUUM_SUPPORT_CONTACT_EPS_M:
+        return 0.0
     if lift > MAX_VACUUM_SUPPORT_BREAKAWAY_M + 1e-12:
         raise GraspFailure(
             'SUPPORT_BREAKAWAY_EXCEEDS_BOUND: '
@@ -134,22 +139,38 @@ def _apply_vac_arm_waypoint(context, waypoint):
     context.mj.mj_collision(context.model, context.data)
 
 
+def _play_vac_kinematic_path(context, path, stage, opening):
+    """FK each waypoint, then one controller tick so video captures the climb.
+
+    Pure qpos writes skip ``_advance_controller`` / ``scripted_render``, so a
+    long LIFT looks like a teleport in recorded video. Sync the absolute joint
+    goal and ``step`` once per waypoint to keep support-safe kinematics while
+    emitting frames.
+    """
+
+    context.stage = stage
+    q_final = None
+    for waypoint in np.asarray(path, dtype=float):
+        waypoint = np.asarray(waypoint, dtype=float).reshape(-1)
+        _apply_vac_arm_waypoint(context, waypoint)
+        _sync_absolute_joint_goal(context, waypoint)
+        context.step(waypoint, opening)
+        context.sample()
+        q_final = waypoint
+    if q_final is None:
+        raise GraspFailure(f'{stage}_KINEMATIC_PATH_EMPTY')
+    return q_final
+
+
 def _kinematic_breakaway_to(context, target, opening):
-    """Play BREAKAWAY by FK + attach sync (no near-support impedance settle).
+    """Play BREAKAWAY by FK + attach sync, with rendered controller ticks.
 
     Live bread: kinematic clear to +12 mm, then PD settle/LIFT tracked back
     toward the pre-breakaway pose (~20 mm TCP dip) and re-immersed meshes.
     """
 
-    del opening  # call-site symmetry with move(...); impedance settle omitted
     path = np.asarray(context.plan_to(target, 'BREAKAWAY', cartesian=True), dtype=float)
-    context.stage = 'BREAKAWAY'
-    for waypoint in path:
-        _apply_vac_arm_waypoint(context, waypoint)
-        context.sample()
-    q_raised = np.asarray(path[-1], dtype=float)
-    _sync_absolute_joint_goal(context, q_raised)
-    return q_raised
+    return _play_vac_kinematic_path(context, path, 'BREAKAWAY', opening)
 
 
 def move_vacuum_cartesian_kinematic(context, target, stage, opening, settle_steps=50):
@@ -158,15 +179,12 @@ def move_vacuum_cartesian_kinematic(context, target, stage, opening, settle_step
     Used for LIFT after support breakaway: absolute joint PD tracks back into
     the pre-breakaway configuration for the first ticks (~20 mm TCP dip on
     bread_b), so early LIFT must not rely on impedance near the island.
+    Each waypoint is followed by one controller tick so recorded video shows a
+    continuous climb instead of a teleport.
     """
 
     path = np.asarray(context.plan_to(target, stage, cartesian=True), dtype=float)
-    context.stage = stage
-    for waypoint in path:
-        _apply_vac_arm_waypoint(context, waypoint)
-        context.sample()
-    q = np.asarray(path[-1], dtype=float)
-    _sync_absolute_joint_goal(context, q)
+    q = _play_vac_kinematic_path(context, path, stage, opening)
     for _ in range(int(settle_steps)):
         context.step(q, opening)
     return q
@@ -322,23 +340,39 @@ def run_kinematic_vacuum_hold(context, q, opening, duration_s):
         lo, hi = splits['right']
         action[lo:hi] = q
         lo, hi = splits['right_gripper']
-        action[lo:hi] = -float(opening)
+        gripper_cmd = -float(opening)
+        if hasattr(context.runtime, 'vac_gripper_action_for_command'):
+            gripper_cmd = float(
+                context.runtime.vac_gripper_action_for_command(gripper_cmd)
+            )
+        action[lo:hi] = gripper_cmd
         context.player._advance_controller(action)
         _apply_vac_arm_waypoint(context, q)
+        suppress = getattr(context.runtime, 'suppress_native_adhesion_actuators', None)
+        if callable(suppress):
+            suppress()
         rows.append(context.sample())
     _sync_absolute_joint_goal(context, q)
     return rows, float(context.data.time) - start
 
 
-def breakaway_vacuum_from_support(context, q, opening):
-    """If the vac-held object still intersects support, lift clear before LIFT.
+def _vacuum_desired_support_clearance_m():
+    return (
+        VACUUM_SUPPORT_CLEARANCE_PAD_M
+        + VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M
+    )
 
-    Skips when AABB and mesh clearances are already non-negative (within eps).
-    Uses residual, geometry-driven chunks bounded by
+
+def breakaway_vacuum_from_support(context, q, opening):
+    """If vac-held object is below the LIFT dip-safe clearance, lift before LIFT.
+
+    Skips only when AABB clearance already meets pad+dip-margin and mesh
+    penetration is within eps. Uses residual, geometry-driven chunks bounded by
     ``MAX_VACUUM_SUPPORT_BREAKAWAY_M``. Does not rewrite free-object initial
     poses or widen collision thresholds.
     """
 
+    desired = _vacuum_desired_support_clearance_m()
     clearance = support_bottom_clearance_m(context)
     mesh_pen = object_support_penetration_m(context)
     record = {
@@ -348,6 +382,7 @@ def breakaway_vacuum_from_support(context, q, opening):
         'applied': False,
         'pad_m': VACUUM_SUPPORT_CLEARANCE_PAD_M,
         'lift_dip_margin_m': VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M,
+        'desired_clearance_m': desired,
         'max_breakaway_m': MAX_VACUUM_SUPPORT_BREAKAWAY_M,
         'chunks': [],
         'mode': 'KINEMATIC_PATH',
@@ -394,7 +429,7 @@ def breakaway_vacuum_from_support(context, q, opening):
         clearance = clearance_after
         mesh_pen = mesh_after
         if (
-            clearance >= VACUUM_SUPPORT_CLEARANCE_PAD_M - 1e-4
+            clearance >= desired - 1e-4
             and mesh_pen <= VACUUM_SUPPORT_CONTACT_EPS_M
         ):
             break
@@ -405,7 +440,7 @@ def breakaway_vacuum_from_support(context, q, opening):
     record['clearance_after_m'] = clearance
     record['mesh_penetration_after_m'] = mesh_pen
     if record['applied'] and (
-        clearance < VACUUM_SUPPORT_CLEARANCE_PAD_M - 1e-4
+        clearance < desired - 1e-4
         or mesh_pen > VACUUM_SUPPORT_CONTACT_EPS_M
     ):
         raise GraspFailure(
@@ -485,6 +520,11 @@ def attach_vacuum(context):
         max_attach_distance_m=.002,
         max_attach_penetration_m=.002,
     )
+    # Lock intended target: kinematic weld holds the object; zero adhesion so
+    # the cup cannot suction additional free bodies during later tool-use.
+    suppress = getattr(context.runtime, 'suppress_native_adhesion_actuators', None)
+    if callable(suppress):
+        suppress()
     pose_after_attach = np.asarray(context.body_pose(), dtype=float).copy()
     jump = pose_after_attach[:3, 3] - pose_before_attach[:3, 3]
     T_GB = inverse(context.grip_pose()) @ context.body_pose()

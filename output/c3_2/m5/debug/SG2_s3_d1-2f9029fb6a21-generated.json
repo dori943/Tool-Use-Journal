@@ -1,0 +1,811 @@
+{
+  "stage": "VLM_GENERATED",
+  "request_id": "motion-request:0:f2098e961f9120f80f0c",
+  "subgoal_id": "SG2_s3_d1",
+  "artifact": {
+    "schema_version": "3.2.0",
+    "artifact_id": "keyframe-plan:3328426e2d5700ff1e3d1082",
+    "provenance": {
+      "artifact_id": "keyframe-plan-artifact:3328426e2d5700ff1e3d1082",
+      "artifact_type": "KeyframePlanArtifact",
+      "produced_by": "MOTION_PLANNER",
+      "invocation_id": "openai-keyframes:motion-request:0:f2098e961f9120f80f0c",
+      "input_artifact_ids": [
+        "motion-request-artifact:f2098e961f9120f80f0c8e43"
+      ],
+      "attempt": 1,
+      "metadata": {
+        "model": "gpt-4o",
+        "prompt_version": "OPENAI_KEYFRAME_STRATEGY_V9",
+        "provider": "openai",
+        "provider_request_id": "resp_0b357704fb16e14e016aa29ed099d487d0b3a9597d603861c1",
+        "generation_attempt": 1,
+        "rejected_candidate_count": 0,
+        "rejected_candidates": []
+      }
+    },
+    "scene_signature": "predicted:8462e0dfb200215367c7d6082d4dffffa199351c064b5d5aa3da69a87d2d37e2",
+    "subgoal_id": "SG2_s3_d1",
+    "candidates": [
+      {
+        "strategy_id": "SG2_s3_d1:strategy_1",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_1:1:fk1",
+            "keyframe_type": "PRE_GRASP",
+            "frame_ref": "object:fork_b",
+            "anchor": "top_center",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.1,
+            "roll_rad": 0.0,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {}
+          },
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_1:2:fk2",
+            "keyframe_type": "GRASP",
+            "frame_ref": "object:fork_b",
+            "anchor": "top_center",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.0,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "GRIPPER_CLOSE",
+              "ATTACH_OBJECT"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "fork_b"
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_1:3:fk3",
+            "keyframe_type": "LIFT",
+            "frame_ref": "object:fork_b",
+            "anchor": "top_center",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.15,
+            "roll_rad": 0.0,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {}
+          }
+        ],
+        "rationale": "Direct approach and grasp from top center with positive lift.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "335e2360e3cf0c79932f8e3986094d7ade97b92ec51af26543b1cbf88c586d13",
+          "model_id": "gpt-4o",
+          "prompt_hash": "335e2360e3cf0c79932f8e3986094d7ade97b92ec51af26543b1cbf88c586d13",
+          "temperature": null,
+          "provider_request_id": "resp_0b357704fb16e14e016aa29ed099d487d0b3a9597d603861c1",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG2_s3_d1:strategy_2",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_2:1:fk4",
+            "keyframe_type": "PRE_GRASP",
+            "frame_ref": "object:fork_b",
+            "anchor": "bottom_center",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.15,
+            "roll_rad": 0.1,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {}
+          },
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_2:2:fk5",
+            "keyframe_type": "GRASP",
+            "frame_ref": "object:fork_b",
+            "anchor": "bottom_center",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.1,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "GRIPPER_CLOSE",
+              "ATTACH_OBJECT"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "fork_b"
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_2:3:fk6",
+            "keyframe_type": "LIFT",
+            "frame_ref": "object:fork_b",
+            "anchor": "bottom_center",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.2,
+            "roll_rad": 0.1,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {}
+          }
+        ],
+        "rationale": "Grasp from bottom with slight roll adjustment and increased lift distance.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "335e2360e3cf0c79932f8e3986094d7ade97b92ec51af26543b1cbf88c586d13",
+          "model_id": "gpt-4o",
+          "prompt_hash": "335e2360e3cf0c79932f8e3986094d7ade97b92ec51af26543b1cbf88c586d13",
+          "temperature": null,
+          "provider_request_id": "resp_0b357704fb16e14e016aa29ed099d487d0b3a9597d603861c1",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG2_s3_d1:strategy_3",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_3:1:fk7",
+            "keyframe_type": "PRE_GRASP",
+            "frame_ref": "object:fork_b",
+            "anchor": "center",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.12,
+            "roll_rad": -0.1,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {}
+          },
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_3:2:fk8",
+            "keyframe_type": "GRASP",
+            "frame_ref": "object:fork_b",
+            "anchor": "center",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": -0.1,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "GRIPPER_CLOSE",
+              "ATTACH_OBJECT"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "fork_b"
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_3:3:fk9",
+            "keyframe_type": "LIFT",
+            "frame_ref": "object:fork_b",
+            "anchor": "center",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.18,
+            "roll_rad": -0.1,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {}
+          }
+        ],
+        "rationale": "Approach from center for a stable grasp with moderate lift.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "335e2360e3cf0c79932f8e3986094d7ade97b92ec51af26543b1cbf88c586d13",
+          "model_id": "gpt-4o",
+          "prompt_hash": "335e2360e3cf0c79932f8e3986094d7ade97b92ec51af26543b1cbf88c586d13",
+          "temperature": null,
+          "provider_request_id": "resp_0b357704fb16e14e016aa29ed099d487d0b3a9597d603861c1",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG2_s3_d1:strategy_4",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_4:1:fk10",
+            "keyframe_type": "PRE_GRASP",
+            "frame_ref": "object:fork_b",
+            "anchor": "top",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.08,
+            "roll_rad": 0.0,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {}
+          },
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_4:2:fk11",
+            "keyframe_type": "GRASP",
+            "frame_ref": "object:fork_b",
+            "anchor": "top",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.0,
+            "planner": "CARTESIAN",
+            "events_after": [
+              "GRIPPER_CLOSE",
+              "ATTACH_OBJECT"
+            ],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "event_target_id": "fork_b"
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d1:strategy_4:3:fk12",
+            "keyframe_type": "LIFT",
+            "frame_ref": "object:fork_b",
+            "anchor": "top",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              1.0
+            ],
+            "tool_axis_to_align": "-z",
+            "offset_along_approach_m": 0.1,
+            "roll_rad": 0.0,
+            "planner": "CARTESIAN",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {}
+          }
+        ],
+        "rationale": "Quick top grasp with minimal lift for efficiency.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "335e2360e3cf0c79932f8e3986094d7ade97b92ec51af26543b1cbf88c586d13",
+          "model_id": "gpt-4o",
+          "prompt_hash": "335e2360e3cf0c79932f8e3986094d7ade97b92ec51af26543b1cbf88c586d13",
+          "temperature": null,
+          "provider_request_id": "resp_0b357704fb16e14e016aa29ed099d487d0b3a9597d603861c1",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      }
+    ]
+  },
+  "strategies": [
+    {
+      "strategy_id": "SG2_s3_d1:strategy_1",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s3_d1:strategy_1:1:fk1",
+          "phase": "PRE_GRASP",
+          "frame_ref": "object:fork_b",
+          "anchor": "top_center",
+          "raw_offset_m": 0.1,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": 0.0,
+          "planner": "CARTESIAN",
+          "metadata": {},
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.441848937119711,
+              -3.4315226548648874,
+              1.0373263953159875
+            ],
+            "orientation_xyzw": [
+              -0.9998917044781661,
+              8.750293277886114e-05,
+              -0.013118231277187609,
+              0.006669607720306289
+            ]
+          },
+          "raw_position_world_m": [
+            2.441848937119711,
+            -3.4315226548648874,
+            1.0373263953159875
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s3_d1:strategy_1:2:fk2",
+          "phase": "GRASP",
+          "frame_ref": "object:fork_b",
+          "anchor": "top_center",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": 0.0,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "fork_b"
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.4444724159680553,
+              -3.430189107355298,
+              0.9373697096477843
+            ],
+            "orientation_xyzw": [
+              -0.9998917044781661,
+              8.750293277886114e-05,
+              -0.013118231277187609,
+              0.006669607720306289
+            ]
+          },
+          "raw_position_world_m": [
+            2.4444724159680553,
+            -3.430189107355298,
+            0.9373697096477843
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG2_s3_d1:strategy_1:3:fk3",
+          "phase": "LIFT",
+          "frame_ref": "object:fork_b",
+          "anchor": "top_center",
+          "raw_offset_m": 0.15,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": 0.0,
+          "planner": "CARTESIAN",
+          "metadata": {},
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.4405371976955386,
+              -3.4321894286196826,
+              1.0873047381500889
+            ],
+            "orientation_xyzw": [
+              -0.9998917044781661,
+              8.750293277886114e-05,
+              -0.013118231277187609,
+              0.006669607720306289
+            ]
+          },
+          "raw_position_world_m": [
+            2.4405371976955386,
+            -3.4321894286196826,
+            1.0873047381500889
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG2_s3_d1:strategy_2",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s3_d1:strategy_2:1:fk4",
+          "phase": "PRE_GRASP",
+          "frame_ref": "object:fork_b",
+          "anchor": "bottom_center",
+          "raw_offset_m": 0.15,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": 0.1,
+          "planner": "CARTESIAN",
+          "metadata": {},
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.4410217474440175,
+              -3.4319431258485493,
+              1.0688429971949878
+            ],
+            "orientation_xyzw": [
+              -0.998637726890446,
+              0.05006115032735955,
+              -0.012768495450790304,
+              0.007316910748922649
+            ]
+          },
+          "raw_position_world_m": [
+            2.4410217474440175,
+            -3.4319431258485493,
+            1.0688429971949878
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s3_d1:strategy_2:2:fk5",
+          "phase": "GRASP",
+          "frame_ref": "object:fork_b",
+          "anchor": "bottom_center",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": 0.1,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "fork_b"
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.444956965716534,
+              -3.4299428045841647,
+              0.9189079686926831
+            ],
+            "orientation_xyzw": [
+              -0.998637726890446,
+              0.05006115032735955,
+              -0.012768495450790304,
+              0.007316910748922649
+            ]
+          },
+          "raw_position_world_m": [
+            2.444956965716534,
+            -3.4299428045841647,
+            0.9189079686926831
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG2_s3_d1:strategy_2:3:fk6",
+          "phase": "LIFT",
+          "frame_ref": "object:fork_b",
+          "anchor": "bottom_center",
+          "raw_offset_m": 0.2,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": 0.1,
+          "planner": "CARTESIAN",
+          "metadata": {},
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.4397100080198455,
+              -3.432609899603344,
+              1.1188213400290894
+            ],
+            "orientation_xyzw": [
+              -0.998637726890446,
+              0.05006115032735955,
+              -0.012768495450790304,
+              0.007316910748922649
+            ]
+          },
+          "raw_position_world_m": [
+            2.4397100080198455,
+            -3.432609899603344,
+            1.1188213400290894
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG2_s3_d1:strategy_3",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s3_d1:strategy_3:1:fk7",
+          "phase": "PRE_GRASP",
+          "frame_ref": "object:fork_b",
+          "anchor": "center",
+          "raw_offset_m": 0.12,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": -0.1,
+          "planner": "CARTESIAN",
+          "metadata": {},
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.4415665162242814,
+              -3.4316662129812388,
+              1.0480868619720773
+            ],
+            "orientation_xyzw": [
+              -0.9986464735382241,
+              -0.04988636317356313,
+              -0.013435178357234727,
+              0.006005634145853717
+            ]
+          },
+          "raw_position_world_m": [
+            2.4415665162242814,
+            -3.4316662129812388,
+            1.0480868619720773
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s3_d1:strategy_3:2:fk8",
+          "phase": "GRASP",
+          "frame_ref": "object:fork_b",
+          "anchor": "center",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": -0.1,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "fork_b"
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.4447146908422948,
+              -3.4300659559697313,
+              0.9281388391702337
+            ],
+            "orientation_xyzw": [
+              -0.9986464735382241,
+              -0.04988636317356313,
+              -0.013435178357234727,
+              0.006005634145853717
+            ]
+          },
+          "raw_position_world_m": [
+            2.4447146908422948,
+            -3.4300659559697313,
+            0.9281388391702337
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG2_s3_d1:strategy_3:3:fk9",
+          "phase": "LIFT",
+          "frame_ref": "object:fork_b",
+          "anchor": "center",
+          "raw_offset_m": 0.18,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": -0.1,
+          "planner": "CARTESIAN",
+          "metadata": {},
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.439992428915275,
+              -3.4324663414869927,
+              1.1080608733729993
+            ],
+            "orientation_xyzw": [
+              -0.9986464735382241,
+              -0.04988636317356313,
+              -0.013435178357234727,
+              0.006005634145853717
+            ]
+          },
+          "raw_position_world_m": [
+            2.439992428915275,
+            -3.4324663414869927,
+            1.1080608733729993
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG2_s3_d1:strategy_4",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s3_d1:strategy_4:1:fk10",
+          "phase": "PRE_GRASP",
+          "frame_ref": "object:fork_b",
+          "anchor": "top",
+          "raw_offset_m": 0.08,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": 0.0,
+          "planner": "CARTESIAN",
+          "metadata": {},
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.44237363288938,
+              -3.4312559453629694,
+              1.0173350581823468
+            ],
+            "orientation_xyzw": [
+              -0.9998917044781661,
+              8.750293277886114e-05,
+              -0.013118231277187609,
+              0.006669607720306289
+            ]
+          },
+          "raw_position_world_m": [
+            2.44237363288938,
+            -3.4312559453629694,
+            1.0173350581823468
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s3_d1:strategy_4:2:fk11",
+          "phase": "GRASP",
+          "frame_ref": "object:fork_b",
+          "anchor": "top",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": 0.0,
+          "planner": "CARTESIAN",
+          "metadata": {
+            "event_target_id": "fork_b"
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.4444724159680553,
+              -3.430189107355298,
+              0.9373697096477843
+            ],
+            "orientation_xyzw": [
+              -0.9998917044781661,
+              8.750293277886114e-05,
+              -0.013118231277187609,
+              0.006669607720306289
+            ]
+          },
+          "raw_position_world_m": [
+            2.4444724159680553,
+            -3.430189107355298,
+            0.9373697096477843
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG2_s3_d1:strategy_4:3:fk12",
+          "phase": "LIFT",
+          "frame_ref": "object:fork_b",
+          "anchor": "top",
+          "raw_offset_m": 0.1,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "roll_rad": 0.0,
+          "planner": "CARTESIAN",
+          "metadata": {},
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.441848937119711,
+              -3.4315226548648874,
+              1.0373263953159875
+            ],
+            "orientation_xyzw": [
+              -0.9998917044781661,
+              8.750293277886114e-05,
+              -0.013118231277187609,
+              0.006669607720306289
+            ]
+          },
+          "raw_position_world_m": [
+            2.441848937119711,
+            -3.4315226548648874,
+            1.0373263953159875
+          ]
+        }
+      ]
+    }
+  ],
+  "raw_position_note": "VLM emits frame/anchor/offset, not absolute XYZ; raw_position_world_m is the first resolver result."
+}

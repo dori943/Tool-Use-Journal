@@ -1,0 +1,188 @@
+{
+  "status": "FAILED",
+  "object_id": "fork_b",
+  "task_id": "c3_2",
+  "ee_id": "3F",
+  "recipe": {
+    "object_id": "fork",
+    "task_id": "c3_2",
+    "ee_id": "3F",
+    "expected_size_m": [
+      0.025003964,
+      0.153709715,
+      0.018469741
+    ],
+    "offset_fraction": [
+      0.0,
+      -0.45,
+      0.0
+    ],
+    "offset_m": [
+      -0.004,
+      0.0,
+      0.016
+    ],
+    "rotation_xyz_deg": [
+      5.0,
+      0.0,
+      0.0
+    ],
+    "contact_region_min": [
+      -0.6,
+      -0.75,
+      -0.6
+    ],
+    "contact_region_max": [
+      0.6,
+      0.05,
+      0.6
+    ],
+    "preshape_aperture_m": 0.025,
+    "preshape_closure_command": 0.05,
+    "approach_distance_m": 0.12,
+    "lift_distance_m": 0.16,
+    "arm_kp": 150.0,
+    "post_grasp_arm_kp": null,
+    "close_duration_s": 4.0,
+    "closure_kp": 20.0,
+    "physics_timestep_s": 0.001,
+    "physics_integrator": "implicitfast",
+    "thin_contact_timeconstant_s": 0.004,
+    "two_finger_parallel_linkage": false,
+    "two_finger_force_target_n": 5.0,
+    "two_finger_force_gain": 0.002,
+    "three_finger_force_targets_n": [
+      3.0,
+      1.5,
+      1.5
+    ],
+    "three_finger_force_gain": 0.002,
+    "prelift_stabilization_s": 0.5,
+    "settle_s": 0.5,
+    "hold_s": 2.0,
+    "joint_speed_rad_s": 0.45,
+    "cartesian_speed_m_s": 0.05,
+    "minimum_lift_m": 0.1,
+    "maximum_slip_m": 0.005,
+    "maximum_slip_deg": 5.0,
+    "contact_ticks": 5,
+    "maximum_joint_limit_error_rad": 0.01,
+    "suction_command": 1.0,
+    "model_class": "JacoThreeFingerDexterousGripper",
+    "recipe_id": "fork_3f_center_v1"
+  },
+  "scenario": {
+    "seed": 0,
+    "mode": "BORROWED_M5_RUNTIME",
+    "request_id": "scripted-validate"
+  },
+  "runtime_version": "catalog_v2_measured_time",
+  "timing": {
+    "physics_timestep_s": 0.001,
+    "control_timestep_s": 0.02,
+    "clock_source": "MUJOCO_DATA_TIME"
+  },
+  "failure_stage": "PLAN_GRASP",
+  "failure_reason": "CARTESIAN_COLLISION: GRASP invalid swept sample 1/1:  [{'geoms': ['gripper0_right_index_distal_collision', 'tray_a_g21'], 'penetration_m': 0.002510164075651435}]",
+  "error_type": "GraspFailure",
+  "object_pose_in_gripper": {
+    "position_m": [
+      0.0040204749306815835,
+      -0.06757914795003117,
+      0.1418834801314378
+    ],
+    "orientation_xyzw": [
+      0.9990479179262834,
+      4.388855336461023e-05,
+      2.257638113523583e-05,
+      0.04362631374824039
+    ]
+  },
+  "final_object_pose": {
+    "position_m": [
+      2.444755326293794,
+      -3.4300987907330347,
+      0.9282355737969656
+    ],
+    "orientation_xyzw": [
+      -0.01397308939009641,
+      0.004526489347021592,
+      0.7071344699005451,
+      -0.7069265203297742
+    ]
+  },
+  "attachment_used": false,
+  "object_material_inputs": [],
+  "learned_model_calls": 0,
+  "hand_model_correction": {
+    "policy": "TENDON_REFERENCE_ALIGNED_TO_DECLARED_REST_AND_INIT",
+    "couplings": [
+      {
+        "name": "gripper0_right_thumb_cpl",
+        "reference_length": 0.6400000000000001,
+        "rest_length": 0.2,
+        "polycoef_constant": -0.4400000000000001,
+        "before": {
+          "name": "gripper0_right_thumb_cpl",
+          "tendon1": "gripper0_right_thumb_cpl"
+        },
+        "after": {
+          "name": "gripper0_right_thumb_cpl",
+          "tendon1": "gripper0_right_thumb_cpl",
+          "polycoef": "-0.44 1 0 0 0",
+          "solref": "0.004 1"
+        }
+      },
+      {
+        "name": "gripper0_right_index_12_cpl",
+        "reference_length": 0.6400000000000001,
+        "rest_length": 0.2,
+        "polycoef_constant": -0.4400000000000001,
+        "before": {
+          "name": "gripper0_right_index_12_cpl",
+          "tendon1": "gripper0_right_index_12_cpl"
+        },
+        "after": {
+          "name": "gripper0_right_index_12_cpl",
+          "tendon1": "gripper0_right_index_12_cpl",
+          "polycoef": "-0.44 1 0 0 0",
+          "solref": "0.004 1"
+        }
+      },
+      {
+        "name": "gripper0_right_pinky_12_cpl",
+        "reference_length": 0.6400000000000001,
+        "rest_length": 0.2,
+        "polycoef_constant": -0.4400000000000001,
+        "before": {
+          "name": "gripper0_right_pinky_12_cpl",
+          "tendon1": "gripper0_right_pinky_12_cpl"
+        },
+        "after": {
+          "name": "gripper0_right_pinky_12_cpl",
+          "tendon1": "gripper0_right_pinky_12_cpl",
+          "polycoef": "-0.44 1 0 0 0",
+          "solref": "0.004 1"
+        }
+      }
+    ],
+    "joint_limit_timeconstant_s": 0.002,
+    "joint_ranges_changed": false,
+    "mass_or_friction_changed": false,
+    "joint_limit_impedance": [
+      0.9999,
+      0.9999,
+      0.001,
+      0.5,
+      2
+    ],
+    "joint_armature_kg_m2": 0.0001,
+    "source_assets_changed": false,
+    "minimum_proximal_command_rad": 0.0
+  },
+  "nominal_joint_limit_diagnostics": {
+    "max_violation_rad": 0.0,
+    "allowed_numerical_residual_rad": 0.01,
+    "physics_steps_audited": 9540
+  }
+}

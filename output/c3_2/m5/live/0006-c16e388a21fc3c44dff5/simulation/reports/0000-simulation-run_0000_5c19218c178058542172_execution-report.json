@@ -1,0 +1,176 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:5c19218c178058542172:execution-report",
+  "run_id": "simulation-run:0000:5c19218c178058542172",
+  "plan_id": "motion-plan:081192565639a2978e6d3476",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:5c19218c178058542172:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:5c19218c178058542172",
+    "input_artifact_ids": [
+      "simulation-run-artifact:5c19218c1780585421721a56",
+      "motion-plan-artifact:081192565639a2978e6d3476"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "SUCCESS",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      0.3560553570326328,
+      -1.8214763170195347,
+      1.9671924562050949,
+      -1.7165264180622009,
+      -1.5707962486543061,
+      0.35541726393582923
+    ],
+    "joint_velocities_rad_s": [
+      0.0008393483104503976,
+      -0.014246232539305948,
+      -0.06932340730458829,
+      0.08356839473008669,
+      3.1646792306243464e-8,
+      0.000837931016333518
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        2.1817185118049647,
+        -2.961089679239429,
+        1.1077987820539343
+      ],
+      "orientation_xyzw": [
+        -0.9999999490803171,
+        -0.00031904654325398696,
+        -6.525665618798106e-6,
+        2.4662443038432485e-6
+      ]
+    },
+    "gripper": {
+      "mode": "OPEN",
+      "command": -1.0
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 2.020000000009645,
+    "max_joint_tracking_error_rad": 0.03650901754977931,
+    "max_eef_tracking_error_m": 0.012605834357117152,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG4_s1_d3:SG4_s1_d3:S1_direct_withdrawal:2:KF2_direct_deposit:event:0:DETACH_OBJECT",
+      "scheduled_time_s": 1.1056773897307224,
+      "actual_time_s": 1.1800000000056343,
+      "status": "SUCCESS",
+      "message": "detached bread_b and preserved world pose"
+    },
+    {
+      "event_id": "SG4_s1_d3:SG4_s1_d3:S1_direct_withdrawal:2:KF2_direct_deposit:event:1:SUCTION_OFF",
+      "scheduled_time_s": 1.1056773897307224,
+      "actual_time_s": 1.1800000000056343,
+      "status": "SUCCESS",
+      "message": "vacuum suction disabled with command -1.000"
+    }
+  ],
+  "failure": null,
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "vac",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": -1.0,
+    "ee_transition_count": 1,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 101,
+    "nominal_plan_duration_s": 1.9289012985035936,
+    "final_plan_time_s": 1.9289012985035936,
+    "adaptive_settle_extra_duration_s": 0.0910987015060516,
+    "segment_tracking": [
+      {
+        "segment_id": "SG4_s1_d3:SG4_s1_d3:S1_direct_withdrawal:0:SG4_s1_d3:SG4_s1_d3:S1_direct_withdrawal:1:KF1_direct_approach",
+        "keyframe_id": "SG4_s1_d3:SG4_s1_d3:S1_direct_withdrawal:1:KF1_direct_approach",
+        "target_block_id": null,
+        "nominal_end_time_s": 0.2186236745056425,
+        "actual_execution_time_s": 0.22000000000105047,
+        "max_joint_error_rad": 7.142954450145567e-9,
+        "eef_position_error_m": 2.6519121113686513e-9,
+        "eef_orientation_error_rad": 8.84348224212182e-15,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG4_s1_d3:SG4_s1_d3:S1_direct_withdrawal:1:SG4_s1_d3:SG4_s1_d3:S1_direct_withdrawal:2:KF2_direct_deposit",
+        "keyframe_id": "SG4_s1_d3:SG4_s1_d3:S1_direct_withdrawal:2:KF2_direct_deposit",
+        "target_block_id": null,
+        "nominal_end_time_s": 1.1056773897307224,
+        "actual_execution_time_s": 1.1800000000056343,
+        "max_joint_error_rad": 0.0,
+        "eef_position_error_m": 4.965068306494546e-16,
+        "eef_orientation_error_rad": 4.888270651299348e-16,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.06000000000028649,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG4_s1_d3:SG4_s1_d3:S1_direct_withdrawal:2:SG4_s1_d3:SG4_s1_d3:S1_direct_withdrawal:3:KF3_direct_withdrawal",
+        "keyframe_id": "SG4_s1_d3:SG4_s1_d3:S1_direct_withdrawal:3:KF3_direct_withdrawal",
+        "target_block_id": null,
+        "nominal_end_time_s": 1.9289012985035936,
+        "actual_execution_time_s": 2.020000000009645,
+        "max_joint_error_rad": 0.00948385086797865,
+        "eef_position_error_m": 0.0035375546640418216,
+        "eef_orientation_error_rad": 0.00007017563241072426,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      }
+    ],
+    "goal_evaluation": {
+      "request_id": "motion-request:live:c16e388a21fc3c44dff5",
+      "goal_type": "POSE",
+      "status": "SATISFIED",
+      "detail": "all target footprints are inside the goal region",
+      "position_error_m": null,
+      "orientation_error_rad": null,
+      "joint_error_rad": null,
+      "observed": {
+        "region_id": "plate_b",
+        "inside_target_ids": [
+          "bread_b"
+        ],
+        "outside_target_ids": [],
+        "geometry_errors": {},
+        "inset_margin_m": 0.0,
+        "include_vertical": false
+      }
+    }
+  }
+}

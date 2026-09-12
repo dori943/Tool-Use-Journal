@@ -1,0 +1,999 @@
+{
+  "stage": "VLM_GENERATED",
+  "request_id": "motion-request:0:13c6a489b9deeaedb68c",
+  "subgoal_id": "SG2_s3_d2",
+  "artifact": {
+    "schema_version": "3.2.0",
+    "artifact_id": "keyframe-plan:0f7c8b7b517569a12c9e108e",
+    "provenance": {
+      "artifact_id": "keyframe-plan-artifact:0f7c8b7b517569a12c9e108e",
+      "artifact_type": "KeyframePlanArtifact",
+      "produced_by": "MOTION_PLANNER",
+      "invocation_id": "openai-keyframes:motion-request:0:13c6a489b9deeaedb68c",
+      "input_artifact_ids": [
+        "motion-request-artifact:13c6a489b9deeaedb68ca0f6"
+      ],
+      "attempt": 1,
+      "metadata": {
+        "model": "gpt-4o",
+        "prompt_version": "OPENAI_KEYFRAME_STRATEGY_V9",
+        "provider": "openai",
+        "provider_request_id": "resp_0dfc2105f1d3e257016aa2ec2828bc87d092ad1526341236bc",
+        "generation_attempt": 1,
+        "rejected_candidate_count": 0,
+        "rejected_candidates": []
+      }
+    },
+    "scene_signature": "predicted:5d7d1240b8e3e4b78ccc4dc98d01c6506864a791dbf9a66fa91581d78f154642",
+    "subgoal_id": "SG2_s3_d2",
+    "candidates": [
+      {
+        "strategy_id": "SG2_s3_d2:DirectRouteStrategy",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s3_d2:DirectRouteStrategy:1:DirectTransferStart",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_transport_start",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d2:DirectRouteStrategy:2:DirectTransferEnd",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_transport_goal",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          }
+        ],
+        "rationale": "A direct, shortest-path route to the destination with minimal clearance.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "ffeb1f3d5bf0c9e3b75e230590545c63c927f283cc0d59b9e9878e7a51adb350",
+          "model_id": "gpt-4o",
+          "prompt_hash": "ffeb1f3d5bf0c9e3b75e230590545c63c927f283cc0d59b9e9878e7a51adb350",
+          "temperature": null,
+          "provider_request_id": "resp_0dfc2105f1d3e257016aa2ec2828bc87d092ad1526341236bc",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG2_s3_d2:HighClearanceStrategy",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s3_d2:HighClearanceStrategy:1:HighClearanceTransferStart",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_transport_start",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.3,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d2:HighClearanceStrategy:2:HighClearanceTransferMid",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "center",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.25,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d2:HighClearanceStrategy:3:HighClearanceTransferEnd",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_transport_goal",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          }
+        ],
+        "rationale": "Uses a high clearance route to avoid potential obstacles in the horizontal plane.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "ffeb1f3d5bf0c9e3b75e230590545c63c927f283cc0d59b9e9878e7a51adb350",
+          "model_id": "gpt-4o",
+          "prompt_hash": "ffeb1f3d5bf0c9e3b75e230590545c63c927f283cc0d59b9e9878e7a51adb350",
+          "temperature": null,
+          "provider_request_id": "resp_0dfc2105f1d3e257016aa2ec2828bc87d092ad1526341236bc",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG2_s3_d2:CornerRouteStrategy",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s3_d2:CornerRouteStrategy:1:CornerRouteTransferStart",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_transport_start",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d2:CornerRouteStrategy:2:CornerRouteTransferCorner",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "top_center",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.15,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d2:CornerRouteStrategy:3:CornerRouteTransferEnd",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_transport_goal",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          }
+        ],
+        "rationale": "Navigates around edge-clearances, moving past any corner interference.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "ffeb1f3d5bf0c9e3b75e230590545c63c927f283cc0d59b9e9878e7a51adb350",
+          "model_id": "gpt-4o",
+          "prompt_hash": "ffeb1f3d5bf0c9e3b75e230590545c63c927f283cc0d59b9e9878e7a51adb350",
+          "temperature": null,
+          "provider_request_id": "resp_0dfc2105f1d3e257016aa2ec2828bc87d092ad1526341236bc",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG2_s3_d2:ZigZagRouteStrategy",
+        "keyframes": [
+          {
+            "keyframe_id": "SG2_s3_d2:ZigZagRouteStrategy:1:ZigZagTransferStart",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_transport_start",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d2:ZigZagRouteStrategy:2:ZigZagTransferMid1",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "bottom_center",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.2,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d2:ZigZagRouteStrategy:3:ZigZagTransferMid2",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "top_center",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.1,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG2_s3_d2:ZigZagRouteStrategy:4:ZigZagTransferEnd",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:tray_b",
+            "anchor": "held_transport_goal",
+            "approach_axis_xyz": [
+              -0.012818692852523041,
+              0.027056660543192675,
+              0.9995517086343274
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": -0.0008489075576372369,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "fork_b",
+              "packing_orientation_xyzw": [
+                0.013785685976242164,
+                0.006827778324218034,
+                -0.0003303277140269338,
+                0.9998816065859604
+              ]
+            }
+          }
+        ],
+        "rationale": "A zig-zag pattern to alternate between different altitudes for obstacle avoidance.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "ffeb1f3d5bf0c9e3b75e230590545c63c927f283cc0d59b9e9878e7a51adb350",
+          "model_id": "gpt-4o",
+          "prompt_hash": "ffeb1f3d5bf0c9e3b75e230590545c63c927f283cc0d59b9e9878e7a51adb350",
+          "temperature": null,
+          "provider_request_id": "resp_0dfc2105f1d3e257016aa2ec2828bc87d092ad1526341236bc",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      }
+    ]
+  },
+  "strategies": [
+    {
+      "strategy_id": "SG2_s3_d2:DirectRouteStrategy",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s3_d2:DirectRouteStrategy:1:DirectTransferStart",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_transport_start",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.440750973375593,
+              -3.4321667477744513,
+              1.0812101387244746
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.440750973375593,
+            -3.4321667477744513,
+            1.0812101387244746
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s3_d2:DirectRouteStrategy:2:DirectTransferEnd",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_transport_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2274111228527524,
+              -3.0491708542495326,
+              1.1496283318975493
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.2274111228527524,
+            -3.0491708542495326,
+            1.1496283318975493
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG2_s3_d2:HighClearanceStrategy",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s3_d2:HighClearanceStrategy:1:HighClearanceTransferStart",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_transport_start",
+          "raw_offset_m": 0.3,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.444844423075251,
+              -3.4404385333221836,
+              1.3810681405076664
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.444844423075251,
+            -3.4404385333221836,
+            1.3810681405076664
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s3_d2:HighClearanceStrategy:2:HighClearanceTransferMid",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "center",
+          "raw_offset_m": 0.25,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2334196553853123,
+              -2.9068976470997945,
+              1.1992036511283164
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.2334196553853123,
+            -2.9068976470997945,
+            1.1992036511283164
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG2_s3_d2:HighClearanceStrategy:3:HighClearanceTransferEnd",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_transport_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2274111228527524,
+              -3.0491708542495326,
+              1.1496283318975493
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.2274111228527524,
+            -3.0491708542495326,
+            1.1496283318975493
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG2_s3_d2:CornerRouteStrategy",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s3_d2:CornerRouteStrategy:1:CornerRouteTransferStart",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_transport_start",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.440750973375593,
+              -3.4321667477744513,
+              1.0812101387244746
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.440750973375593,
+            -3.4321667477744513,
+            1.0812101387244746
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s3_d2:CornerRouteStrategy:2:CornerRouteTransferCorner",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "top_center",
+          "raw_offset_m": 0.15,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.232079428514422,
+              -2.904155533789487,
+              1.1285979359331113
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.232079428514422,
+            -2.904155533789487,
+            1.1285979359331113
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG2_s3_d2:CornerRouteStrategy:3:CornerRouteTransferEnd",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_transport_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2274111228527524,
+              -3.0491708542495326,
+              1.1496283318975493
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.2274111228527524,
+            -3.0491708542495326,
+            1.1496283318975493
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG2_s3_d2:ZigZagRouteStrategy",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG2_s3_d2:ZigZagRouteStrategy:1:ZigZagTransferStart",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_transport_start",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.440750973375593,
+              -3.4321667477744513,
+              1.0812101387244746
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.440750973375593,
+            -3.4321667477744513,
+            1.0812101387244746
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG2_s3_d2:ZigZagRouteStrategy:2:ZigZagTransferMid1",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "bottom_center",
+          "raw_offset_m": 0.2,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.232713157406373,
+              -2.9055038676362357,
+              1.1198803654319258
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.232713157406373,
+            -2.9055038676362357,
+            1.1198803654319258
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG2_s3_d2:ZigZagRouteStrategy:3:ZigZagTransferMid2",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "top_center",
+          "raw_offset_m": 0.1,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.231397186897812,
+              -2.902776902864865,
+              1.0786216023025792
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.231397186897812,
+            -2.902776902864865,
+            1.0786216023025792
+          ]
+        },
+        {
+          "index": 3,
+          "keyframe_id": "SG2_s3_d2:ZigZagRouteStrategy:4:ZigZagTransferEnd",
+          "phase": "TRANSFER",
+          "frame_ref": "object:tray_b",
+          "anchor": "held_transport_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            -0.012818692852523041,
+            0.027056660543192675,
+            0.9995517086343274
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": -0.0008489075576372369,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "fork_b",
+            "packing_orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2274111228527524,
+              -3.0491708542495326,
+              1.1496283318975493
+            ],
+            "orientation_xyzw": [
+              0.013785685976242164,
+              0.006827778324218034,
+              -0.0003303277140269338,
+              0.9998816065859604
+            ]
+          },
+          "raw_position_world_m": [
+            2.2274111228527524,
+            -3.0491708542495326,
+            1.1496283318975493
+          ]
+        }
+      ]
+    }
+  ],
+  "raw_position_note": "VLM emits frame/anchor/offset, not absolute XYZ; raw_position_world_m is the first resolver result."
+}

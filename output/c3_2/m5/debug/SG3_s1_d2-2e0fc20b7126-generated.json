@@ -1,0 +1,926 @@
+{
+  "stage": "VLM_GENERATED",
+  "request_id": "motion-request:0:bd0a4c9bd6432fcbd011",
+  "subgoal_id": "SG3_s1_d2",
+  "artifact": {
+    "schema_version": "3.2.0",
+    "artifact_id": "keyframe-plan:2c54481ba513b29dce8961a0",
+    "provenance": {
+      "artifact_id": "keyframe-plan-artifact:2c54481ba513b29dce8961a0",
+      "artifact_type": "KeyframePlanArtifact",
+      "produced_by": "MOTION_PLANNER",
+      "invocation_id": "openai-keyframes:motion-request:0:bd0a4c9bd6432fcbd011",
+      "input_artifact_ids": [
+        "motion-request-artifact:bd0a4c9bd6432fcbd0116fd8"
+      ],
+      "attempt": 1,
+      "metadata": {
+        "model": "gpt-4o",
+        "prompt_version": "OPENAI_KEYFRAME_STRATEGY_V9",
+        "provider": "openai",
+        "provider_request_id": "resp_02c3e5d9f3ce7a6f016aa2f045439487d0b7b70f2990c23a2d",
+        "generation_attempt": 1,
+        "rejected_candidate_count": 0,
+        "rejected_candidates": []
+      }
+    },
+    "scene_signature": "predicted:2122a38fba211f16caaae00bd3514ad9db742532582c4fe32e3aaf857c484aaa",
+    "subgoal_id": "SG3_s1_d2",
+    "candidates": [
+      {
+        "strategy_id": "SG3_s1_d2:direct_transfer_strategy",
+        "keyframes": [
+          {
+            "keyframe_id": "SG3_s1_d2:direct_transfer_strategy:1:direct_transfer_start",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:plate_a",
+            "anchor": "held_transport_start",
+            "approach_axis_xyz": [
+              0.02747036979120238,
+              -0.10274874702982986,
+              -0.9943279508126756
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.003268053686156334,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "bread_a",
+              "packing_orientation_xyzw": [
+                0.014360659843808656,
+                -0.05126440395357912,
+                0.0008905140245638187,
+                0.9985814635376058
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG3_s1_d2:direct_transfer_strategy:2:direct_transfer_goal",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:plate_a",
+            "anchor": "held_transport_goal",
+            "approach_axis_xyz": [
+              0.02747036979120238,
+              -0.10274874702982986,
+              -0.9943279508126756
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.003268053686156334,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "bread_a",
+              "packing_orientation_xyzw": [
+                0.014360659843808656,
+                -0.05126440395357912,
+                0.0008905140245638187,
+                0.9985814635376058
+              ]
+            }
+          }
+        ],
+        "rationale": "This strategy proposes a direct path from the start to the goal with minimal detours ensuring the shortest transit. It respects the given orientation and approach direction, ensuring that the object is kept steady during movement.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "6a4b6d9666a4bc8893efa8852062c79ae836593574023b3d15406b4ba9452bd6",
+          "model_id": "gpt-4o",
+          "prompt_hash": "6a4b6d9666a4bc8893efa8852062c79ae836593574023b3d15406b4ba9452bd6",
+          "temperature": null,
+          "provider_request_id": "resp_02c3e5d9f3ce7a6f016aa2f045439487d0b7b70f2990c23a2d",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG3_s1_d2:zigzag_clearance_strategy",
+        "keyframes": [
+          {
+            "keyframe_id": "SG3_s1_d2:zigzag_clearance_strategy:1:zigzag_start",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:plate_a",
+            "anchor": "held_transport_start",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              -1.0
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.0,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "bread_a",
+              "packing_orientation_xyzw": [
+                0.014360659843808656,
+                -0.05126440395357912,
+                0.0008905140245638187,
+                0.9985814635376058
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG3_s1_d2:zigzag_clearance_strategy:2:zigzag_midpoint",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:plate_a",
+            "anchor": "center",
+            "approach_axis_xyz": [
+              -1.0,
+              0.0,
+              0.0
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.2,
+            "roll_rad": 0.0,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "bread_a",
+              "packing_orientation_xyzw": [
+                0.014360659843808656,
+                -0.05126440395357912,
+                0.0008905140245638187,
+                0.9985814635376058
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG3_s1_d2:zigzag_clearance_strategy:3:zigzag_goal",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:plate_a",
+            "anchor": "held_transport_goal",
+            "approach_axis_xyz": [
+              0.02747036979120238,
+              -0.10274874702982986,
+              -0.9943279508126756
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.003268053686156334,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "bread_a",
+              "packing_orientation_xyzw": [
+                0.014360659843808656,
+                -0.05126440395357912,
+                0.0008905140245638187,
+                0.9985814635376058
+              ]
+            }
+          }
+        ],
+        "rationale": "The zigzag clearance strategy adds a detour to ensure a trajectory over obstacles or around areas with potential collisions, allowing the robot to clear the environment's structures safely.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "6a4b6d9666a4bc8893efa8852062c79ae836593574023b3d15406b4ba9452bd6",
+          "model_id": "gpt-4o",
+          "prompt_hash": "6a4b6d9666a4bc8893efa8852062c79ae836593574023b3d15406b4ba9452bd6",
+          "temperature": null,
+          "provider_request_id": "resp_02c3e5d9f3ce7a6f016aa2f045439487d0b7b70f2990c23a2d",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG3_s1_d2:high_climb_strategy",
+        "keyframes": [
+          {
+            "keyframe_id": "SG3_s1_d2:high_climb_strategy:1:high_climb_start",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:plate_a",
+            "anchor": "held_transport_start",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              -1.0
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.0,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "bread_a",
+              "packing_orientation_xyzw": [
+                0.014360659843808656,
+                -0.05126440395357912,
+                0.0008905140245638187,
+                0.9985814635376058
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG3_s1_d2:high_climb_strategy:2:high_climb_elevation",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:plate_a",
+            "anchor": "origin",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              -1.0
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.5,
+            "roll_rad": 0.0,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "bread_a",
+              "packing_orientation_xyzw": [
+                0.014360659843808656,
+                -0.05126440395357912,
+                0.0008905140245638187,
+                0.9985814635376058
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG3_s1_d2:high_climb_strategy:3:high_climb_goal",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:plate_a",
+            "anchor": "held_transport_goal",
+            "approach_axis_xyz": [
+              0.02747036979120238,
+              -0.10274874702982986,
+              -0.9943279508126756
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.003268053686156334,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "bread_a",
+              "packing_orientation_xyzw": [
+                0.014360659843808656,
+                -0.05126440395357912,
+                0.0008905140245638187,
+                0.9985814635376058
+              ]
+            }
+          }
+        ],
+        "rationale": "High climb strategy involves an initial ascent to a higher position before proceeding to the location, useful in environments with significant vertical challenges.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "6a4b6d9666a4bc8893efa8852062c79ae836593574023b3d15406b4ba9452bd6",
+          "model_id": "gpt-4o",
+          "prompt_hash": "6a4b6d9666a4bc8893efa8852062c79ae836593574023b3d15406b4ba9452bd6",
+          "temperature": null,
+          "provider_request_id": "resp_02c3e5d9f3ce7a6f016aa2f045439487d0b7b70f2990c23a2d",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      },
+      {
+        "strategy_id": "SG3_s1_d2:sweep_right_strategy",
+        "keyframes": [
+          {
+            "keyframe_id": "SG3_s1_d2:sweep_right_strategy:1:sweep_right_start",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:plate_a",
+            "anchor": "held_transport_start",
+            "approach_axis_xyz": [
+              0.0,
+              0.0,
+              -1.0
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.0,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "bread_a",
+              "packing_orientation_xyzw": [
+                0.014360659843808656,
+                -0.05126440395357912,
+                0.0008905140245638187,
+                0.9985814635376058
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG3_s1_d2:sweep_right_strategy:2:sweep_right_swing",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:plate_a",
+            "anchor": "held_transport_goal",
+            "approach_axis_xyz": [
+              0.0,
+              -1.0,
+              0.0
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.3,
+            "roll_rad": 1.0,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "bread_a",
+              "packing_orientation_xyzw": [
+                0.014360659843808656,
+                -0.05126440395357912,
+                0.0008905140245638187,
+                0.9985814635376058
+              ]
+            }
+          },
+          {
+            "keyframe_id": "SG3_s1_d2:sweep_right_strategy:3:sweep_right_goal",
+            "keyframe_type": "TRANSFER",
+            "frame_ref": "object:plate_a",
+            "anchor": "held_transport_goal",
+            "approach_axis_xyz": [
+              0.02747036979120238,
+              -0.10274874702982986,
+              -0.9943279508126756
+            ],
+            "tool_axis_to_align": "+z",
+            "offset_along_approach_m": 0.0,
+            "roll_rad": 0.003268053686156334,
+            "planner": "SAMPLING_BASED",
+            "events_after": [],
+            "collision_context_id": null,
+            "collision_context_after_events_id": null,
+            "metadata": {
+              "pose_subject": "ATTACHED_OBJECT",
+              "pose_subject_object_id": "bread_a",
+              "packing_orientation_xyzw": [
+                0.014360659843808656,
+                -0.05126440395357912,
+                0.0008905140245638187,
+                0.9985814635376058
+              ]
+            }
+          }
+        ],
+        "rationale": "The sweep right strategy involves making a lateral approach to the target, leveraging side-to-side movement to navigate around obstacles efficiently.",
+        "provenance": {
+          "generator_kind": "VLM",
+          "generator_id": "OPENAI_KEYFRAME_STRATEGY_V9",
+          "input_hash": "6a4b6d9666a4bc8893efa8852062c79ae836593574023b3d15406b4ba9452bd6",
+          "model_id": "gpt-4o",
+          "prompt_hash": "6a4b6d9666a4bc8893efa8852062c79ae836593574023b3d15406b4ba9452bd6",
+          "temperature": null,
+          "provider_request_id": "resp_02c3e5d9f3ce7a6f016aa2f045439487d0b7b70f2990c23a2d",
+          "attempt_index": 1
+        },
+        "metadata": {}
+      }
+    ]
+  },
+  "strategies": [
+    {
+      "strategy_id": "SG3_s1_d2:direct_transfer_strategy",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG3_s1_d2:direct_transfer_strategy:1:direct_transfer_start",
+          "phase": "TRANSFER",
+          "frame_ref": "object:plate_a",
+          "anchor": "held_transport_start",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.02747036979120238,
+            -0.10274874702982986,
+            -0.9943279508126756
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.003268053686156334,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "bread_a",
+            "packing_orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.395876851041436,
+              -3.095042159647856,
+              1.0936919083891141
+            ],
+            "orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "raw_position_world_m": [
+            2.395876851041436,
+            -3.095042159647856,
+            1.0936919083891141
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG3_s1_d2:direct_transfer_strategy:2:direct_transfer_goal",
+          "phase": "TRANSFER",
+          "frame_ref": "object:plate_a",
+          "anchor": "held_transport_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.02747036979120238,
+            -0.10274874702982986,
+            -0.9943279508126756
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.003268053686156334,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "bread_a",
+            "packing_orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2061848666220834,
+              -3.380536193970541,
+              1.0936919083891141
+            ],
+            "orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "raw_position_world_m": [
+            2.2061848666220834,
+            -3.380536193970541,
+            1.0936919083891141
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG3_s1_d2:zigzag_clearance_strategy",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG3_s1_d2:zigzag_clearance_strategy:1:zigzag_start",
+          "phase": "TRANSFER",
+          "frame_ref": "object:plate_a",
+          "anchor": "held_transport_start",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.0,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "bread_a",
+            "packing_orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.395876851041436,
+              -3.095042159647856,
+              1.0936919083891141
+            ],
+            "orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "raw_position_world_m": [
+            2.395876851041436,
+            -3.095042159647856,
+            1.0936919083891141
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG3_s1_d2:zigzag_clearance_strategy:2:zigzag_midpoint",
+          "phase": "TRANSFER",
+          "frame_ref": "object:plate_a",
+          "anchor": "center",
+          "raw_offset_m": 0.2,
+          "approach_axis_xyz": [
+            -1.0,
+            0.0,
+            0.0
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.0,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "bread_a",
+            "packing_orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.229963567967356,
+              -3.580528708061738,
+              0.9345514563540492
+            ],
+            "orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "raw_position_world_m": [
+            2.229963567967356,
+            -3.580528708061738,
+            0.9345514563540492
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG3_s1_d2:zigzag_clearance_strategy:3:zigzag_goal",
+          "phase": "TRANSFER",
+          "frame_ref": "object:plate_a",
+          "anchor": "held_transport_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.02747036979120238,
+            -0.10274874702982986,
+            -0.9943279508126756
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.003268053686156334,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "bread_a",
+            "packing_orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2061848666220834,
+              -3.380536193970541,
+              1.0936919083891141
+            ],
+            "orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "raw_position_world_m": [
+            2.2061848666220834,
+            -3.380536193970541,
+            1.0936919083891141
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG3_s1_d2:high_climb_strategy",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG3_s1_d2:high_climb_strategy:1:high_climb_start",
+          "phase": "TRANSFER",
+          "frame_ref": "object:plate_a",
+          "anchor": "held_transport_start",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.0,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "bread_a",
+            "packing_orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.395876851041436,
+              -3.095042159647856,
+              1.0936919083891141
+            ],
+            "orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "raw_position_world_m": [
+            2.395876851041436,
+            -3.095042159647856,
+            1.0936919083891141
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG3_s1_d2:high_climb_strategy:2:high_climb_elevation",
+          "phase": "TRANSFER",
+          "frame_ref": "object:plate_a",
+          "anchor": "origin",
+          "raw_offset_m": 0.5,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.0,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "bread_a",
+            "packing_orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2298090606852394,
+              -3.3796204108539967,
+              0.43482906010267325
+            ],
+            "orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "raw_position_world_m": [
+            2.2298090606852394,
+            -3.3796204108539967,
+            0.43482906010267325
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG3_s1_d2:high_climb_strategy:3:high_climb_goal",
+          "phase": "TRANSFER",
+          "frame_ref": "object:plate_a",
+          "anchor": "held_transport_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.02747036979120238,
+            -0.10274874702982986,
+            -0.9943279508126756
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.003268053686156334,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "bread_a",
+            "packing_orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2061848666220834,
+              -3.380536193970541,
+              1.0936919083891141
+            ],
+            "orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "raw_position_world_m": [
+            2.2061848666220834,
+            -3.380536193970541,
+            1.0936919083891141
+          ]
+        }
+      ]
+    },
+    {
+      "strategy_id": "SG3_s1_d2:sweep_right_strategy",
+      "keyframes": [
+        {
+          "index": 0,
+          "keyframe_id": "SG3_s1_d2:sweep_right_strategy:1:sweep_right_start",
+          "phase": "TRANSFER",
+          "frame_ref": "object:plate_a",
+          "anchor": "held_transport_start",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            -1.0
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.0,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "bread_a",
+            "packing_orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.395876851041436,
+              -3.095042159647856,
+              1.0936919083891141
+            ],
+            "orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "raw_position_world_m": [
+            2.395876851041436,
+            -3.095042159647856,
+            1.0936919083891141
+          ]
+        },
+        {
+          "index": 1,
+          "keyframe_id": "SG3_s1_d2:sweep_right_strategy:2:sweep_right_swing",
+          "phase": "TRANSFER",
+          "frame_ref": "object:plate_a",
+          "anchor": "held_transport_goal",
+          "raw_offset_m": 0.3,
+          "approach_axis_xyz": [
+            0.0,
+            -1.0,
+            0.0
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 1.0,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "bread_a",
+            "packing_orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.5061848351853304,
+              -3.3806033964990423,
+              1.0935721341388585
+            ],
+            "orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "raw_position_world_m": [
+            2.5061848351853304,
+            -3.3806033964990423,
+            1.0935721341388585
+          ]
+        },
+        {
+          "index": 2,
+          "keyframe_id": "SG3_s1_d2:sweep_right_strategy:3:sweep_right_goal",
+          "phase": "TRANSFER",
+          "frame_ref": "object:plate_a",
+          "anchor": "held_transport_goal",
+          "raw_offset_m": 0.0,
+          "approach_axis_xyz": [
+            0.02747036979120238,
+            -0.10274874702982986,
+            -0.9943279508126756
+          ],
+          "tool_axis_to_align": "+z",
+          "roll_rad": 0.003268053686156334,
+          "planner": "SAMPLING_BASED",
+          "metadata": {
+            "pose_subject": "ATTACHED_OBJECT",
+            "pose_subject_object_id": "bread_a",
+            "packing_orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "resolver_world_pose": {
+            "frame_id": "world",
+            "position_m": [
+              2.2061848666220834,
+              -3.380536193970541,
+              1.0936919083891141
+            ],
+            "orientation_xyzw": [
+              0.014360659843808656,
+              -0.05126440395357912,
+              0.0008905140245638187,
+              0.9985814635376058
+            ]
+          },
+          "raw_position_world_m": [
+            2.2061848666220834,
+            -3.380536193970541,
+            1.0936919083891141
+          ]
+        }
+      ]
+    }
+  ],
+  "raw_position_note": "VLM emits frame/anchor/offset, not absolute XYZ; raw_position_world_m is the first resolver result."
+}

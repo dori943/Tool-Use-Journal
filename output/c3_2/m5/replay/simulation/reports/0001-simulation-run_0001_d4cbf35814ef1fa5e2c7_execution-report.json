@@ -1,0 +1,142 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0001:d4cbf35814ef1fa5e2c7:execution-report",
+  "run_id": "simulation-run:0001:d4cbf35814ef1fa5e2c7",
+  "plan_id": "motion-plan:3ac153af2912b4a2a24b5da3",
+  "provenance": {
+    "artifact_id": "simulation-run:0001:d4cbf35814ef1fa5e2c7:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0001:d4cbf35814ef1fa5e2c7",
+    "input_artifact_ids": [
+      "simulation-run-artifact:d4cbf35814ef1fa5e2c758c8",
+      "motion-plan-artifact:3ac153af2912b4a2a24b5da3"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "FAILED",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      0.07492782661373036,
+      -0.8392343602846941,
+      1.1938709113074972,
+      -1.9254504712980451,
+      -1.5705882051276445,
+      0.07471488661084219
+    ],
+    "joint_velocities_rad_s": [
+      0.0001360902475015998,
+      0.01716019773440446,
+      0.023034612411298838,
+      -0.04018683968007955,
+      -0.000010248330590214884,
+      0.00015050777061285895
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        2.6093736208447726,
+        -3.0300879801380063,
+        1.0451359786087318
+      ],
+      "orientation_xyzw": [
+        -0.7071820596295232,
+        0.7070314870160351,
+        0.00007313877144238258,
+        0.00007454367715459266
+      ]
+    },
+    "gripper": {
+      "mode": "CLOSED",
+      "command": -0.9991956224578545
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 9.760000000011928,
+    "max_joint_tracking_error_rad": 0.13541703580741493,
+    "max_eef_tracking_error_m": 0.03234354284956492,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG2_s1_d1:strategy1:2:keyframe2:event:0:SUCTION_ON",
+      "scheduled_time_s": 9.489047225828,
+      "actual_time_s": 9.760000000011928,
+      "status": "SUCCESS",
+      "message": "vacuum suction enabled with command -0.999196; payload base force 0.032175 N, capacity 80.000000 N"
+    },
+    {
+      "event_id": "SG2_s1_d1:strategy1:2:keyframe2:event:1:ATTACH_OBJECT",
+      "scheduled_time_s": 9.489047225828,
+      "actual_time_s": 9.760000000011928,
+      "status": "FAILED",
+      "message": "BREAKABLE_WELD grasp-contact contract failed for 'plate_b': CONTACT_COUNT; observed count=0, normal_force=0.000 N, groups=[]"
+    }
+  ],
+  "failure": {
+    "code": "EVENT_EXECUTION_FAILED",
+    "category": "SIMULATION_RUNTIME",
+    "message": "BREAKABLE_WELD grasp-contact contract failed for 'plate_b': CONTACT_COUNT; observed count=0, normal_force=0.000 N, groups=[]",
+    "segment_id": null,
+    "waypoint_index": null,
+    "event_id": "SG2_s1_d1:strategy1:2:keyframe2:event:1:ATTACH_OBJECT",
+    "expected": {},
+    "observed": {
+      "active_ee": "vac",
+      "attached_object_id": null
+    },
+    "evidence_refs": []
+  },
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "vac",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": -0.9991956224578545,
+    "ee_transition_count": 1,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 488,
+    "nominal_plan_duration_s": 19.12852973678844,
+    "final_plan_time_s": 9.489047225828,
+    "adaptive_settle_extra_duration_s": 0.2709527741839288,
+    "segment_tracking": [
+      {
+        "segment_id": "SG2_s1_d1:strategy1:0:SG2_s1_d1:strategy1:1:keyframe1",
+        "keyframe_id": "SG2_s1_d1:strategy1:1:keyframe1",
+        "target_block_id": null,
+        "nominal_end_time_s": 7.993682861542346,
+        "actual_execution_time_s": 8.000000000009777,
+        "max_joint_error_rad": 0.0030945238938296787,
+        "eef_position_error_m": 0.0007686221609467838,
+        "eef_orientation_error_rad": 0.002147631115021853,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      }
+    ]
+  }
+}

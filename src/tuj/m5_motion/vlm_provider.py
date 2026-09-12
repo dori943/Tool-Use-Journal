@@ -33,6 +33,7 @@ from tuj.m5_motion.contact_keyframe_validation import (
     _sweep_target_top_z_m,
     canonicalize_contact_tcp_height,
     canonicalize_held_tool_axis_for_contact,
+    canonicalize_held_tool_orientation_for_contact,
     canonicalize_sweep_strategy_heights,
     is_tool_act_contact_geometry_scope,
     validate_resolved_contact_keyframe,
@@ -718,6 +719,9 @@ Hard rules:
   lift height (the tool then sweeps empty air) and do not bury them into the
   support surface. PRE_CONTACT and RETREAT stay at or above the current EEF
   height.
+- CONTACT_START, CONTACT_SWEEP, and CONTACT_END must also move laterally: end
+  farther along the path toward goal.target_region_id than start. Collapsing
+  all three onto the same target top (zero horizontal travel) is invalid.
 - Use CARTESIAN for straight approach/contact/retreat intent, SAMPLING_BASED for
   obstacle-avoiding free-space transit intent, and JOINT only for a joint goal.
 - Diversify approach axes, roll, and standoff where the task geometry allows it.
@@ -1098,6 +1102,9 @@ class OpenAIKeyframeProvider:
                         request, keyframe, resolver=resolver
                     )
                     keyframe = canonicalize_contact_tcp_height(
+                        request, keyframe, resolver=resolver
+                    )
+                    keyframe = canonicalize_held_tool_orientation_for_contact(
                         request, keyframe, resolver=resolver
                     )
                     # Resolve now so unknown frames/anchors never enter the compiler.
