@@ -20,10 +20,13 @@ from tuj.m5_motion.scripted_grasps.spoon_runtime import SpoonContext,approach_sp
 
 class CatalogContext(SpoonContext):
 
-    def find_support_geom(self):
-        for name in ('table_collision','island_island_group_top_2'):
-            try:return self.model.geom(name).id
-            except KeyError:pass
+    def find_support_geoms(self):
+        try:return {self.model.geom('table_collision').id}
+        except KeyError:pass
+        geoms={i for i in range(self.model.ngeom)
+            if self.model.geom(i).name.startswith('island_island_group_top_')
+            and not self.model.geom(i).name.endswith('_visual')}
+        if geoms:return geoms
         raise GraspFailure('SUPPORT_GEOMETRY_NOT_FOUND')
 
     def geom_top_height(self,gid):
@@ -65,13 +68,23 @@ class CatalogContext(SpoonContext):
         bad=super().bad_contacts(data,stage)
         if stage!='LIFT' or self.support_released:return bad
         height=float(self.body_pose(data)[2,3]-self.initial_body[2,3])
-        if not -.002<=height<=.005:return bad
-        support=self.model.geom(self.support_gid).name
+        if height<-.002:return bad
+        supports={self.model.geom(g).name for g in self.support_gids}
         object_names={self.model.geom(g).name for g in self.object_geoms}
-        return [c for c in bad if not (support in c['geoms'] and any(n in object_names for n in c['geoms']) and c['penetration_m']<=.002)]
+        return [c for c in bad if not (supports.intersection(c['geoms'])
+            and any(n in object_names for n in c['geoms'])
+            and c['penetration_m']<=self.recipe.maximum_support_separation_penetration_m)]
 
     def sample(self):
-        if self.stage=='LIFT' and self.body_pose()[2,3]-self.initial_body[2,3]>.005:self.support_released=True
+        if self.stage=='LIFT' and not self.support_released:
+            height=self.body_pose()[2,3]-self.initial_body[2,3]
+            touching=any(c.dist<=0 and (
+                (int(c.geom1) in self.support_gids and int(c.geom2) in self.object_geoms)
+                or (int(c.geom2) in self.support_gids and int(c.geom1) in self.object_geoms))
+                for c in self.data.contact[:self.data.ncon])
+            # Once the lifted object has physically cleared its original
+            # support, any later re-contact is an ordinary collision.
+            if height>.002 and not touching:self.support_released=True
         forces={n:0. for n in self.finger_groups};points={n:[] for n in forces};normals={n:[] for n in forces}
         for i,c in enumerate(self.data.contact[:self.data.ncon]):
             a,b=int(c.geom1),int(c.geom2)
@@ -130,7 +143,8 @@ class CatalogContext(SpoonContext):
         for row in self.trace[-self.recipe.contact_ticks:]:
             if set(row['finger_contacts'])!=set(self.finger_groups):return False
             if self.recipe.ee_id=='vac':
-                if row['contact_count']<self.recipe.vacuum_min_contacts or row['suction_alignment']<.9 or min(row['gripper_ctrl'])<.5:return False
+                if (row['contact_count']<self.recipe.minimum_vacuum_contact_count
+                        or row['suction_alignment']<.9 or min(row['gripper_ctrl'])<.5):return False
             elif row['normal_opposition']<.5 or row['contact_span_m']<.0035 or min(row['finger_force_n'].values())<1.:
                 return False
         return True

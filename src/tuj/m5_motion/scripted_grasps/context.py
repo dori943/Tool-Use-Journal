@@ -73,11 +73,13 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     c.fixed_mount_pairs = {tuple(sorted((int(con.geom1), int(con.geom2)))) for con in c.data.contact[:c.data.ncon]
         if con.dist < 0 and (int(con.geom1) in c.robot_geoms or int(con.geom2) in c.robot_geoms)
         and int(con.geom1) not in c.gripper_geoms and int(con.geom2) not in c.gripper_geoms}
-    c.support_gid = CatalogContext.find_support_geom(c)
-    c.support_top_z = CatalogContext.geom_top_height(c, c.support_gid)
+    c.support_gids = CatalogContext.find_support_geoms(c)
+    c.support_gid = min(c.support_gids)
+    c.support_top_z = max(CatalogContext.geom_top_height(c, gid)
+        for gid in c.support_gids)
     c.thin_contact_profile = None
     if hasattr(recipe, "thin_contact_timeconstant_s"):
-        relevant = c.gripper_geoms | c.object_geoms | {c.support_gid}
+        relevant = c.gripper_geoms | c.object_geoms | c.support_gids
         original = {c.model.geom(i).name: c.model.geom_solref[i].tolist() for i in relevant}
         for i in relevant:
             c.model.geom_solref[i] = [recipe.thin_contact_timeconstant_s, 1.]
@@ -122,6 +124,13 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
 def execute_grasp(runtime, entry, output, *, seed=0, request=None):
     """Call one object function and retain real state only after validation."""
     c = bind_context(runtime, entry, output, seed=seed, request=request)
+    arm_controller = getattr(getattr(c, 'robot', None), 'part_controllers', {}).get('right')
+    original_arm_gains = None
+    if arm_controller is not None and hasattr(c.recipe, 'arm_kp'):
+        original_arm_gains = (arm_controller.kp.copy(), arm_controller.kd.copy())
+        damping_ratio = arm_controller.kd / (2. * np.sqrt(arm_controller.kp))
+        runtime.set_joint_position_controller_gains(
+            kp=c.recipe.arm_kp, damping_ratio=float(np.asarray(damping_ratio).mean()))
     finish = runtime.finish_attachment_step
     audit = getattr(c, "audit_hand_range", None)
     if audit is not None:
@@ -133,6 +142,8 @@ def execute_grasp(runtime, entry, output, *, seed=0, request=None):
         result = entry.function()(c)
     finally:
         runtime.finish_attachment_step = finish
+        if original_arm_gains is not None:
+            arm_controller.kp, arm_controller.kd = original_arm_gains
     if result["status"] != "SUCCESS":
         raise GraspFailure(f"{entry.object_id}: {result.get('failure_stage')}: {result.get('failure_reason')}")
     result["acquisition_status"] = result["status"]
