@@ -21,6 +21,7 @@ class CatalogRecipe:
     preshape_closure_command: float = .16
     approach_distance_m: float = .12
     lift_distance_m: float = .18
+    linear_lift_start: bool = False
     arm_kp: float = 150.
     post_grasp_arm_kp: float | None = None
     close_duration_s: float = 4.
@@ -47,6 +48,9 @@ class CatalogRecipe:
     maximum_slip_m: float = .005
     maximum_slip_deg: float = 5.
     contact_ticks: int = 5
+    minimum_vacuum_contact_count: int = 3
+    maximum_vacuum_attach_penetration_m: float = .002
+    maximum_support_separation_penetration_m: float = .002
     maximum_joint_limit_error_rad: float = .01
     suction_command: float = 1.
     # Minimum simultaneous cup-object contacts for the vacuum contact gate.
@@ -69,7 +73,7 @@ class CatalogRecipe:
 
     def __post_init__(self):
         if self.ee_id not in {'2F','3F','vac'}: raise ValueError('UNSUPPORTED_EE')
-        if self.task_id not in {'c1_1','c1_2','c2_1','c2_2','c4_2'}: raise ValueError('UNSUPPORTED_TASK')
+        if self.task_id not in {'c1_1','c1_2','c2_1','c2_2','c3_1','c3_2','c4_2'}: raise ValueError('UNSUPPORTED_TASK')
         for name in ('expected_size_m','offset_fraction','offset_m','rotation_xyz_deg','contact_region_min','contact_region_max'):
             value=np.asarray(getattr(self,name),dtype=float)
             if value.shape!=(3,) or not np.isfinite(value).all(): raise ValueError(f'Invalid {name}')
@@ -85,11 +89,16 @@ class CatalogRecipe:
             raise ValueError('Invalid post-grasp arm gain')
         if not 0<=self.suction_command<=1: raise ValueError('Invalid suction command')
         if self.ee_id=='vac' and self.suction_command<.5: raise ValueError('Vacuum attachment requires suction command >= .5')
+        if not isinstance(self.linear_lift_start,bool): raise ValueError('Invalid lift easing policy')
         if self.physics_timestep_s not in (.0005,.001,.002): raise ValueError('Invalid timestep')
         if self.physics_integrator!='implicitfast': raise ValueError('Invalid integrator')
         if not isinstance(self.contact_ticks,int) or self.contact_ticks<1: raise ValueError('Invalid contact ticks')
-        if not isinstance(self.vacuum_min_contacts,int) or self.vacuum_min_contacts<1: raise ValueError('Invalid vacuum_min_contacts')
-        if not 0<=self.three_finger_force_deadband_n<min(self.three_finger_force_targets_n): raise ValueError('Invalid three_finger_force_deadband_n')
+        if not isinstance(self.minimum_vacuum_contact_count,int) or self.minimum_vacuum_contact_count<1:
+            raise ValueError('Invalid vacuum contact count')
+        if not 0 < self.maximum_vacuum_attach_penetration_m <= .004:
+            raise ValueError('Invalid vacuum attachment penetration')
+        if not 0 < self.maximum_support_separation_penetration_m <= .006:
+            raise ValueError('Invalid support separation penetration')
 
     def to_dict(self):
         result={**asdict(self),'model_class':self.model_class,'recipe_id':self.recipe_id}

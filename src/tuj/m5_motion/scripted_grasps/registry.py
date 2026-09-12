@@ -17,6 +17,8 @@ class GraspEntry:
         name = self.module_name or self.object_id
         module = import_module(f"{__package__}.objects.{name}")
         if self.driver == "catalog":
+            if name == "plate_vac":
+                return module.plate_vac_recipe(self.environment, self.object_id)
             return getattr(module, name + "_recipe")()
         if self.driver == "spoon":
             # Spoon has independently calibrated 2F and 3F recipes.  The EE
@@ -37,23 +39,12 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # 0911: C1_1 에서 M2 가 접시를 쓸어 담는 도구로 고르는데, 접지값상 접시는
     # 폭 182mm 라 2F(개구 85mm)/3F(140mm)로는 안 잡히고 vac 만 가능하다. 2F 항목만
     # 있으면 M4 의 constrain_task_request 가 SCRIPTED_GRASP_EE_INFEASIBLE 로 멈춘다.
-    # C2_1 에서 검증된 흡착 레시피를 그대로 쓴다 (같은 접시 자산). resolve() 가
-    # EE 로 매칭하므로 위 2F 항목과 공존한다.
-    # 주의: plate_vac_recipe() 의 task_id 가 'c2_1' 로 고정돼 있어 실행 기록에는
-    # C1_1 작업도 c2_1 로 남는다. 동작에는 영향이 없다 (catalog_types 는 task_id 를
-    # 화이트리스트로만 검사하고 dispatch_grasp 는 object_id 만 대조한다).
+    # C2_1 에서 검증된 흡착 동작을 같은 크기의 접시에 재사용한다. resolve() 가
+    # 환경과 EE 로 정확히 매칭하므로 아래 2F 항목과 공존한다.
     ("plate", "C1_1_LegoSweep", "vac", "catalog", "plate_vac"),
     ("bottle", "C1_2_DoughFlatten", "3F", "bottle"),
     ("spatula", "C1_2_DoughFlatten", "3F", "spatula"),
     ("spoon", "C1_2_DoughFlatten", "2F", "spoon"),
-    # 0909: C3_1 also picks the spoon with the 2F gripper. Without an entry for
-    # this environment the generic path plans the grasp, and its pose put the
-    # object 10.6 cm from the grip site: the fingers closed on air (0 contacts,
-    # 0.08 mm lift against a 50 mm requirement).
-    ("spoon", "C3_1_ObjectSorting", "2F", "spoon"),
-    # M4's selected EE is preserved all the way to the hand-specific spoon
-    # recipe. Object-sorting can emit either combination; both must avoid the
-    # generic grasp path that previously closed on air.
     ("spoon", "C1_2_DoughFlatten", "3F", "spoon"),
     # C2_1 reuses the validated object-frame 2F spoon recipe so the tabletop
     # sorting pick uses the tuned scripted grasp (reliable formation/lift/
@@ -65,7 +56,6 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # the 2F ``plate`` driver used at C1_1 (objects/plate.py / grasp_plate).
     ("spoon", "C2_1_ObjectSorting", "2F", "spoon"),
     ("spoon", "C2_1_ObjectSorting", "3F", "spoon"),
-    ("spoon", "C3_1_ObjectSorting", "3F", "spoon"),
     ("plate", "C2_1_ObjectSorting", "vac", "catalog", "plate_vac"),
     # 0912: C3_1 도 정렬 태스크라 M4 가 접시에 vac EE 를 물리는데, C3_1 용 plate
     # 항목이 없어 resolve() 가 매칭 실패(matches 빈 리스트) → generic M5 파지로
@@ -105,9 +95,8 @@ ALIASES = {f"obj_{e.object_id}_{e.object_id}": e.object_id for e in ENTRIES}
 # visibly distinct from validated entries in every execution artifact. A failed
 # experimental grasp still stops the task; it is never replaced by an LLM grasp.
 EXPERIMENTAL_INTEGRATION = {
-    "plate": "2F recipe is connected for C1_1 and the C2_1 vacuum recipe is reused "
-             "there for the sweep tool; physical validation of a suction-held sweep "
-             "is pending",
+    "plate": "vacuum routes are task-scoped for C1_1, C2_1 and C3_1; the C1_1 "
+             "2F grasp and suction-held sweep still require physical validation",
 }
 PENDING_INTEGRATION = {}
 ENABLED_ENTRIES = tuple(entry for entry in ENTRIES if entry.object_id not in PENDING_INTEGRATION)
