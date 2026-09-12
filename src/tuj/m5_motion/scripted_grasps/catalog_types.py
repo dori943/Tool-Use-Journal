@@ -44,6 +44,7 @@ class CatalogRecipe:
     contact_ticks: int = 5
     maximum_joint_limit_error_rad: float = .01
     suction_command: float = 1.
+    finger_attachment_policy: str = 'FREE_HOLD_THEN_ATTACH'
 
     @property
     def model_class(self):
@@ -52,9 +53,14 @@ class CatalogRecipe:
     @property
     def recipe_id(self):
         version='v2_attach' if self.ee_id=='vac' else 'v1'
+        if self.finger_attachment_policy == 'STABLE_CONTACT':version='v2_contact_attach'
         return f'{self.object_id}_{self.ee_id.lower()}_center_{version}'
 
     def __post_init__(self):
+        if self.finger_attachment_policy not in {'FREE_HOLD_THEN_ATTACH', 'STABLE_CONTACT'}:
+            raise ValueError('Invalid finger attachment policy')
+        if self.finger_attachment_policy == 'STABLE_CONTACT' and self.ee_id != '2F':
+            raise ValueError('Stable bilateral contact attachment requires 2F')
         if self.ee_id not in {'2F','3F','vac'}: raise ValueError('UNSUPPORTED_EE')
         if self.task_id not in {'c1_1','c1_2','c2_1','c2_2','c4_2'}: raise ValueError('UNSUPPORTED_TASK')
         for name in ('expected_size_m','offset_fraction','offset_m','rotation_xyz_deg','contact_region_min','contact_region_max'):
