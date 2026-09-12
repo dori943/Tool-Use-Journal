@@ -1547,6 +1547,9 @@ class C4_2_DiagonalFitPacking(KitchenBase):
                     BOX_FLOOR_THICKNESS + 0.5 * BOX_INNER_H,
                 ),
                 "opening_top_z_m": BOX_FLOOR_THICKNESS + BOX_INNER_H,
+                # Prefer nearby free volume when an occupied drop site would
+                # depend on incidental tipping; retain all physical gates.
+                "position_policy": "NEAREST_CLEAR_VOLUME",
             }
         candidates = _PACKING_ORIENTATION_CANDIDATES.get(object_id)
         if candidates is None:
