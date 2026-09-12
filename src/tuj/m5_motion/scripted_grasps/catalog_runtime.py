@@ -101,7 +101,17 @@ class CatalogContext(SpoonContext):
             for n,p in zip(normals[first],points[first]):
                 for v,q in zip(normals[other],points[other]):
                     opposition=max(opposition,float(-n@v));span=max(span,float(np.linalg.norm(p-q)))
-        suction_alignment=min((abs(float(n@self.grip_pose()[:3,2])) for n in normals[first]),default=0.)
+        # 0912: 이 지표는 접촉 법선 중 최솟값이라 "모든 접촉이 평평한가" 를
+        # 묻는다. 접촉이 하나뿐인 접시에서는 그게 곧 밀착 여부지만, 빵처럼
+        # 메시 표면이 울퉁불퉁해 접촉이 34개 나오는 면에서는 가장자리 미세
+        # 경사 하나가 값을 끌어내린다 (빵은 월드 수직과 0.06 도로 평평한데
+        # 최솟값이 0.784 로 나와 게이트에 막혔다). 판정은 그대로 두고 분포만
+        # 같이 남겨, 통계의 문제인지 컵이 실제로 경사에 앉은 것인지 가른다.
+        alignments=[abs(float(n@self.grip_pose()[:3,2])) for n in normals[first]]
+        suction_alignment=min(alignments,default=0.)
+        suction_alignment_mean=float(np.mean(alignments)) if alignments else 0.
+        suction_aligned_fraction=(
+            float(sum(a>=.9 for a in alignments))/len(alignments) if alignments else 0.)
         body=self.body_pose()
         contact_centers={name:((np.mean(group,axis=0)-body[:3,3])@body[:3,:3]-self.center_in_body).tolist()
                          for name,group in points.items() if group}
@@ -109,7 +119,7 @@ class CatalogContext(SpoonContext):
             'attachment_active':self.runtime.attached_object_id==self.object_id,
             'finger_contacts':[n for n in forces if forces[n]>.01],'finger_force_n':forces,
             'contact_count':sum(map(len,points.values())),'normal_opposition':opposition,'contact_span_m':span,
-            'suction_alignment':suction_alignment,'lift_m':float(self.body_pose()[2,3]-self.initial_body[2,3]),
+            'suction_alignment':suction_alignment,'suction_alignment_mean':suction_alignment_mean,'suction_aligned_fraction':suction_aligned_fraction,'lift_m':float(self.body_pose()[2,3]-self.initial_body[2,3]),
             'finger_contact_centers_from_object_center_m':contact_centers,
             'bottom_clearance_m':self.bottom_height()-self.support_top_z,'T_GB':inverse(self.grip_pose())@self.body_pose(),
             'gripper_q':self.data.qpos[self.model.jnt_qposadr[self.hand_joint_ids]],
@@ -143,8 +153,22 @@ class CatalogContext(SpoonContext):
         for row in self.trace[-self.recipe.contact_ticks:]:
             if set(row['finger_contacts'])!=set(self.finger_groups):return False
             if self.recipe.ee_id=='vac':
+                # 0912: 예전 조건은 suction_alignment(접촉 법선 정렬의 최솟값)
+                # 이었다. 접촉이 하나뿐인 접시에서는 그게 곧 밀착 여부지만,
+                # 메시 표면이 거친 면에서는 가장자리 미세 경사 하나가 값을
+                # 끌어내린다. c2_2 의 빵은 몸체 z 가 월드 수직과 0.06 도이고
+                # 컵도 수직으로 내려왔는데, 접촉 34개 중 32개가 평균 0.987 로
+                # 정렬된 상태에서 최솟값이 0.784 로 나와 막혔다.
+                #
+                # 밀봉이 성립하는 조건은 "모든 접촉이 평평한가" 가 아니라
+                # "컵 면이 평평한 자리에 앉았는가" 다. 평균과 정렬 비율을 함께
+                # 요구한다. 컵이 모서리에 걸치면 둘 다 같이 떨어지므로 판정은
+                # 느슨해지지 않는다. 접촉이 하나인 접시는 평균=비율=최솟값이라
+                # 기존 동작 그대로다. 최솟값은 진단용으로 계속 기록한다.
                 if (row['contact_count']<self.recipe.minimum_vacuum_contact_count
-                        or row['suction_alignment']<.9 or min(row['gripper_ctrl'])<.5):return False
+                        or row['suction_alignment_mean']<.9
+                        or row['suction_aligned_fraction']<.8
+                        or min(row['gripper_ctrl'])<.5):return False
             elif row['normal_opposition']<.5 or row['contact_span_m']<.0035 or min(row['finger_force_n'].values())<1.:
                 return False
         return True

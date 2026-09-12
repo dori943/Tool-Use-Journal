@@ -90,11 +90,24 @@ _PLATE_FOOD_SURFACE_OFFSET = -0.01
 # 도마는 테두리가 없어 bbox 윗면이 곧 놓이는 면이다 (빵은 이미 이 받침으로
 # 바꿔 두었고 실측 +0.05mm 로 정확히 올라간다). 접시 자리 간격이 220mm 라
 # 기본 크기(147 x 245mm)로는 이웃과 겹쳐 축소해서 쓴다.
-_INGREDIENT_BOARD_SCALE = 0.19  # 약 112 x 187 x 11 mm
+# 0912: 0.19 는 245mm 짜리 도마를 만드는데 재료 자리 간격이 220mm 라 이웃과
+# 25mm 씩 겹쳤다. 실측 y 범위가 turkey [-3.0228, -2.7772], cheese
+# [-3.2665, -3.0209], tomato [-3.4590, -3.2134] 로, 치즈 도마가 토마토 도마를
+# 53mm 물고 그 위에 올라타 혼자 도마 두께만큼(14.7mm) 높아졌다. 그 위에 놓인
+# 치즈는 미끄러져 조리대 바닥(z=0.920)까지 떨어졌고, 흡착이 상판 높이까지
+# 내려가야 해서 팔뚝이 아일랜드를 208mm 파고들며 파지 전략이 전부 기각됐다.
+# 200 x 120mm 로 줄여 간격 안에 넣는다. 가장 큰 재료가 80 x 50mm 라 충분하다.
+_INGREDIENT_BOARD_SCALE = 0.155  # 약 91 x 152 x 9 mm
+_INGREDIENT_BOARD_DENSITY = 700.  # kg/m3, 나무
 
 
 def _ingredient_board(name):
-    return CuttingBoardObject(name=name, scale=_INGREDIENT_BOARD_SCALE)
+    # 0912: 자산이 선언한 density 100 kg/m3 은 나무(600~800)의 1/7 이다.
+    # 크기를 줄이면 질량이 세제곱으로 줄어 13g 이 되고, 흡착을 뗄 때 생기는
+    # 힘에 도마가 그대로 날아간다 (터키를 들자 도마가 12cm 튀어 올라 운반
+    # 자세가 전부 기각됐다). 이 태스크의 재료 도마에만 실물 밀도를 준다.
+    return CuttingBoardObject(name=name, scale=_INGREDIENT_BOARD_SCALE,
+                              density=_INGREDIENT_BOARD_DENSITY)
 
 
 _SPATULA_THICKNESS = 0.0018

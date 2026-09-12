@@ -111,6 +111,16 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # ``apple`` catalog recipe used at C2_1.
     ("apple", "C3_1_ObjectSorting", "2F", "catalog", "apple_2f"),
     ("knife", "C2_2_SandwichAssembly", "2F", "catalog"),
+    # 0912: C2_2 는 칼만 등록돼 있어 재료 다섯 개가 일반 M5 파지로 떨어졌다.
+    # 스크립트가 없으니 VLM 이 전략을 지어내는데, 흡착으로 4mm 두께 슬라이스를
+    # 옆에서 집는 전략(strat_cheese_side_x_left 등)을 내고 조리대 높이에서
+    # 옆으로 손을 뻗어 팔뚝이 아일랜드를 137mm 뚫었다. 흡착컵은 윗면에 수직
+    # 하강해야 하므로 접근을 고정한다 (objects/ingredient_vac.py).
+    ("bread_a", "C2_2_SandwichAssembly", "vac", "catalog", "ingredient_vac"),
+    ("bread_b", "C2_2_SandwichAssembly", "vac", "catalog", "ingredient_vac"),
+    ("turkey_1", "C2_2_SandwichAssembly", "vac", "catalog", "ingredient_vac"),
+    ("cheese_1", "C2_2_SandwichAssembly", "vac", "catalog", "ingredient_vac"),
+    ("tomato_slice", "C2_2_SandwichAssembly", "vac", "catalog", "ingredient_vac"),
     ("rolling_pin", "C4_2_DiagonalFitPacking", "2F", "catalog"),
     ("baguette", "C4_2_DiagonalFitPacking", "2F", "catalog"),
     ("whisk", "C4_2_DiagonalFitPacking", "2F", "catalog"),

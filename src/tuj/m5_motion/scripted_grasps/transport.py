@@ -291,9 +291,25 @@ class _Grounding:
                 mask = (np.abs(rel[:, 0]) <= self.region_dims[0] * fraction) & \
                        (np.abs(rel[:, 1]) <= self.region_dims[1] * fraction)
                 if mask.sum() >= 4:
-                    lower = P[mask, 2][P[mask, 2] <= self.region_center_local[2] + 1e-9]
-                    if lower.size:
-                        floor_local = max(floor_local, float(lower.max()))
+                    # 0912: 중심 이하만 보는 이 필터는 용기의 벽을 걸러내려는
+                    # 것인데, 속이 찬 물체 위에 얹는 place_on 에서는 물체의
+                    # 한가운데를 지지면으로 돌려준다. c2_2 가 터키를 빵 위에
+                    # 올리는 단계에서 EEF 를 z=0.945646 (빵 중심 0.94602, 윗면
+                    # 0.95748) 에 두어 흡착컵이 빵을 7.8~9.6mm 파고들었고 전략
+                    # 11개가 전부 기각됐다.
+                    #
+                    # 둘은 같은 점군으로 갈린다. 용기는 테두리가 중앙 발자국
+                    # 바깥에 있어 중앙 점들이 중심 이하에서 끝나고, 속이 찬
+                    # 물체는 중앙 점들이 꼭대기까지 올라간다. 중앙 최고점이
+                    # 중심보다 위면 그 점이 곧 얹는 면이다.
+                    central = P[mask, 2]
+                    highest = float(central.max())
+                    if highest > self.region_center_local[2] + 1e-9:
+                        floor_local = highest
+                    else:
+                        lower = central[central <= self.region_center_local[2] + 1e-9]
+                        if lower.size:
+                            floor_local = max(floor_local, float(lower.max()))
                     break
         self._floor_local_cache = float(floor_local)
         return self._floor_local_cache

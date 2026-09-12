@@ -22,6 +22,10 @@ from tuj.m5_motion.geometry import (
     quaternion_matrix_xyzw,
     tool_rotation_from_axis,
 )
+from tuj.m5_motion.grasp_geometry import (
+    _object_world_bounds,
+    _support_surface_under_footprint,
+)
 from tuj.m5_motion.profiles import PushPlanningProfile
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
@@ -314,6 +318,76 @@ def target_above_region(
         horizontally_aligned
         and target_bottom >= region_top - vertical_tolerance_m
     )
+
+
+def target_resting_on_region(
+    world: WorldSnapshot,
+    *,
+    target_id: str,
+    region_id: str,
+    horizontal_tolerance_m: float = 0.0,
+    maximum_gap_m: float = .005,
+    maximum_penetration_m: float = .005,
+) -> bool:
+    """Check a ``stacked on`` postcondition: supported, stable, and resting.
+
+    ``target_fully_inside_region`` is the right predicate for putting an object
+    into a container or onto a bounded area, but it cannot describe stacking.
+    A sandwich's top slice of bread is wider than the filling under it, so no
+    ordering of the ingredients can ever place every layer fully inside the
+    layer below.  What actually defines a stack is the pair of conditions used
+    here: the target's centre of mass sits over the base's support polygon, and
+    the target rests on the base's top face rather than floating above it or
+    sinking through it.
+
+    ``target_above_region`` already covers the first condition and the lower
+    bound of the second, but it deliberately leaves the object free to be far
+    above the region because a transported object is still held in the air.  A
+    placement has to close that side too, which is what ``maximum_gap_m`` does.
+    """
+
+    if horizontal_tolerance_m < 0.0:
+        raise ValueError("horizontal tolerance must be non-negative")
+    if maximum_gap_m < 0.0 or maximum_penetration_m < 0.0:
+        raise ValueError("resting tolerances must be non-negative")
+    target_position, target_rotation, target_center, target_size = (
+        _record_box_geometry(world, target_id)
+    )
+    region_position, region_rotation, region_center, region_size = (
+        _record_box_geometry(world, region_id)
+    )
+    target_center_world = target_position + target_rotation @ target_center
+    target_center_in_region = region_rotation.T @ (
+        target_center_world - region_position
+    )
+    horizontal_limit = region_size[:2] * .5 + horizontal_tolerance_m
+    supported = bool(np.all(
+        np.abs(target_center_in_region[:2] - region_center[:2])
+        <= horizontal_limit
+    ))
+    if not supported:
+        return False
+    # A bbox top is the rim of a concave dish, not the face an object rests on:
+    # serving_plate measures 9.8 mm too high, so bread placed on its inner floor
+    # reads as 9.8 mm of penetration.  grasp_geometry already solved this for
+    # the grasp side (0912), so reuse that measurement rather than repeat it.
+    bounds = _object_world_bounds(world.objects.get(target_id))
+    if bounds is None:
+        return False
+    target_minimum, target_maximum = bounds
+    target_bottom = float(target_minimum[2])
+    support_top = _support_surface_under_footprint(
+        world.objects.get(region_id),
+        target_minimum,
+        target_maximum,
+        target_bottom,
+        maximum_gap_m,
+    )
+    if support_top is None:
+        region_center_world = region_position + region_rotation @ region_center
+        support_top = float(region_center_world[2]) + float(region_size[2]) * .5
+    gap = target_bottom - support_top
+    return bool(-maximum_penetration_m <= gap <= maximum_gap_m)
 
 
 def order_targets_around_region(

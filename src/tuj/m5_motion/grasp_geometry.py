@@ -527,6 +527,93 @@ def _explicit_support_clearance(
     return None
 
 
+
+_SUPPORT_FOOTPRINT_MARGIN_M = 0.005
+_SUPPORT_SURFACE_MIN_POINTS = 3
+
+
+def _support_surface_under_footprint(
+    support_record: Mapping[str, object] | None,
+    object_minimum: np.ndarray,
+    object_maximum: np.ndarray,
+    object_bottom_z: float,
+    tolerance_m: float,
+) -> float | None:
+    """Highest support contact point directly under the object, or None.
+
+    A candidate support's bbox top is its rim, not the face the object rests
+    on, so a concave dish measures roughly its own depth too high.  Take the
+    support's own collision vertices that lie under the object's footprint and
+    at or below its bottom, and use the highest of those.  A flat slab returns
+    the same value as the bbox top; a dish returns its inner floor.  Returns
+    None when the record carries no usable points, leaving the bbox behaviour
+    untouched for supports without collision geometry.
+    """
+
+    if not isinstance(support_record, Mapping):
+        return None
+    points = _finite_points(support_record.get("collision_points_m"))
+    if points is None or len(points) < _SUPPORT_SURFACE_MIN_POINTS:
+        return _resting_plane_within_span(support_record, object_bottom_z)
+    position = _finite_vector(
+        _mapping_get(support_record.get("pose"), "position_m"), 3
+    )
+    orientation = _finite_vector(
+        _mapping_get(support_record.get("pose"), "orientation_xyzw"), 4
+    )
+    if position is None or orientation is None:
+        return None
+    try:
+        rotation = quaternion_matrix_xyzw(orientation)
+    except ValueError:
+        return None
+    world = points @ rotation.T + position
+    lower = object_minimum[:2] - _SUPPORT_FOOTPRINT_MARGIN_M
+    upper = object_maximum[:2] + _SUPPORT_FOOTPRINT_MARGIN_M
+    under = (
+        np.all(world[:, :2] >= lower, axis=1)
+        & np.all(world[:, :2] <= upper, axis=1)
+        & (world[:, 2] <= object_bottom_z + tolerance_m)
+    )
+    if int(np.count_nonzero(under)) < _SUPPORT_SURFACE_MIN_POINTS:
+        return _resting_plane_within_span(support_record, object_bottom_z)
+    return float(world[under, 2].max())
+
+
+def _resting_plane_within_span(
+    support_record: Mapping[str, object],
+    object_bottom_z: float,
+) -> float | None:
+    """Contact plane inferred without a usable point cloud, or None.
+
+    A record collision vertex set can be decimated to a handful of points in a
+    rebuilt world snapshot (c2_2 carries 512 of them for tomato_plate in one
+    request and 8 in a later one), and then no vertex lies under the object
+    footprint at all.  Falling back to the bbox top puts a dish rim about 10 mm
+    above the face the object actually rests on, and the support goes
+    unrecognised exactly as it did before this measurement existed.
+
+    When the object bottom sits inside the candidate own vertical span it is
+    resting in or on that candidate whatever the shape of its interior, so take
+    the object bottom as the contact plane.  A flat slab reports the same value
+    as its bbox top, since that is where the object bottom already is; a
+    candidate the object merely hovers over is outside the span and still
+    returns None.
+    """
+
+    bounds = _object_world_bounds(support_record)
+    if bounds is None:
+        return None
+    support_minimum, support_maximum = bounds
+    if not (
+        float(support_minimum[2]) - 1e-9
+        <= object_bottom_z
+        <= float(support_maximum[2]) + 1e-9
+    ):
+        return None
+    return float(object_bottom_z)
+
+
 def support_clearance_context_from_world(
     record: object,
     world: WorldSnapshot,
@@ -598,6 +685,7 @@ def support_clearance_context_from_world(
         support_minimum: np.ndarray,
         support_maximum: np.ndarray,
         source: str,
+        support_record: Mapping[str, object] | None = None,
     ) -> None:
         if np.any(support_maximum < support_minimum):
             return
@@ -607,7 +695,25 @@ def support_clearance_context_from_world(
             support_minimum,
             support_maximum,
         )
-        gap_m = object_bottom_z - float(support_maximum[2])
+        # 0912: 받침면을 bbox 윗면으로 보면 오목한 그릇에서 테두리를 재게 된다.
+        # c2_2 의 tomato_slice 는 접시 안쪽 바닥에 놓여 있는데 접시 OBB 윗면은
+        # 테두리라 간격이 -9.856 m 로 나와 5mm 허용을 넘겼고, 접시가 후보에서
+        # 탈락해 대신 20.8mm 아래의 아일랜드 상판이 받침으로 뽑혔다. 그러면
+        # 파지 허용이 엉뚱한 쌍에 걸려 정작 부딪히는 tomato_slice <-> tomato_plate
+        # 는 5mm 를 그대로 요구받고, 파지에서 들어올리기로 가는 엣지가 전부
+        # 기각된다. 대상 쪽 바닥은 이미 점군으로 재고 있으므로 받침 쪽도 맞춘다.
+        # 같은 접시를 이렇게 재면 간격이 -9.856mm 에서 +0.022mm 가 된다.
+        surface_z = float(support_maximum[2])
+        measured_z = _support_surface_under_footprint(
+            support_record,
+            object_minimum,
+            object_maximum,
+            object_bottom_z,
+            tolerance_m,
+        )
+        if measured_z is not None:
+            surface_z = measured_z
+        gap_m = object_bottom_z - surface_z
         if (
             overlap_ratio <= 0.0
             or overlap_ratio + 1e-9 < minimum_horizontal_overlap_ratio
@@ -616,7 +722,7 @@ def support_clearance_context_from_world(
             return
         context = _make_support_context(
             support_id=support_id,
-            surface_z_m=float(support_maximum[2]),
+            surface_z_m=surface_z,
             object_bottom_z_m=object_bottom_z,
             object_top_z_m=float(object_maximum[2]),
             horizontal_overlap_ratio=overlap_ratio,
@@ -660,6 +766,7 @@ def support_clearance_context_from_world(
             candidate_bounds[0],
             candidate_bounds[1],
             "world.objects.obb",
+            candidate_record,
         )
 
     if not inferred:

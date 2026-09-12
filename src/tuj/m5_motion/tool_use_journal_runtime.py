@@ -1185,27 +1185,125 @@ class ToolUseJournalEERuntime:
             if int(model.geom_contype[geom_id])
             or int(model.geom_conaffinity[geom_id])
         )
-        distances: list[float] = []
+        # Prefer the contact set the solver itself built.  mj_geomDistance runs
+        # GJK/EPA per convex hull, and on a flat cup resting on a decomposed
+        # mesh that penetration depth is unreliable: bread_b reported -0.0280 m
+        # against hull g24 while its neighbours g17 and g4 reported -0.0000 m at
+        # the same pose, and the figure moved between runs (0.0279, 0.0280,
+        # 0.0342) although the loaf never moved.  It cannot be real either, as
+        # the cup bottom (0.9576) and the bread top (0.9577) overlap by 0.1 mm
+        # and no penetration depth can exceed that overlap.  mjContact.dist is
+        # what the physics actually integrates, and the runtime already reports
+        # it as penetration elsewhere, so a genuine deep grab still registers.
+        ee_set = set(ee_geoms)
+        object_set = set(object_geoms)
+        contacts: list[tuple[float, int, int]] = []
+        for index in range(int(data.ncon)):
+            contact = data.contact[index]
+            first, second = int(contact.geom1), int(contact.geom2)
+            if first in ee_set and second in object_set:
+                contacts.append((float(contact.dist), first, second))
+            elif second in ee_set and first in object_set:
+                contacts.append((float(contact.dist), second, first))
+        if contacts:
+            contacts.sort(key=lambda item: item[0])
+            self._ee_object_pairs = contacts
+            self._ee_distance_source = "SIMULATOR_CONTACT"
+            distance, ee_id, object_id = contacts[0]
+            self._last_ee_object_pair = (
+                distance,
+                str(model.geom(ee_id).name),
+                str(model.geom(object_id).name),
+            )
+            return distance
+        self._ee_distance_source = "GEOM_QUERY"
+        closest: tuple[float, str, str] | None = None
+        measured: list[tuple[float, int, int]] = []
         for ee_geom in ee_geoms:
             for object_geom in object_geoms:
                 from_to = np.empty(6, dtype=float)
-                distances.append(
-                    float(
-                        mujoco.mj_geomDistance(
-                            model,
-                            data,
-                            ee_geom,
-                            object_geom,
-                            10.0,
-                            from_to,
-                        )
+                distance = float(
+                    mujoco.mj_geomDistance(
+                        model,
+                        data,
+                        ee_geom,
+                        object_geom,
+                        10.0,
+                        from_to,
                     )
                 )
-        if distances:
-            return min(distances)
+                measured.append((distance, int(ee_geom), int(object_geom)))
+                if closest is None or distance < closest[0]:
+                    closest = (
+                        distance,
+                        str(model.geom(ee_geom).name),
+                        str(model.geom(object_geom).name),
+                    )
+        measured.sort(key=lambda item: item[0])
+        self._ee_object_pairs = measured
+        if closest is not None:
+            self._last_ee_object_pair = closest
+            return closest[0]
         _, _, reference_position, _ = self._grasp_reference(self.env)
+        self._last_ee_object_pair = None
         return float(
             np.linalg.norm(data.xpos[object_body_id] - reference_position)
+        )
+
+    def _ee_object_pair_report(self, limit: int = 3) -> str:
+        """Describe the closest EE/object geom pairs with their geometry.
+
+        bread_b reported a 34 mm penetration while the trace showed the cup
+        seated exactly on the top face (T_GB z equal to the half thickness) and
+        the loaf motionless, which a 22.9 mm slab cannot produce.  When the
+        number cannot come from the pose, the next thing to measure is the
+        geometry the query actually ran against: type, size and world height of
+        both geoms in the offending pair.
+        """
+
+        pairs = getattr(self, "_ee_object_pairs", None)
+        if not pairs:
+            return ""
+        model, data = _raw_model_data(self.env)
+        types = {
+            int(getattr(mujoco.mjtGeom, name)): name.replace("mjGEOM_", "").lower()
+            for name in dir(mujoco.mjtGeom)
+            if name.startswith("mjGEOM_")
+        }
+
+        def describe(geom_id: int) -> str:
+            geom = model.geom(geom_id)
+            kind = types.get(int(model.geom_type[geom_id]), "?")
+            size = ", ".join(f"{value:.4f}" for value in model.geom_size[geom_id])
+            return (
+                f"{geom.name!r} type={kind} size=({size}) "
+                f"z={float(data.geom_xpos[geom_id][2]):.4f}"
+            )
+
+        lines = [
+            f"{distance:+.4f} m  {describe(ee_id)}  <->  {describe(object_id)}"
+            for distance, ee_id, object_id in pairs[:limit]
+        ]
+        return "; closest pairs: " + " | ".join(lines)
+
+    def _closest_ee_object_pair_detail(self) -> str:
+        """Name the geom pair behind the last measured EE/object distance.
+
+        A bare penetration number cannot say whether the cup sealed too deep on
+        the target face or some other part of the EE met some other part of the
+        object, and those need opposite fixes.  0912 showed the same thing for
+        rejected keyframes: the measurement had to name the pose before the
+        cause was readable at all.
+        """
+
+        pair = getattr(self, "_last_ee_object_pair", None)
+        if pair is None:
+            return ""
+        _, ee_name, object_name = pair
+        source = getattr(self, "_ee_distance_source", "GEOM_QUERY")
+        return (
+            f"; closest geom pair {ee_name!r} <-> {object_name!r}"
+            f" measured by {source}"
         )
 
     @staticmethod
@@ -1840,12 +1938,15 @@ class ToolUseJournalEERuntime:
             raise ToolUseJournalRuntimeError(
                 f"object {object_id!r} is {distance:.4f} m from the EE; "
                 f"attach limit is {max_attach_distance_m:.4f} m"
+                f"{self._closest_ee_object_pair_detail()}"
             )
         if distance < -max_attach_penetration_m:
             raise ToolUseJournalRuntimeError(
                 f"object {object_id!r} penetrates EE geometry by "
                 f"{-distance:.4f} m; limit is "
                 f"{max_attach_penetration_m:.4f} m"
+                f"{self._closest_ee_object_pair_detail()}"
+                f"{self._ee_object_pair_report()}"
             )
         kind, name, reference_position, reference_rotation = (
             self._grasp_reference(self.env)

@@ -987,27 +987,36 @@ class ToolUseJournalCollisionContextFactory:
             contexts[contact_id] = contact
             contexts[attached_id] = attached
             if support_selectors:
+                # 0912: 이 문맥은 [대상, 받침] 만 면제하고 [EE, 받침] 에는 5mm
+                # 마진을 그대로 요구했다. 얇은 물체를 받침에서 떼는 동안 EE 는
+                # 물체 두께만큼만 받침에서 떨어져 있으므로 원리상 만족이
+                # 불가능하다. c2_2 의 turkey_1(두께 2.5mm)을 흡착으로 들어올릴
+                # 때 흡착컵과 접시 여유가 0.000439 / 0.000737 / 0.001557 /
+                # 0.001993 m 로 나와 생성된 전략이 전부 기각됐다. 파지 중 문맥이
+                # 0911 에 같은 이유로 이미 하는 처리를 파지 후에도 건다. 무제한
+                # 면제가 아니라 EE 가 받침을 뚫는 것은 계속 막는다.
+                support_allowances = [
+                    {
+                        "selectors": [selector_a, selector],
+                        "minimum_distance_m": -support_penetration_tolerance_m,
+                    }
+                    for selector_a in (target, active_ee)
+                    for selector in support_selectors
+                ]
                 release = attached.model_copy(
                     update={
                         "context_id": release_id,
-                        "allowed_collision_pairs": self._contact_pairs(
-                            target, support_selectors
-                        ),
+                        "allowed_collision_pairs": [
+                            *self._contact_pairs(target, support_selectors),
+                            *self._contact_pairs(active_ee, support_selectors),
+                        ],
                         "metadata": {
                             "support_separation": {
                                 **support_evidence,
                                 "target_selector": target,
                                 "support_selectors": list(support_selectors),
                             },
-                            _BOUNDED_COLLISION_ALLOWANCES_KEY: [
-                                {
-                                    "selectors": [target, selector],
-                                    "minimum_distance_m": (
-                                        -support_penetration_tolerance_m
-                                    ),
-                                }
-                                for selector in support_selectors
-                            ],
+                            _BOUNDED_COLLISION_ALLOWANCES_KEY: support_allowances,
                             _POST_SEGMENT_VALIDATION_CONTEXT_KEY: attached_id,
                         },
                     }

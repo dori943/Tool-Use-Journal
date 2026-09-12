@@ -171,8 +171,25 @@ class FirstFeasibleStrategyCompiler:
                             if valid_solutions.enumeration_complete
                             else "IK_SEARCH_EXHAUSTED"
                         )
+                    # 0912: 기각된 전략의 키프레임은 계획 파일에 남지 않아서
+                    # "어느 자세를 시도했는지"를 사후에 볼 방법이 없었다.
+                    # c2_2 의 place_on 은 전략 11개가 전부 같은 관통값으로
+                    # 떨어졌는데, 그 자세가 받침의 윗면에서 온 것인지 중심에서
+                    # 온 것인지 가릴 수가 없었다. 시도한 자세와 그 자세를 만든
+                    # 기준 프레임/앵커를 실패 기록에 같이 남긴다.
+                    try:
+                        position = [
+                            round(float(v), 6)
+                            for v in pose.position_m
+                        ]
+                    except Exception:
+                        position = None
+                    frame_ref = getattr(keyframe, "frame_ref", None)
+                    anchor = getattr(keyframe, "anchor", None)
                     failure_detail = (
                         f"{keyframe.keyframe_id}: {valid_solutions.detail}"
+                        f"; attempted eef position_m={position}"
+                        f" frame_ref={frame_ref} anchor={anchor}"
                     )
                     break
 
