@@ -66,12 +66,16 @@ class OpenHandDropCorridor:
         depth = max(0., float(np.max(self.hand_points @ direction)
                               - np.min(self.object_points @ direction) + self.margin))
         count = max(2, 1 + math.ceil(depth / self.resolution))
+        max_samples, max_refinements = 4097, 8
+        if count > max_samples:
+            raise ValueError('RELEASE_CORRIDOR_SAMPLE_BUDGET_EXCEEDED')
         interval = depth / (count-1)
         required = self.margin + interval / 2.
         cutoff = 2. * max(required, self.resolution)
-        worst = {'distance_m': cutoff, 'drop_m': 0., 'geoms': None}
         closest = np.zeros(6)
-        for drop in np.linspace(0., depth, count):
+
+        def sample(drop):
+            worst = {'distance_m': cutoff, 'drop_m': float(drop), 'geoms': None}
             self.data.qpos[self.address:self.address+3] = self.initial_position + direction * drop
             self.mj.mj_fwdPosition(self.model, self.data)
             for a in self.objects:
@@ -82,9 +86,44 @@ class OpenHandDropCorridor:
                     if distance < worst['distance_m']:
                         worst = {'distance_m': distance, 'drop_m': float(drop),
                                  'geoms': [self.model.geom(a).name, self.model.geom(b).name]}
-        return {'clear': worst['distance_m'] >= required, 'minimum': worst,
+            return worst
+
+        samples = [sample(drop) for drop in np.linspace(0., depth, count)]
+        history = []
+        for refinement in range(max_refinements + 1):
+            interval = max(b['drop_m'] - a['drop_m'] for a, b in zip(samples, samples[1:]))
+            required = self.margin + interval / 2.
+            worst = min(samples, key=lambda row: row['distance_m'])
+            distance = worst['distance_m']
+            if distance < 0.:
+                status = 'COLLISION'
+            elif distance < self.margin:
+                status = 'MARGIN_VIOLATION'
+            elif distance >= required:
+                status = 'CLEAR'
+            else:
+                status = 'UNRESOLVED_SAMPLING'
+            history.append({'sample_count': len(samples), 'sample_interval_m': interval,
+                            'required_sample_distance_m': required, 'minimum': dict(worst),
+                            'status': status})
+            if status != 'UNRESOLVED_SAMPLING':
+                break
+            if refinement == max_refinements or 2 * len(samples) - 1 > max_samples:
+                break
+            # With fixed rotations and a unit translation direction, distance
+            # between any two closed geometry sets changes by at most |delta|.
+            # Their minimum (and distance clipped above at cutoff) is also
+            # 1-Lipschitz. Every point is within interval/2 of a sampled pose.
+            # Refine an inconclusive corridor; never reduce its physical margin
+            # or accept merely because a computational resolution was reached.
+            refined = []
+            for a, b in zip(samples, samples[1:]):
+                refined.extend((a, sample((a['drop_m'] + b['drop_m']) / 2.)))
+            samples = refined + [samples[-1]]
+        return {'clear': status == 'CLEAR', 'status': status, 'minimum': worst,
                 'drop_direction_in_current_world': direction.tolist(),
-                'depth_to_full_hand_separation_m': depth, 'sample_count': count,
+                'depth_to_full_hand_separation_m': depth, 'sample_count': len(samples),
                 'sample_interval_m': interval, 'margin_m': self.margin,
                 'required_sample_distance_m': required,
+                'refinement_history': history,
                 'validation_scope': 'NECESSARY_OPEN_HAND_GRAVITY_DROP_CLEARANCE'}
