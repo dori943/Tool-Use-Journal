@@ -1836,17 +1836,31 @@ class ToolUseJournalEERuntime:
             self.env, object_id
         )
         distance = self._minimum_ee_object_distance(body_id)
+        self.last_attachment_geometry_audit = None
         if distance > max_attach_distance_m:
             raise ToolUseJournalRuntimeError(
                 f"object {object_id!r} is {distance:.4f} m from the EE; "
                 f"attach limit is {max_attach_distance_m:.4f} m"
             )
         if distance < -max_attach_penetration_m:
-            raise ToolUseJournalRuntimeError(
-                f"object {object_id!r} penetrates EE geometry by "
-                f"{-distance:.4f} m; limit is "
-                f"{max_attach_penetration_m:.4f} m"
+            from tuj.m5_motion.attachment_geometry import certify_attachment_penetration
+            adapter = ToolUseJournalEnvironmentAdapter(self.env)
+            mounted_id = model.body(adapter.mounted_root_body).id
+            enabled = lambda root: tuple(
+                gid for gid in self._subtree_geom_ids(model, root)
+                if model.geom_contype[gid] or model.geom_conaffinity[gid]
             )
+            audit = certify_attachment_penetration(
+                model, data, enabled(mounted_id), enabled(body_id),
+                max_attach_penetration_m,
+            )
+            self.last_attachment_geometry_audit = audit
+            if not audit['certified']:
+                raise ToolUseJournalRuntimeError(
+                    f"object {object_id!r} penetrates EE geometry by "
+                    f"{-distance:.4f} m; limit is "
+                    f"{max_attach_penetration_m:.4f} m"
+                )
         kind, name, reference_position, reference_rotation = (
             self._grasp_reference(self.env)
         )
