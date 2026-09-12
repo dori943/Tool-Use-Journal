@@ -96,7 +96,17 @@ class GraspRetention:
             c.original_monitor_sample(time_s)
         if self.loss_started is not None and time_s - self.loss_started > .10:
             raise GraspFailure("SCRIPTED_GRASP_CONTACT_LOST")
-        if slip > .005 or angle > 5.:
+        # Use the recipe's own slip tolerances so a per-object allowance set for
+        # the grasp HOLD validation (catalog_runtime) carries through transport
+        # and place.  Defaults reproduce the historical hard-coded 5 mm / 5 deg,
+        # so every recipe that does not override them is unchanged; an
+        # orientation-invariant object (e.g. a sphere pinched by the 2F jaw,
+        # which spins freely about the grip axis) can widen only its rotational
+        # bound while position slip and contact loss stay tight.
+        recipe = c.recipe
+        max_slip_m = float(getattr(recipe, "maximum_slip_m", .005))
+        max_slip_deg = float(getattr(recipe, "maximum_slip_deg", 5.))
+        if slip > max_slip_m or angle > max_slip_deg:
             raise GraspFailure(f"SCRIPTED_GRASP_SLIPPED: {slip:.6f} m, {angle:.3f} deg")
 
     def transform(self):
