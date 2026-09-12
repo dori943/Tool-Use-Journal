@@ -36,11 +36,53 @@ def configure_packing_orientation(g):
         choices.append((angle, rotation, lower, upper))
     if not choices:
         raise ValueError('PACKING_NO_INTERIOR_FIT_ORIENTATION')
+    from .transport import _is_transport
+    if getattr(g, 'retention', None) is not None and _is_transport(g.task):
+        from copy import copy
+        feasible = []
+        for choice in sorted(choices, key=lambda row: row[0]):
+            _, rotation, lower, upper = choice
+            # Probe candidate-local geometry without contaminating the winner
+            # or the next candidate with a prior half extent / packing bound.
+            probe = copy(g)
+            probe.destination_rotation = g.T_WR[:3, :3] @ rotation
+            probe.preserve_destination_rotation = True
+            probe.half = np.ptp(points @ probe.destination_rotation.T, axis=0) / 2.
+            probe.packing_bounds = (lower, upper)
+            if packing_transport_has_ik(probe):
+                feasible.append(choice)
+                break
+        if not feasible:
+            raise ValueError('PACKING_NO_REACHABLE_FIT_ORIENTATION')
+        choices = feasible
     _, rotation, lower, upper = min(choices, key=lambda row: row[0])
     g.destination_rotation = g.T_WR[:3, :3] @ rotation
     g.preserve_destination_rotation = True
     g.half = np.ptp(points @ g.destination_rotation.T, axis=0) / 2.
     g.packing_bounds = (lower, upper)
+
+
+def packing_transport_has_ik(g):
+    """Prefilter the exact transport EEF goal; path/collision gates still apply."""
+    from .transport import transport_destination_center
+    from .container_release import clear_container_rim
+    from .frames import inverse
+    center = transport_destination_center(g)
+    body = np.eye(4)
+    body[:3, :3] = g.destination_rotation
+    body[:3, 3] = center - g.destination_rotation @ g.center_in_body
+    body, _ = clear_container_rim(g, body, g.retention)
+    target = body @ inverse(inverse(g.T_WE) @ g.T_WB)
+    c = g.retention.context
+    solved = c.kinematics.solve_all_ik(target[:3, 3], Rotation.from_matrix(target[:3, :3]).as_quat(),
+                                     seed_qpos=c.data.qpos[c.arm_ids])
+    g.task.metadata.setdefault('packing_orientation_ik_candidates', []).append({
+        'object_orientation_xyzw': Rotation.from_matrix(g.destination_rotation).as_quat().tolist(),
+        'eef_position_m': target[:3, 3].tolist(),
+        'eef_orientation_xyzw': Rotation.from_matrix(target[:3, :3]).as_quat().tolist(),
+        'raw_ik_count': len(solved.solutions),
+    })
+    return bool(solved.solutions)
 
 
 def packing_destination_center(g, desired_center, *, place):

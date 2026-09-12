@@ -527,6 +527,19 @@ def _grounding_for(request, retention, predicate):
     return _Grounding(request, retention, object_id)
 
 
+def transport_destination_center(g):
+    """Shared exact center for transport grounding and orientation IK probes."""
+    desired_center = g.region_world.copy()
+    desired_center[:2] = g.free_destination_xy()
+    # Keep the measured object bbox clear of the rim without an arbitrary 5 cm
+    # standoff that can place a reachable kitchen destination outside UR5e reach.
+    clearance = max(.02, g.request.constraints.collision_margin_m * 2.)
+    desired_center[2] = max(g.center[2],
+                            g.interior_top_world_z() + g.half[2] + clearance)
+    from .container_orientation import packing_destination_center
+    return packing_destination_center(g, desired_center, place=False)
+
+
 def ground_held_transport(request, retention=None):
     """Carry the held object to a free spot above the region with rim clearance."""
     _materialize_conceptual_tool_home(request, retention)
@@ -535,15 +548,7 @@ def ground_held_transport(request, retention=None):
     g = _grounding_for(request, retention, _is_transport)
     if g is None:
         return
-    desired_center = g.region_world.copy()
-    desired_center[:2] = g.free_destination_xy()
-    # Keep the measured object bbox clear of the rim without an arbitrary 5 cm
-    # standoff that can place a reachable kitchen destination outside UR5e reach.
-    clearance = max(.02, request.constraints.collision_margin_m * 2.)
-    desired_center[2] = max(g.center[2],
-                            g.interior_top_world_z() + g.half[2] + clearance)
-    from .container_orientation import packing_destination_center
-    desired_center = packing_destination_center(g, desired_center, place=False)
+    desired_center = transport_destination_center(g)
     g.task.goal.target_pose = None
     destination = g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, {})
     from .container_release import clear_container_rim
