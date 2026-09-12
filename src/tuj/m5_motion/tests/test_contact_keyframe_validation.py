@@ -520,18 +520,18 @@ def test_engagement_presses_held_tool_into_target_tops() -> None:
     assert press <= 0.15 * float(thickness) + 1e-9
 
 
-def test_hollow_dish_still_uses_shallow_top_engagement() -> None:
+def test_hollow_dish_uses_mid_height_with_fill_policy() -> None:
     from tuj.m5_motion.contact_keyframe_validation import (
         _contact_engagement_tcp_z_m,
         _held_tool_below_tcp_m,
         _held_tool_hollow_rim_inner_radius_m,
+        _support_surface_z_m,
         _sweep_target_top_z_m,
     )
 
     request = _sweep_request()
     request.world.robot_state.held_tool_id = "tool_pusher"
     request.world.robot_state.attached_object_id = "tool_pusher"
-    # Ring-only collision cloud (no center fill) like the C1 dish plate.
     ring: list[list[float]] = []
     for angle in np.linspace(0.0, 2.0 * np.pi, 48, endpoint=False):
         ring.append([0.05 * float(np.cos(angle)), 0.05 * float(np.sin(angle)), -0.005])
@@ -540,15 +540,16 @@ def test_hollow_dish_still_uses_shallow_top_engagement() -> None:
         (-0.20, -0.05, 0.985), dimensions=(0.12, 0.12, 0.01)
     )
     request.world.objects["tool_pusher"]["collision_points_m"] = ring
-    rim = _held_tool_hollow_rim_inner_radius_m(request)
-    assert rim is not None and rim == pytest.approx(0.05, abs=1e-3)
+    assert _held_tool_hollow_rim_inner_radius_m(request) is not None
     top = _sweep_target_top_z_m(request)
+    support = _support_surface_z_m(request)
     below = _held_tool_below_tcp_m(request)
     eng = _contact_engagement_tcp_z_m(request)
-    assert top is not None and eng is not None
-    # Playback enables a solid AABB fill; planning keeps shallow top press.
-    press = float(top) - float(eng - below)
-    assert 0.0005 <= press <= 0.003
+    assert top is not None and support is not None and eng is not None
+    mid = 0.5 * (float(support) + float(top))
+    underside = float(eng - below)
+    assert underside == pytest.approx(mid - 0.0015, abs=2e-3)
+    assert underside < float(top) - 0.002
 
 
 def test_engagement_press_capped_by_thin_held_tool_thickness() -> None:

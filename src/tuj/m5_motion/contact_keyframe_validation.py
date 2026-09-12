@@ -92,6 +92,9 @@ _MIN_SWEEP_LATERAL_M = 0.08
 # Require this fraction of the start→region distance as forward progress when a
 # goal region is known (generic; not task-id specific).
 _MIN_SWEEP_REGION_PROGRESS_FRAC = 0.35
+# CONTACT_SWEEP poses farther than this from the start→region line are pulled
+# back onto the corridor even when END already has enough progress.
+_SWEEP_CORRIDOR_DEVIATION_M = 0.03
 
 _CONTACT_PHASE_TYPES = frozenset(
     {
@@ -536,15 +539,31 @@ def _sweep_engagement_press_m(request: MotionPlanRequest) -> float:
 def _contact_engagement_tcp_z_m(request: MotionPlanRequest) -> float | None:
     """TCP z for held-tool sweep engagement.
 
-    Uses shallow underside press into target tops. Hollow dishes get a temporary
-    solid AABB fill at playback (``reg_bbox``), so mid-height rim plow is not
-    needed and would put free bodies inside the empty cavity.
+    Flat tools: shallow underside press into target tops.
+    Hollow dishes: mid-target height so the solid AABB fill (enabled at playback)
+    side-pushes instead of only friction-dragging across tops. The fill closes
+    the empty cavity so mid-height no longer tunnels bodies into the vac cup.
     """
 
     tool_below = _held_tool_below_tcp_m(request)
     target_top = _sweep_target_top_z_m(request)
     support_z = _support_surface_z_m(request)
     press = _sweep_engagement_press_m(request)
+    rim_r = _held_tool_hollow_rim_inner_radius_m(request)
+    if (
+        target_top is not None
+        and support_z is not None
+        and rim_r is not None
+        and rim_r > 1e-4
+    ):
+        mid_z = float(support_z) + float(_HOLLOW_RIM_CONTACT_HEIGHT_FRAC) * (
+            float(target_top) - float(support_z)
+        )
+        underside = mid_z - press
+        underside = max(
+            underside, float(support_z) + float(_CONTACT_SWEEP_SUPPORT_CLEARANCE_M)
+        )
+        return float(underside + tool_below)
     if target_top is not None:
         if support_z is not None:
             max_press = max(
@@ -1055,7 +1074,26 @@ def canonicalize_sweep_lateral_toward_region(
         _MIN_SWEEP_LATERAL_M,
         _MIN_SWEEP_REGION_PROGRESS_FRAC * dist_region,
     )
-    if lateral >= _MIN_SWEEP_LATERAL_M and progress >= min_progress:
+    corridor_ok = True
+    for keyframe in keyframes:
+        if keyframe.keyframe_type is not KeyframeType.CONTACT_SWEEP:
+            continue
+        try:
+            sweep_pose = active_resolver.resolve(keyframe)
+        except GeometryResolutionError:
+            corridor_ok = False
+            break
+        sweep_xy = np.asarray(sweep_pose.position_m[:2], dtype=float)
+        along = float(np.dot(sweep_xy - start_xy, direction))
+        closest = start_xy + direction * along
+        if float(np.linalg.norm(sweep_xy - closest)) > _SWEEP_CORRIDOR_DEVIATION_M:
+            corridor_ok = False
+            break
+    if (
+        lateral >= _MIN_SWEEP_LATERAL_M
+        and progress >= min_progress
+        and corridor_ok
+    ):
         return list(keyframes)
 
     move_indices = [

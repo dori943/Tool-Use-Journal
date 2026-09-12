@@ -595,6 +595,8 @@ class ToolUseJournalEERuntime:
         # Prior (contype, conaffinity) for temporarily enabled hollow-tool fill
         # geoms (``*_reg_bbox``) during tabletop push / tool_act sweeps.
         self._held_tool_fill_geom_backup: dict[int, tuple[int, int]] = {}
+        # Last synchronized attached-object pose for finite-difference qvel.
+        self._attached_sync_state: tuple[np.ndarray, np.ndarray, float] | None = None
         self._set_declared_active_ee(env, self._active_ee)
         self._hidden_rack_ee = self._apply_rack_visibility(
             env, self._active_ee
@@ -2049,6 +2051,7 @@ class ToolUseJournalEERuntime:
         self._attachment = attachment
         self._last_attachment_break = None
         self._vac_attach_diag_logged.clear()
+        self._attached_sync_state = None
         self.log_vac_attach_diagnostic(
             action="ATTACH",
             intended_target=object_id,
@@ -2282,9 +2285,43 @@ class ToolUseJournalEERuntime:
         )
         qpos_start = int(model.jnt_qposadr[joint_id])
         qvel_start = int(model.jnt_dofadr[joint_id])
+        previous = self._attached_sync_state
+        now = float(data.time)
         data.qpos[qpos_start : qpos_start + 3] = object_position
         data.qpos[qpos_start + 3 : qpos_start + 7] = quaternion_wxyz
-        data.qvel[qvel_start : qvel_start + 6] = 0.0
+        # Finite-difference velocity so soft contacts see tool motion. Zeroing
+        # qvel every substep makes a kinematic plate slide over blocks with
+        # only vertical penetration and no lateral friction/push.
+        if previous is not None:
+            prev_pos, prev_quat, prev_time = previous
+            dt = now - float(prev_time)
+            if math.isfinite(dt) and dt > 1e-6:
+                linear = (object_position - prev_pos) / dt
+                quat_conj = np.array(
+                    [
+                        float(prev_quat[0]),
+                        -float(prev_quat[1]),
+                        -float(prev_quat[2]),
+                        -float(prev_quat[3]),
+                    ],
+                    dtype=float,
+                )
+                quat_delta = np.empty(4, dtype=float)
+                mujoco.mju_mulQuat(quat_delta, quaternion_wxyz, quat_conj)
+                if float(quat_delta[0]) < 0.0:
+                    quat_delta *= -1.0
+                angular = np.asarray(quat_delta[1:4], dtype=float) * (2.0 / dt)
+                data.qvel[qvel_start : qvel_start + 3] = linear
+                data.qvel[qvel_start + 3 : qvel_start + 6] = angular
+            else:
+                data.qvel[qvel_start : qvel_start + 6] = 0.0
+        else:
+            data.qvel[qvel_start : qvel_start + 6] = 0.0
+        self._attached_sync_state = (
+            np.asarray(object_position, dtype=float).copy(),
+            np.asarray(quaternion_wxyz, dtype=float).copy(),
+            now,
+        )
         mujoco.mj_forward(model, data)
         self.suppress_native_adhesion_actuators()
         self.log_vac_non_target_cup_contacts()
@@ -2357,11 +2394,16 @@ class ToolUseJournalEERuntime:
             body_id, _, _ = self._object_free_joint(self.env, tool_id)
         except ToolUseJournalRuntimeError:
             return []
-        if not self._body_collision_underside_is_hollow(body_id):
-            return []
+        # Enable fill whenever an inactive AABB slab exists. Hollow detection is
+        # only a preference signal; tabletop push plans already gate activation.
         fill_ids = self._held_tool_inactive_fill_geom_ids(body_id)
         if not fill_ids:
             return []
+        if not self._body_collision_underside_is_hollow(body_id):
+            # Still enable: a solid AABB matching the tool footprint is harmless
+            # for already-solid tools and required when geom-center heuristics
+            # miss a hollow dish.
+            pass
         model, data = _raw_model_data(self.env)
         template_id = next(
             (
@@ -2415,6 +2457,7 @@ class ToolUseJournalEERuntime:
         """Release the attached object while preserving its current world pose."""
 
         self.disable_held_tool_collision_fill()
+        self._attached_sync_state = None
         attachment = self._attachment
         if attachment is None:
             raise ToolUseJournalRuntimeError("no object is attached")
