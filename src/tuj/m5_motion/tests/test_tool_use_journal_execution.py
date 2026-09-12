@@ -167,6 +167,31 @@ def test_adapter_refuses_unscoped_collision_execution() -> None:
         adapter.player(request, plan, 0)
 
 
+@pytest.mark.parametrize('controller,extra', [(True, 10.), (False, 0.)])
+def test_global_budget_includes_each_controller_settle_without_changing_local_limits(controller, extra):
+    request, plan = _request_and_plan()
+    segment = plan.segments[0]
+    segment.metadata['tracking_settle'] = {'eef_tolerance_m': .005, 'max_wait_s': 5.,
+                                            'required_consecutive_ticks': 3}
+    plan.segments.append(segment.model_copy(deep=True, update={'segment_id': 'retreat'}))
+    before = [s.metadata.copy() for s in plan.segments]
+    adapter = ToolUseJournalExecutionAdapter(
+        SimpleNamespace(env=SimpleNamespace(model_timestep=.001, control_timestep=.02)),
+        compiler=_Compiler(), controller=controller)
+    assert adapter.config(request, plan, 0).max_duration_s == pytest.approx(plan.duration_s + 5. + extra)
+    assert [s.metadata for s in plan.segments] == before
+
+
+def test_budget_rejects_invalid_local_wait_instead_of_masking_it():
+    request, plan = _request_and_plan()
+    plan.segments[0].metadata['tracking_settle'] = {'eef_tolerance_m': .005, 'max_wait_s': -1.}
+    adapter = ToolUseJournalExecutionAdapter(
+        SimpleNamespace(env=SimpleNamespace(model_timestep=.001, control_timestep=.02)),
+        compiler=_Compiler(), controller=True)
+    with pytest.raises(RuntimeError, match='max_wait_s must be positive'):
+        adapter.config(request, plan, 0)
+
+
 def test_world_snapshot_normalizes_and_carries_contact_friction_transform(
     monkeypatch,
 ) -> None:

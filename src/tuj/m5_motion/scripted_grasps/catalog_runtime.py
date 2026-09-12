@@ -1,7 +1,8 @@
 """Scripted grasp runner for object-specific catalog recipes.
 
 Reuses the already tested joint/Cartesian planner without changing spoon code.
-Fingers use contact forces; vacuum attaches after verified cup contact.
+Fingers use contact forces, with explicit opt-in attachment after stable contact.
+Vacuum attaches after verified cup contact.
 """
 from pathlib import Path
 import importlib.util
@@ -21,6 +22,10 @@ from tuj.m5_motion.scripted_grasps.spoon_runtime import SpoonContext,approach_sp
 class CatalogContext(SpoonContext):
 
     def find_support_geoms(self):
+        from .support_geometry import measured_support_geoms
+        measured = measured_support_geoms(self)
+        if measured:
+            return measured
         try:return {self.model.geom('table_collision').id}
         except KeyError:pass
         geoms={i for i in range(self.model.ngeom)
@@ -126,6 +131,8 @@ class CatalogContext(SpoonContext):
             'gripper_ctrl':self.data.ctrl[[self.model.actuator(n).id for n in self.gripper.actuators]],
             'object_pose':self.body_pose(),'bad_contacts':self.bad_contacts(self.data,self.stage)}
         self.trace.append(row)
+        from .contact_attachment import audit_contact_attachment
+        audit_contact_attachment(self, row)
         lift_rows=self.trace[-10:]
         if self.recipe.ee_id=='vac' and self.vacuum_attachment_record is not None and self.stage in {'CLOSE','LIFT','SETTLE','HOLD'}:
             if not row['attachment_active']:raise GraspFailure('VACUUM_ATTACHMENT_LOST')
@@ -232,6 +239,10 @@ class CatalogContext(SpoonContext):
         try:
             self.record_input()
             targets=build_catalog_targets(self.body_pose(),self.center_in_body,self.local_size,recipe)
+            from .release_grasp import resolve_release_clearance_targets
+            targets, release_clearance = resolve_release_clearance_targets(self, targets)
+            if release_clearance is not None:
+                save_json(self.output/'release_grasp_geometry.json',release_clearance)
             save_json(self.output/'targets.json',targets)
             q=self.data.qpos[self.arm_ids].copy()
             if recipe.ee_id=='2F':opening,aperture=self.preshape()
@@ -240,6 +251,13 @@ class CatalogContext(SpoonContext):
                 for _ in range(75):self.step(q,opening)
                 aperture=None
             save_json(self.output/'preshape.json',{'aperture_m':aperture,'opening_command':opening})
+            if recipe.contact_region_endpoint_policy is not None:
+                from .endpoint_grasp import resolve_endpoint_support_clearance
+                # Measure the real preshaped hand and the current object pose.
+                targets=build_catalog_targets(self.body_pose(),self.center_in_body,self.local_size,recipe)
+                targets, endpoint_clearance = resolve_endpoint_support_clearance(self, targets)
+                save_json(self.output/'endpoint_grasp_geometry.json',endpoint_clearance)
+                save_json(self.output/'targets.json',targets)
             approach_spoon(self,targets,opening)
             q=self.move(targets['GRASP'],'GRASP',opening,cartesian=True)
             np.savez_compressed(self.output/'grasp_state.npz',qpos=self.data.qpos,qvel=self.data.qvel,ctrl=self.data.ctrl,time=self.data.time)
@@ -262,6 +280,9 @@ class CatalogContext(SpoonContext):
             if recipe.ee_id=='vac':
                 if self.runtime.attached_object_id!=self.object_id:raise GraspFailure('VACUUM_ATTACHMENT_LOST')
             elif not self.ready():raise GraspFailure('CONTACT_LOST_BEFORE_LIFT')
+            if recipe.finger_attachment_policy == 'STABLE_CONTACT':
+                from .contact_attachment import attach_after_stable_contact
+                hold_opening = attach_after_stable_contact(self)
             self.carried_pose=inverse(self.grip_pose())@self.body_pose()
             save_json(self.output/'contact_gate.json',{'status':'PASSED','sample':self.trace[-1]})
             q=self.move(targets['LIFT'],'LIFT',hold_opening,cartesian=True)
@@ -269,6 +290,8 @@ class CatalogContext(SpoonContext):
             run_timed_hold(self,q,hold_opening,recipe.settle_s)
             self.stage='HOLD';hold,measured_hold_s=run_timed_hold(self,q,hold_opening,recipe.hold_s)
             ref=np.asarray(self.vacuum_attachment_record['T_GB_at_attach']) if recipe.ee_id=='vac' else hold[0]['T_GB']
+            if getattr(self, 'finger_attachment_record', None) is not None:
+                ref = np.asarray(self.finger_attachment_record['T_GB_at_attach'])
             slip=max(float(np.linalg.norm(s['T_GB'][:3,3]-ref[:3,3])) for s in hold)
             angle=max(float(np.rad2deg(Rotation.from_matrix(ref[:3,:3].T@s['T_GB'][:3,:3]).magnitude())) for s in hold)
             metrics={'minimum_hold_lift_m':min(s['lift_m'] for s in hold),
@@ -282,6 +305,11 @@ class CatalogContext(SpoonContext):
                 metrics['pose_error_reference']='ATTACH_TIME'
                 ok=ok and metrics['attachment_active_fraction']==1.
             else:ok=ok and metrics['all_finger_contact_fraction']>=.95
+            if getattr(self, 'finger_attachment_record', None) is not None:
+                metrics['attachment_active_fraction'] = sum(s['attachment_active'] for s in hold)/len(hold)
+                metrics['validation_basis'] = 'CONTACT_GATED_KINEMATIC_ATTACHMENT'
+                metrics['pose_error_reference'] = 'ATTACH_TIME'
+                ok = ok and metrics['attachment_active_fraction'] == 1.
             result.update(status='SUCCESS' if ok else 'FAILED',metrics=metrics,failure_reason=None if ok else 'HOLD_VALIDATION_FAILED')
         except Exception as exc:
             import traceback
@@ -296,6 +324,8 @@ class CatalogContext(SpoonContext):
             if recipe.ee_id=='vac':
                 from tuj.m5_motion.scripted_grasps.catalog_vacuum import VACUUM_POLICY
                 result.update(vacuum_policy=VACUUM_POLICY,vacuum_attachment=self.vacuum_attachment_record)
+            if getattr(self, 'finger_attachment_record', None) is not None:
+                result['finger_attachment'] = self.finger_attachment_record
             save_json(self.output/'result.json',result);save_json(self.output/'trace.json',self.trace)
             np.savez_compressed(self.output/'final_state.npz',qpos=self.data.qpos,qvel=self.data.qvel,ctrl=self.data.ctrl,time=self.data.time)
             if self.camera:
