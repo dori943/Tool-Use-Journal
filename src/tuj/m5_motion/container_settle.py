@@ -5,6 +5,7 @@ import math
 import numpy as np
 from scipy.spatial.transform import Rotation
 from .push_to_region import target_fully_inside_region
+from .container_surface import is_container_surface_task, cover_geometry, measured_surface_support
 
 
 def configure_container_settle(request, plan):
@@ -23,10 +24,11 @@ def configure_container_settle(request, plan):
     if not math.isfinite(timeout) or timeout <= 0:
         raise ValueError('CONTAINER_SETTLE_TIMEOUT_REQUIRED')
     targets={target}
+    surface = is_container_surface_task(request.task, request.world.objects)
     for name,record in request.world.objects.items():
         if (record.get('packing_metadata', {}).get('kind') == 'PACKABLE_OBJECT'
-                and target_fully_inside_region(request.world,target_id=name,
-                     region_id=region_id,include_vertical=True)):
+                and (surface or target_fully_inside_region(request.world,target_id=name,
+                     region_id=region_id,include_vertical=True))):
             targets.add(name)
     segment=plan.segments[-1]
     tracking=dict(segment.metadata.get('tracking_settle', {}))
@@ -40,9 +42,13 @@ def configure_container_settle(request, plan):
         'position_tolerance_m':request.constraints.position_tolerance_m,
         'orientation_tolerance_rad':request.constraints.orientation_tolerance_rad,
     }
+    if surface:
+        segment.metadata['container_settle'].update(
+            surface_target_id=target, request_id=request.request_id)
 
 
-def evaluate_container_settle(config, poses, previous, *, attached=False, hand_contacts=0):
+def evaluate_container_settle(config, poses, previous, *, attached=False, hand_contacts=0,
+                              surface_support=None):
     objects=deepcopy(config['objects'])
     stable=previous is not None
     max_position=0.;max_angle=0.
@@ -55,12 +61,22 @@ def evaluate_container_settle(config, poses, previous, *, attached=False, hand_c
             max_position=max(max_position,delta);max_angle=max(max_angle,angle)
     stable=stable and max_position<=config['position_tolerance_m'] and max_angle<=config['orientation_tolerance_rad']
     world=SimpleNamespace(objects=objects)
-    outside=[name for name in config['target_ids'] if not target_fully_inside_region(
+    surface_target = config.get('surface_target_id')
+    outside=[name for name in config['target_ids'] if name != surface_target and not target_fully_inside_region(
         world,target_id=name,region_id=config['region_id'],include_vertical=True)]
-    return {'succeeded':not outside and stable and not attached and hand_contacts==0,
+    result = {'succeeded':not outside and stable and not attached and hand_contacts==0,
             'outside_target_ids':outside,'stable':stable,'attached':attached,
             'hand_contact_count':hand_contacts,'max_position_delta_m':max_position,
             'max_orientation_delta_rad':max_angle}
+    if surface_target is not None:
+        cover = cover_geometry(objects, surface_target, config['region_id'],
+            config['position_tolerance_m'], config['orientation_tolerance_rad'])
+        support = surface_support or {'contact_count': 0, 'upward_force_n': 0.}
+        result.update(cover=cover, surface_support=support, surface_target_id=surface_target,
+                      region_id=config['region_id'], request_id=config['request_id'])
+        result['succeeded'] = (result['succeeded'] and cover['succeeded']
+            and support['contact_count'] > 0 and support['upward_force_n'] > 0)
+    return result
 
 
 def measured_container_settle(runtime, config, state):
@@ -84,7 +100,16 @@ def measured_container_settle(runtime, config, state):
         if a<0 or b<0:continue
         hand_contacts+=int((int(model.geom_bodyid[a]) in target_bodies and (model.geom(b).name or '').startswith(prefix))
                           or (int(model.geom_bodyid[b]) in target_bodies and (model.geom(a).name or '').startswith(prefix)))
+    support = None
+    if config.get('surface_target_id') is not None:
+        region_id = config['region_id']
+        rim = config['objects'][region_id]['packing_metadata']['opening_top_z_m']
+        support = measured_surface_support(model, data,
+            int(runtime.env.obj_body_id[config['surface_target_id']]),
+            int(runtime.env.obj_body_id[region_id]), float(poses[region_id]['position_m'][2] + rim),
+            config['position_tolerance_m'], config['orientation_tolerance_rad'])
     result=evaluate_container_settle(config,poses,state.get('container_previous_poses'),
-        attached=runtime.attached_object_id in config['target_ids'],hand_contacts=hand_contacts)
+        attached=runtime.attached_object_id in config['target_ids'],hand_contacts=hand_contacts,
+        surface_support=support)
     state['container_previous_poses']=poses
     return result
