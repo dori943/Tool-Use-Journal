@@ -67,11 +67,29 @@ def test_invalid_or_unbounded_sampling_fails_explicitly(monkeypatch, resolution,
         packing_overlap_preference(g, ['occupied'])
 
 
+def _isolate_ranking_from_release_corridor(monkeypatch, g):
+    # These ranking unit tests isolate IK and occupancy scoring. The physical
+    # release gate has real MuJoCo geometry coverage in test_release_corridor.
+    class ClearCorridor:
+        def __init__(self, context, margin, resolution):
+            pass
+
+        def evaluate(self, rotation):
+            return {"clear": True}
+
+    g.retention = NS(context=object())
+    monkeypatch.setattr(
+        'tuj.m5_motion.scripted_grasps.release_corridor.OpenHandDropCorridor',
+        ClearCorridor,
+    )
+
+
 def test_preference_cannot_select_unreachable_orientation(monkeypatch):
     from tuj.m5_motion.tests.test_container_orientation import fixture
     from tuj.m5_motion.scripted_grasps import container_orientation, packing_occupancy
     g, _ = fixture(0.)
-    g.task = NS(action_type='TRANSPORT', metadata={}); g.retention = NS()
+    g.task = NS(action_type='TRANSPORT', metadata={})
+    _isolate_ranking_from_release_corridor(monkeypatch, g)
     reached = []; scored = []
     monkeypatch.setattr(packing_occupancy, 'packing_occupants', lambda g: ['occupied'])
     def ik(probe):
@@ -92,7 +110,8 @@ def test_equal_scores_preserve_closest_orientation(monkeypatch):
     from tuj.m5_motion.tests.test_container_orientation import fixture
     from tuj.m5_motion.scripted_grasps import container_orientation, packing_occupancy
     g, _ = fixture(.3)
-    g.task = NS(action_type='TRANSPORT', metadata={}); g.retention = NS()
+    g.task = NS(action_type='TRANSPORT', metadata={})
+    _isolate_ranking_from_release_corridor(monkeypatch, g)
     calls = []
     monkeypatch.setattr(packing_occupancy, 'packing_occupants', lambda g: ['occupied'])
     def ik(probe):
