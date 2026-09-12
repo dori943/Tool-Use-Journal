@@ -21,7 +21,7 @@ import math
 import time
 from bisect import bisect_right
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Protocol
@@ -165,6 +165,9 @@ class _RuntimeState:
     qvel_by_joint: Mapping[str, tuple[float, ...]]
     ctrl_by_actuator: Mapping[str, float]
     simulation_time_s: float
+    # Legacy serialized checkpoints omit calibration history. The in-memory
+    # EE transition captures it explicitly; never invent it for old checkpoints.
+    scene_geom_solref: Mapping[str, Any] = field(default_factory=dict)
 
 
 def _active_contact_snapshot(
@@ -207,6 +210,7 @@ def _active_contact_snapshot(
 
 
 def _capture_runtime_state(env: object) -> _RuntimeState:
+    from .scene_contact_state import capture_scene_solref
     model, data = _raw_model_data(env)
     qpos: dict[str, tuple[float, ...]] = {}
     qvel: dict[str, tuple[float, ...]] = {}
@@ -239,11 +243,14 @@ def _capture_runtime_state(env: object) -> _RuntimeState:
         qvel_by_joint=qvel,
         ctrl_by_actuator=controls,
         simulation_time_s=float(data.time),
+        scene_geom_solref=capture_scene_solref(env, model),
     )
 
 
 def _restore_runtime_state(env: object, state: _RuntimeState) -> None:
+    from .scene_contact_state import restore_scene_solref
     model, data = _raw_model_data(env)
+    restore_scene_solref(env, model, state.scene_geom_solref)
     for joint_id in range(model.njnt):
         name = _name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
         if not name:
@@ -2216,6 +2223,10 @@ class ToolUseJournalEERuntime:
             # Verify every common named joint survived bit-for-bit within
             # floating-point transfer tolerance before committing the swap.
             restored = _capture_runtime_state(new_env)
+            common_contacts = state.scene_geom_solref.keys() & restored.scene_geom_solref.keys()
+            if any(state.scene_geom_solref[name] != restored.scene_geom_solref[name]
+                   for name in common_contacts):
+                raise ToolUseJournalRuntimeError('EE transfer changed common scene contact calibration')
             common = sorted(
                 set(state.qpos_by_joint) & set(restored.qpos_by_joint)
             )
