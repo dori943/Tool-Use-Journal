@@ -287,11 +287,21 @@ def test_pick_binds_contact_then_candidate_specific_attachment_context() -> None
     assert release.metadata["post_segment_validation_context_id"] == (
         transfer.collision_context_id
     )
+    # 0912: 파지 후 문맥은 [대상, 받침] 과 함께 [EE, 받침] 도 면제한다. 얇은
+    # 물체를 받침에서 떼는 동안 EE 는 물체 두께만큼만 받침에서 떨어져 있어,
+    # 5mm 마진을 그대로 요구하면 원리상 만족이 불가능하다 (c2_2 turkey_1,
+    # 두께 2.5mm: 흡착컵과 접시 여유 0.4~2.0mm 로 전략 전부 기각). 관통
+    # 한계는 그대로라 EE 가 받침을 뚫는 것은 계속 막힌다.
+    assert ("2F", "table_collision") in release.allowed_collision_pairs
     assert release.metadata["bounded_collision_allowances"] == [
         {
             "selectors": ["bottle", "table_collision"],
             "minimum_distance_m": -0.001,
-        }
+        },
+        {
+            "selectors": ["2F", "table_collision"],
+            "minimum_distance_m": -0.001,
+        },
     ]
     attached = setup.collision_contexts[transfer.collision_context_id]
     assert attached.attached_object_ids == ["bottle"]
@@ -340,7 +350,10 @@ def test_pick_infers_exact_initial_support_for_only_the_separation_edge() -> Non
         "object-attached-release:bottle:"
     )
     release = setup.collision_contexts[retreat.collision_context_id]
-    assert release.allowed_collision_pairs == [("bottle", "fixture_surface")]
+    assert release.allowed_collision_pairs == [
+        ("bottle", "fixture_surface"),
+        ("2F", "fixture_surface"),
+    ]
     assert release.metadata["support_separation"] == {
         "policy": "AUTO_INITIAL_SUPPORT_V1",
         "detection_source": "world.obstacles.aabb",
