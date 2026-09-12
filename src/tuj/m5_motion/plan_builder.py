@@ -942,6 +942,17 @@ class MotionPlanBuilder:
                 ),
                 **(
                     {
+                        "target_ids": [
+                            str(object_id).strip()
+                            for object_id in request.task.target_ids
+                            if str(object_id).strip()
+                        ]
+                    }
+                    if request.task.target_ids
+                    else {}
+                ),
+                **(
+                    {
                         "grasp_execution_mode": "CONTACT_FRICTION",
                         "planned_contact_friction_transform": (
                             planned_contact_friction_transform

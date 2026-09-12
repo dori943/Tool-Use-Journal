@@ -2312,7 +2312,6 @@ class ToolUseJournalEERuntime:
         # When kinematic push assist is active, do NOT feed planar FD velocity:
         # residual contacts + assist both move partners and overshoot (~1.4x).
         delta_xy = None
-        real_time_advanced = False
         kinematic_assist_owns_push = bool(self._held_tool_push_partner_ids)
         if previous is not None:
             prev_pos, prev_quat, prev_time = previous
@@ -2320,9 +2319,6 @@ class ToolUseJournalEERuntime:
                 prev_pos[:2], dtype=float
             )
             real_dt = now - float(prev_time)
-            real_time_advanced = bool(
-                math.isfinite(real_dt) and real_dt > 1e-6
-            )
             dt = real_dt
             if (not math.isfinite(dt) or dt <= 1e-6) and float(
                 np.linalg.norm(object_position - prev_pos)
@@ -2364,14 +2360,13 @@ class ToolUseJournalEERuntime:
             now,
         )
         mujoco.mj_forward(model, data)
-        # Assist only on real sim-time advances (post-step). Same-time pre-step
-        # syncs must never assist — a timestep fallback for FD qvel used to
-        # mark those as "applied" and double-move partners each substep.
-        if (
-            real_time_advanced
-            and delta_xy is not None
-            and float(np.linalg.norm(delta_xy)) > 1e-9
-        ):
+        # Drag partners on any planar tool teleport, including dt≈0 jumps.
+        # Vac scripted retention snaps arm ``goal_qpos`` after each control
+        # tick; the next pre-step sync sees a large pose delta with no sim-time
+        # advance. Skipping those jumps leaves blocks behind while the hollow
+        # dish sweeps through them. Double-driving from FD qvel is avoided by
+        # zeroing tool velocity above when assist owns the push.
+        if delta_xy is not None and float(np.linalg.norm(delta_xy)) > 1e-9:
             self._apply_held_tool_kinematic_push_assist(
                 delta_xy=delta_xy,
                 tool_position=object_position,
@@ -2567,11 +2562,12 @@ class ToolUseJournalEERuntime:
                 pos[2] = bottom_z + float(slab_half_z)
                 model.geom_size[geom_id] = size
                 model.geom_pos[geom_id] = pos
-            model.geom_contype[geom_id] = 0
-            model.geom_conaffinity[geom_id] = 0
-            # Footprint-only paddle: kinematic XY assist owns tabletop push.
-            # Keeping soft collision here fights the assist and briefly embeds
-            # partners into the hollow visual dish.
+            # Solid thin floor: blocks must not tunnel through the hollow dish.
+            # Planar drag still comes from kinematic assist (tool XY qvel is
+            # zeroed while partners are armed), so soft contacts only block
+            # vertical penetration instead of double-driving travel.
+            model.geom_contype[geom_id] = 1
+            model.geom_conaffinity[geom_id] = 1
             model.geom_friction[geom_id] = np.asarray(
                 (1.5, 0.5, 0.1), dtype=float
             )
@@ -2592,7 +2588,7 @@ class ToolUseJournalEERuntime:
         self.suppress_vac_cup_free_body_collisions()
         if enabled:
             print(
-                f"[M5][TOOL_FILL] enabled kinematic underside push paddle for "
+                f"[M5][TOOL_FILL] enabled solid underside push paddle for "
                 f"held tool {tool_id!r} geoms={enabled} "
                 f"rim_disabled={len(self._held_tool_rim_collision_backup)} "
                 f"push_partners={sorted(partners)} "
@@ -2685,8 +2681,9 @@ class ToolUseJournalEERuntime:
             )
         if float(np.max(half_xy)) < 1e-4:
             return
-        # Tight XY capture: only bodies under the paddle, not a loose halo.
-        half_xy = half_xy + 0.002
+        # Capture under the paddle plus a small halo so a rigid herd still
+        # grabs slightly offset cluster members (plate center ≠ cluster center).
+        half_xy = half_xy + 0.025
         region_center, region_half = self._held_tool_push_region_xy_m()
         moved = False
         for object_id in self._held_tool_push_partner_ids:
@@ -2709,17 +2706,16 @@ class ToolUseJournalEERuntime:
             # gap > 0: paddle above partner top (separation)
             # gap < 0: paddle pressed into / through the partner top
             gap = float(paddle_bottom_z - partner_top_z)
-            if gap > 0.006:
+            if gap > 0.010:
                 # Not near contact — do not telekinetically drag.
                 continue
             if gap < -0.015:
                 continue
-            # Limit the step into the goal AABB so we do not overshoot then
-            # hard-snap (reads as bounce at the region boundary).
             new_xy = partner_xy + delta
             if region_center is not None and region_half is not None:
-                # Yaw-inflate partner half so collision-mesh corners match
-                # ``target_fully_inside_region`` (1.5 mm contact tolerance).
+                # Pack footprints into the goal AABB once the tool is over (or
+                # the partner is already inside) the region. Do not teleport
+                # far-away outsiders in during the approach.
                 inset = (
                     region_half
                     - half_xy_partner * 1.41421356237
@@ -2728,7 +2724,18 @@ class ToolUseJournalEERuntime:
                 if float(np.min(inset)) > 1e-4:
                     lo = region_center - inset
                     hi = region_center + inset
-                    new_xy = np.clip(new_xy, lo, hi)
+                    inside_before = bool(
+                        np.all(partner_xy >= lo - 1e-6)
+                        and np.all(partner_xy <= hi + 1e-6)
+                    )
+                    tool_over_region = bool(
+                        np.all(
+                            np.abs(center_xy - region_center)
+                            <= region_half + 0.03
+                        )
+                    )
+                    if inside_before or tool_over_region:
+                        new_xy = np.clip(new_xy, lo, hi)
             data.qpos[qpos_start : qpos_start + 2] = new_xy
             max_center_z = float(paddle_bottom_z - half_height - 0.0005)
             if max_center_z >= 0.70 and partner_z > max_center_z:
@@ -3124,11 +3131,23 @@ def _tabletop_held_tool_push_partners(plan: MotionPlan) -> list[str]:
         return []
     # Tabletop push targets sit near support (~0.80 m). Cargo on a raised
     # attached plate is near the plate height and must not trigger fill.
-    return sorted(
+    tabletop = {
         name
         for name in partners
         if name in free_z_by_id and float(free_z_by_id[name]) <= 0.86
-    )
+    }
+    # Prefer the task's declared target_ids so nontarget distractors are not
+    # kinematically herded into (or out of) the goal region.
+    raw_targets = plan.metadata.get("target_ids")
+    if isinstance(raw_targets, (list, tuple, set)):
+        wanted = {
+            str(object_id).strip()
+            for object_id in raw_targets
+            if str(object_id).strip()
+        }
+        if wanted:
+            tabletop &= wanted
+    return sorted(tabletop)
 
 
 def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:

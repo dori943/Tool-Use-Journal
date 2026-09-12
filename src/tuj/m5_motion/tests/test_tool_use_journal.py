@@ -769,8 +769,149 @@ def test_held_tool_kinematic_push_assist_moves_tabletop_partner() -> None:
     runtime.close()
 
 
-def test_kinematic_push_assist_skips_same_time_sync_and_zeros_tool_qvel() -> None:
-    """Pre-step (dt≈0) must not assist; assist mode zeros tool FD qvel."""
+def test_kinematic_push_assist_packs_partner_when_tool_over_region() -> None:
+    """When the paddle is over the goal region, pack footprints into the AABB."""
+
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    # Partner near the region edge (would fail footprint containment by ~mm).
+    data.qpos[apple_qpos : apple_qpos + 3] = [-0.09, 0.082, 0.80]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+
+    box_geom = next(
+        geom_id
+        for geom_id in range(int(model.ngeom))
+        if int(model.geom_type[geom_id]) == int(mujoco.mjtGeom.mjGEOM_BOX)
+    )
+    runtime._held_tool_fill_geom_backup[box_geom] = (
+        0,
+        0,
+        np.asarray(model.geom_size[box_geom], dtype=float).copy(),
+        np.asarray(model.geom_pos[box_geom], dtype=float).copy(),
+    )
+    model.geom_size[box_geom] = np.asarray([0.10, 0.10, 0.0025], dtype=float)
+    model.geom_pos[box_geom] = np.asarray([0.0, 0.0, 0.0], dtype=float)
+    runtime._held_tool_push_partner_ids = frozenset({"apple"})
+    runtime._held_tool_push_region_id = "collection_zone_visual"
+    runtime._held_tool_push_region_xy_m = lambda: (  # type: ignore[method-assign]
+        np.asarray([-0.15, 0.0], dtype=float),
+        np.asarray([0.125, 0.09], dtype=float),
+    )
+
+    runtime._apply_held_tool_kinematic_push_assist(
+        delta_xy=np.asarray([-0.001, 0.0], dtype=float),
+        tool_position=np.asarray([-0.15, 0.0, 0.822], dtype=float),
+        tool_rotation=np.eye(3, dtype=float),
+    )
+    after = data.qpos[apple_qpos : apple_qpos + 2]
+    # Y must be pulled inside the yaw-inflated footprint inset (~0.061).
+    assert float(after[1]) <= 0.07 + 1e-6
+    runtime.close()
+
+
+def test_tabletop_push_partners_intersect_plan_target_ids() -> None:
+    from tuj.m5_motion.tool_use_journal_runtime import (
+        _tabletop_held_tool_push_partners,
+    )
+    from tuj.m5_motion.schema import (
+        CollisionContext,
+        FreeObjectPose,
+        MotionPlan,
+        Pose,
+        RobotState,
+        SegmentType,
+        TrajectorySegment,
+        TrajectoryWaypoint,
+        ArtifactProvenance,
+        ModuleName,
+    )
+
+    pose = Pose(
+        frame_id="world",
+        position_m=(0.1, 0.0, 0.8),
+        orientation_xyzw=(0.0, 0.0, 0.0, 1.0),
+    )
+    context = CollisionContext(
+        context_id="c0",
+        scene_state_id="s0",
+        active_ee="vac",
+        attached_object_ids=["plate"],
+        attached_object_transforms=[],
+        free_object_poses=[
+            FreeObjectPose(
+                object_id="block_a", free_joint_name="block_a_joint", pose=pose
+            ),
+            FreeObjectPose(
+                object_id="block_b", free_joint_name="block_b_joint", pose=pose
+            ),
+            FreeObjectPose(
+                object_id="block_c", free_joint_name="block_c_joint", pose=pose
+            ),
+        ],
+        touch_links=[],
+        kinematic_joint_positions={},
+        allowed_collision_pairs=[
+            ("block_a", "plate"),
+            ("block_b", "plate"),
+            ("block_c", "plate"),
+        ],
+        collision_model_version="v0",
+        metadata={},
+    )
+    waypoint = TrajectoryWaypoint(
+        time_from_start_s=0.0,
+        joint_positions_rad=[0.0] * 6,
+    )
+    segment = TrajectorySegment(
+        segment_id="seg0",
+        segment_type=SegmentType.TRANSFER,
+        start_time_s=0.0,
+        end_time_s=1.0,
+        interpolation="LINEAR",
+        waypoints=[
+            waypoint,
+            waypoint.model_copy(update={"time_from_start_s": 1.0}),
+        ],
+        collision_checked=True,
+        min_clearance_m=0.0,
+        collision_context_before=context,
+        collision_context_after=context,
+        processing_steps=[],
+        metadata={},
+    )
+    plan = MotionPlan(
+        plan_id="plan0",
+        request_id="req0",
+        provenance=ArtifactProvenance(
+            artifact_id="a0",
+            artifact_type="motion-plan",
+            produced_by=ModuleName.MOTION_PLANNER,
+            invocation_id="inv0",
+        ),
+        scene_signature="sig",
+        robot_id="ur5e_0",
+        joint_names=[f"j{i}" for i in range(6)],
+        duration_s=1.0,
+        segments=[segment],
+        events=[],
+        expected_final_state=RobotState(
+            robot_id="ur5e_0",
+            joint_names=[f"j{i}" for i in range(6)],
+            joint_positions_rad=[0.0] * 6,
+        ),
+        metadata={"target_ids": ["block_a", "block_c"]},
+    )
+    assert _tabletop_held_tool_push_partners(plan) == ["block_a", "block_c"]
+
+
+def test_kinematic_push_assist_applies_same_time_pose_jump_and_zeros_tool_qvel() -> None:
+    """Vac goal-snap (dt≈0) must still assist; assist mode zeros tool FD qvel."""
 
     runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
     model = runtime.env.sim.model._model
@@ -793,8 +934,7 @@ def test_kinematic_push_assist_skips_same_time_sync_and_zeros_tool_qvel() -> Non
         max_attach_penetration_m=0.05,
     )
     runtime.mark_attached_object_as_tool("apple")
-    # Non-empty partner set engages kinematic-assist mode (qvel zeroing +
-    # real-time-only assist gating) without needing a second free body.
+    # Non-empty partner set engages kinematic-assist mode (qvel zeroing).
     runtime._held_tool_push_partner_ids = frozenset({"block_partner"})
     assist_calls: list[np.ndarray] = []
 
@@ -817,14 +957,15 @@ def test_kinematic_push_assist_skips_same_time_sync_and_zeros_tool_qvel() -> Non
         mode=runtime._attachment.mode,
         breakable_weld=runtime._attachment.breakable_weld,
     )
-    # Same-time re-sync with pose change: must NOT assist.
+    # Same-time re-sync with pose change (vac goal snap): must assist once.
     runtime.synchronize_attached_object()
-    assert assist_calls == []
+    assert len(assist_calls) == 1
+    assert float(np.linalg.norm(assist_calls[0])) > 1e-3
     assert data.qvel[apple_qvel : apple_qvel + 3] == pytest.approx(
         np.zeros(3), abs=1e-9
     )
 
-    # New planar shift + real time advance: assist exactly once.
+    # Real time advance with another planar shift: assist again.
     runtime._attachment = AttachedObjectState(
         object_id=runtime._attachment.object_id,
         free_joint_name=runtime._attachment.free_joint_name,
@@ -838,8 +979,7 @@ def test_kinematic_push_assist_skips_same_time_sync_and_zeros_tool_qvel() -> Non
     )
     data.time = 2.02
     runtime.synchronize_attached_object()
-    assert len(assist_calls) == 1
-    assert float(np.linalg.norm(assist_calls[0])) > 1e-3
+    assert len(assist_calls) == 2
     assert data.qvel[apple_qvel : apple_qvel + 3] == pytest.approx(
         np.zeros(3), abs=1e-9
     )
