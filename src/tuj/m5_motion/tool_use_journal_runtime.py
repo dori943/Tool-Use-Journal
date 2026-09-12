@@ -2106,11 +2106,24 @@ class ToolUseJournalEERuntime:
             quaternion_wxyz,
             np.ascontiguousarray(object_rotation.reshape(9)),
         )
+        # A moving attachment must carry velocity as well as pose. Zeroing it
+        # makes the contact solver see a stationary object against moving fingers.
+        # Evaluate the reference body's twist at the projected object origin;
+        # MuJoCo free joints use world linear and body-local angular velocity.
+        mujoco.mj_comPos(model, data)
+        reference_body = self._attachment_reference_body_id(model, attachment)
+        jacp = np.zeros((3, model.nv))
+        jacr = np.zeros((3, model.nv))
+        mujoco.mj_jac(model, data, jacp, jacr,
+                      np.ascontiguousarray(object_position), reference_body)
+        linear_velocity = jacp @ data.qvel
+        angular_velocity = object_rotation.T @ (jacr @ data.qvel)
         qpos_start = int(model.jnt_qposadr[joint_id])
         qvel_start = int(model.jnt_dofadr[joint_id])
         data.qpos[qpos_start : qpos_start + 3] = object_position
         data.qpos[qpos_start + 3 : qpos_start + 7] = quaternion_wxyz
-        data.qvel[qvel_start : qvel_start + 6] = 0.0
+        data.qvel[qvel_start : qvel_start + 3] = linear_velocity
+        data.qvel[qvel_start + 3 : qvel_start + 6] = angular_velocity
         mujoco.mj_forward(model, data)
 
     def detach_object(self, object_id: str | None = None) -> AttachedObjectState:
