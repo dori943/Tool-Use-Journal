@@ -204,6 +204,33 @@ def test_c3_2_plate_vac_rim_offset_is_geometry_derived():
     assert np.linalg.norm(grasp_xy - np.array([0.4, 0.1])) == pytest.approx(radial, abs=1e-9)
 
 
+def test_c3_2_plate_vac_tunes_rim_to_measured_aabb():
+    """Stale expected size must not pull the cup inward on a larger live plate."""
+    from tuj.m5_motion.scripted_grasps.catalog_types import CatalogRecipe
+    from tuj.m5_motion.scripted_grasps.objects import plate_vac
+
+    measured = (0.167550312, 0.167090268, 0.010191929)
+    small = (0.157694411, 0.157261429, 0.009592404)
+    fx, fy, fz = plate_vac._rim_offset_fraction(small)
+    recipe = CatalogRecipe(
+        'plate', 'c3_2', 'vac', small,
+        offset_fraction=(fx, fy, fz),
+        offset_m=(0.0, 0.0, plate_vac.SEATING_OFFSET_Z_M),
+        two_finger_parallel_linkage=False,
+        post_grasp_arm_kp=300.0,
+        contact_region_min=(-0.95, -0.95, 0.0),
+        contact_region_max=(0.95, 0.95, 0.6),
+    )
+    tuned = plate_vac.tune_recipe_to_measured_size(recipe, measured)
+    assert tuned.expected_size_m == pytest.approx(measured)
+    radial = tuned.expected_size_m[0] * tuned.offset_fraction[0]
+    half = 0.5 * min(measured[0], measured[1])
+    assert radial == pytest.approx(
+        half - plate_vac.CUP_CLEARANCE_RADIUS_M - plate_vac.RIM_EDGE_MARGIN_M)
+    stale_radial = measured[0] * recipe.offset_fraction[0]
+    assert radial > stale_radial + 0.001
+
+
 def test_c3_2_bread_vac_does_not_seat_below_aabb_top():
     """Same vac cup ≡ grip-site rule as plate: no immersion past AABB top."""
     from tuj.m5_motion.scripted_grasps.objects import bread_vac

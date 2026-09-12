@@ -592,6 +592,9 @@ class ToolUseJournalEERuntime:
         self._last_attachment_break: AttachmentBreakObservation | None = None
         self._vac_attach_diag_logged: set[tuple[str, str]] = set()
         self._render_callback: Callable[[object], None] | None = None
+        # Prior (contype, conaffinity) for temporarily enabled hollow-tool fill
+        # geoms (``*_reg_bbox``) during tabletop push / tool_act sweeps.
+        self._held_tool_fill_geom_backup: dict[int, tuple[int, int]] = {}
         self._set_declared_active_ee(env, self._active_ee)
         self._hidden_rack_ee = self._apply_rack_visibility(
             env, self._active_ee
@@ -2286,9 +2289,132 @@ class ToolUseJournalEERuntime:
         self.suppress_native_adhesion_actuators()
         self.log_vac_non_target_cup_contacts()
 
+    def _held_tool_inactive_fill_geom_ids(self, body_id: int) -> list[int]:
+        """Collision-disabled AABB/region geoms under a body (e.g. ``reg_bbox``)."""
+
+        model, _ = _raw_model_data(self.env)
+        geom_ids: list[int] = []
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) != int(body_id):
+                continue
+            name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+            if not isinstance(name, str):
+                continue
+            lowered = name.lower()
+            if not (
+                lowered.endswith("reg_bbox")
+                or lowered.endswith("tool_act_collision_slab")
+            ):
+                continue
+            if int(model.geom_contype[geom_id]) or int(model.geom_conaffinity[geom_id]):
+                continue
+            geom_ids.append(int(geom_id))
+        return geom_ids
+
+    def _body_collision_underside_is_hollow(self, body_id: int) -> bool:
+        """True when active collision geoms leave an empty central disk."""
+
+        model, data = _raw_model_data(self.env)
+        mujoco.mj_forward(model, data)
+        body_pos = np.asarray(data.xpos[body_id], dtype=float)
+        body_rot = np.asarray(data.xmat[body_id], dtype=float).reshape(3, 3)
+        radii: list[float] = []
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) != int(body_id):
+                continue
+            if not (
+                int(model.geom_contype[geom_id])
+                or int(model.geom_conaffinity[geom_id])
+            ):
+                continue
+            geom_pos = np.asarray(data.geom_xpos[geom_id], dtype=float)
+            local = body_rot.T @ (geom_pos - body_pos)
+            radii.append(float(np.linalg.norm(local[:2])))
+        if len(radii) < 4:
+            return False
+        r_max = max(radii)
+        if not math.isfinite(r_max) or r_max < 1e-3:
+            return False
+        inner = 0.45 * r_max
+        inner_count = sum(1 for radius in radii if radius <= inner + 1e-9)
+        return inner_count <= max(1, int(0.05 * len(radii)))
+
+    def enable_held_tool_collision_fill(self) -> list[int]:
+        """Enable inactive AABB fill geoms so hollow dishes can push tabletop targets.
+
+        Dish collision meshes leave an empty center; kinematic mid-height sweeps
+        then let free bodies occupy the cavity and reach the vac cup. Turning on
+        ``reg_bbox`` (collision-only) closes that cavity without changing visuals.
+        """
+
+        self.disable_held_tool_collision_fill()
+        tool_id = self._held_tool_id or (
+            self._attachment.object_id if self._attachment is not None else None
+        )
+        if tool_id is None:
+            return []
+        try:
+            body_id, _, _ = self._object_free_joint(self.env, tool_id)
+        except ToolUseJournalRuntimeError:
+            return []
+        if not self._body_collision_underside_is_hollow(body_id):
+            return []
+        fill_ids = self._held_tool_inactive_fill_geom_ids(body_id)
+        if not fill_ids:
+            return []
+        model, data = _raw_model_data(self.env)
+        template_id = next(
+            (
+                geom_id
+                for geom_id in range(int(model.ngeom))
+                if int(model.geom_bodyid[geom_id]) == int(body_id)
+                and (
+                    int(model.geom_contype[geom_id])
+                    or int(model.geom_conaffinity[geom_id])
+                )
+            ),
+            None,
+        )
+        enabled: list[int] = []
+        for geom_id in fill_ids:
+            self._held_tool_fill_geom_backup[geom_id] = (
+                int(model.geom_contype[geom_id]),
+                int(model.geom_conaffinity[geom_id]),
+            )
+            model.geom_contype[geom_id] = 1
+            model.geom_conaffinity[geom_id] = 1
+            if template_id is not None:
+                model.geom_friction[geom_id] = model.geom_friction[template_id]
+                model.geom_solref[geom_id] = model.geom_solref[template_id]
+                model.geom_solimp[geom_id] = model.geom_solimp[template_id]
+            enabled.append(geom_id)
+        mujoco.mj_forward(model, data)
+        if enabled:
+            print(
+                f"[M5][TOOL_FILL] enabled solid collision fill for "
+                f"hollow held tool {tool_id!r} geoms={enabled}"
+            )
+        return enabled
+
+    def disable_held_tool_collision_fill(self) -> None:
+        """Restore contype/conaffinity for temporarily enabled fill geoms."""
+
+        if not self._held_tool_fill_geom_backup:
+            return
+        model, data = _raw_model_data(self.env)
+        for geom_id, (contype, conaffinity) in list(
+            self._held_tool_fill_geom_backup.items()
+        ):
+            if 0 <= int(geom_id) < int(model.ngeom):
+                model.geom_contype[geom_id] = int(contype)
+                model.geom_conaffinity[geom_id] = int(conaffinity)
+        self._held_tool_fill_geom_backup.clear()
+        mujoco.mj_forward(model, data)
+
     def detach_object(self, object_id: str | None = None) -> AttachedObjectState:
         """Release the attached object while preserving its current world pose."""
 
+        self.disable_held_tool_collision_fill()
         attachment = self._attachment
         if attachment is None:
             raise ToolUseJournalRuntimeError("no object is attached")
@@ -2534,6 +2660,75 @@ class _PlaybackFailure:
     waypoint_index: int | None = None
     event_id: str | None = None
     observed: Mapping[str, Any] | None = None
+
+
+def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
+    """True when the plan allows the held tool to touch free tabletop objects.
+
+    Used to enable a temporary solid collision fill for hollow dishes during
+    sweep / push tool_act, without arming fill for cargo resting on a raised
+    plate during transport.
+    """
+
+    if not plan.segments:
+        return False
+    held_ids: set[str] = set()
+    for segment in plan.segments:
+        for context in (
+            segment.collision_context_before,
+            segment.collision_context_after,
+        ):
+            if context is None:
+                continue
+            held_ids.update(str(object_id) for object_id in context.attached_object_ids)
+    if not held_ids:
+        return False
+    partners: set[str] = set()
+    free_z_by_id: dict[str, float] = {}
+    for segment in plan.segments:
+        for context in (
+            segment.collision_context_before,
+            segment.collision_context_after,
+        ):
+            if context is None:
+                continue
+            for object_id, other_id in context.allowed_collision_pairs:
+                left = str(object_id)
+                right = str(other_id)
+                if left in held_ids and right not in held_ids:
+                    partners.add(right)
+                elif right in held_ids and left not in held_ids:
+                    partners.add(left)
+            for free_pose in context.free_object_poses:
+                free_z_by_id[str(free_pose.object_id)] = float(
+                    free_pose.pose.position_m[2]
+                )
+    # Ignore EE / rack names that may appear in exemption pairs.
+    skip = {"vac", "2f", "3f", "bare", "table", "table_collision"}
+    partners = {
+        name
+        for name in partners
+        if name.lower() not in skip and not name.lower().startswith("robot0")
+    }
+    if not partners:
+        return False
+    # Tabletop push targets sit near support (~0.80 m). Cargo on a raised
+    # attached plate is near the plate height and must not trigger fill.
+    tabletop = [
+        name
+        for name in partners
+        if name in free_z_by_id and float(free_z_by_id[name]) <= 0.86
+    ]
+    return bool(tabletop)
+
+
+def _maybe_enable_held_tool_fill_for_plan(
+    runtime: ToolUseJournalEERuntime, plan: MotionPlan
+) -> bool:
+    if not _plan_requests_tabletop_held_tool_push(plan):
+        return False
+    enabled = runtime.enable_held_tool_collision_fill()
+    return bool(enabled)
 
 
 class ToolUseJournalKinematicTrajectoryPlayer:
@@ -3015,6 +3210,26 @@ class ToolUseJournalKinematicTrajectoryPlayer:
         """Replay a MotionPlan and return a schema-valid execution artifact."""
 
         report_name = report_id or f"{run.run_id}:execution-report"
+        fill_enabled = _maybe_enable_held_tool_fill_for_plan(self.runtime, run.plan)
+
+        try:
+            return self._execute_plan_body(
+                run,
+                report_id=report_name,
+            )
+        finally:
+            if fill_enabled:
+                self.runtime.disable_held_tool_collision_fill()
+
+    def _execute_plan_body(
+        self,
+        run: SimulationRun,
+        *,
+        report_id: str,
+    ) -> ExecutionReport:
+        """Replay body shared by kinematic / controller players' fill wrapper."""
+
+        report_name = report_id
         plan = run.plan
         executed_events: list[ExecutedEvent] = []
         executed_event_ids: set[str] = set()
@@ -4012,6 +4227,21 @@ class ToolUseJournalControllerTrajectoryPlayer(
         report_id: str | None = None,
     ) -> ExecutionReport:
         """Execute a MotionPlan through controller torques and physics."""
+
+        fill_enabled = _maybe_enable_held_tool_fill_for_plan(self.runtime, run.plan)
+        try:
+            return self._execute_controller_plan_body(run, report_id=report_id)
+        finally:
+            if fill_enabled:
+                self.runtime.disable_held_tool_collision_fill()
+
+    def _execute_controller_plan_body(
+        self,
+        run: SimulationRun,
+        *,
+        report_id: str | None = None,
+    ) -> ExecutionReport:
+        """Controller playback body (held-tool fill enabled by ``execute``)."""
 
         report_name = report_id or f"{run.run_id}:execution-report"
         plan = run.plan

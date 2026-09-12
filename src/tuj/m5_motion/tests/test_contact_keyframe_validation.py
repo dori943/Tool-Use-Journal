@@ -520,12 +520,11 @@ def test_engagement_presses_held_tool_into_target_tops() -> None:
     assert press <= 0.15 * float(thickness) + 1e-9
 
 
-def test_hollow_dish_uses_mid_height_rim_engagement() -> None:
+def test_hollow_dish_still_uses_shallow_top_engagement() -> None:
     from tuj.m5_motion.contact_keyframe_validation import (
         _contact_engagement_tcp_z_m,
         _held_tool_below_tcp_m,
         _held_tool_hollow_rim_inner_radius_m,
-        _support_surface_z_m,
         _sweep_target_top_z_m,
     )
 
@@ -544,14 +543,12 @@ def test_hollow_dish_uses_mid_height_rim_engagement() -> None:
     rim = _held_tool_hollow_rim_inner_radius_m(request)
     assert rim is not None and rim == pytest.approx(0.05, abs=1e-3)
     top = _sweep_target_top_z_m(request)
-    support = _support_surface_z_m(request)
     below = _held_tool_below_tcp_m(request)
     eng = _contact_engagement_tcp_z_m(request)
-    assert top is not None and support is not None and eng is not None
-    mid = 0.5 * (float(support) + float(top))
-    underside = float(eng - below)
-    assert underside == pytest.approx(mid - 0.0015, abs=2e-3)
-    assert underside < float(top) - 0.002
+    assert top is not None and eng is not None
+    # Playback enables a solid AABB fill; planning keeps shallow top press.
+    press = float(top) - float(eng - below)
+    assert 0.0005 <= press <= 0.003
 
 
 def test_engagement_press_capped_by_thin_held_tool_thickness() -> None:
@@ -631,73 +628,6 @@ def test_canonicalizes_contact_start_onto_target_centroid() -> None:
     start_xy = np.asarray(resolver.resolve(fixed[1]).position_m[:2], dtype=float)
     centroid = np.array([-0.0, -0.05], dtype=float)  # mean of (-0.10,0.05) and (0.10,-0.15)
     assert float(np.linalg.norm(start_xy - centroid)) < 0.02
-
-
-def test_hollow_dish_offsets_contact_start_for_rim_plow() -> None:
-    from tuj.m5_motion.contact_keyframe_validation import (
-        canonicalize_sweep_strategy_heights,
-    )
-
-    request = _sweep_request()
-    request.world.robot_state.held_tool_id = "tool_pusher"
-    request.world.robot_state.attached_object_id = "tool_pusher"
-    ring: list[list[float]] = []
-    for angle in np.linspace(0.0, 2.0 * np.pi, 48, endpoint=False):
-        ring.append([0.05 * float(np.cos(angle)), 0.05 * float(np.sin(angle)), -0.005])
-    request.world.objects["tool_pusher"]["collision_points_m"] = ring
-    # START already on the single target; hollow mode must still shift away
-    # from the region by the rim radius.
-    sequence = [
-        _keyframe(
-            keyframe_id="pre",
-            frame_ref="object:block_a",
-            offset=0.15,
-            keyframe_type=KeyframeType.PRE_CONTACT,
-        ),
-        _keyframe(
-            keyframe_id="start",
-            frame_ref="object:block_a",
-            offset=0.03,
-            keyframe_type=KeyframeType.CONTACT_START,
-        ),
-        _keyframe(
-            keyframe_id="sweep",
-            frame_ref="object:block_a",
-            offset=0.03,
-            keyframe_type=KeyframeType.CONTACT_SWEEP,
-        ),
-        _keyframe(
-            keyframe_id="end",
-            frame_ref="object:block_a",
-            offset=0.03,
-            keyframe_type=KeyframeType.CONTACT_END,
-        ),
-        _keyframe(
-            keyframe_id="retract",
-            frame_ref="object:block_a",
-            offset=0.17,
-            keyframe_type=KeyframeType.RETREAT,
-        ),
-    ]
-    fixed = canonicalize_sweep_strategy_heights(request, sequence)
-    validate_sweep_keyframe_strategy(request, fixed)
-    assert fixed[1].metadata.get("sweep_hollow_rim_plow_start") is True
-    resolver = RelativePoseResolver(request.world)
-    start_xy = np.asarray(resolver.resolve(fixed[1]).position_m[:2], dtype=float)
-    block_xy = np.asarray(
-        request.world.objects["block_a"]["pose"]["position_m"][:2], dtype=float
-    )
-    region_xy = np.asarray(
-        request.world.objects["collect_zone"]["pose"]["position_m"][:2], dtype=float
-    )
-    away = block_xy - region_xy
-    away = away / float(np.linalg.norm(away))
-    expected = block_xy + away * 0.05
-    assert float(np.linalg.norm(start_xy - expected)) < 0.02
-    # Start must be farther from the region than the block itself.
-    assert float(np.linalg.norm(start_xy - region_xy)) > float(
-        np.linalg.norm(block_xy - region_xy)
-    )
 
 
 def test_accepts_matching_held_tool_orientation() -> None:

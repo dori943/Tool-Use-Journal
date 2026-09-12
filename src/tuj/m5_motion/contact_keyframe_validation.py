@@ -536,30 +536,15 @@ def _sweep_engagement_press_m(request: MotionPlanRequest) -> float:
 def _contact_engagement_tcp_z_m(request: MotionPlanRequest) -> float | None:
     """TCP z for held-tool sweep engagement.
 
-    Flat tools: shallow underside press into target tops.
-    Hollow dishes (empty collision disk): put the rim underside near mid-target
-    height so the rim wall side-pushes instead of hovering a bowl over tops.
+    Uses shallow underside press into target tops. Hollow dishes get a temporary
+    solid AABB fill at playback (``reg_bbox``), so mid-height rim plow is not
+    needed and would put free bodies inside the empty cavity.
     """
 
     tool_below = _held_tool_below_tcp_m(request)
     target_top = _sweep_target_top_z_m(request)
     support_z = _support_surface_z_m(request)
     press = _sweep_engagement_press_m(request)
-    rim_r = _held_tool_hollow_rim_inner_radius_m(request)
-    if (
-        target_top is not None
-        and support_z is not None
-        and rim_r is not None
-        and rim_r > 1e-4
-    ):
-        mid_z = float(support_z) + float(_HOLLOW_RIM_CONTACT_HEIGHT_FRAC) * (
-            float(target_top) - float(support_z)
-        )
-        underside = mid_z - press
-        underside = max(
-            underside, float(support_z) + float(_CONTACT_SWEEP_SUPPORT_CLEARANCE_M)
-        )
-        return float(underside + tool_below)
     if target_top is not None:
         if support_z is not None:
             max_press = max(
@@ -921,12 +906,12 @@ def canonicalize_sweep_contact_start_over_targets(
     *,
     resolver: RelativePoseResolver | None = None,
 ) -> list[RelativeKeyframeSpec]:
-    """Snap CONTACT_START onto a sweep-ready XY over the target cluster.
+    """Snap CONTACT_START onto the sweep-target cluster centroid in XY.
 
-    Flat tools: start on the target centroid so the face covers the group.
-    Hollow dishes: shift the start away from the goal region by the rim inner
-    radius so the trailing rim begins at the cluster and can side-plow toward
-    the region (AABB-centered starts leave blocks in the empty disk).
+    VLM paths often start on one corner block, so a short plate never covers the
+    group. When START is far from the target centroid, retarget it (and lift
+    PRE_CONTACT above the new XY) before the region push. Hollow dishes rely on
+    a temporary solid collision fill at playback rather than a rim-plow offset.
     """
 
     if not is_tool_act_contact_geometry_scope(request) or not keyframes:
@@ -936,14 +921,6 @@ def canonicalize_sweep_contact_start_over_targets(
         return list(keyframes)
     desired_xy = np.asarray(centroid, dtype=float)
     metadata_flag = "sweep_contact_start_centroid"
-    rim_r = _held_tool_hollow_rim_inner_radius_m(request)
-    region_xy = _goal_region_center_xy_m(request)
-    if rim_r is not None and region_xy is not None and float(rim_r) > 1e-4:
-        away = desired_xy - np.asarray(region_xy, dtype=float)
-        away_norm = float(np.linalg.norm(away))
-        if away_norm > 1e-6:
-            desired_xy = desired_xy + (away / away_norm) * float(rim_r)
-            metadata_flag = "sweep_hollow_rim_plow_start"
 
     active_resolver = resolver or RelativePoseResolver(request.world)
     start_index = next(

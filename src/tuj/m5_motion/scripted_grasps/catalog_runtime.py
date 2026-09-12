@@ -264,6 +264,13 @@ class CatalogContext(SpoonContext):
 
     def execute_object(self,recipe):
         if recipe!=self.recipe:raise ValueError('Context must be initialized with the same recipe')
+        if recipe.ee_id=='vac' and recipe.object_id=='plate' and recipe.task_id=='c3_2':
+            # Rim fraction is size-relative; retune to the live AABB so a
+            # PLATE_SCALE edit cannot seat the cup on the recessed dish.
+            from tuj.m5_motion.scripted_grasps.objects.plate_vac import (
+                tune_recipe_to_measured_size)
+            recipe=tune_recipe_to_measured_size(recipe,self.local_size)
+            self.recipe=recipe
         self.execution_started=time.monotonic()
         result={'status':'FAILED','object_id':self.object_id,'task_id':recipe.task_id,'ee_id':recipe.ee_id,
             'recipe':recipe.to_dict(),'scenario':self.scenario,'runtime_version':RUNTIME_VERSION,'timing':self.timing}

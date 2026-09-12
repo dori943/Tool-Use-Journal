@@ -5,12 +5,14 @@ path). C3_2 breakfast plates are shallow dishes: lateral contact is derived from
 the plate bbox and an explicit cup-clearance so the TCP is not aimed at the
 recessed center.
 """
+from dataclasses import replace
+import numpy as np
 from tuj.m5_motion.scripted_grasps.catalog_types import (
     CatalogRecipe, build_catalog_targets, dispatch_grasp,
 )
 
-# Compiled C3_2 plate AABB (plate_a / plate_b share the same asset).
-PLATE_EXPECTED_SIZE_M = (0.157694411, 0.157261429, 0.009592404)
+# Compiled C3_2 plate AABB at PLATE_SCALE=0.17 (plate_a / plate_b share asset).
+PLATE_EXPECTED_SIZE_M = (0.167550312, 0.167090268, 0.010191929)
 
 # VacuumGripper cup outer contact radius used to keep the seal on solid rim.
 CUP_CLEARANCE_RADIUS_M = 0.030
@@ -29,6 +31,27 @@ def _rim_offset_fraction(size_m=PLATE_EXPECTED_SIZE_M):
     if radial_m <= 0:
         raise ValueError('PLATE_TOO_SMALL_FOR_VACUUM_CUP')
     return (radial_m / sx, 0.0, 0.5)
+
+
+def tune_recipe_to_measured_size(recipe, local_size_m):
+    """Recompute C3_2 rim fraction from the live AABB (PLATE_SCALE-safe).
+
+    ``offset_fraction`` is size-relative. If ``expected_size_m`` drifts from the
+    measured plate while ``local_size`` is used for ``size * fraction``, the cup
+    seats too far inward on the dish and CLOSE loses suction alignment.
+    """
+    if recipe.object_id != 'plate' or recipe.task_id != 'c3_2' or recipe.ee_id != 'vac':
+        return recipe
+    size = tuple(float(x) for x in np.asarray(local_size_m, dtype=float).reshape(3))
+    if len(size) != 3 or not np.isfinite(size).all() or min(size) <= 0:
+        raise ValueError('Invalid measured plate size')
+    fx, fy, fz = _rim_offset_fraction(size)
+    return replace(
+        recipe,
+        expected_size_m=size,
+        offset_fraction=(fx, fy, fz),
+        offset_m=(0.0, 0.0, SEATING_OFFSET_Z_M),
+    )
 
 
 def plate_vac_c2_1_recipe():
