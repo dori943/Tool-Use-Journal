@@ -552,9 +552,16 @@ Hard rules:
   anchor is the object's resting destination on the region's interior floor
   (release clearance included): put the PLACE keyframe exactly at that
   frame_ref/anchor with zero offset and the supplied orientation, put
-  PRE_PLACE at the same anchor with a positive offset_along_approach_m, and
-  RETREAT at the same anchor with a larger positive offset. Never lower the
-  object below that anchor and never target the region's center or bottom.
+  PRE_PLACE at the same anchor with a positive offset_along_approach_m.
+  When entry_eef_anchor is supplied, include one compact candidate with
+  PRE_PLACE at start_anchor, PLACE at anchor, and RETREAT at entry_eef_anchor,
+  all in the supplied frame_ref with zero offset. start_anchor is the measured
+  OBJECT entry; entry_eef_anchor is the measured HAND entry and RETREAT uses
+  eef_orientation_xyzw. Do not substitute the object start for the hand entry.
+  Other candidates may use additional clearance, but a larger vertical offset
+  is not inherently reachable. The measured return is only a candidate: normal
+  post-release collision and IK checks still apply. Never lower the object below
+  the destination anchor and never target the region's center or bottom.
 - PICK_TOOL strategies use GRASP then LIFT/RETREAT; RETURN_TOOL strategies use
   PLACE then RETREAT.
 - Use CARTESIAN for straight approach/contact/retreat intent, SAMPLING_BASED for
