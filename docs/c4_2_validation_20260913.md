@@ -63,55 +63,63 @@ python scripts/run.py c4_2 --provider openai --model gpt-5.4-mini --seed 0 --mem
 
 최근 실행·분석·중요 제어/기하 검토는 사용자 최신 지시에 따라 OpenAI를 사용했다. review119~122는 점유/위치 선택 가설과 수정안을 실제 재현·코드와 비교했고, review123은 main 통합을 검토했다. 무녹화019 후 review124로 최종 교차 검토한 뒤 코드 변경 없이 HQ020을 실행했다. 모델 의견만으로 성공 처리하거나 코드를 변경하지 않았다.
 
+## CONTRIBUTING 규칙에 따른 PR 이력 정리
+
+PR 작업 브랜치는 `fix/dain-c4-2-packing`, 대상은 `main`이다. 기존 검증 브랜치를 보존하고, 새 브랜치에서 커밋 제목만 50자 이내 Conventional Commits 형식으로 정리했다. 각 새 커밋의 파일 트리가 대응하는 원본과 동일함을 확인했다. 원본 커밋은 메시지의 `Original-commit` 및 외부 `dain_commit_mapping.json`으로 연결된다. 실제 영상에 기록된 코드 hash는 이 문서 상단의 원본 검증 hash 그대로이며, 재실행을 했다고 주장하지 않는다.
+
+정리 후 코드 대응 커밋은 `f8df2713df3742d3e1ccf21d99d4cdf44a59e05c`이다. 이 기록을 추가하는 후속 변경은 검증 문서만 수정한다. 런타임 코드는 동일하다. 변경 Python 57개 파일의 AST·tabnanny 및 git diff --check를 다시 확인했다. 별도 프로젝트 lint/formatter/build 명령은 저장소에 정의되어 있지 않아 이 검사를 명시하며, 기존 실제 실행과 회귀 테스트 결과를 재사용한다.
+
+권장 500줄을 넘는 PR이다. 파지 상대 자세, 열린 손 해제 기하, 접촉 지원과 최종 수납/뚜껑 판정이 연결된 실제 C4_2 검증 범위를 유지했다. 리뷰어는 아래 원인별 작은 커밋과 해당 회귀 테스트 순서로 검토할 수 있다. 작은 PR 권장 크기를 충족한다고 주장하지 않는다. 최소 한 명 승인 후 병합하는 규칙을 따르며 이 작업에서는 병합하지 않는다.
+
 ## 롤백
 
 태스크 완전 종료 후 깨끗한 해당 checkout에서 전체 통합 변경은 다음으로 되돌린다. 검증 문서만 추가한 후속 커밋은 실행 코드에 영향을 주지 않으며 별도로 revert할 수 있다.
 
 ```text
-git revert -m 1 cd2eb481ed61a728cb7b87b5c05a57b66da3bc45
+git revert -m 1 f8df2713df3742d3e1ccf21d99d4cdf44a59e05c
 ```
 
 선택적 롤백은 아래 원인별 커밋을 사용한다. 후속 변경과 의존 관계가 있으면 충돌 내용을 확인해 해결해야 하며 강제 reset/checkout/clean으로 처리하지 않는다. 기존 사용자 변경은 대상에 포함하지 않는다.
 
 | 커밋 | 변경 | 선택적 롤백 |
 |---|---|---|
-| df620b3 | fix(task): prefer nearby clear packing volume and retain placement intent | `git revert df620b3f5b52c6cdfd027a0f51d9068ad68d420c` |
-| c118fe5 | fix(task): preserve rigid container contact support under packed loads | `git revert c118fe5682ada0f7ec40cac4e9ceb99c26901ed9` |
-| de096d3 | test(task): isolate packing ranking from the release corridor gate | `git revert de096d35f04562f7a57927a338838412a1a9cf2a` |
-| c76bf5c | fix(execution): allow per-run OpenAI response token budgets | `git revert c76bf5c780657b25b00852de31288754a4546e13` |
-| 9438e01 | fix(planner): refine inconclusive gravity release clearance checks | `git revert 9438e012226532fb9caef85fdd4727c2652adfec` |
-| 2ef78d1 | fix(execution): preserve scene contact calibration across EE swaps | `git revert 2ef78d1d879fa5ccace5995872f1a31c3ff656c0` |
-| 2d7c8ad | fix(planner): reject obstructed gravity release orientations | `git revert 2d7c8adf66dce462603e6f57731aebdf378a546a` |
-| bc92ea4 | fix(execution): derive endpoint grasps from contact and support geometry | `git revert bc92ea49205d972606bedd559f3747d1e5bf5a32` |
-| bc59e21 | fix(planner): honor requested clearance during scripted grasp approach | `git revert bc59e21894934955d0952146d407dc148defb7a5` |
-| abe5da2 | fix(execution): synchronize attached object velocity with the hand | `git revert abe5da250b1f46aaefa8c034ba4653f9744d62ec` |
-| 5f7c53a | fix(task): verify covers on container rims with packed contents | `git revert 5f7c53a79d7964dca6149fe9840fe70a1862a009` |
-| b2cfaf9 | fix(planner): ground container place-on goals above the rim | `git revert b2cfaf9e703211b47b73e6b3f90974873d289a67` |
-| 89e1286 | fix(planner): measure rigid vacuum release geometry | `git revert 89e12868b647f5bdeb62b93f4e1bd57ba9dfcd0a` |
-| 1240ffe | fix(execution): synchronize attachment from current hand pose | `git revert 1240ffea7a5e93ce59e931ba613647cfdd128d14` |
-| 747cfb3 | fix(task): preserve stable baguette contact before lift | `git revert 747cfb3c2427ca1886f6b08002e6e6473757e466` |
-| 2c7c6ae | fix(execution): verify ambiguous attach penetration with convex geometry | `git revert 2c7c6ae58839f6504ee64059adeff7190e1a3491` |
-| 84e5144 | fix(task): increase approved C4_2 box wall height | `git revert 84e51440ea3104fddf8dd1b1096606a3d9c63311` |
-| 9d537bc | fix(task): derive edge grasps from open-hand release geometry | `git revert 9d537bcb56c04b75e8236c20b469fe2cdfd4a6a6` |
-| 5fba16b | fix(planner): reject packing goals without collision-valid IK | `git revert 5fba16bc7aa558d4f754f6af44b518779dde6e17` |
-| 4b8a460 | fix(planner): rank reachable packing orientations by occupied geometry | `git revert 4b8a4605c36101aa769edff0f1cb0cbbaa1d375d` |
-| 7858e9a | fix(execution): account for bounded per-segment settling in run budget | `git revert 7858e9a265de043d3a4c5b121e9c0e42e0c654ba` |
-| 6be84a5 | fix(planner): filter packing orientations by measured grasp reachability | `git revert 6be84a5170bb254ad2596fd54741f7ec97d5da7f` |
-| 7fd70e8 | fix(task): attach whisk after stable bilateral contact | `git revert 7fd70e80e627e8efe23f73a448621a1efa237e99` |
-| df1923b | fix(execution): await released container objects before completion | `git revert df1923b06834fe8f8676ef6950b4b8c7f367344f` |
-| 0ddb242 | fix(planner): expose measured hand entry for container retreat | `git revert 0ddb242514da741d124c8ed92ce75efe1e74041d` |
-| 9ec0b5a | fix(planner): converge open linkage geometry at joint bounds | `git revert 9ec0b5a496301b48f83c786edb07993092df2037` |
-| 28258cd | fix(planner): derive open hand geometry from the executed endpoint | `git revert 28258cd53512063fd407bd3c16fbdad38d610d42` |
-| 7b61a19 | fix(planner): reserve declared tracking tolerance above container rims | `git revert 7b61a1958578cebf3391482b590569fc28530c96` |
-| e3e700f | fix(execution): recover missing constrained finger contact without unloading peers | `git revert e3e700f51b48297916f44e39e86db2627afe2caf` |
-| 1c3d725 | fix(planner): include hand rim clearance in container transport | `git revert 1c3d725dc816251d65e727dcecd5e803ab612f0a` |
-| 46ef453 | fix(planner): reject unreachable stable faces using measured grasp | `git revert 46ef453b66367b56a57fb612808b7bd80d622d58` |
-| 22e869f | fix(planner): derive low stable container faces from collision geometry | `git revert 22e869fb686dbb5b8d12381227ed98bb674fd586` |
-| f00feb5 | fix(planner): preserve measured orientation at held start anchors | `git revert f00feb56a326614868ee09a931a946ace7ae4ded` |
-| 084d702 | fix(execution): identify lift support from measured static contacts | `git revert 084d70254d02a9e935253697876062e037445282` |
-| 0e6c60a | fix(planner): ground container poses from declared collision geometry | `git revert 0e6c60ac8c2ce86dc27379d8bbfc414579b5bb69` |
-| 6075d55 | fix(planner): honor assigned slot for the first region placement | `git revert 6075d55b8ed065c6a10d3b3850a5c2f646f17a99` |
-| 7d6e656 | fix(execution): pass live grasp geometry to region place grounding | `git revert 7d6e656356511cb564efceac6cc266a06c176803` |
-| cfa6dae | fix(planner): derive container release height from hand opening geometry | `git revert cfa6dae430ceb0d1022b8d79d18db7c9a216fdf8` |
-| 7330cc1 | fix(execution): retain validated 3F closure on constrained objects | `git revert 7330cc1446e6fb97338661c686c6b57e1c95b790` |
-| eaa117e | fix(execution): damp calibrated parallel gripper preshape oscillation | `git revert eaa117ed5114e095333a788ab80912694e072320` |
+| 8192890 | fix(task): prefer nearby clear packing volume and retain placement intent | `git revert 8192890fbee2178b5c7775c7e73aab7614f80418` |
+| 3a892f4 | fix(task): preserve rigid container contact support under packed loads | `git revert 3a892f43a36f6492735d46a97800e900978b2e0b` |
+| a840e1b | test(task): isolate packing ranking from the release corridor gate | `git revert a840e1b70a9a70d103b956e9b83f539691a325c3` |
+| f60e2f7 | fix(execution): allow per-run OpenAI response token budgets | `git revert f60e2f7a2a48792641af97eaa44eda5de819405c` |
+| 78d126c | fix(planner): refine inconclusive gravity release clearance checks | `git revert 78d126c60287bdd60a0cca6161ccd2494ebefbe9` |
+| eca3860 | fix(execution): preserve scene contact calibration across EE swaps | `git revert eca386012fb923d178e45b5ec42000d87ac1fa72` |
+| dd3e26d | fix(planner): reject obstructed gravity release orientations | `git revert dd3e26d9bbdf65e3324485319aae3f8c99eeda2b` |
+| 238bd9f | fix(execution): derive endpoint grasps from contact and support geometry | `git revert 238bd9f02f343725474e41fc5e6c364042de96d4` |
+| 1e97d6e | fix(planner): honor requested clearance during scripted grasp approach | `git revert 1e97d6eb60f6c0a08ba9b84c9567cd29027445d3` |
+| 3c4dbd3 | fix(execution): synchronize attached object velocity with the hand | `git revert 3c4dbd36f44a1d110549b6b2c934d7e448613363` |
+| 0ff14a2 | fix(task): verify covers on container rims with packed contents | `git revert 0ff14a2d564f940abf4589a4df71266e22ca0a38` |
+| 757d274 | fix(planner): ground container place-on goals above the rim | `git revert 757d2741700158c86f386cc988597a8e25b363ac` |
+| 079033d | fix(planner): measure rigid vacuum release geometry | `git revert 079033d038e38a20d11a12242d720b960d6f9847` |
+| 8f76da5 | fix(execution): synchronize attachment from current hand pose | `git revert 8f76da5eb9840ceaf47811b47f335508a7ae9014` |
+| 8f98b39 | fix(task): preserve stable baguette contact before lift | `git revert 8f98b39f607a6567c302454e63eff6c3fdc58ff6` |
+| cac5590 | fix(execution): verify ambiguous attach penetration with convex geometry | `git revert cac5590600ab0bc0b76f44b424854ae2500788f2` |
+| 91bc0f6 | fix(task): increase approved C4_2 box wall height | `git revert 91bc0f630b4ff69725372328788615f22685a6d8` |
+| 85e277e | fix(task): derive edge grasps from open-hand release geometry | `git revert 85e277ee235082ea26b788263fedd0bead695905` |
+| c4f3b75 | fix(planner): reject packing goals without collision-valid IK | `git revert c4f3b75162212b9e1fedcdb1f387cea945c29692` |
+| df79ee6 | fix(planner): rank reachable packing orientations by occupied geometry | `git revert df79ee6ed962c8656d44ce02fb7c74ac055ba25c` |
+| ad733ae | fix(execution): account for bounded per-segment settling in run budget | `git revert ad733ae2497c57e110bfb5fe6f9a19e983cabd6b` |
+| 67e8aaf | fix(planner): filter packing orientations by measured grasp reachability | `git revert 67e8aaf04bac914bba4c1fb399dfa519f41e658d` |
+| b2ff038 | fix(task): attach whisk after stable bilateral contact | `git revert b2ff038acedf18a0d4fc002ca5da1d72c3894d17` |
+| 87f9c84 | fix(execution): await released container objects before completion | `git revert 87f9c842f1bd6c0ca9dce3ad7a92513b250be087` |
+| 5893c93 | fix(planner): expose measured hand entry for container retreat | `git revert 5893c93de5d220705b832d1226740e61d6e2778b` |
+| 0a1ae14 | fix(planner): converge open linkage geometry at joint bounds | `git revert 0a1ae149e25a0a99e87d777b8cf6c6f7971f71b2` |
+| 8faedfd | fix(planner): derive open hand geometry from the executed endpoint | `git revert 8faedfd9ae29fcc09c4f518c9982bc0e81327c70` |
+| 9118e61 | fix(planner): reserve declared tracking tolerance above container rims | `git revert 9118e612539a5c529cb4576f41694253bd78b2de` |
+| f60379f | fix(execution): recover missing constrained finger contact without unloading peers | `git revert f60379f978e1f82b4531e6c2d6dbd6bc88aa55a0` |
+| 3551c06 | fix(planner): include hand rim clearance in container transport | `git revert 3551c066a0e8ac2c2d5491b3fa26b7a2e487bf39` |
+| e0e4476 | fix(planner): reject unreachable stable faces using measured grasp | `git revert e0e4476cebcf90b10fc1e3cc84b6cd7d623c3511` |
+| 7da135e | fix(planner): derive low stable container faces from collision geometry | `git revert 7da135e46e29867f642dbd2c39363260d1407864` |
+| 3058f39 | fix(planner): preserve measured orientation at held start anchors | `git revert 3058f39706a6d3255be34641f724081ae28c318f` |
+| f03f532 | fix(execution): identify lift support from measured static contacts | `git revert f03f532e679f42c01c33d6ebc4fac8746869ce0f` |
+| dee6bbd | fix(planner): ground container poses from declared collision geometry | `git revert dee6bbd50f4d5164b8243cd36eecdf58860da0e7` |
+| 0e4dd28 | fix(planner): honor assigned slot for the first region placement | `git revert 0e4dd280bf3c31fad7685948340d2362d14ce969` |
+| d4a5427 | fix(execution): pass live grasp geometry to region place grounding | `git revert d4a5427e23e7cd7a5edeaf0cdf89db652f31264c` |
+| deb6647 | fix(planner): derive container release height from hand opening geometry | `git revert deb6647ebac8680f71a635f5a6feeaa8cf483cbd` |
+| 9dd4c09 | fix(execution): retain validated 3F closure on constrained objects | `git revert 9dd4c097534b6faf27f4cb6a84448b710c786927` |
+| dd827bc | fix(execution): damp calibrated parallel gripper preshape oscillation | `git revert dd827bc9622f133c657f97e8e544e9fb76191ba7` |
