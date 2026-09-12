@@ -33,6 +33,11 @@ class CatalogRecipe:
     two_finger_force_gain: float = .002
     three_finger_force_targets_n: tuple = (6.,3.,3.)
     three_finger_force_gain: float = .002
+    # Force-integrator deadband (N) shared by the 3F force hold
+    # (update_three_finger_commands).  Upstream added this to the spoon recipe
+    # but not to CatalogRecipe, so a catalog 3F grasp (e.g. bread) raised
+    # AttributeError at CLOSE.  Same default as the spoon recipe.
+    three_finger_force_deadband_n: float = .5
     prelift_stabilization_s: float = .5
     settle_s: float = 1.
     hold_s: float = 5.
@@ -44,6 +49,14 @@ class CatalogRecipe:
     contact_ticks: int = 5
     maximum_joint_limit_error_rad: float = .01
     suction_command: float = 1.
+    # Minimum simultaneous cup-object contacts for the vacuum contact gate.
+    # A multi-finger grasp naturally makes several contacts, but a single
+    # suction cup pressed flat on a flat surface makes only ONE MuJoCo contact
+    # point, so the historical hard-coded >=3 could never arm for a flat disc
+    # (plate: contact_count=1 with suction_alignment=0.999 and 40 N of force).
+    # Default stays 3 so existing recipes are unchanged; a flat single-cup
+    # target sets this to 1.
+    vacuum_min_contacts: int = 3
 
     @property
     def model_class(self):
@@ -75,6 +88,8 @@ class CatalogRecipe:
         if self.physics_timestep_s not in (.0005,.001,.002): raise ValueError('Invalid timestep')
         if self.physics_integrator!='implicitfast': raise ValueError('Invalid integrator')
         if not isinstance(self.contact_ticks,int) or self.contact_ticks<1: raise ValueError('Invalid contact ticks')
+        if not isinstance(self.vacuum_min_contacts,int) or self.vacuum_min_contacts<1: raise ValueError('Invalid vacuum_min_contacts')
+        if not 0<=self.three_finger_force_deadband_n<min(self.three_finger_force_targets_n): raise ValueError('Invalid three_finger_force_deadband_n')
 
     def to_dict(self):
         result={**asdict(self),'model_class':self.model_class,'recipe_id':self.recipe_id}

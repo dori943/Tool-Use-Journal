@@ -130,7 +130,7 @@ class CatalogContext(SpoonContext):
         for row in self.trace[-self.recipe.contact_ticks:]:
             if set(row['finger_contacts'])!=set(self.finger_groups):return False
             if self.recipe.ee_id=='vac':
-                if row['contact_count']<3 or row['suction_alignment']<.9 or min(row['gripper_ctrl'])<.5:return False
+                if row['contact_count']<self.recipe.vacuum_min_contacts or row['suction_alignment']<.9 or min(row['gripper_ctrl'])<.5:return False
             elif row['normal_opposition']<.5 or row['contact_span_m']<.0035 or min(row['finger_force_n'].values())<1.:
                 return False
         return True

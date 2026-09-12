@@ -15,13 +15,26 @@ from tuj.m5_motion.scripted_grasps.catalog_types import (
 
 
 def plate_vac_recipe():
+    # The plate is a concave dish: offset_fraction z=+0.5 aims the cup at the
+    # bbox top, which is the RIM height, but the cup is centered over the well
+    # whose surface sits ~several mm below the rim.  With only -0.5 mm of press
+    # the cup floated above that surface and never made contact (grasp trace:
+    # contact_count=0 through GRASP/CLOSE), so the vacuum contact gate never
+    # armed (GRASP_CONTACT_NOT_STABLE).  Press ~5 mm deeper so the cup reaches
+    # the well surface; the plate is backed by the table, so a firm press just
+    # seats the cup rather than displacing the plate.
     return CatalogRecipe(
         'plate', 'c2_1', 'vac',
         (0.182334163, 0.181833528, 0.011091216),
         offset_fraction=(0., 0., .5),
-        offset_m=(0., 0., -.0005),
+        offset_m=(0., 0., -.005),
         two_finger_parallel_linkage=False,
         post_grasp_arm_kp=300.,
+        # A single cup pressed flat on the disc makes one strong, well-aligned
+        # MuJoCo contact (contact_count=1, suction_alignment=0.999, ~40 N), which
+        # is a valid seat for the kinematic vacuum attach.  The default gate of 3
+        # contacts is for multi-finger grasps and can never arm here, so require 1.
+        vacuum_min_contacts=1,
     )
 
 
