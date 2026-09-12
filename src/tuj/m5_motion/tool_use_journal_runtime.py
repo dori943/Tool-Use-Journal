@@ -21,7 +21,7 @@ import math
 import time
 from bisect import bisect_right
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Protocol
@@ -165,6 +165,9 @@ class _RuntimeState:
     qvel_by_joint: Mapping[str, tuple[float, ...]]
     ctrl_by_actuator: Mapping[str, float]
     simulation_time_s: float
+    # Legacy serialized checkpoints omit calibration history. The in-memory
+    # EE transition captures it explicitly; never invent it for old checkpoints.
+    scene_geom_solref: Mapping[str, Any] = field(default_factory=dict)
 
 
 def _active_contact_snapshot(
@@ -207,6 +210,7 @@ def _active_contact_snapshot(
 
 
 def _capture_runtime_state(env: object) -> _RuntimeState:
+    from .scene_contact_state import capture_scene_solref
     model, data = _raw_model_data(env)
     qpos: dict[str, tuple[float, ...]] = {}
     qvel: dict[str, tuple[float, ...]] = {}
@@ -239,11 +243,14 @@ def _capture_runtime_state(env: object) -> _RuntimeState:
         qvel_by_joint=qvel,
         ctrl_by_actuator=controls,
         simulation_time_s=float(data.time),
+        scene_geom_solref=capture_scene_solref(env, model),
     )
 
 
 def _restore_runtime_state(env: object, state: _RuntimeState) -> None:
+    from .scene_contact_state import restore_scene_solref
     model, data = _raw_model_data(env)
+    restore_scene_solref(env, model, state.scene_geom_solref)
     for joint_id in range(model.njnt):
         name = _name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
         if not name:
@@ -1934,6 +1941,7 @@ class ToolUseJournalEERuntime:
             self.env, object_id
         )
         distance = self._minimum_ee_object_distance(body_id)
+        self.last_attachment_geometry_audit = None
         if distance > max_attach_distance_m:
             raise ToolUseJournalRuntimeError(
                 f"object {object_id!r} is {distance:.4f} m from the EE; "
@@ -1941,13 +1949,26 @@ class ToolUseJournalEERuntime:
                 f"{self._closest_ee_object_pair_detail()}"
             )
         if distance < -max_attach_penetration_m:
-            raise ToolUseJournalRuntimeError(
-                f"object {object_id!r} penetrates EE geometry by "
-                f"{-distance:.4f} m; limit is "
-                f"{max_attach_penetration_m:.4f} m"
-                f"{self._closest_ee_object_pair_detail()}"
-                f"{self._ee_object_pair_report()}"
+            from tuj.m5_motion.attachment_geometry import certify_attachment_penetration
+            adapter = ToolUseJournalEnvironmentAdapter(self.env)
+            mounted_id = model.body(adapter.mounted_root_body).id
+            enabled = lambda root: tuple(
+                gid for gid in self._subtree_geom_ids(model, root)
+                if model.geom_contype[gid] or model.geom_conaffinity[gid]
             )
+            audit = certify_attachment_penetration(
+                model, data, enabled(mounted_id), enabled(body_id),
+                max_attach_penetration_m,
+            )
+            self.last_attachment_geometry_audit = audit
+            if not audit['certified']:
+                raise ToolUseJournalRuntimeError(
+                    f"object {object_id!r} penetrates EE geometry by "
+                    f"{-distance:.4f} m; limit is "
+                    f"{max_attach_penetration_m:.4f} m"
+                    f"{self._closest_ee_object_pair_detail()}"
+                    f"{self._ee_object_pair_report()}"
+                )
         kind, name, reference_position, reference_rotation = (
             self._grasp_reference(self.env)
         )
@@ -2170,6 +2191,9 @@ class ToolUseJournalEERuntime:
             raise ToolUseJournalRuntimeError(
                 f"attached free joint {attachment.free_joint_name!r} is absent"
             )
+        # Integration updates qpos before refreshing site/body transforms.
+        # Project from the current hand pose, not the preceding physics step.
+        mujoco.mj_kinematics(model, data)
         reference_position, reference_rotation = self._reference_pose(
             self.env,
             attachment.reference_kind,
@@ -2190,11 +2214,24 @@ class ToolUseJournalEERuntime:
             quaternion_wxyz,
             np.ascontiguousarray(object_rotation.reshape(9)),
         )
+        # A moving attachment must carry velocity as well as pose. Zeroing it
+        # makes the contact solver see a stationary object against moving fingers.
+        # Evaluate the reference body's twist at the projected object origin;
+        # MuJoCo free joints use world linear and body-local angular velocity.
+        mujoco.mj_comPos(model, data)
+        reference_body = self._attachment_reference_body_id(model, attachment)
+        jacp = np.zeros((3, model.nv))
+        jacr = np.zeros((3, model.nv))
+        mujoco.mj_jac(model, data, jacp, jacr,
+                      np.ascontiguousarray(object_position), reference_body)
+        linear_velocity = jacp @ data.qvel
+        angular_velocity = object_rotation.T @ (jacr @ data.qvel)
         qpos_start = int(model.jnt_qposadr[joint_id])
         qvel_start = int(model.jnt_dofadr[joint_id])
         data.qpos[qpos_start : qpos_start + 3] = object_position
         data.qpos[qpos_start + 3 : qpos_start + 7] = quaternion_wxyz
-        data.qvel[qvel_start : qvel_start + 6] = 0.0
+        data.qvel[qvel_start : qvel_start + 3] = linear_velocity
+        data.qvel[qvel_start + 3 : qvel_start + 6] = angular_velocity
         mujoco.mj_forward(model, data)
 
     def detach_object(self, object_id: str | None = None) -> AttachedObjectState:
@@ -2287,6 +2324,10 @@ class ToolUseJournalEERuntime:
             # Verify every common named joint survived bit-for-bit within
             # floating-point transfer tolerance before committing the swap.
             restored = _capture_runtime_state(new_env)
+            common_contacts = state.scene_geom_solref.keys() & restored.scene_geom_solref.keys()
+            if any(state.scene_geom_solref[name] != restored.scene_geom_solref[name]
+                   for name in common_contacts):
+                raise ToolUseJournalRuntimeError('EE transfer changed common scene contact calibration')
             common = sorted(
                 set(state.qpos_by_joint) & set(restored.qpos_by_joint)
             )
@@ -4172,6 +4213,15 @@ class ToolUseJournalControllerTrajectoryPlayer(
                         if custom_settle is None
                         else bool(custom_settle.get("succeeded", False))
                     )
+                    if segment.metadata.get('container_settle') is not None:
+                        from .container_settle import measured_container_settle
+                        container_result = measured_container_settle(
+                            self.runtime, segment.metadata['container_settle'], settle_state)
+                        settle_ok = (settle_ok and joint_ok and eef_ok
+                                     and eef_orientation_ok and container_result['succeeded'])
+                        custom_settle = {**(custom_settle or {}),
+                                         'container_settle': container_result,
+                                         'succeeded': settle_ok}
                     settle_state["last_joint_error_rad"] = step_joint_error
                     settle_state["last_eef_error_m"] = target_eef_error
                     settle_state["last_eef_orientation_error_rad"] = (
