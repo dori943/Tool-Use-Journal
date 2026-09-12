@@ -77,11 +77,23 @@ class ScriptedGraspSession:
             shutil.rmtree(self.output)
         self.output.mkdir(parents=True, exist_ok=True)
 
+    def _get_planner(self):
+        from tuj.m5_motion.tool_use_journal_planning import ToolUseJournalMotionRequestPlanner
+        factory = self.planner_factory or ToolUseJournalMotionRequestPlanner.from_environment
+        key = (id(self.runtime.env), id(self.provider))
+        if self._planner is None or key != self._planner_key:
+            self._planner = factory(self.runtime.env, self.repository, provider=self.provider,
+                seed=self.seed, **self.planner_options)
+            self._planner_key = key
+        else:
+            collision_factory = self._planner.collision_context_factory
+            collision_factory.compiler = collision_factory.compiler.with_reference_environment(self.runtime.env)
+        return self._planner
+
     def execute_request(self, request, *, completed_subgoal=None):
         from .context import execute_grasp
         from tuj.m5_motion.execution import SimulationArtifactStore
         from tuj.m5_motion.tool_use_journal_execution import ToolUseJournalExecutionAdapter
-        from tuj.m5_motion.tool_use_journal_planning import ToolUseJournalMotionRequestPlanner
 
         request = request.model_copy(deep=True)
         request.world = self.world.model_copy(deep=True)
@@ -118,6 +130,9 @@ class ScriptedGraspSession:
             contact_speed = ContactExecutionProfile().contact_penetration_m / env.control_timestep
             request.constraints.max_cartesian_speed_m_s = min(request.constraints.max_cartesian_speed_m_s or contact_speed, contact_speed)
         if retention is not None:
+            from .packing_validity import needs_packing_transport_filter, bind_packing_transport_filter
+            if needs_packing_transport_filter(request, retention):
+                bind_packing_transport_filter(request, retention, self._get_planner())
             from .transport import ground_held_region_goal
             ground_held_region_goal(request, retention)
         token = hashlib.sha256(request.model_dump_json().encode()).hexdigest()[:20]
@@ -142,16 +157,7 @@ class ScriptedGraspSession:
                     metrics=result.get("metrics"))
             else:
                 record["route"] = "M5_MOTION_PLAN"
-                factory = self.planner_factory or ToolUseJournalMotionRequestPlanner.from_environment
-                key = (id(self.runtime.env), id(self.provider))
-                if self._planner is None or key != self._planner_key:
-                    self._planner = factory(self.runtime.env, self.repository, provider=self.provider,
-                        seed=self.seed, **self.planner_options)
-                    self._planner_key = key
-                else:
-                    collision_factory = self._planner.collision_context_factory
-                    collision_factory.compiler = collision_factory.compiler.with_reference_environment(self.runtime.env)
-                planner = self._planner
+                planner = self._get_planner()
                 plan = _unwrap_plan(planner(request), request)
                 from tuj.m5_motion.container_settle import configure_container_settle
                 configure_container_settle(request, plan)
