@@ -4064,6 +4064,15 @@ class ToolUseJournalControllerTrajectoryPlayer(
                         if custom_settle is None
                         else bool(custom_settle.get("succeeded", False))
                     )
+                    if segment.metadata.get('container_settle') is not None:
+                        from .container_settle import measured_container_settle
+                        container_result = measured_container_settle(
+                            self.runtime, segment.metadata['container_settle'], settle_state)
+                        settle_ok = (settle_ok and joint_ok and eef_ok
+                                     and eef_orientation_ok and container_result['succeeded'])
+                        custom_settle = {**(custom_settle or {}),
+                                         'container_settle': container_result,
+                                         'succeeded': settle_ok}
                     settle_state["last_joint_error_rad"] = step_joint_error
                     settle_state["last_eef_error_m"] = target_eef_error
                     settle_state["last_eef_orientation_error_rad"] = (

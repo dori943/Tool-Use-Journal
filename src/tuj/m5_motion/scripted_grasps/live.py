@@ -153,6 +153,8 @@ class ScriptedGraspSession:
                     collision_factory.compiler = collision_factory.compiler.with_reference_environment(self.runtime.env)
                 planner = self._planner
                 plan = _unwrap_plan(planner(request), request)
+                from tuj.m5_motion.container_settle import configure_container_settle
+                configure_container_settle(request, plan)
                 store.save_request(request, index=0)
                 record["plan"] = str(store.save_plan(plan, index=0))
                 execution_factory = self.executor_factory or ToolUseJournalExecutionAdapter
