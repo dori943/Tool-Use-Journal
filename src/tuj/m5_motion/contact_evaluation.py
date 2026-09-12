@@ -17,6 +17,7 @@ from tuj.m5_motion.execution import (
 from tuj.m5_motion.push_to_region import (
     target_above_region,
     target_fully_inside_region,
+    target_resting_on_region,
 )
 from tuj.m5_motion.schema import ExecutionReport, MotionPlanRequest, WorldSnapshot
 from tuj.m5_motion.task_semantics import (
@@ -208,6 +209,84 @@ class AboveRegionEvaluator:
                 "above_target_ids": above,
                 "not_above_target_ids": [item for item in targets if item not in above],
                 "geometry_errors": errors,
+            },
+        )
+
+
+class StackPlacementEvaluator:
+    """Require each placed target to rest stably on its base object.
+
+    Stacking cannot use ``RegionContainmentEvaluator``.  Containment asks the
+    placed footprint to fit inside the base footprint, which a sandwich can
+    never satisfy: the top slice of bread (113.1 x 113.3 mm) goes onto the
+    filling (turkey is 80.0 x 50.0 mm), and reordering the layers does not
+    help because some layer is always wider than the one beneath it.  The
+    physical success condition for a stack is support, not containment, so the
+    target's centre must lie over the base and the target must rest on it.
+    """
+
+    def __init__(
+        self,
+        *,
+        horizontal_tolerance_m: float = 0.0,
+        maximum_gap_m: float = .005,
+        maximum_penetration_m: float = .005,
+    ) -> None:
+        if horizontal_tolerance_m < 0.0:
+            raise ValueError("horizontal tolerance must be non-negative")
+        if maximum_gap_m < 0.0 or maximum_penetration_m < 0.0:
+            raise ValueError("resting tolerances must be non-negative")
+        self._horizontal = horizontal_tolerance_m
+        self._gap = maximum_gap_m
+        self._penetration = maximum_penetration_m
+
+    def evaluate(
+        self,
+        request: MotionPlanRequest,
+        report: ExecutionReport,
+        observed_world: WorldSnapshot | None,
+    ) -> GoalEvaluation:
+        del report
+        region_id = request.task.goal.target_region_id
+        targets = list(request.task.target_ids)
+        if not region_id or not targets or observed_world is None:
+            return _result(
+                request,
+                GoalEvaluationStatus.UNKNOWN,
+                "stack placement requires observed targets and a base region",
+            )
+        resting: list[str] = []
+        errors: dict[str, str] = {}
+        for target_id in targets:
+            try:
+                if target_resting_on_region(
+                    observed_world,
+                    target_id=target_id,
+                    region_id=region_id,
+                    horizontal_tolerance_m=self._horizontal,
+                    maximum_gap_m=self._gap,
+                    maximum_penetration_m=self._penetration,
+                ):
+                    resting.append(target_id)
+            except ValueError as error:
+                errors[target_id] = str(error)
+        satisfied = len(resting) == len(targets) and not errors
+        return _result(
+            request,
+            GoalEvaluationStatus.SATISFIED if satisfied else GoalEvaluationStatus.FAILED,
+            "all targets rest stably on the base object"
+            if satisfied
+            else "one or more targets do not rest stably on the base object",
+            observed={
+                "region_id": region_id,
+                "resting_target_ids": resting,
+                "unsupported_target_ids": [
+                    item for item in targets if item not in resting
+                ],
+                "geometry_errors": errors,
+                "maximum_gap_m": self._gap,
+                "maximum_penetration_m": self._penetration,
+                "predicate": "STACK_SUPPORT",
             },
         )
 
@@ -423,6 +502,7 @@ class TaskAwareGoalEvaluator:
             require_interior_geometry=True,
         )
         self._above_region = AboveRegionEvaluator()
+        self._stack_placement = StackPlacementEvaluator()
         self._grasp = GraspRetentionEvaluator()
 
     def evaluate(
@@ -514,6 +594,13 @@ class TaskAwareGoalEvaluator:
                     GoalEvaluationStatus.FAILED,
                     f"placed object {target!r} is still attached",
                     observed={"attached_object_id": state.attached_object_id},
+                )
+            if operation == "PLACE_ON" and region_evaluator is self._region:
+                # place_on names a base object to stack onto, so support is the
+                # success condition rather than containment.  Containers keep
+                # the containment predicate through _container_region above.
+                return self._stack_placement.evaluate(
+                    request, report, evaluation_world
                 )
             return region_evaluator.evaluate(request, report, evaluation_world)
         if (
