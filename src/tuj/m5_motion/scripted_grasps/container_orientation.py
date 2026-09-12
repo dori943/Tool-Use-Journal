@@ -67,7 +67,7 @@ def configure_packing_orientation(g):
 
 
 def packing_transport_has_ik(g):
-    """Prefilter the exact transport EEF goal; path/collision gates still apply."""
+    """Check exact goal IK and ordinary state validity; full path gates remain."""
     from .transport import transport_destination_center
     from .container_release import clear_container_rim
     from .frames import inverse
@@ -80,13 +80,20 @@ def packing_transport_has_ik(g):
     c = g.retention.context
     solved = c.kinematics.solve_all_ik(target[:3, 3], Rotation.from_matrix(target[:3, :3]).as_quat(),
                                      seed_qpos=c.data.qpos[c.arm_ids])
+    check = getattr(g.retention, 'packing_transport_state_check', None)
+    if check is None:
+        raise ValueError('PACKING_TRANSPORT_COLLISION_BINDING_REQUIRED')
+    results = [check(solution.qpos) for solution in solved.solutions]
     g.task.metadata.setdefault('packing_orientation_ik_candidates', []).append({
         'object_orientation_xyzw': Rotation.from_matrix(g.destination_rotation).as_quat().tolist(),
         'eef_position_m': target[:3, 3].tolist(),
         'eef_orientation_xyzw': Rotation.from_matrix(target[:3, :3]).as_quat().tolist(),
         'raw_ik_count': len(solved.solutions),
+        'valid_ik_count': sum(result.valid for result in results),
+        'state_checks': [{'valid': result.valid, 'failure_code': result.failure_code,
+                          'detail': result.detail} for result in results],
     })
-    return bool(solved.solutions)
+    return any(result.valid for result in results)
 
 
 def packing_destination_center(g, desired_center, *, place):
