@@ -96,9 +96,13 @@ _SWEEP_CORRIDOR_DEVIATION_M = 0.03
 # an intermediate waypoint (herd sideways first, then into the region).
 _MIN_SWEEP_CROSS_TRACK_M = 0.02
 # Keep fitted footprints this far inside the region AABB when it has size.
-_REGION_FIT_MARGIN_M = 0.005
+# Includes slack for yaw-expanded collision footprints (not just AABB dims).
+_REGION_FIT_MARGIN_M = 0.010
 # Default target half-extent when the world snapshot omits dimensions_m.
 _DEFAULT_TARGET_HALF_XY_M = 0.02
+# Inflate half-extents by sqrt(2) so a yawed box footprint still fits the
+# planned rigid herd into the region AABB.
+_FOOTPRINT_YAW_INFLATE = 1.41421356237
 
 _CONTACT_PHASE_TYPES = frozenset(
     {
@@ -1073,6 +1077,13 @@ def canonicalize_sweep_lateral_toward_region(
     translation = _translation_to_fit_targets_in_region(request)
     if translation is None:
         translation = np.asarray(region_xy, dtype=float) - start_xy
+    # Do not drive TCP past the region center along the inbound axis.
+    # Full AABB-fit translations often overshoot into distractors that sit on
+    # the far side of the goal (utensils, fixtures). Keep the cross-track
+    # (herd) component so offset targets still enter the region AABB.
+    translation = _clamp_herd_translation_to_region_approach(
+        start_xy, region_xy, translation
+    )
     dist = float(np.linalg.norm(translation))
     if not math.isfinite(dist) or dist < _MIN_SWEEP_LATERAL_M:
         return list(keyframes)
@@ -1185,28 +1196,43 @@ def canonicalize_sweep_lateral_toward_region(
     return result
 
 
-def _object_half_extents_xy_m(record: Mapping[str, Any]) -> np.ndarray:
+def _object_half_extents_xy_m(
+    record: Mapping[str, Any],
+    *,
+    yaw_inflate: bool = True,
+) -> np.ndarray:
     dims = _finite_vector(record.get("dimensions_m"), 3)
     if dims is None:
-        return np.asarray(
+        half = np.asarray(
             (_DEFAULT_TARGET_HALF_XY_M, _DEFAULT_TARGET_HALF_XY_M), dtype=float
         )
-    return np.asarray(
-        (max(float(dims[0]) * 0.5, 1e-4), max(float(dims[1]) * 0.5, 1e-4)),
-        dtype=float,
-    )
+    else:
+        half = np.asarray(
+            (max(float(dims[0]) * 0.5, 1e-4), max(float(dims[1]) * 0.5, 1e-4)),
+            dtype=float,
+        )
+    if yaw_inflate:
+        return half * float(_FOOTPRINT_YAW_INFLATE)
+    return half
 
 
 def _goal_region_half_extents_xy_m(
     request: MotionPlanRequest,
 ) -> np.ndarray | None:
+    """True region AABB half-extents (not yaw-inflated).
+
+    Inflating the region makes herd-fit believe there is more room than
+    ``target_fully_inside_region`` allows, so planned translations under-fit.
+    Target footprints stay yaw-inflated; the container must stay exact.
+    """
+
     region_id = request.task.goal.target_region_id
     if not region_id:
         return None
     record = request.world.objects.get(str(region_id))
     if not isinstance(record, Mapping):
         return None
-    return _object_half_extents_xy_m(record)
+    return _object_half_extents_xy_m(record, yaw_inflate=False)
 
 
 def _sweep_target_footprint_aabbs(
@@ -1235,6 +1261,32 @@ def _sweep_target_footprint_aabbs(
         center = np.asarray(position[:2], dtype=float)
         boxes.append((center - half, center + half))
     return boxes
+
+
+def _clamp_herd_translation_to_region_approach(
+    start_xy: np.ndarray,
+    region_xy: np.ndarray,
+    translation: np.ndarray,
+) -> np.ndarray:
+    """Keep inbound travel from overshooting the region center.
+
+    Cross-track (perpendicular) components are preserved so a rigid herd can
+    still slide laterally into the region AABB without pushing the TCP past
+    the goal into far-side distractors.
+    """
+
+    start = np.asarray(start_xy, dtype=float)
+    region = np.asarray(region_xy, dtype=float)
+    delta = np.asarray(translation, dtype=float)
+    inbound = region - start
+    inbound_norm = float(np.linalg.norm(inbound))
+    if inbound_norm < 1e-6:
+        return delta
+    unit = inbound / inbound_norm
+    parallel_mag = float(np.dot(delta, unit))
+    perp = delta - unit * parallel_mag
+    parallel_mag = min(max(parallel_mag, 0.0), inbound_norm)
+    return unit * parallel_mag + perp
 
 
 def _translation_to_fit_targets_in_region(
@@ -1451,6 +1503,12 @@ def _reject_degenerate_sweep_lateral(
         if region_xy is None:
             return
         translation = np.asarray(region_xy, dtype=float) - start_xy
+    else:
+        region_xy = _goal_region_center_xy_m(request)
+        if region_xy is not None:
+            translation = _clamp_herd_translation_to_region_approach(
+                start_xy, region_xy, translation
+            )
     dist = float(np.linalg.norm(translation))
     if dist < _MIN_SWEEP_LATERAL_M:
         return

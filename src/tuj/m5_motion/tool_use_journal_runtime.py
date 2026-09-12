@@ -602,6 +602,8 @@ class ToolUseJournalEERuntime:
         self._held_tool_rim_collision_backup: dict[int, tuple[int, int]] = {}
         # Free-object ids that inherit held-tool XY motion during tabletop push.
         self._held_tool_push_partner_ids: frozenset[str] = frozenset()
+        # Optional goal region for clamping pushed partners fully inside.
+        self._held_tool_push_region_id: str | None = None
         # Prior contype/conaffinity for vac cup geoms disabled while a tool is held.
         self._vac_cup_collision_backup: dict[int, tuple[int, int]] = {}
         # Last synchronized attached-object pose for finite-difference qvel.
@@ -2306,22 +2308,36 @@ class ToolUseJournalEERuntime:
         # pre-step call shares ``data.time`` with the previous post-step sync
         # (dt≈0). Clearing qvel there kills contact drag for the upcoming
         # step — keep the last FD velocity instead.
+        #
+        # When kinematic push assist is active, do NOT feed planar FD velocity:
+        # residual contacts + assist both move partners and overshoot (~1.4x).
         delta_xy = None
-        applied_motion_dt = False
+        real_time_advanced = False
+        kinematic_assist_owns_push = bool(self._held_tool_push_partner_ids)
         if previous is not None:
             prev_pos, prev_quat, prev_time = previous
             delta_xy = np.asarray(object_position[:2], dtype=float) - np.asarray(
                 prev_pos[:2], dtype=float
             )
-            dt = now - float(prev_time)
+            real_dt = now - float(prev_time)
+            real_time_advanced = bool(
+                math.isfinite(real_dt) and real_dt > 1e-6
+            )
+            dt = real_dt
             if (not math.isfinite(dt) or dt <= 1e-6) and float(
                 np.linalg.norm(object_position - prev_pos)
             ) > 1e-9:
                 # Pose moved without a sim-time advance; fall back to the
                 # model timestep so contacts still see a tangential velocity.
                 dt = float(model.opt.timestep)
-            if math.isfinite(dt) and dt > 1e-6:
-                applied_motion_dt = True
+            if kinematic_assist_owns_push:
+                # Assist teleports partners by the EEF XY delta; integrating
+                # the tool free-joint with FD qvel double-drives any leftover
+                # contacts and reads as bounce / overshoot.
+                data.qvel[qvel_start : qvel_start + 2] = 0.0
+                data.qvel[qvel_start + 2] = 0.0
+                data.qvel[qvel_start + 3 : qvel_start + 6] = 0.0
+            elif math.isfinite(dt) and dt > 1e-6:
                 linear = (object_position - prev_pos) / dt
                 quat_conj = np.array(
                     [
@@ -2349,9 +2365,10 @@ class ToolUseJournalEERuntime:
         )
         mujoco.mj_forward(model, data)
         # Assist only on real sim-time advances (post-step). Same-time pre-step
-        # syncs have delta≈0 anyway, but gating avoids accidental double moves.
+        # syncs must never assist — a timestep fallback for FD qvel used to
+        # mark those as "applied" and double-move partners each substep.
         if (
-            applied_motion_dt
+            real_time_advanced
             and delta_xy is not None
             and float(np.linalg.norm(delta_xy)) > 1e-9
         ):
@@ -2473,6 +2490,7 @@ class ToolUseJournalEERuntime:
         self,
         *,
         push_partner_ids: Sequence[str] | None = None,
+        push_region_id: str | None = None,
     ) -> list[int]:
         """Enable a thin underside paddle for held-tool tabletop pushes.
 
@@ -2568,6 +2586,8 @@ class ToolUseJournalEERuntime:
             if str(object_id).strip()
         }
         self._held_tool_push_partner_ids = frozenset(partners)
+        region = str(push_region_id).strip() if push_region_id else ""
+        self._held_tool_push_region_id = region or None
         mujoco.mj_forward(model, data)
         self.suppress_vac_cup_free_body_collisions()
         if enabled:
@@ -2575,7 +2595,8 @@ class ToolUseJournalEERuntime:
                 f"[M5][TOOL_FILL] enabled kinematic underside push paddle for "
                 f"held tool {tool_id!r} geoms={enabled} "
                 f"rim_disabled={len(self._held_tool_rim_collision_backup)} "
-                f"push_partners={sorted(partners)}"
+                f"push_partners={sorted(partners)} "
+                f"push_region={self._held_tool_push_region_id!r}"
             )
         return enabled
 
@@ -2584,6 +2605,7 @@ class ToolUseJournalEERuntime:
 
         self.restore_vac_cup_free_body_collisions()
         self._held_tool_push_partner_ids = frozenset()
+        self._held_tool_push_region_id = None
         if not (
             self._held_tool_fill_geom_backup or self._held_tool_rim_collision_backup
         ):
@@ -2614,32 +2636,28 @@ class ToolUseJournalEERuntime:
         tool_position: np.ndarray,
         tool_rotation: np.ndarray,
     ) -> None:
-        """Drag plan partners under the fill paddle by the tool's XY delta.
+        """Drag plan partners that are in underside contact by the tool XY delta.
 
         Soft contacts cannot reliably push when a kinematic attached tool is
-        teleported each substep. Partners listed at fill-enable time that lie
-        under the paddle footprint inherit the same planar displacement.
+        teleported each substep. Partners listed at fill-enable time that:
 
-        Only ``qpos`` is updated — setting matching ``qvel`` makes the next
-        physics substep integrate the same delta again (blocks overshoot /
-        "bounce"). Vertical soft overlap into the hollow dish is clamped so
-        partners stay at/under the paddle underside.
+        1. lie under the paddle footprint, and
+        2. have their top face within a small vertical band of the paddle
+           underside (actual near-contact — not merely XY overlap),
+
+        inherit the same planar displacement. Optionally clamp those partners
+        into the plan's goal-region AABB so yawed footprints do not fail
+        containment by a millimetre after a rigid herd.
         """
 
         if not self._held_tool_fill_geom_backup:
             return
         if not self._held_tool_push_partner_ids:
             return
-        # Only while the tool is lowered into the tabletop contact band.
-        # Otherwise PRE_CONTACT approach would drag partners under the raised
-        # plate's XY footprint.
-        if float(tool_position[2]) > 0.88:
-            return
         delta = np.asarray(delta_xy, dtype=float).reshape(2)
         if float(np.linalg.norm(delta)) < 1e-9:
             return
         model, data = _raw_model_data(self.env)
-        # World-frame half-extents / underside of enabled fill box geoms.
         half_xy = np.zeros(2, dtype=float)
         center_xy = np.asarray(tool_position[:2], dtype=float)
         paddle_bottom_z = float(tool_position[2])
@@ -2667,7 +2685,9 @@ class ToolUseJournalEERuntime:
             )
         if float(np.max(half_xy)) < 1e-4:
             return
-        half_xy = half_xy + 0.005
+        # Tight XY capture: only bodies under the paddle, not a loose halo.
+        half_xy = half_xy + 0.002
+        region_center, region_half = self._held_tool_push_region_xy_m()
         moved = False
         for object_id in self._held_tool_push_partner_ids:
             try:
@@ -2679,44 +2699,126 @@ class ToolUseJournalEERuntime:
                 data.qpos[qpos_start : qpos_start + 2], dtype=float
             )
             partner_z = float(data.qpos[qpos_start + 2])
-            # Tabletop free bodies only (ignore raised cargo).
             if partner_z > 0.86 or partner_z < 0.70:
                 continue
             if float(np.max(np.abs(partner_xy - center_xy) - half_xy)) > 0.0:
                 continue
-            data.qpos[qpos_start : qpos_start + 2] = partner_xy + delta
-            # Keep the free body under the paddle underside so it cannot climb
-            # into the hollow visual cavity (looks like plate tunneling).
-            half_height = 0.0
-            for geom_id in range(int(model.ngeom)):
-                if int(model.geom_bodyid[geom_id]) != int(body_id):
-                    continue
-                if not (
-                    int(model.geom_contype[geom_id])
-                    or int(model.geom_conaffinity[geom_id])
-                ):
-                    continue
-                size = np.asarray(model.geom_size[geom_id], dtype=float)
-                gtype = int(model.geom_type[geom_id])
-                if gtype == int(mujoco.mjtGeom.mjGEOM_BOX):
-                    half_height = max(half_height, float(size[2]))
-                elif gtype == int(mujoco.mjtGeom.mjGEOM_SPHERE):
-                    half_height = max(half_height, float(size[0]))
-                elif gtype == int(mujoco.mjtGeom.mjGEOM_CYLINDER):
-                    half_height = max(half_height, float(size[1]))
-            if half_height <= 0.0:
-                half_height = 0.02
+            half_height = self._body_collision_half_height_m(model, body_id)
+            half_xy_partner = self._body_collision_half_xy_m(model, body_id)
+            partner_top_z = partner_z + half_height
+            # gap > 0: paddle above partner top (separation)
+            # gap < 0: paddle pressed into / through the partner top
+            gap = float(paddle_bottom_z - partner_top_z)
+            if gap > 0.006:
+                # Not near contact — do not telekinetically drag.
+                continue
+            if gap < -0.015:
+                continue
+            # Limit the step into the goal AABB so we do not overshoot then
+            # hard-snap (reads as bounce at the region boundary).
+            new_xy = partner_xy + delta
+            if region_center is not None and region_half is not None:
+                # Yaw-inflate partner half so collision-mesh corners match
+                # ``target_fully_inside_region`` (1.5 mm contact tolerance).
+                inset = (
+                    region_half
+                    - half_xy_partner * 1.41421356237
+                    - 0.002
+                )
+                if float(np.min(inset)) > 1e-4:
+                    lo = region_center - inset
+                    hi = region_center + inset
+                    new_xy = np.clip(new_xy, lo, hi)
+            data.qpos[qpos_start : qpos_start + 2] = new_xy
             max_center_z = float(paddle_bottom_z - half_height - 0.0005)
             if max_center_z >= 0.70 and partner_z > max_center_z:
                 data.qpos[qpos_start + 2] = max_center_z
+                partner_z = max_center_z
             qvel_start = int(model.jnt_dofadr[joint_id])
-            # Zero planar velocity so the next mj_step does not re-integrate
-            # the same assist delta (that looked like blocks "bouncing" ahead).
             data.qvel[qvel_start : qvel_start + 2] = 0.0
             data.qvel[qvel_start + 2] = min(float(data.qvel[qvel_start + 2]), 0.0)
+            # Kill residual spin that soft contacts inject after a teleport;
+            # spinning footprints fail containment even when the center is in.
+            data.qvel[qvel_start + 3 : qvel_start + 6] = 0.0
             moved = True
         if moved:
             mujoco.mj_forward(model, data)
+
+    def _body_collision_half_height_m(
+        self, model: mujoco.MjModel, body_id: int
+    ) -> float:
+        half_height = 0.0
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) != int(body_id):
+                continue
+            if not (
+                int(model.geom_contype[geom_id])
+                or int(model.geom_conaffinity[geom_id])
+            ):
+                continue
+            size = np.asarray(model.geom_size[geom_id], dtype=float)
+            gtype = int(model.geom_type[geom_id])
+            if gtype == int(mujoco.mjtGeom.mjGEOM_BOX):
+                half_height = max(half_height, float(size[2]))
+            elif gtype == int(mujoco.mjtGeom.mjGEOM_SPHERE):
+                half_height = max(half_height, float(size[0]))
+            elif gtype == int(mujoco.mjtGeom.mjGEOM_CYLINDER):
+                half_height = max(half_height, float(size[1]))
+        return half_height if half_height > 0.0 else 0.02
+
+    def _body_collision_half_xy_m(
+        self, model: mujoco.MjModel, body_id: int
+    ) -> np.ndarray:
+        half = np.zeros(2, dtype=float)
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) != int(body_id):
+                continue
+            if not (
+                int(model.geom_contype[geom_id])
+                or int(model.geom_conaffinity[geom_id])
+            ):
+                continue
+            size = np.asarray(model.geom_size[geom_id], dtype=float)
+            gtype = int(model.geom_type[geom_id])
+            if gtype == int(mujoco.mjtGeom.mjGEOM_BOX):
+                half = np.maximum(half, size[:2])
+            elif gtype == int(mujoco.mjtGeom.mjGEOM_SPHERE):
+                half = np.maximum(half, np.array([size[0], size[0]]))
+            elif gtype == int(mujoco.mjtGeom.mjGEOM_CYLINDER):
+                half = np.maximum(half, np.array([size[0], size[0]]))
+        if float(np.min(half)) <= 0.0:
+            return np.asarray((0.02, 0.02), dtype=float)
+        return half
+
+    def _held_tool_push_region_xy_m(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
+        region_id = self._held_tool_push_region_id
+        if not region_id:
+            return None, None
+        try:
+            body_id, _, _ = self._object_free_joint(self.env, region_id)
+        except ToolUseJournalRuntimeError:
+            # Visual / static regions may not have a free joint — resolve body.
+            adapter = ToolUseJournalEnvironmentAdapter(self.env)
+            try:
+                body_id = int(adapter.object_body_ids[region_id])
+            except (KeyError, TypeError, ValueError):
+                return None, None
+        model, data = _raw_model_data(self.env)
+        mujoco.mj_forward(model, data)
+        center = np.asarray(data.xpos[body_id][:2], dtype=float)
+        half = np.zeros(2, dtype=float)
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) != int(body_id):
+                continue
+            if int(model.geom_type[geom_id]) != int(mujoco.mjtGeom.mjGEOM_BOX):
+                continue
+            size = np.asarray(model.geom_size[geom_id], dtype=float)
+            half = np.maximum(half, size[:2])
+        if float(np.min(half)) < 1e-4:
+            return None, None
+        return center, half
 
     def detach_object(self, object_id: str | None = None) -> AttachedObjectState:
         """Release the attached object while preserving its current world pose."""
@@ -3041,7 +3143,13 @@ def _maybe_enable_held_tool_fill_for_plan(
     partners = _tabletop_held_tool_push_partners(plan)
     if not partners:
         return False
-    enabled = runtime.enable_held_tool_collision_fill(push_partner_ids=partners)
+    region_id = plan.metadata.get("target_region_id")
+    if not isinstance(region_id, str) or not region_id.strip():
+        region_id = None
+    enabled = runtime.enable_held_tool_collision_fill(
+        push_partner_ids=partners,
+        push_region_id=region_id,
+    )
     return bool(enabled)
 
 

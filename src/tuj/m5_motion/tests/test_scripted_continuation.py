@@ -255,3 +255,47 @@ def test_vac_retention_same_recipe_binds_each_scene_instance(monkeypatch, instan
     retention.context.runtime.attached_object_id = "plate_a" if instance == "plate_b" else "plate_b"
     retention.after_tick(0.01)
     assert retention.samples[-1]["contact"] is False
+
+
+def test_kinematic_3f_retention_tolerates_finger_unload_while_attached(monkeypatch):
+    """fruit_a transport: one pad force can hit 0 while KINEMATIC attach holds."""
+    from dataclasses import replace
+    from tuj.m5_motion.scripted_grasps.retention import GraspRetention
+    from tuj.m5_motion.tests.test_scripted_grasps import _c3_2_entry
+
+    entry = replace(_c3_2_entry("fruit"), body_object_id="fruit_a")
+    assert entry.ee == "3F"
+    assert entry.scene_object_id == "fruit_a"
+    context = SimpleNamespace(
+        grip_pose=lambda: np.eye(4),
+        body_pose=lambda: np.eye(4),
+        runtime=SimpleNamespace(
+            attached_object_id="fruit_a",
+            attachment=object(),
+        ),
+        recipe=SimpleNamespace(),
+        gripper=SimpleNamespace(current_action=np.zeros(3)),
+        body_id=0,
+        model=SimpleNamespace(
+            body_jntadr=np.array([0]),
+            joint=lambda _jid: SimpleNamespace(name="fruit_a_joint0"),
+        ),
+    )
+    # Index unloaded (0 N) while thumb/pinky still report force.
+    monkeypatch.setattr(
+        GraspRetention,
+        "_forces",
+        lambda self: {"thumb": 6.0, "index": 0.0, "pinky": 2.8},
+    )
+    retention = GraspRetention(context, entry)
+    retention.after_tick(0.0)
+    retention.after_tick(0.20)
+    assert retention.samples[-1]["contact"] is True
+    assert retention.samples[-1]["attached"] is True
+    assert retention.loss_started is None
+    # Detach must fall back to finger-force contact and start the loss timer.
+    context.runtime.attachment = None
+    context.runtime.attached_object_id = None
+    retention.after_tick(0.21)
+    assert retention.samples[-1]["contact"] is False
+    assert retention.loss_started == 0.21

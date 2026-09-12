@@ -936,6 +936,11 @@ class MotionPlanBuilder:
                 "ik_branch_ids": [node.solution.branch_id for node in connected.nodes],
                 "edge_evaluations": connected.edge_evaluations,
                 **(
+                    {"target_region_id": request.task.goal.target_region_id}
+                    if request.task.goal.target_region_id
+                    else {}
+                ),
+                **(
                     {
                         "grasp_execution_mode": "CONTACT_FRICTION",
                         "planned_contact_friction_transform": (

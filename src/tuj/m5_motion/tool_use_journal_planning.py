@@ -908,13 +908,25 @@ class ToolUseJournalCollisionContextFactory:
         same bodies closer than ``collision_margin_m``. Mirror PICK's
         ``active_ee ↔ touch`` exemptions so CONTACT_* can make intended contact
         while unrelated obstacles stay blocked.
+
+        Large held dishes (C1_1 plate sweeps) also graze non-target tabletop
+        blocks beside the declared targets. Admit free ``block*`` neighbors that
+        lie within plate-reach of a sweep seed (``target_ids`` /
+        block ``allowed_touch_objects``) so CONTACT_SWEEP does not fail on
+        incidental contacts while distant blocks / bottles stay blocked.
         """
 
-        if not base.attached_object_ids or not request.task.allowed_touch_objects:
+        if not base.attached_object_ids:
             return base
         touch = [
             selector for selector in request.task.allowed_touch_objects if selector
         ]
+        touch.extend(
+            self._tabletop_incidental_block_touch_ids(request, base)
+        )
+        # Preserve order while dropping duplicates.
+        seen: set[str] = set()
+        touch = [name for name in touch if not (name in seen or seen.add(name))]
         if not touch:
             return base
         pairs = {
@@ -929,6 +941,99 @@ class ToolUseJournalCollisionContextFactory:
         if ee:
             pairs.update(self._contact_pairs(ee, touch))
         return base.model_copy(update={"allowed_collision_pairs": sorted(pairs)})
+
+    @staticmethod
+    def _object_xy_half_extent_m(
+        request: MotionPlanRequest,
+        object_id: str,
+    ) -> float:
+        record = request.world.objects.get(object_id)
+        if not isinstance(record, Mapping):
+            return 0.0
+        dims = record.get("dimensions_m")
+        if dims is None:
+            return 0.0
+        values = np.asarray(dims, dtype=float).reshape(-1)
+        if values.size < 2 or not np.isfinite(values[:2]).all():
+            return 0.0
+        return float(0.5 * max(float(values[0]), float(values[1])))
+
+    @classmethod
+    def _tabletop_incidental_block_touch_ids(
+        cls,
+        request: MotionPlanRequest,
+        base: CollisionContext,
+    ) -> list[str]:
+        """Free tabletop blocks within plate-reach of sweep seeds (dynamic neighbors)."""
+
+        from tuj.m5_motion.task_semantics import task_operation
+
+        if task_operation(request.task) != "TOOL_ACT":
+            return []
+        attached = {str(object_id) for object_id in base.attached_object_ids}
+        tool = str(request.task.tool or "").strip()
+        held = str(
+            getattr(request.world.robot_state, "held_tool_id", None)
+            or getattr(request.world.robot_state, "attached_object_id", None)
+            or ""
+        ).strip()
+        if "plate" not in attached and tool != "plate" and held != "plate":
+            return []
+        plate_id = next(
+            (
+                name
+                for name in (
+                    tool if tool == "plate" else None,
+                    held if held == "plate" else None,
+                    *(name for name in attached if name == "plate"),
+                    "plate",
+                )
+                if name
+            ),
+            "plate",
+        )
+        plate_half_m = cls._object_xy_half_extent_m(request, plate_id)
+        if plate_half_m <= 0.0:
+            return []
+        margin_m = float(getattr(request.constraints, "collision_margin_m", 0.0) or 0.0)
+        free_xy: dict[str, np.ndarray] = {}
+        # Same support band as TOOL_FILL push partners (~table height).
+        tabletop_z_max_m = 0.86
+        for free_pose in base.free_object_poses:
+            object_id = str(free_pose.object_id)
+            if object_id in attached:
+                continue
+            if float(free_pose.pose.position_m[2]) > tabletop_z_max_m:
+                continue
+            free_xy[object_id] = np.asarray(free_pose.pose.position_m[:2], dtype=float)
+        seed_ids = {
+            str(name)
+            for name in (*request.task.target_ids, *request.task.allowed_touch_objects)
+            if str(name).strip()
+        }
+        seed_xy = [
+            (seed_id, free_xy[seed_id])
+            for seed_id in seed_ids
+            if seed_id in free_xy
+        ]
+        if not seed_xy:
+            return []
+        ids: list[str] = []
+        for object_id, xy in free_xy.items():
+            if object_id in attached or object_id in seed_ids:
+                continue
+            if not object_id.lower().startswith("block"):
+                continue
+            neighbor_half_m = cls._object_xy_half_extent_m(request, object_id)
+            # Plate centered near a seed can reach this far in XY to another block.
+            reach_m = plate_half_m + neighbor_half_m + margin_m
+            for seed_id, seed in seed_xy:
+                seed_half_m = cls._object_xy_half_extent_m(request, seed_id)
+                limit_m = reach_m + seed_half_m
+                if float(np.linalg.norm(xy - seed)) <= limit_m + 1e-9:
+                    ids.append(object_id)
+                    break
+        return ids
 
     def _bind_default(
         self,

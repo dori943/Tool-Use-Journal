@@ -496,15 +496,22 @@ def test_canonicalizes_collapsed_sweep_toward_goal_region() -> None:
     assert translation is not None
     assert float(np.linalg.norm(end - start)) >= 0.08
     assert float(np.dot(end - start, region - start)) > 0.0
-    # END follows the generic in-region herd translation, not a bare
-    # region-center snap (that leaves Y-offset targets outside the AABB).
-    assert float(np.linalg.norm((end - start) - translation)) < 0.03
+    from tuj.m5_motion.contact_keyframe_validation import (
+        _clamp_herd_translation_to_region_approach,
+    )
+
+    clamped = _clamp_herd_translation_to_region_approach(start, region, translation)
+    # END follows the obstacle-safe herd translation (inbound clamped to the
+    # region center; cross-track fit preserved).
+    assert float(np.linalg.norm((end - start) - clamped)) < 0.03
+    assert float(np.linalg.norm(end - region)) < 0.08
     assert fixed[2].metadata.get("sweep_lateral_canonicalized") is True
     assert fixed[3].metadata.get("sweep_lateral_canonicalized") is True
 
 
 def test_herd_translation_fits_y_offset_targets_into_region_aabb() -> None:
     from tuj.m5_motion.contact_keyframe_validation import (
+        _goal_region_half_extents_xy_m,
         _translation_to_fit_targets_in_region,
         canonicalize_sweep_strategy_heights,
     )
@@ -524,6 +531,10 @@ def test_herd_translation_fits_y_offset_targets_into_region_aabb() -> None:
     request.world.objects["collect_zone"] = _object(
         (-0.15, 0.0, 0.82), dimensions=(0.25, 0.18, 0.02)
     )
+    region_half = _goal_region_half_extents_xy_m(request)
+    assert region_half is not None
+    # Region half must be the true AABB, not yaw-inflated (that under-fits).
+    assert region_half == pytest.approx(np.array([0.125, 0.09]), abs=1e-9)
     translation = _translation_to_fit_targets_in_region(request)
     assert translation is not None
     assert float(translation[1]) > 0.02  # must lift cluster in +Y

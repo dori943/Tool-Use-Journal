@@ -132,13 +132,33 @@ class GraspRetention:
         actual = inverse(c.grip_pose()) @ c.body_pose()
         slip = float(np.linalg.norm(actual[:3, 3] - self.reference[:3, 3]))
         angle = float(np.rad2deg(Rotation.from_matrix(self.reference[:3, :3].T @ actual[:3, :3]).magnitude()))
-        contact = all(force > .01 for force in self.forces.values())
+        # Attachments are keyed by scene instance (fruit_a / plate_b), not recipe
+        # type id. Vac multi-instance holds compare those ids alone.
+        attached = (
+            getattr(c.runtime, "attached_object_id", None) == self.entry.scene_object_id
+            and getattr(c.runtime, "attachment", None) is not None
+        )
         if self.entry.ee == "vac":
-            # Attachments are keyed by scene instance (plate_b), not recipe
-            # type id (plate). Multi-instance vac holds must compare those.
-            contact = c.runtime.attached_object_id == self.entry.scene_object_id
+            contact = (
+                getattr(c.runtime, "attached_object_id", None)
+                == self.entry.scene_object_id
+            )
+        elif attached:
+            # Post-validated kinematic 3F/2F carry: finger pads can unload under
+            # M5 dynamics while slip stays tiny; requiring all finger forces then
+            # false-triggers SCRIPTED_GRASP_CONTACT_LOST (c3_2 fruit_a transport).
+            contact = True
+        else:
+            contact = all(force > .01 for force in self.forces.values())
         self.loss_started = None if contact else (time_s if self.loss_started is None else self.loss_started)
-        self.samples.append({"time_s": time_s, "contact": contact, "slip_m": slip, "slip_deg": angle, "finger_force_n": self.forces.copy()})
+        self.samples.append({
+            "time_s": time_s,
+            "contact": contact,
+            "slip_m": slip,
+            "slip_deg": angle,
+            "finger_force_n": self.forces.copy(),
+            "attached": bool(attached),
+        })
         if self.entry.driver == "plate":
             c.original_monitor_sample(time_s)
         if self.loss_started is not None and time_s - self.loss_started > .10:

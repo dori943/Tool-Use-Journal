@@ -714,7 +714,7 @@ def test_attached_object_same_time_resync_preserves_finite_diff_qvel() -> None:
 
 
 def test_held_tool_kinematic_push_assist_moves_tabletop_partner() -> None:
-    """Lowered fill paddle inherits XY delta onto listed tabletop partners."""
+    """Underside-contact partners inherit XY delta; raised tools do not drag."""
 
     runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
     model = runtime.env.sim.model._model
@@ -745,9 +745,10 @@ def test_held_tool_kinematic_push_assist_moves_tabletop_partner() -> None:
     runtime._held_tool_push_partner_ids = frozenset({"apple"})
 
     before = data.qpos[apple_qpos : apple_qpos + 2].copy()
+    # Paddle underside near the partner top (contact band).
     runtime._apply_held_tool_kinematic_push_assist(
         delta_xy=np.asarray([-0.05, 0.01], dtype=float),
-        tool_position=np.asarray([0.0, 0.0, 0.82], dtype=float),
+        tool_position=np.asarray([0.0, 0.0, 0.822], dtype=float),
         tool_rotation=np.eye(3, dtype=float),
     )
     after = data.qpos[apple_qpos : apple_qpos + 2]
@@ -757,7 +758,7 @@ def test_held_tool_kinematic_push_assist_moves_tabletop_partner() -> None:
         np.zeros(2), abs=1e-9
     )
 
-    # Raised tool must not drag partners.
+    # Raised tool must not drag partners (no underside contact).
     data.qpos[apple_qpos : apple_qpos + 2] = before
     runtime._apply_held_tool_kinematic_push_assist(
         delta_xy=np.asarray([-0.05, 0.01], dtype=float),
@@ -765,6 +766,83 @@ def test_held_tool_kinematic_push_assist_moves_tabletop_partner() -> None:
         tool_rotation=np.eye(3, dtype=float),
     )
     assert data.qpos[apple_qpos : apple_qpos + 2] == pytest.approx(before, abs=1e-9)
+    runtime.close()
+
+
+def test_kinematic_push_assist_skips_same_time_sync_and_zeros_tool_qvel() -> None:
+    """Pre-step (dt≈0) must not assist; assist mode zeros tool FD qvel."""
+
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    hand_id = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_BODY, "robot0_right_hand"
+    )
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    apple_qvel = int(model.jnt_dofadr[apple_joint])
+    data.qpos[apple_qpos : apple_qpos + 3] = data.xpos[hand_id]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+    runtime.command_gripper(engaged=True, suction=False)
+    runtime.attach_object(
+        "apple",
+        max_attach_distance_m=0.05,
+        max_attach_penetration_m=0.05,
+    )
+    runtime.mark_attached_object_as_tool("apple")
+    # Non-empty partner set engages kinematic-assist mode (qvel zeroing +
+    # real-time-only assist gating) without needing a second free body.
+    runtime._held_tool_push_partner_ids = frozenset({"block_partner"})
+    assist_calls: list[np.ndarray] = []
+
+    def _capture_assist(*, delta_xy, tool_position, tool_rotation):
+        assist_calls.append(np.asarray(delta_xy, dtype=float).copy())
+
+    runtime._apply_held_tool_kinematic_push_assist = _capture_assist  # type: ignore[method-assign]
+
+    data.time = 2.0
+    runtime.synchronize_attached_object()
+    assert runtime._attachment is not None
+    runtime._attachment = AttachedObjectState(
+        object_id=runtime._attachment.object_id,
+        free_joint_name=runtime._attachment.free_joint_name,
+        reference_kind=runtime._attachment.reference_kind,
+        reference_name=runtime._attachment.reference_name,
+        position_in_reference_m=(0.03, 0.01, 0.0),
+        rotation_in_reference=runtime._attachment.rotation_in_reference,
+        attach_distance_m=runtime._attachment.attach_distance_m,
+        mode=runtime._attachment.mode,
+        breakable_weld=runtime._attachment.breakable_weld,
+    )
+    # Same-time re-sync with pose change: must NOT assist.
+    runtime.synchronize_attached_object()
+    assert assist_calls == []
+    assert data.qvel[apple_qvel : apple_qvel + 3] == pytest.approx(
+        np.zeros(3), abs=1e-9
+    )
+
+    # New planar shift + real time advance: assist exactly once.
+    runtime._attachment = AttachedObjectState(
+        object_id=runtime._attachment.object_id,
+        free_joint_name=runtime._attachment.free_joint_name,
+        reference_kind=runtime._attachment.reference_kind,
+        reference_name=runtime._attachment.reference_name,
+        position_in_reference_m=(0.06, 0.02, 0.0),
+        rotation_in_reference=runtime._attachment.rotation_in_reference,
+        attach_distance_m=runtime._attachment.attach_distance_m,
+        mode=runtime._attachment.mode,
+        breakable_weld=runtime._attachment.breakable_weld,
+    )
+    data.time = 2.02
+    runtime.synchronize_attached_object()
+    assert len(assist_calls) == 1
+    assert float(np.linalg.norm(assist_calls[0])) > 1e-3
+    assert data.qvel[apple_qvel : apple_qvel + 3] == pytest.approx(
+        np.zeros(3), abs=1e-9
+    )
     runtime.close()
 
 

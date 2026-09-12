@@ -951,6 +951,26 @@ def test_held_tool_sweep_allows_ee_and_tool_to_touch_targets() -> None:
         },
         "dimensions_m": [0.04, 0.04, 0.04],
     }
+    # Neighbor not in target_ids / allowed_touch: within plate-reach of block_a.
+    world.objects["block_10"] = {
+        "object_id": "block_10",
+        "free_joint_name": "block_10_free",
+        "pose": {
+            "position_m": [0.32, 0.08, 0.805],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.04, 0.04, 0.04],
+    }
+    # Far tabletop block: same support band, but outside plate-reach of seeds.
+    world.objects["block_far"] = {
+        "object_id": "block_far",
+        "free_joint_name": "block_far_free",
+        "pose": {
+            "position_m": [0.85, 0.05, 0.805],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.04, 0.04, 0.04],
+    }
     world.metadata["physical_active_ee"] = "vac"
     request = MotionPlanRequest(
         request_id="request-sweep-touch",
@@ -1009,6 +1029,10 @@ def test_held_tool_sweep_allows_ee_and_tool_to_touch_targets() -> None:
 
     assert ("block_a", "plate") in pairs
     assert ("block_a", "vac") in pairs
+    assert ("block_10", "plate") in pairs
+    assert ("block_10", "vac") in pairs
+    assert ("block_far", "plate") not in pairs
+    assert ("block_far", "vac") not in pairs
     assert ("bottle", "plate") not in pairs
     assert ("other", "vac") not in pairs
 
