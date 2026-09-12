@@ -238,11 +238,19 @@ class ToolUseJournalExecutionAdapter:
     ) -> SimulationConfig:
         del request, index
         env = self.runtime.env
+        settle_budget_s = 0.0
+        if self.controller:
+            for segment in plan.segments:
+                settle = ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(segment)
+                if settle is not None:
+                    settle_budget_s += float(settle['max_wait_s'])
         return SimulationConfig(
             physics_timestep_s=float(env.model_timestep),
             control_timestep_s=float(env.control_timestep),
             realtime_factor=self.realtime_factor,
-            max_duration_s=float(plan.duration_s) + self.max_duration_padding_s,
+            # Local waits pause plan time and have their own unchanged limits.
+            # Do not make them compete for the generic execution padding.
+            max_duration_s=float(plan.duration_s) + self.max_duration_padding_s + settle_budget_s,
             terminate_on_collision=self.terminate_on_collision,
             render=self.render,
             random_seed=self.random_seed,
