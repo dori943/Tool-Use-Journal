@@ -975,6 +975,16 @@ class C4_2_DiagonalFitPacking(KitchenBase):
         BOX_INNER_W / D / H describe the clear interior.
         """
 
+        # Author boundary compliance explicitly: MuJoCo averages each wall's
+        # defaults with the contacting object, otherwise softening thin bodies'
+        # calibrated support when later objects load the packed contents.
+        contact_profile = json.loads(
+            (
+                Path(__file__).parent
+                / "assets/contact_profiles/rigid_container.json"
+            ).read_text(encoding="utf-8")
+        )
+
         body = new_body(
             name=_BOX_BODY_NAME,
             pos=[
@@ -1013,6 +1023,8 @@ class C4_2_DiagonalFitPacking(KitchenBase):
                     friction=(
                         "0.95 0.3 0.1"
                     ),
+                    solref=contact_profile["solref"],
+                    solimp=contact_profile["solimp"],
                 )
             )
 
