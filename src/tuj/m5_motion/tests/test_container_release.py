@@ -5,6 +5,39 @@ from scipy.spatial.transform import Rotation
 from tuj.m5_motion.scripted_grasps.container_release import rim_clearance_lift
 
 
+def test_real_vacuum_geometry_has_one_sample_and_preserves_live_state():
+    from pathlib import Path
+    from types import SimpleNamespace
+    import mujoco
+    from tuj.m5_motion.scripted_grasps.container_release import opening_points_in_body
+    from tuj.m5_motion.scripted_grasps.open_geometry import open_joint_positions
+
+    repo = Path(__file__).resolve().parents[4]
+    model = mujoco.MjModel.from_xml_path(str(repo / 'scripts/assets/vacuum_gripper.xml'))
+    data = mujoco.MjData(model)
+    data.ctrl[:] = .7
+    data.time = 12.3
+    mujoco.mj_forward(model, data)
+    body = np.eye(4)
+    body[:3, :3] = Rotation.from_euler('xyz', [.3, -.7, 1.2]).as_matrix()
+    body[:3, 3] = [1., -2., .8]
+    c = SimpleNamespace(model=model, data=data, mj=mujoco,
+        gripper=SimpleNamespace(joints=[]), gripper_actuator_ids=list(range(model.nu)),
+        gripper_geoms=set(range(model.ngeom)), body_pose=lambda: body)
+    before = {key: getattr(data, key).copy() for key in ('qpos', 'qvel', 'ctrl', 'geom_xpos')}
+    assert open_joint_positions(c) == {}
+    points, samples = opening_points_in_body(c)
+    assert samples == 1
+    # Both enabled collision cylinders are represented by conservative boxes.
+    assert points.shape == (16, 3)
+    world = points @ body[:3, :3].T + body[:3, 3]
+    np.testing.assert_allclose(world.min(axis=0), [-.03, -.03, 0.], atol=1e-12)
+    np.testing.assert_allclose(world.max(axis=0), [.03, .03, .112], atol=1e-12)
+    for key, value in before.items():
+        np.testing.assert_array_equal(getattr(data, key), value)
+    assert data.time == 12.3
+
+
 @pytest.mark.parametrize('yaw', [0., .7, -1.4])
 def test_open_hand_crossing_wall_is_lifted_above_rim(yaw):
     region = np.eye(4)

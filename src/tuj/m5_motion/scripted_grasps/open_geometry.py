@@ -11,6 +11,14 @@ def open_joint_positions(context):
     cached = getattr(c, '_resolved_open_joint_positions', None)
     if cached is not None:
         return dict(cached)
+    if not c.gripper.joints:
+        # Rigid tools do not change shape on release. Body transmissions apply
+        # adhesion forces; other actuator kinds need an explicit geometry model.
+        if any(c.model.actuator_trntype[aid] != mujoco.mjtTrn.mjTRN_BODY
+               for aid in c.gripper_actuator_ids):
+            raise ValueError('OPEN_GEOMETRY_UNSUPPORTED_RIGID_TRANSMISSION')
+        c._resolved_open_joint_positions = {}
+        return {}
     endpoint, _ = open_action_endpoint(c.gripper, -1.)
     hand = deepcopy(c.gripper)
     hand.current_action = endpoint.copy()

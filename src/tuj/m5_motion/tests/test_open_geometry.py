@@ -47,6 +47,37 @@ def test_unsupported_transmission_fails_explicitly():
         open_joint_positions(c)
 
 
+def test_articulated_zero_speed_still_fails():
+    c = context()
+    c.gripper.speed = 0.
+    with pytest.raises(ValueError, match='GRIPPER_RELEASE_INVALID_SPEED'):
+        open_joint_positions(c)
+
+
+@pytest.mark.parametrize('adhesion', [False, True])
+def test_rigid_hand_retains_geometry_without_opening_action(adhesion):
+    model = mujoco.MjModel.from_xml_string('''<mujoco><worldbody>
+        <body name="cup"><geom type="sphere" size=".03"/></body></worldbody>'''
+        + ('<actuator><adhesion body="cup" gain="80" ctrlrange="0 1"/></actuator>'
+           if adhesion else '') + '</mujoco>')
+    # No action/speed API is needed to sample a rigid shape.
+    c = SimpleNamespace(model=model, gripper=SimpleNamespace(joints=[]),
+                        gripper_actuator_ids=list(range(model.nu)))
+    assert open_joint_positions(c) == {}
+    assert open_joint_positions(c) == {}
+
+
+@pytest.mark.parametrize('kind', [mujoco.mjtTrn.mjTRN_JOINT,
+    mujoco.mjtTrn.mjTRN_JOINTINPARENT, mujoco.mjtTrn.mjTRN_TENDON,
+    mujoco.mjtTrn.mjTRN_SITE])
+def test_rigid_hand_rejects_unmodeled_actuator_transmission(kind):
+    c = context()
+    c.gripper.joints = []
+    c.model.actuator_trntype[0] = kind
+    with pytest.raises(ValueError, match='UNSUPPORTED_RIGID_TRANSMISSION'):
+        open_joint_positions(c)
+
+
 @pytest.mark.parametrize('boundary', ['lower', 'upper'])
 def test_open_linkage_converges_at_joint_boundary_from_grasped_state(boundary):
     c=context(.5 if boundary == 'upper' else 1.)
