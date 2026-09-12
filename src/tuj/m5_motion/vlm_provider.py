@@ -152,6 +152,8 @@ class OpenAIKeyframeProviderConfig:
         cache = os.environ.get("MOTION_PLANNER_KEYFRAME_CACHE")
         if cache:
             values["cache_dir"] = Path(cache)
+        if output_budget := os.environ.get("OPENAI_KEYFRAME_MAX_OUTPUT_TOKENS"):
+            values["max_output_tokens"] = int(output_budget)
         values.update(overrides)
         return cls(**values)
 
