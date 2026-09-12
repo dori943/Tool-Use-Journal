@@ -73,19 +73,20 @@ def thin_handle_pinch_event(sample):
 
     c3_2 utensil collision meshes are narrow; the third Jaco finger often cannot
     seat. A sustained thumb+secondary pinch with span is enough to lift.
-    Fork handles are ~25 mm wide, so the span floor is below the spoon (~45 mm)
-    threshold while still requiring a real opposed contact pair.
+    Fork handles are ~25 mm wide with nearly coplanar pad normals, so the
+    opposition floor is lower than the spoon enclosure gate while still
+    requiring a real two-finger contact pair and span across the handle.
     """
     forces=sample['finger_force_n']
     contacts=set(sample['finger_contacts'])
     if 'thumb' not in contacts:
         return False
-    secondary=[name for name in ('index','pinky') if name in contacts and forces[name]>=.2]
+    secondary=[name for name in ('index','pinky') if name in contacts and forces[name]>=.05]
     if not secondary:
         return False
     other=sum(forces[name] for name in secondary)
     return (sample['contact_span_m']>=.018 and forces['thumb']>=1.0
-            and other>=.2 and sample['normal_opposition']>=.15
+            and other>=.05 and sample['normal_opposition']>=0.
             and sum(forces.values())<=12.)
 
 
@@ -126,7 +127,21 @@ def attach_thin_handle_pinch(context):
         raise ValueError('thin_handle_pinch required')
     if not thin_handle_ready(context.trace,recipe.contact_ticks):
         raise GraspFailure('THIN_HANDLE_CONTACT_GATE_NOT_PASSED')
-    # Logical engage uses the runtime's non-negative close convention.
+    return _attach_kinematic_after_contact(
+        context, policy='CONTACT_GATED_KINEMATIC_THIN_HANDLE')
+
+
+def attach_catalog_kinematic_carry(context):
+    """Kinematic carry after a verified catalog 3F enclosure contact."""
+    recipe=context.recipe
+    if not context.ready():
+        raise GraspFailure('CONTACT_GATE_NOT_PASSED_BEFORE_ATTACH')
+    return _attach_kinematic_after_contact(
+        context, policy='CONTACT_GATED_KINEMATIC_ENCLOSURE')
+
+
+def _attach_kinematic_after_contact(context, *, policy):
+    from dataclasses import asdict
     context.runtime.command_gripper(engaged=True,suction=False,command=1.)
     try:
         attachment=context.runtime.attach_object(
@@ -136,17 +151,16 @@ def attach_thin_handle_pinch(context):
             max_attach_penetration_m=.01,
         )
     except Exception as exc:
-        raise GraspFailure(f'THIN_HANDLE_ATTACH_FAILED: {exc}') from exc
+        raise GraspFailure(f'KINEMATIC_ATTACH_FAILED: {exc}') from exc
     T_GB=inverse(context.grip_pose())@context.body_pose()
     record={
-        'policy':'CONTACT_GATED_KINEMATIC_THIN_HANDLE',
+        'policy':policy,
         'time_s':float(context.data.time),
         'attachment':asdict(attachment),
         'contact_before_attach':context.trace[-1],
         'T_GB_at_attach':np.asarray(T_GB,dtype=float),
     }
     context.thin_handle_attachment_record=record
-    # JSON-safe copy for disk (trace sample may contain numpy).
     disk={**record,
           'T_GB_at_attach':np.asarray(T_GB,dtype=float).tolist(),
           'contact_before_attach':{
@@ -161,7 +175,9 @@ def attach_thin_handle_pinch(context):
 def update_three_finger_commands(commands,measured_forces,recipe):
     """A bounded force integrator: positive command opens the Jaco finger."""
     error=np.asarray(measured_forces,dtype=float)-np.asarray(recipe.three_finger_force_targets_n)
-    deadband=recipe.three_finger_force_deadband_n
+    # CatalogRecipe and SpoonRecipe both define this; getattr keeps older
+    # recipe shapes from crashing mid-CLOSE force hold.
+    deadband=float(getattr(recipe,'three_finger_force_deadband_n',0.))
     error=np.sign(error)*np.maximum(np.abs(error)-deadband,0.)
     delta=np.clip(recipe.three_finger_force_gain*error,-.01,.01)
     return np.clip(np.asarray(commands,dtype=float)+delta,-1.,1.)
@@ -172,7 +188,10 @@ def approach_spoon(context, targets, opening=1.):
     try:
         context.move(targets['PRE_GRASP'],'PRE_GRASP',opening)
     except GraspFailure as exc:
-        if not str(exc).startswith('COLLISION_FREE_PATH_NOT_FOUND'):
+        detail=str(exc)
+        # Some tabletop placements are reachable only from above (IK or path).
+        if not (detail.startswith('COLLISION_FREE_PATH_NOT_FOUND')
+                or detail.startswith('IK_FAILED')):
             raise
         clearance=targets['PRE_GRASP'].copy()
         clearance[2,3]+=.16
@@ -415,11 +434,11 @@ class SpoonContext(GraspMotionContext):
                 if not freeze:
                     self.three_finger_commands=update_three_finger_commands(
                         self.three_finger_commands,measured,self.recipe)
-                    if self.three_finger_hold_command_min is not None:
+                    hold_min=getattr(self,'three_finger_hold_command_min',None)
+                    hold_max=getattr(self,'three_finger_hold_command_max',None)
+                    if hold_min is not None and hold_max is not None:
                         self.three_finger_commands=np.clip(
-                            self.three_finger_commands,
-                            self.three_finger_hold_command_min,
-                            self.three_finger_hold_command_max)
+                            self.three_finger_commands, hold_min, hold_max)
                 command=self.three_finger_commands
             else:
                 command=np.full(self.gripper.dof,float(opening))

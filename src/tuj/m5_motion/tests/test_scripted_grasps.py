@@ -188,6 +188,25 @@ def test_c3_2_remaining_instances_resolve_and_build_targets():
     assert c1_spoon.recipe().expected_size_m is None
 
 
+def test_catalog_recipe_exposes_three_finger_force_deadband():
+    """Catalog 3F CLOSE force-hold reads recipe.three_finger_force_deadband_n."""
+    from tuj.m5_motion.scripted_grasps.catalog_types import CatalogRecipe
+    from tuj.m5_motion.scripted_grasps.objects.fruit import fruit_recipe
+    from tuj.m5_motion.scripted_grasps.spoon_runtime import (
+        update_three_finger_commands,
+    )
+
+    assert "three_finger_force_deadband_n" in CatalogRecipe.__dataclass_fields__
+    recipe = fruit_recipe()
+    assert 0 <= recipe.three_finger_force_deadband_n < min(
+        recipe.three_finger_force_targets_n
+    )
+    cmd = update_three_finger_commands(
+        np.zeros(3), [1.0, 1.0, 1.0], recipe)
+    assert cmd.shape == (3,)
+    assert np.all(np.isfinite(cmd))
+
+
 def test_c3_2_plate_vac_rim_offset_is_geometry_derived():
     from tuj.m5_motion.scripted_grasps.objects import plate_vac
     recipe = plate_vac.plate_vac_recipe()

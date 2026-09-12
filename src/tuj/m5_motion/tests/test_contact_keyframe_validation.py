@@ -444,6 +444,7 @@ def test_rejects_collapsed_contact_sweep_without_lateral_travel() -> None:
 
 def test_canonicalizes_collapsed_sweep_toward_goal_region() -> None:
     from tuj.m5_motion.contact_keyframe_validation import (
+        _translation_to_fit_targets_in_region,
         canonicalize_sweep_strategy_heights,
     )
 
@@ -491,10 +492,90 @@ def test_canonicalizes_collapsed_sweep_toward_goal_region() -> None:
         request.world.objects["collect_zone"]["pose"]["position_m"][:2],
         dtype=float,
     )
+    translation = _translation_to_fit_targets_in_region(request)
+    assert translation is not None
     assert float(np.linalg.norm(end - start)) >= 0.08
     assert float(np.dot(end - start, region - start)) > 0.0
+    # END follows the generic in-region herd translation, not a bare
+    # region-center snap (that leaves Y-offset targets outside the AABB).
+    assert float(np.linalg.norm((end - start) - translation)) < 0.03
     assert fixed[2].metadata.get("sweep_lateral_canonicalized") is True
     assert fixed[3].metadata.get("sweep_lateral_canonicalized") is True
+
+
+def test_herd_translation_fits_y_offset_targets_into_region_aabb() -> None:
+    from tuj.m5_motion.contact_keyframe_validation import (
+        _translation_to_fit_targets_in_region,
+        canonicalize_sweep_strategy_heights,
+    )
+
+    request = _sweep_request()
+    request.world.robot_state.held_tool_id = "tool_pusher"
+    request.world.robot_state.attached_object_id = "tool_pusher"
+    # Cluster straddles the region in X-progress but sits below it in Y — a
+    # straight start→region-center line would leave the low block outside.
+    request.world.objects["block_a"] = _object(
+        (0.20, -0.12, 0.84), dimensions=(0.04, 0.04, 0.04)
+    )
+    request.world.objects["block_b"] = _object(
+        (0.18, -0.02, 0.84), dimensions=(0.04, 0.04, 0.04)
+    )
+    request.task.target_ids = ["block_a", "block_b"]
+    request.world.objects["collect_zone"] = _object(
+        (-0.15, 0.0, 0.82), dimensions=(0.25, 0.18, 0.02)
+    )
+    translation = _translation_to_fit_targets_in_region(request)
+    assert translation is not None
+    assert float(translation[1]) > 0.02  # must lift cluster in +Y
+
+    sequence = [
+        _keyframe(
+            keyframe_id="pre",
+            frame_ref="object:block_a",
+            offset=0.15,
+            keyframe_type=KeyframeType.PRE_CONTACT,
+        ),
+        _keyframe(
+            keyframe_id="start",
+            frame_ref="object:block_a",
+            offset=0.03,
+            keyframe_type=KeyframeType.CONTACT_START,
+        ),
+        _keyframe(
+            keyframe_id="sweep",
+            frame_ref="object:block_a",
+            offset=0.03,
+            keyframe_type=KeyframeType.CONTACT_SWEEP,
+        ),
+        _keyframe(
+            keyframe_id="end",
+            frame_ref="object:block_a",
+            offset=0.03,
+            keyframe_type=KeyframeType.CONTACT_END,
+        ),
+        _keyframe(
+            keyframe_id="retract",
+            frame_ref="object:block_a",
+            offset=0.17,
+            keyframe_type=KeyframeType.RETREAT,
+        ),
+    ]
+    fixed = canonicalize_sweep_strategy_heights(request, sequence)
+    validate_sweep_keyframe_strategy(request, fixed)
+    resolver = RelativePoseResolver(request.world)
+    start = np.asarray(resolver.resolve(fixed[1]).position_m[:2], dtype=float)
+    end = np.asarray(resolver.resolve(fixed[3]).position_m[:2], dtype=float)
+    assert float((end - start)[1]) > 0.02
+    # After the herd translation, both footprints should land in the region.
+    region = np.array([-0.15, 0.0], dtype=float)
+    half = np.array([0.125, 0.09], dtype=float)
+    for object_id in ("block_a", "block_b"):
+        pos = np.asarray(
+            request.world.objects[object_id]["pose"]["position_m"][:2],
+            dtype=float,
+        )
+        herded = pos + (end - start)
+        assert np.all(np.abs(herded - region) <= half + 1e-6)
 
 
 def test_engagement_presses_held_tool_into_target_tops() -> None:
@@ -620,11 +701,14 @@ def test_canonicalizes_contact_start_onto_target_centroid() -> None:
     ]
     fixed = canonicalize_sweep_strategy_heights(request, sequence)
     validate_sweep_keyframe_strategy(request, fixed)
-    assert fixed[1].metadata.get("sweep_contact_start_centroid") is True
+    assert fixed[1].metadata.get("sweep_contact_start_tool_center") is True
     resolver = RelativePoseResolver(request.world)
     start_xy = np.asarray(resolver.resolve(fixed[1]).position_m[:2], dtype=float)
     centroid = np.array([-0.0, -0.05], dtype=float)  # mean of (-0.10,0.05) and (0.10,-0.15)
-    assert float(np.linalg.norm(start_xy - centroid)) < 0.02
+    # Vac-style offset: tool at (-0.20,-0.05), TCP at (-0.24,-0.10).
+    tool_offset = np.array([0.04, 0.05], dtype=float)
+    desired_tcp = centroid - tool_offset
+    assert float(np.linalg.norm(start_xy - desired_tcp)) < 0.02
 
 
 def test_accepts_matching_held_tool_orientation() -> None:

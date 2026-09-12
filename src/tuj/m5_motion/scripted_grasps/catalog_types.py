@@ -33,6 +33,8 @@ class CatalogRecipe:
     two_finger_force_gain: float = .002
     three_finger_force_targets_n: tuple = (6.,3.,3.)
     three_finger_force_gain: float = .002
+    # SpoonContext.step force servo (CatalogContext inherits it).
+    three_finger_force_deadband_n: float = .5
     prelift_stabilization_s: float = .5
     settle_s: float = 1.
     hold_s: float = 5.
@@ -79,6 +81,12 @@ class CatalogRecipe:
             raise ValueError('thin_handle_pinch requires 3F')
         if self.hold_finger_positions and self.ee_id!='3F':
             raise ValueError('hold_finger_positions requires 3F')
+        if self.ee_id=='3F':
+            targets=np.asarray(self.three_finger_force_targets_n,dtype=float)
+            if targets.shape!=(3,) or np.any(targets<=0) or not np.isfinite(targets).all():
+                raise ValueError('Invalid three-finger force targets')
+            if not 0<=self.three_finger_force_deadband_n<float(np.min(targets)):
+                raise ValueError('Invalid three-finger force deadband')
         if self.physics_timestep_s not in (.0005,.001,.002): raise ValueError('Invalid timestep')
         if self.physics_integrator!='implicitfast': raise ValueError('Invalid integrator')
         if not isinstance(self.contact_ticks,int) or self.contact_ticks<1: raise ValueError('Invalid contact ticks')

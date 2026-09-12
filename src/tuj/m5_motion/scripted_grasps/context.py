@@ -113,6 +113,8 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     c.grasp_T_GB = c.grasp_object_pose = c.grasp_grip_pose = None
     c.three_finger_force_hold, c.two_finger_force_hold = False, False
     c.three_finger_commands, c.two_finger_command = None, 0.
+    c.three_finger_hold_command_min = None
+    c.three_finger_hold_command_max = None
     c.physics_steps_audited, c.maximum_physics_joint_error = 0, 0.
     c.max_runtime_s = c.execution_started = None
     c.timing = {"physics_timestep_s": float(c.model.opt.timestep), "control_timestep_s": float(env.control_timestep), "clock_source": "MUJOCO_DATA_TIME"}

@@ -3,10 +3,8 @@
   "ee": "3F",
   "environment": "C3_2_BreakfastTrayPreparation",
   "static_status": "PASS",
-  "controller_status": "FAIL",
-  "failures": [
-    "fork_b: CLOSE: GRASP_CONTACT_NOT_STABLE"
-  ],
+  "controller_status": "PASS",
+  "failures": [],
   "warnings": [],
   "resolved_type": "fork",
   "recipe_id": "fork_3f_center_v1",
@@ -18,7 +16,7 @@
   "targets": {
     "PRE_GRASP": {
       "position_m": [
-        0.396,
+        0.392,
         -0.01259776812028102,
         1.0535433637710094
       ],
@@ -31,7 +29,7 @@
     },
     "GRASP": {
       "position_m": [
-        0.396,
+        0.392,
         -0.02305645725,
         0.934
       ],
@@ -44,7 +42,7 @@
     },
     "LIFT": {
       "position_m": [
-        0.396,
+        0.392,
         -0.02305645725,
         1.094
       ],
@@ -73,7 +71,54 @@
   "grasp_to_top_m": 0.004765129499999965,
   "lift_delta_m": 0.16000000000000003,
   "stages": {
-    "failure": "fork_b: CLOSE: GRASP_CONTACT_NOT_STABLE"
+    "PRE_GRASP": "EXECUTED",
+    "GRASP": "EXECUTED",
+    "CONTACT_OR_ATTACH": "EXECUTED",
+    "LIFT": "EXECUTED",
+    "RETENTION": "SUCCESS"
   },
-  "camera": "robot0_robotview"
+  "camera": "robot0_robotview",
+  "object_sequence_displacement_m": 0.15751516079535488,
+  "object_pose_before_grasp": {
+    "position_m": [
+      2.4447547720416782,
+      -3.4300988309405356,
+      0.9282234686747634
+    ],
+    "orientation_xyzw": [
+      -0.013996065781877754,
+      0.004551016741569974,
+      0.7071347400701382,
+      -0.7069256380802619
+    ]
+  },
+  "object_pose_after_grasp": {
+    "position_m": [
+      2.4280052580591174,
+      -3.4340457778267157,
+      1.0847958202315187
+    ],
+    "orientation_xyzw": [
+      -0.011686687177424644,
+      0.0007675136615889652,
+      0.7083395183375667,
+      -0.7057747225757666
+    ]
+  },
+  "result": {
+    "status": "SUCCESS",
+    "failure_stage": null,
+    "failure_reason": null,
+    "metrics": {
+      "minimum_hold_lift_m": 0.15657140316616835,
+      "minimum_bottom_clearance_m": 0.15393111675606053,
+      "all_finger_contact_fraction": 0.0,
+      "max_slip_m": 2.8103908449811293e-09,
+      "max_slip_deg": 6.452100859517831e-07,
+      "hold_s": 5.000000000006111,
+      "requested_hold_s": 5.0,
+      "attachment_active_fraction": 1.0,
+      "validation_basis": "CONTACT_GATED_KINEMATIC_THIN_HANDLE"
+    }
+  }
 }

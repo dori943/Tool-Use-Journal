@@ -37,6 +37,7 @@ from tuj.m5_motion.schema import (
 from tuj.m5_motion.tool_use_journal_runtime import (
     AttachmentContactMetrics,
     AttachmentMode,
+    AttachedObjectState,
     BreakableWeldConfig,
     ToolUseJournalAttachmentBroken,
     ToolUseJournalControllerTrajectoryPlayer,
@@ -649,6 +650,121 @@ def test_runtime_grasp_attach_tracks_hand_and_blocks_tool_exchange() -> None:
     runtime.command_gripper(engaged=False, suction=False)
     assert runtime.attached_object_id is None
     assert runtime.held_tool_id is None
+    runtime.close()
+
+
+def test_attached_object_same_time_resync_preserves_finite_diff_qvel() -> None:
+    """Controller pre-step sync shares sim time with the prior post-step sync.
+
+    Zeroing qvel on that dt≈0 call removes tangential velocity before physics
+    and makes held tools slide over tabletop targets without lateral push.
+    """
+
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    hand_id = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_BODY, "robot0_right_hand"
+    )
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    apple_qvel = int(model.jnt_dofadr[apple_joint])
+    data.qpos[apple_qpos : apple_qpos + 3] = data.xpos[hand_id]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+    runtime.command_gripper(engaged=True, suction=False)
+    runtime.attach_object(
+        "apple",
+        max_attach_distance_m=0.05,
+        max_attach_penetration_m=0.05,
+    )
+    assert runtime._attachment is not None
+
+    data.time = 1.0
+    runtime.synchronize_attached_object()
+    # Shift the locked relative pose so FD qvel is well-defined without
+    # relying on the tiny fake arm's joint kinematics.
+    runtime._attachment = AttachedObjectState(
+        object_id=runtime._attachment.object_id,
+        free_joint_name=runtime._attachment.free_joint_name,
+        reference_kind=runtime._attachment.reference_kind,
+        reference_name=runtime._attachment.reference_name,
+        position_in_reference_m=(0.04, 0.0, 0.0),
+        rotation_in_reference=runtime._attachment.rotation_in_reference,
+        attach_distance_m=runtime._attachment.attach_distance_m,
+        mode=runtime._attachment.mode,
+        breakable_weld=runtime._attachment.breakable_weld,
+    )
+    data.time = 1.02
+    runtime.synchronize_attached_object()
+    moving = np.asarray(
+        data.qvel[apple_qvel : apple_qvel + 3], dtype=float
+    ).copy()
+    assert float(np.linalg.norm(moving)) > 1e-3
+
+    # Same-sim-time re-sync must keep the FD velocity for the next physics step.
+    runtime.synchronize_attached_object()
+    preserved = np.asarray(
+        data.qvel[apple_qvel : apple_qvel + 3], dtype=float
+    )
+    assert preserved == pytest.approx(moving, abs=1e-9)
+    runtime.close()
+
+
+def test_held_tool_kinematic_push_assist_moves_tabletop_partner() -> None:
+    """Lowered fill paddle inherits XY delta onto listed tabletop partners."""
+
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    # Place a tabletop partner under the tool footprint.
+    data.qpos[apple_qpos : apple_qpos + 3] = [0.0, 0.0, 0.80]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+
+    # Fabricate an active fill box geom entry (no need to mutate model sizes).
+    box_geom = next(
+        geom_id
+        for geom_id in range(int(model.ngeom))
+        if int(model.geom_type[geom_id]) == int(mujoco.mjtGeom.mjGEOM_BOX)
+    )
+    runtime._held_tool_fill_geom_backup[box_geom] = (
+        0,
+        0,
+        np.asarray(model.geom_size[box_geom], dtype=float).copy(),
+        np.asarray(model.geom_pos[box_geom], dtype=float).copy(),
+    )
+    model.geom_size[box_geom] = np.asarray([0.10, 0.10, 0.0025], dtype=float)
+    model.geom_pos[box_geom] = np.asarray([0.0, 0.0, 0.0], dtype=float)
+    runtime._held_tool_push_partner_ids = frozenset({"apple"})
+
+    before = data.qpos[apple_qpos : apple_qpos + 2].copy()
+    runtime._apply_held_tool_kinematic_push_assist(
+        delta_xy=np.asarray([-0.05, 0.01], dtype=float),
+        tool_position=np.asarray([0.0, 0.0, 0.82], dtype=float),
+        tool_rotation=np.eye(3, dtype=float),
+    )
+    after = data.qpos[apple_qpos : apple_qpos + 2]
+    assert after == pytest.approx(before + np.asarray([-0.05, 0.01]), abs=1e-9)
+    apple_qvel = int(model.jnt_dofadr[apple_joint])
+    assert data.qvel[apple_qvel : apple_qvel + 2] == pytest.approx(
+        np.zeros(2), abs=1e-9
+    )
+
+    # Raised tool must not drag partners.
+    data.qpos[apple_qpos : apple_qpos + 2] = before
+    runtime._apply_held_tool_kinematic_push_assist(
+        delta_xy=np.asarray([-0.05, 0.01], dtype=float),
+        tool_position=np.asarray([0.0, 0.0, 0.99], dtype=float),
+        tool_rotation=np.eye(3, dtype=float),
+    )
+    assert data.qpos[apple_qpos : apple_qpos + 2] == pytest.approx(before, abs=1e-9)
     runtime.close()
 
 

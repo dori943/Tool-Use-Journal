@@ -19,6 +19,12 @@ def fruit_recipe():
         offset_fraction=(0.0, 0.0, UPPER_BODY_FRACTION_Z),
         offset_m=(LATERAL_OFFSET_M, 0.0, 0.0),
         two_finger_parallel_linkage=False,
+        # fruit_a PRE at the default 0.12 m standoff has no IK from the
+        # deterministic seeds; 0.07 m is reachable for both fruit_a/fruit_b.
+        approach_distance_m=0.07,
+        # fruit_a also fails IK at the default 0.18 m LIFT height.
+        lift_distance_m=0.12,
+        minimum_lift_m=0.08,
     )
 
 

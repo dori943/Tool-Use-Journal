@@ -32,6 +32,8 @@ def fork_recipe():
         contact_region_max=(0.6, 0.05, 0.6),
         two_finger_parallel_linkage=False,
         three_finger_force_targets_n=(3.0, 1.5, 0.5),
+        # Keep deadband strictly below the lowest finger target (pinky 0.5).
+        three_finger_force_deadband_n=0.25,
         lift_distance_m=0.16,
         # Near-open approach; mid-close tips strike the island/tray.
         preshape_aperture_m=0.025,

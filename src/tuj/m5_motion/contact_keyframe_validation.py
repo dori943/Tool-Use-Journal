@@ -90,9 +90,15 @@ _MIN_SWEEP_LATERAL_M = 0.08
 # Require this fraction of the start→region distance as forward progress when a
 # goal region is known (generic; not task-id specific).
 _MIN_SWEEP_REGION_PROGRESS_FRAC = 0.35
-# CONTACT_SWEEP poses farther than this from the start→region line are pulled
-# back onto the corridor even when END already has enough progress.
+# CONTACT_SWEEP poses farther than this from the planned herd path are rewritten.
 _SWEEP_CORRIDOR_DEVIATION_M = 0.03
+# If the fit translation has a cross-track component at least this large, insert
+# an intermediate waypoint (herd sideways first, then into the region).
+_MIN_SWEEP_CROSS_TRACK_M = 0.02
+# Keep fitted footprints this far inside the region AABB when it has size.
+_REGION_FIT_MARGIN_M = 0.005
+# Default target half-extent when the world snapshot omits dimensions_m.
+_DEFAULT_TARGET_HALF_XY_M = 0.02
 
 _CONTACT_PHASE_TYPES = frozenset(
     {
@@ -538,8 +544,9 @@ def _contact_engagement_tcp_z_m(request: MotionPlanRequest) -> float | None:
     """TCP z for held-tool sweep engagement.
 
     Shallow underside press into target tops. Hollow dishes rely on a temporary
-    solid AABB fill + kinematic tool velocity at playback for drag/push — not
-    mid-height embedding (that visually sinks blocks through the dish mesh).
+    thin underside collision slab + kinematic tool velocity at playback for
+    drag/push — not mid-height embedding (that visually sinks blocks through
+    the dish mesh).
     """
 
     tool_below = _held_tool_below_tcp_m(request)
@@ -901,18 +908,41 @@ def _sweep_target_centroid_xy_m(request: MotionPlanRequest) -> np.ndarray | None
     return np.mean(np.stack(points, axis=0), axis=0)
 
 
+def _held_tool_xy_offset_from_tcp_m(
+    request: MotionPlanRequest,
+) -> np.ndarray | None:
+    """World XY of held-tool center minus live TCP (vac plate is offset from cup)."""
+
+    eef = request.world.robot_state.eef_pose
+    if eef is None:
+        return None
+    eef_xy = np.asarray(eef.position_m[:2], dtype=float)
+    for object_id in sorted(_held_object_ids(request)):
+        record = request.world.objects.get(object_id)
+        if not isinstance(record, Mapping):
+            continue
+        pose = record.get("pose")
+        if not isinstance(pose, Mapping):
+            continue
+        position = _finite_vector(pose.get("position_m"), 3)
+        if position is None:
+            continue
+        return np.asarray(position[:2], dtype=float) - eef_xy
+    return None
+
+
 def canonicalize_sweep_contact_start_over_targets(
     request: MotionPlanRequest,
     keyframes: Sequence[RelativeKeyframeSpec],
     *,
     resolver: RelativePoseResolver | None = None,
 ) -> list[RelativeKeyframeSpec]:
-    """Snap CONTACT_START onto a sweep-ready XY over the target cluster.
+    """Snap CONTACT_START so the held-tool footprint covers the target cluster.
 
-    Flat tools: start on the target centroid.
-    Hollow dishes: shift start away from the goal by the rim radius so the
-    solid AABB fill's trailing face begins behind the cluster and scoops toward
-    the region (without mid-height mesh embedding).
+    Targets the held-tool center onto the cluster centroid. Vac plates sit
+    laterally offset from TCP; compensating that offset restores coverage that
+    raw TCP-centroid snaps miss. Avoid rim-plow TCP shifts that push the plate
+    past the cluster.
     """
 
     if not is_tool_act_contact_geometry_scope(request) or not keyframes:
@@ -920,16 +950,14 @@ def canonicalize_sweep_contact_start_over_targets(
     centroid = _sweep_target_centroid_xy_m(request)
     if centroid is None:
         return list(keyframes)
-    desired_xy = np.asarray(centroid, dtype=float)
-    metadata_flag = "sweep_contact_start_centroid"
-    rim_r = _held_tool_hollow_rim_inner_radius_m(request)
-    region_xy = _goal_region_center_xy_m(request)
-    if rim_r is not None and region_xy is not None and float(rim_r) > 1e-4:
-        away = desired_xy - np.asarray(region_xy, dtype=float)
-        away_norm = float(np.linalg.norm(away))
-        if away_norm > 1e-6:
-            desired_xy = desired_xy + (away / away_norm) * float(rim_r)
-            metadata_flag = "sweep_hollow_rim_plow_start"
+    desired_plate_xy = np.asarray(centroid, dtype=float)
+    tool_offset = _held_tool_xy_offset_from_tcp_m(request)
+    if tool_offset is not None:
+        desired_xy = desired_plate_xy - tool_offset
+        metadata_flag = "sweep_contact_start_tool_center"
+    else:
+        desired_xy = desired_plate_xy
+        metadata_flag = "sweep_contact_start_centroid"
 
     active_resolver = resolver or RelativePoseResolver(request.world)
     start_index = next(
@@ -1006,12 +1034,16 @@ def canonicalize_sweep_lateral_toward_region(
     *,
     resolver: RelativePoseResolver | None = None,
 ) -> list[RelativeKeyframeSpec]:
-    """Stretch a collapsed CONTACT path toward the goal region in XY.
+    """Rewrite CONTACT path so a rigid herd translation fits targets in-region.
 
     VLMs often emit CONTACT_START/SWEEP/END on the same target top (zero lateral
-    travel). That plans and executes but cannot move footprints into
-    ``target_region_id``. When a region exists, rewrite SWEEP/END (and RETREAT
-    XY) along start→region while keeping the engagement height.
+    travel), or a straight start→region-center line that leaves offset targets
+    outside the goal AABB. Compute a generic XY translation that maps the
+    target-cluster AABB into the goal-region AABB, then distribute SWEEP/END
+    along that displacement. When the translation has a large cross-track
+    component, herd that component first (still far from the region) before
+    pushing into the region — avoids dragging the whole cluster past distractors
+    beside the goal while still being task-id agnostic.
     """
 
     if not is_tool_act_contact_geometry_scope(request) or not keyframes:
@@ -1037,11 +1069,17 @@ def canonicalize_sweep_lateral_toward_region(
         return list(keyframes)
     start_xy = np.asarray(start_pose.position_m[:2], dtype=float)
     start_z = float(start_pose.position_m[2])
-    to_region = region_xy - start_xy
-    dist_region = float(np.linalg.norm(to_region))
-    if not math.isfinite(dist_region) or dist_region < _MIN_SWEEP_LATERAL_M:
+
+    translation = _translation_to_fit_targets_in_region(request)
+    if translation is None:
+        translation = np.asarray(region_xy, dtype=float) - start_xy
+    dist = float(np.linalg.norm(translation))
+    if not math.isfinite(dist) or dist < _MIN_SWEEP_LATERAL_M:
         return list(keyframes)
-    direction = to_region / dist_region
+
+    path_points = _sweep_herd_path_points(start_xy, translation, region_xy)
+    path_end = path_points[-1]
+    path_poly = [start_xy, *path_points]
 
     end_index = next(
         (
@@ -1058,33 +1096,25 @@ def canonicalize_sweep_lateral_toward_region(
     except GeometryResolutionError:
         return list(keyframes)
     end_xy = np.asarray(end_pose.position_m[:2], dtype=float)
-    lateral = float(np.linalg.norm(end_xy - start_xy))
-    progress = float(np.dot(end_xy - start_xy, direction))
-    min_progress = max(
-        _MIN_SWEEP_LATERAL_M,
-        _MIN_SWEEP_REGION_PROGRESS_FRAC * dist_region,
-    )
-    corridor_ok = True
-    for keyframe in keyframes:
-        if keyframe.keyframe_type is not KeyframeType.CONTACT_SWEEP:
-            continue
-        try:
-            sweep_pose = active_resolver.resolve(keyframe)
-        except GeometryResolutionError:
-            corridor_ok = False
-            break
-        sweep_xy = np.asarray(sweep_pose.position_m[:2], dtype=float)
-        along = float(np.dot(sweep_xy - start_xy, direction))
-        closest = start_xy + direction * along
-        if float(np.linalg.norm(sweep_xy - closest)) > _SWEEP_CORRIDOR_DEVIATION_M:
-            corridor_ok = False
-            break
-    if (
-        lateral >= _MIN_SWEEP_LATERAL_M
-        and progress >= min_progress
-        and corridor_ok
-    ):
-        return list(keyframes)
+    if float(np.linalg.norm(end_xy - path_end)) <= _SWEEP_CORRIDOR_DEVIATION_M:
+        corridor_ok = True
+        for keyframe in keyframes:
+            if keyframe.keyframe_type is not KeyframeType.CONTACT_SWEEP:
+                continue
+            try:
+                sweep_pose = active_resolver.resolve(keyframe)
+            except GeometryResolutionError:
+                corridor_ok = False
+                break
+            sweep_xy = np.asarray(sweep_pose.position_m[:2], dtype=float)
+            if (
+                _distance_to_polyline_m(sweep_xy, path_poly)
+                > _SWEEP_CORRIDOR_DEVIATION_M
+            ):
+                corridor_ok = False
+                break
+        if corridor_ok:
+            return list(keyframes)
 
     move_indices = [
         index
@@ -1101,10 +1131,9 @@ def canonicalize_sweep_lateral_toward_region(
     if packing is None:
         packing = list(start_pose.orientation_xyzw)
 
+    sample_xy = _sample_polyline_by_fraction(path_points, len(move_indices))
     result = list(keyframes)
-    for step, index in enumerate(move_indices, start=1):
-        frac = float(step) / float(len(move_indices))
-        target_xy = start_xy + direction * (dist_region * frac)
+    for index, target_xy in zip(move_indices, sample_xy):
         retargeted = _retarget_tcp_world_xy(
             result[index],
             resolver=active_resolver,
@@ -1114,7 +1143,14 @@ def canonicalize_sweep_lateral_toward_region(
             metadata_flag="sweep_lateral_canonicalized",
         )
         if retargeted is not None:
-            result[index] = retargeted
+            meta = {
+                **retargeted.metadata,
+                "sweep_herd_translation_m": [
+                    float(translation[0]),
+                    float(translation[1]),
+                ],
+            }
+            result[index] = retargeted.model_copy(update={"metadata": meta})
 
     # Keep RETREAT above the final contact XY so withdraw does not fly back
     # over the pre-sweep cluster.
@@ -1147,6 +1183,187 @@ def canonicalize_sweep_lateral_toward_region(
         if retargeted is not None:
             result[index] = retargeted
     return result
+
+
+def _object_half_extents_xy_m(record: Mapping[str, Any]) -> np.ndarray:
+    dims = _finite_vector(record.get("dimensions_m"), 3)
+    if dims is None:
+        return np.asarray(
+            (_DEFAULT_TARGET_HALF_XY_M, _DEFAULT_TARGET_HALF_XY_M), dtype=float
+        )
+    return np.asarray(
+        (max(float(dims[0]) * 0.5, 1e-4), max(float(dims[1]) * 0.5, 1e-4)),
+        dtype=float,
+    )
+
+
+def _goal_region_half_extents_xy_m(
+    request: MotionPlanRequest,
+) -> np.ndarray | None:
+    region_id = request.task.goal.target_region_id
+    if not region_id:
+        return None
+    record = request.world.objects.get(str(region_id))
+    if not isinstance(record, Mapping):
+        return None
+    return _object_half_extents_xy_m(record)
+
+
+def _sweep_target_footprint_aabbs(
+    request: MotionPlanRequest,
+) -> list[tuple[np.ndarray, np.ndarray]]:
+    """Axis-aligned footprints (min_xy, max_xy) for non-held sweep targets."""
+
+    held_ids = _held_object_ids(request)
+    boxes: list[tuple[np.ndarray, np.ndarray]] = []
+    for target_id in request.task.target_ids:
+        if not isinstance(target_id, str) or not target_id.strip():
+            continue
+        object_id = target_id.strip()
+        if object_id in held_ids:
+            continue
+        record = request.world.objects.get(object_id)
+        if not isinstance(record, Mapping):
+            continue
+        pose = record.get("pose")
+        if not isinstance(pose, Mapping):
+            continue
+        position = _finite_vector(pose.get("position_m"), 3)
+        if position is None:
+            continue
+        half = _object_half_extents_xy_m(record)
+        center = np.asarray(position[:2], dtype=float)
+        boxes.append((center - half, center + half))
+    return boxes
+
+
+def _translation_to_fit_targets_in_region(
+    request: MotionPlanRequest,
+) -> np.ndarray | None:
+    """Rigid XY translation that best fits target footprints into the goal region.
+
+    Generic for any tool_act sweep with ``target_region_id``: uses region and
+    target AABBs from the world snapshot (no task-id branching). When the
+    cluster is larger than the region on an axis, that axis falls back to
+    center alignment.
+    """
+
+    region_xy = _goal_region_center_xy_m(request)
+    if region_xy is None:
+        return None
+    boxes = _sweep_target_footprint_aabbs(request)
+    if not boxes:
+        return None
+    cluster_min = np.min(np.stack([box[0] for box in boxes], axis=0), axis=0)
+    cluster_max = np.max(np.stack([box[1] for box in boxes], axis=0), axis=0)
+    cluster_center = 0.5 * (cluster_min + cluster_max)
+    preferred = np.asarray(region_xy, dtype=float) - cluster_center
+
+    region_half = _goal_region_half_extents_xy_m(request)
+    if region_half is None:
+        return preferred
+    margin = float(_REGION_FIT_MARGIN_M)
+    region_min = np.asarray(region_xy, dtype=float) - region_half + margin
+    region_max = np.asarray(region_xy, dtype=float) + region_half - margin
+    if np.any(region_max <= region_min):
+        return preferred
+
+    translation = np.zeros(2, dtype=float)
+    for axis in (0, 1):
+        c_min = float(cluster_min[axis])
+        c_max = float(cluster_max[axis])
+        r_min = float(region_min[axis])
+        r_max = float(region_max[axis])
+        if (c_max - c_min) > (r_max - r_min) + 1e-9:
+            translation[axis] = 0.5 * (r_min + r_max) - 0.5 * (c_min + c_max)
+            continue
+        t_lo = r_min - c_min
+        t_hi = r_max - c_max
+        translation[axis] = float(np.clip(preferred[axis], t_lo, t_hi))
+    return translation
+
+
+def _sweep_herd_path_points(
+    start_xy: np.ndarray,
+    translation: np.ndarray,
+    region_xy: np.ndarray,
+) -> list[np.ndarray]:
+    """Polyline from CONTACT_START: optional cross-track herd, then full fit."""
+
+    start = np.asarray(start_xy, dtype=float)
+    delta = np.asarray(translation, dtype=float)
+    end = start + delta
+    inbound = np.asarray(region_xy, dtype=float) - start
+    inbound_norm = float(np.linalg.norm(inbound))
+    if inbound_norm < 1e-6:
+        inbound = delta
+        inbound_norm = float(np.linalg.norm(inbound))
+    if inbound_norm < 1e-6:
+        return [end]
+    unit = inbound / inbound_norm
+    parallel = unit * float(np.dot(delta, unit))
+    perp = delta - parallel
+    if float(np.linalg.norm(perp)) < float(_MIN_SWEEP_CROSS_TRACK_M):
+        return [end]
+    return [start + perp, end]
+
+
+def _distance_to_polyline_m(
+    point: np.ndarray, poly: Sequence[np.ndarray]
+) -> float:
+    nodes = [np.asarray(p, dtype=float) for p in poly]
+    if not nodes:
+        return float("inf")
+    query = np.asarray(point, dtype=float)
+    best = float(np.linalg.norm(query - nodes[0]))
+    prev = nodes[0]
+    for node in nodes[1:]:
+        seg = node - prev
+        seg_len = float(np.linalg.norm(seg))
+        if seg_len < 1e-12:
+            prev = node
+            continue
+        t = float(np.dot(query - prev, seg) / (seg_len * seg_len))
+        t = min(1.0, max(0.0, t))
+        closest = prev + seg * t
+        best = min(best, float(np.linalg.norm(query - closest)))
+        prev = node
+    return best
+
+
+def _sample_polyline_by_fraction(
+    poly: Sequence[np.ndarray], count: int
+) -> list[np.ndarray]:
+    if count <= 0:
+        return []
+    nodes = [np.asarray(p, dtype=float) for p in poly]
+    if not nodes:
+        return []
+    if len(nodes) == 1:
+        return [nodes[0].copy() for _ in range(count)]
+    lengths = [0.0]
+    for index in range(1, len(nodes)):
+        lengths.append(
+            lengths[-1] + float(np.linalg.norm(nodes[index] - nodes[index - 1]))
+        )
+    total = lengths[-1]
+    if total < 1e-12:
+        return [nodes[-1].copy() for _ in range(count)]
+    samples: list[np.ndarray] = []
+    for step in range(1, count + 1):
+        target = total * (float(step) / float(count))
+        seg_index = 1
+        while seg_index < len(lengths) - 1 and lengths[seg_index] < target:
+            seg_index += 1
+        seg_start = lengths[seg_index - 1]
+        seg_end = lengths[seg_index]
+        span = max(seg_end - seg_start, 1e-12)
+        frac = (target - seg_start) / span
+        samples.append(
+            nodes[seg_index - 1]
+            + (nodes[seg_index] - nodes[seg_index - 1]) * frac
+        )
+    return samples
 
 
 def _retarget_tcp_world_xy(
@@ -1228,22 +1445,24 @@ def _reject_degenerate_sweep_lateral(
             f"{lateral:.3f}m is below {_MIN_SWEEP_LATERAL_M:.3f}m "
             "(collapsed contact path cannot move targets)"
         )
-    region_xy = _goal_region_center_xy_m(request)
-    if region_xy is None:
+    translation = _translation_to_fit_targets_in_region(request)
+    if translation is None:
+        region_xy = _goal_region_center_xy_m(request)
+        if region_xy is None:
+            return
+        translation = np.asarray(region_xy, dtype=float) - start_xy
+    dist = float(np.linalg.norm(translation))
+    if dist < _MIN_SWEEP_LATERAL_M:
         return
-    to_region = region_xy - start_xy
-    dist_region = float(np.linalg.norm(to_region))
-    if dist_region < _MIN_SWEEP_LATERAL_M:
-        return
-    direction = to_region / dist_region
+    direction = translation / dist
     progress = float(np.dot(end_xy - start_xy, direction))
     min_progress = max(
         _MIN_SWEEP_LATERAL_M,
-        _MIN_SWEEP_REGION_PROGRESS_FRAC * dist_region,
+        _MIN_SWEEP_REGION_PROGRESS_FRAC * dist,
     )
     if progress < min_progress:
         raise ContactKeyframeGeometryError(
-            f"sweep CONTACT_END progress toward region "
+            f"sweep CONTACT_END progress toward in-region herd "
             f"{progress:.3f}m is below {min_progress:.3f}m "
             f"(region={request.task.goal.target_region_id!r})"
         )

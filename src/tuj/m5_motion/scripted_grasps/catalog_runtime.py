@@ -17,7 +17,7 @@ from tuj.m5_motion.scripted_grasps.catalog_types import build_catalog_targets
 from tuj.m5_motion.scripted_grasps.catalog_timing import RUNTIME_VERSION,synchronize_timing,check_control_elapsed,run_timed_hold
 from tuj.m5_motion.scripted_grasps.spoon_runtime import (
     SpoonContext, approach_spoon, grasp_contact_ready, hold_contact_fraction,
-    thin_handle_pinch_event, attach_thin_handle_pinch,
+    thin_handle_pinch_event, attach_thin_handle_pinch, attach_catalog_kinematic_carry,
 )
 
 
@@ -176,7 +176,12 @@ class CatalogContext(SpoonContext):
             if row['attachment_position_error_m']>self.recipe.maximum_slip_m or row['attachment_angle_error_deg']>self.recipe.maximum_slip_deg:
                 raise GraspFailure('VACUUM_ATTACHMENT_POSE_ERROR')
         if self.recipe.ee_id!='vac' and len(lift_rows)==10 and all(s['stage']=='LIFT' for s in lift_rows):
-            if getattr(self.recipe,'thin_handle_pinch',False):
+            # After kinematic attach, finger pads may unload while the free joint
+            # is welded to the grip site (thin-handle utensils and mug carry).
+            if self.runtime.attached_object_id==self.object_id:
+                if all(not s.get('attachment_active') for s in lift_rows):
+                    raise GraspFailure('KINEMATIC_ATTACHMENT_LOST_DURING_LIFT')
+            elif getattr(self.recipe,'thin_handle_pinch',False):
                 if all(not thin_handle_pinch_event(s) for s in lift_rows):
                     raise GraspFailure('CONTACT_LOST_DURING_LIFT')
             elif all(set(s['finger_contacts'])!=set(self.finger_groups) for s in lift_rows):
@@ -209,7 +214,10 @@ class CatalogContext(SpoonContext):
         if not any(v>.05 for v in row['finger_force_n'].values()):return
         if self.recipe.ee_id=='2F' and not self.two_finger_force_hold:
             self.two_finger_command=float(np.asarray(self.gripper.current_action).mean());self.two_finger_force_hold=True
-        if self.recipe.ee_id=='3F' and not self.three_finger_force_hold:
+        # hold_finger_positions freezes commands at acquire; starting the force
+        # servo on first contact opens overloaded fingers before CLOSE finishes.
+        if (self.recipe.ee_id=='3F' and not self.three_finger_force_hold
+                and not getattr(self.recipe,'hold_finger_positions',False)):
             self.three_finger_commands=np.asarray(self.gripper.current_action).copy();self.three_finger_force_hold=True
 
     def preshape(self):
@@ -272,6 +280,12 @@ class CatalogContext(SpoonContext):
             recipe=tune_recipe_to_measured_size(recipe,self.local_size)
             self.recipe=recipe
         self.execution_started=time.monotonic()
+        self.three_finger_force_hold=False
+        self.three_finger_commands=None
+        self.three_finger_hold_command_min=None
+        self.three_finger_hold_command_max=None
+        self.two_finger_force_hold=False
+        self.two_finger_command=0.
         result={'status':'FAILED','object_id':self.object_id,'task_id':recipe.task_id,'ee_id':recipe.ee_id,
             'recipe':recipe.to_dict(),'scenario':self.scenario,'runtime_version':RUNTIME_VERSION,'timing':self.timing}
         try:
@@ -353,6 +367,11 @@ class CatalogContext(SpoonContext):
             elif not self.ready():raise GraspFailure('CONTACT_LOST_BEFORE_LIFT')
             if getattr(recipe,'thin_handle_pinch',False):
                 attach_thin_handle_pinch(self)
+            elif (recipe.ee_id=='3F'
+                  and getattr(recipe,'hold_finger_positions',False)):
+                # Larger enclosure bodies (c3_2 mug) unload fingers under force
+                # servo / inertia; contact still gates, attachment carries LIFT.
+                attach_catalog_kinematic_carry(self)
             self.apply_post_grasp_arm_gains()
             # Snapshot grasp relative pose before any post-attach breakaway so
             # BREAKAWAY/LIFT collision probes carry the held object with the TCP.
@@ -430,10 +449,11 @@ class CatalogContext(SpoonContext):
                 metrics['validation_basis']='CONTACT_GATED_KINEMATIC_ATTACHMENT'
                 metrics['pose_error_reference']='ATTACH_TIME'
                 ok=ok and metrics['attachment_active_fraction']==1.
-            elif getattr(recipe,'thin_handle_pinch',False):
+            elif getattr(self,'thin_handle_attachment_record',None) is not None:
                 metrics['attachment_active_fraction']=sum(
                     self.runtime.attached_object_id==self.object_id for _ in hold)/len(hold)
-                metrics['validation_basis']='CONTACT_GATED_KINEMATIC_THIN_HANDLE'
+                metrics['validation_basis']=self.thin_handle_attachment_record.get(
+                    'policy','CONTACT_GATED_KINEMATIC_ATTACH')
                 ok=ok and metrics['attachment_active_fraction']==1.
             else:ok=ok and metrics['all_finger_contact_fraction']>=.95
             result.update(status='SUCCESS' if ok else 'FAILED',metrics=metrics,failure_reason=None if ok else 'HOLD_VALIDATION_FAILED')

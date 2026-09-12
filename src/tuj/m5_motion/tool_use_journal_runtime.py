@@ -592,9 +592,16 @@ class ToolUseJournalEERuntime:
         self._last_attachment_break: AttachmentBreakObservation | None = None
         self._vac_attach_diag_logged: set[tuple[str, str]] = set()
         self._render_callback: Callable[[object], None] | None = None
-        # Prior (contype, conaffinity) for temporarily enabled hollow-tool fill
-        # geoms (``*_reg_bbox``) during tabletop push / tool_act sweeps.
-        self._held_tool_fill_geom_backup: dict[int, tuple[int, int]] = {}
+        # Prior collision state for temporarily enabled held-tool fill geoms.
+        # Values: (contype, conaffinity, size_xyz, pos_xyz).
+        self._held_tool_fill_geom_backup: dict[
+            int, tuple[int, int, np.ndarray, np.ndarray]
+        ] = {}
+        # Prior contype/conaffinity for hollow-tool rim meshes disabled while
+        # the underside fill paddle is active.
+        self._held_tool_rim_collision_backup: dict[int, tuple[int, int]] = {}
+        # Free-object ids that inherit held-tool XY motion during tabletop push.
+        self._held_tool_push_partner_ids: frozenset[str] = frozenset()
         # Prior contype/conaffinity for vac cup geoms disabled while a tool is held.
         self._vac_cup_collision_backup: dict[int, tuple[int, int]] = {}
         # Last synchronized attached-object pose for finite-difference qvel.
@@ -2294,10 +2301,27 @@ class ToolUseJournalEERuntime:
         # Finite-difference velocity so soft contacts see tool motion. Zeroing
         # qvel every substep makes a kinematic plate slide over blocks with
         # only vertical penetration and no lateral friction/push.
+        #
+        # Controller loop syncs twice per physics substep (pre + post). The
+        # pre-step call shares ``data.time`` with the previous post-step sync
+        # (dt≈0). Clearing qvel there kills contact drag for the upcoming
+        # step — keep the last FD velocity instead.
+        delta_xy = None
+        applied_motion_dt = False
         if previous is not None:
             prev_pos, prev_quat, prev_time = previous
+            delta_xy = np.asarray(object_position[:2], dtype=float) - np.asarray(
+                prev_pos[:2], dtype=float
+            )
             dt = now - float(prev_time)
+            if (not math.isfinite(dt) or dt <= 1e-6) and float(
+                np.linalg.norm(object_position - prev_pos)
+            ) > 1e-9:
+                # Pose moved without a sim-time advance; fall back to the
+                # model timestep so contacts still see a tangential velocity.
+                dt = float(model.opt.timestep)
             if math.isfinite(dt) and dt > 1e-6:
+                applied_motion_dt = True
                 linear = (object_position - prev_pos) / dt
                 quat_conj = np.array(
                     [
@@ -2315,8 +2339,7 @@ class ToolUseJournalEERuntime:
                 angular = np.asarray(quat_delta[1:4], dtype=float) * (2.0 / dt)
                 data.qvel[qvel_start : qvel_start + 3] = linear
                 data.qvel[qvel_start + 3 : qvel_start + 6] = angular
-            else:
-                data.qvel[qvel_start : qvel_start + 6] = 0.0
+            # else: same-time re-projection — leave existing qvel untouched
         else:
             data.qvel[qvel_start : qvel_start + 6] = 0.0
         self._attached_sync_state = (
@@ -2325,6 +2348,18 @@ class ToolUseJournalEERuntime:
             now,
         )
         mujoco.mj_forward(model, data)
+        # Assist only on real sim-time advances (post-step). Same-time pre-step
+        # syncs have delta≈0 anyway, but gating avoids accidental double moves.
+        if (
+            applied_motion_dt
+            and delta_xy is not None
+            and float(np.linalg.norm(delta_xy)) > 1e-9
+        ):
+            self._apply_held_tool_kinematic_push_assist(
+                delta_xy=delta_xy,
+                tool_position=object_position,
+                tool_rotation=object_rotation,
+            )
         self.suppress_native_adhesion_actuators()
         self.log_vac_non_target_cup_contacts()
 
@@ -2434,12 +2469,22 @@ class ToolUseJournalEERuntime:
         self._vac_cup_collision_backup.clear()
         mujoco.mj_forward(model, data)
 
-    def enable_held_tool_collision_fill(self) -> list[int]:
-        """Enable inactive AABB fill geoms so hollow dishes can push tabletop targets.
+    def enable_held_tool_collision_fill(
+        self,
+        *,
+        push_partner_ids: Sequence[str] | None = None,
+    ) -> list[int]:
+        """Enable a thin underside paddle for held-tool tabletop pushes.
 
-        Dish collision meshes leave an empty center. Turning on ``reg_bbox``
-        (collision-only) closes that cavity without changing visuals. Also
-        disables vac-cup collisions so free bodies cannot clip into the cup.
+        Hollow dishes leave an empty center. Enabling the full ``reg_bbox``
+        solidifies the dish cavity so free bodies look like they tunnel through
+        the plate. Instead:
+
+        1. disable hollow rim mesh collisions,
+        2. morph the inactive AABB into a thin bottom paddle,
+        3. disable vac-cup collisions,
+        4. remember free-object partners for kinematic XY push assist (soft
+           contacts alone do not drag when the tool free-joint is teleported).
         """
 
         self.disable_held_tool_collision_fill()
@@ -2456,59 +2501,222 @@ class ToolUseJournalEERuntime:
         if not fill_ids:
             return []
         model, data = _raw_model_data(self.env)
-        template_id = next(
-            (
-                geom_id
-                for geom_id in range(int(model.ngeom))
-                if int(model.geom_bodyid[geom_id]) == int(body_id)
-                and (
-                    int(model.geom_contype[geom_id])
-                    or int(model.geom_conaffinity[geom_id])
-                )
-            ),
-            None,
-        )
+        # Prefer a dedicated thin slab geom when present; otherwise morph
+        # ``reg_bbox`` into a bottom paddle (~5 mm thick) so shallow top-press
+        # still gets a few mm of solid overlap without filling the dish cavity.
+        slab_half_z = 0.0025
+        preferred = [
+            geom_id
+            for geom_id in fill_ids
+            if str(
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id) or ""
+            )
+            .lower()
+            .endswith("tool_act_collision_slab")
+        ]
+        active_ids = preferred or fill_ids
+        fill_id_set = {int(geom_id) for geom_id in active_ids}
+        # Hollow rim meshes stay active otherwise and let free bodies climb
+        # into the visual bowl above the thin paddle.
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) != int(body_id):
+                continue
+            if int(geom_id) in fill_id_set:
+                continue
+            contype = int(model.geom_contype[geom_id])
+            conaffinity = int(model.geom_conaffinity[geom_id])
+            if not (contype or conaffinity):
+                continue
+            self._held_tool_rim_collision_backup[geom_id] = (contype, conaffinity)
+            model.geom_contype[geom_id] = 0
+            model.geom_conaffinity[geom_id] = 0
         enabled: list[int] = []
-        for geom_id in fill_ids:
+        for geom_id in active_ids:
+            size = np.asarray(model.geom_size[geom_id], dtype=float).copy()
+            pos = np.asarray(model.geom_pos[geom_id], dtype=float).copy()
             self._held_tool_fill_geom_backup[geom_id] = (
                 int(model.geom_contype[geom_id]),
                 int(model.geom_conaffinity[geom_id]),
+                size,
+                pos,
             )
-            model.geom_contype[geom_id] = 1
-            model.geom_conaffinity[geom_id] = 1
-            # High tangential friction so kinematic plate motion with finite-
-            # difference qvel can drag tabletop targets without mid-height embed.
+            # Bottom-align a thin slab inside the original AABB footprint.
+            if not preferred:
+                bottom_z = float(pos[2] - size[2])
+                size = size.copy()
+                size[2] = float(slab_half_z)
+                pos = pos.copy()
+                pos[2] = bottom_z + float(slab_half_z)
+                model.geom_size[geom_id] = size
+                model.geom_pos[geom_id] = pos
+            model.geom_contype[geom_id] = 0
+            model.geom_conaffinity[geom_id] = 0
+            # Footprint-only paddle: kinematic XY assist owns tabletop push.
+            # Keeping soft collision here fights the assist and briefly embeds
+            # partners into the hollow visual dish.
             model.geom_friction[geom_id] = np.asarray(
                 (1.5, 0.5, 0.1), dtype=float
             )
-            if template_id is not None:
-                model.geom_solref[geom_id] = model.geom_solref[template_id]
-                model.geom_solimp[geom_id] = model.geom_solimp[template_id]
+            model.geom_solref[geom_id] = np.asarray((0.002, 1.0), dtype=float)
+            model.geom_solimp[geom_id] = np.asarray(
+                (0.99, 0.99, 0.001, 0.5, 2.0), dtype=float
+            )
             enabled.append(geom_id)
+        partners = {
+            str(object_id).strip()
+            for object_id in (push_partner_ids or ())
+            if str(object_id).strip()
+        }
+        self._held_tool_push_partner_ids = frozenset(partners)
         mujoco.mj_forward(model, data)
         self.suppress_vac_cup_free_body_collisions()
         if enabled:
             print(
-                f"[M5][TOOL_FILL] enabled solid collision fill for "
-                f"held tool {tool_id!r} geoms={enabled}"
+                f"[M5][TOOL_FILL] enabled kinematic underside push paddle for "
+                f"held tool {tool_id!r} geoms={enabled} "
+                f"rim_disabled={len(self._held_tool_rim_collision_backup)} "
+                f"push_partners={sorted(partners)}"
             )
         return enabled
 
     def disable_held_tool_collision_fill(self) -> None:
-        """Restore contype/conaffinity for temporarily enabled fill geoms."""
+        """Restore fill paddle, rim meshes, and vac-cup collision state."""
 
         self.restore_vac_cup_free_body_collisions()
-        if not self._held_tool_fill_geom_backup:
+        self._held_tool_push_partner_ids = frozenset()
+        if not (
+            self._held_tool_fill_geom_backup or self._held_tool_rim_collision_backup
+        ):
             return
         model, data = _raw_model_data(self.env)
+        for geom_id, backup in list(self._held_tool_fill_geom_backup.items()):
+            if not (0 <= int(geom_id) < int(model.ngeom)):
+                continue
+            contype, conaffinity, size, pos = backup
+            model.geom_contype[geom_id] = int(contype)
+            model.geom_conaffinity[geom_id] = int(conaffinity)
+            model.geom_size[geom_id] = np.asarray(size, dtype=float)
+            model.geom_pos[geom_id] = np.asarray(pos, dtype=float)
+        self._held_tool_fill_geom_backup.clear()
         for geom_id, (contype, conaffinity) in list(
-            self._held_tool_fill_geom_backup.items()
+            self._held_tool_rim_collision_backup.items()
         ):
             if 0 <= int(geom_id) < int(model.ngeom):
                 model.geom_contype[geom_id] = int(contype)
                 model.geom_conaffinity[geom_id] = int(conaffinity)
-        self._held_tool_fill_geom_backup.clear()
+        self._held_tool_rim_collision_backup.clear()
         mujoco.mj_forward(model, data)
+
+    def _apply_held_tool_kinematic_push_assist(
+        self,
+        *,
+        delta_xy: np.ndarray,
+        tool_position: np.ndarray,
+        tool_rotation: np.ndarray,
+    ) -> None:
+        """Drag plan partners under the fill paddle by the tool's XY delta.
+
+        Soft contacts cannot reliably push when a kinematic attached tool is
+        teleported each substep. Partners listed at fill-enable time that lie
+        under the paddle footprint inherit the same planar displacement.
+
+        Only ``qpos`` is updated — setting matching ``qvel`` makes the next
+        physics substep integrate the same delta again (blocks overshoot /
+        "bounce"). Vertical soft overlap into the hollow dish is clamped so
+        partners stay at/under the paddle underside.
+        """
+
+        if not self._held_tool_fill_geom_backup:
+            return
+        if not self._held_tool_push_partner_ids:
+            return
+        # Only while the tool is lowered into the tabletop contact band.
+        # Otherwise PRE_CONTACT approach would drag partners under the raised
+        # plate's XY footprint.
+        if float(tool_position[2]) > 0.88:
+            return
+        delta = np.asarray(delta_xy, dtype=float).reshape(2)
+        if float(np.linalg.norm(delta)) < 1e-9:
+            return
+        model, data = _raw_model_data(self.env)
+        # World-frame half-extents / underside of enabled fill box geoms.
+        half_xy = np.zeros(2, dtype=float)
+        center_xy = np.asarray(tool_position[:2], dtype=float)
+        paddle_bottom_z = float(tool_position[2])
+        rot = np.asarray(tool_rotation, dtype=float)
+        for geom_id in self._held_tool_fill_geom_backup:
+            if int(model.geom_type[geom_id]) != int(mujoco.mjtGeom.mjGEOM_BOX):
+                continue
+            size = np.asarray(model.geom_size[geom_id], dtype=float)
+            local_pos = np.asarray(model.geom_pos[geom_id], dtype=float)
+            world_offset = rot @ local_pos
+            center_xy = np.asarray(tool_position[:2], dtype=float) + world_offset[:2]
+            half_xy = np.maximum(
+                half_xy,
+                np.array(
+                    [
+                        abs(rot[0, 0]) * size[0] + abs(rot[0, 1]) * size[1],
+                        abs(rot[1, 0]) * size[0] + abs(rot[1, 1]) * size[1],
+                    ],
+                    dtype=float,
+                ),
+            )
+            paddle_bottom_z = min(
+                paddle_bottom_z,
+                float(tool_position[2] + world_offset[2] - size[2]),
+            )
+        if float(np.max(half_xy)) < 1e-4:
+            return
+        half_xy = half_xy + 0.005
+        moved = False
+        for object_id in self._held_tool_push_partner_ids:
+            try:
+                body_id, joint_id, _ = self._object_free_joint(self.env, object_id)
+            except ToolUseJournalRuntimeError:
+                continue
+            qpos_start = int(model.jnt_qposadr[joint_id])
+            partner_xy = np.asarray(
+                data.qpos[qpos_start : qpos_start + 2], dtype=float
+            )
+            partner_z = float(data.qpos[qpos_start + 2])
+            # Tabletop free bodies only (ignore raised cargo).
+            if partner_z > 0.86 or partner_z < 0.70:
+                continue
+            if float(np.max(np.abs(partner_xy - center_xy) - half_xy)) > 0.0:
+                continue
+            data.qpos[qpos_start : qpos_start + 2] = partner_xy + delta
+            # Keep the free body under the paddle underside so it cannot climb
+            # into the hollow visual cavity (looks like plate tunneling).
+            half_height = 0.0
+            for geom_id in range(int(model.ngeom)):
+                if int(model.geom_bodyid[geom_id]) != int(body_id):
+                    continue
+                if not (
+                    int(model.geom_contype[geom_id])
+                    or int(model.geom_conaffinity[geom_id])
+                ):
+                    continue
+                size = np.asarray(model.geom_size[geom_id], dtype=float)
+                gtype = int(model.geom_type[geom_id])
+                if gtype == int(mujoco.mjtGeom.mjGEOM_BOX):
+                    half_height = max(half_height, float(size[2]))
+                elif gtype == int(mujoco.mjtGeom.mjGEOM_SPHERE):
+                    half_height = max(half_height, float(size[0]))
+                elif gtype == int(mujoco.mjtGeom.mjGEOM_CYLINDER):
+                    half_height = max(half_height, float(size[1]))
+            if half_height <= 0.0:
+                half_height = 0.02
+            max_center_z = float(paddle_bottom_z - half_height - 0.0005)
+            if max_center_z >= 0.70 and partner_z > max_center_z:
+                data.qpos[qpos_start + 2] = max_center_z
+            qvel_start = int(model.jnt_dofadr[joint_id])
+            # Zero planar velocity so the next mj_step does not re-integrate
+            # the same assist delta (that looked like blocks "bouncing" ahead).
+            data.qvel[qvel_start : qvel_start + 2] = 0.0
+            data.qvel[qvel_start + 2] = min(float(data.qvel[qvel_start + 2]), 0.0)
+            moved = True
+        if moved:
+            mujoco.mj_forward(model, data)
 
     def detach_object(self, object_id: str | None = None) -> AttachedObjectState:
         """Release the attached object while preserving its current world pose."""
@@ -2762,8 +2970,8 @@ class _PlaybackFailure:
     observed: Mapping[str, Any] | None = None
 
 
-def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
-    """True when the plan allows the held tool to touch free tabletop objects.
+def _tabletop_held_tool_push_partners(plan: MotionPlan) -> list[str]:
+    """Free tabletop object ids allowed to contact the held tool in ``plan``.
 
     Used to enable a temporary solid collision fill for hollow dishes during
     sweep / push tool_act, without arming fill for cargo resting on a raised
@@ -2771,7 +2979,7 @@ def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
     """
 
     if not plan.segments:
-        return False
+        return []
     held_ids: set[str] = set()
     for segment in plan.segments:
         for context in (
@@ -2782,7 +2990,7 @@ def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
                 continue
             held_ids.update(str(object_id) for object_id in context.attached_object_ids)
     if not held_ids:
-        return False
+        return []
     partners: set[str] = set()
     free_z_by_id: dict[str, float] = {}
     for segment in plan.segments:
@@ -2811,23 +3019,29 @@ def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
         if name.lower() not in skip and not name.lower().startswith("robot0")
     }
     if not partners:
-        return False
+        return []
     # Tabletop push targets sit near support (~0.80 m). Cargo on a raised
     # attached plate is near the plate height and must not trigger fill.
-    tabletop = [
+    return sorted(
         name
         for name in partners
         if name in free_z_by_id and float(free_z_by_id[name]) <= 0.86
-    ]
-    return bool(tabletop)
+    )
+
+
+def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
+    """True when the plan allows the held tool to touch free tabletop objects."""
+
+    return bool(_tabletop_held_tool_push_partners(plan))
 
 
 def _maybe_enable_held_tool_fill_for_plan(
     runtime: ToolUseJournalEERuntime, plan: MotionPlan
 ) -> bool:
-    if not _plan_requests_tabletop_held_tool_push(plan):
+    partners = _tabletop_held_tool_push_partners(plan)
+    if not partners:
         return False
-    enabled = runtime.enable_held_tool_collision_fill()
+    enabled = runtime.enable_held_tool_collision_fill(push_partner_ids=partners)
     return bool(enabled)
 
 

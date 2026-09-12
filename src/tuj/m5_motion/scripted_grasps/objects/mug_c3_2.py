@@ -11,7 +11,8 @@ OFFSET_FRACTION = (0.0, 0.1, 0.1)
 CONTACT_REGION_MIN = (-0.6, -0.25, -0.45)
 CONTACT_REGION_MAX = (0.6, 0.45, 0.5)
 # Lift kept near the c2_1 mug value; physical hold may refine.
-LIFT_DISTANCE_M = 0.14
+LIFT_DISTANCE_M = 0.18
+MINIMUM_LIFT_M = 0.08
 
 
 def mug_c3_2_recipe():
@@ -26,6 +27,10 @@ def mug_c3_2_recipe():
         preshape_closure_command=-.82,
         two_finger_force_target_n=8.0,
         lift_distance_m=LIFT_DISTANCE_M,
+        minimum_lift_m=MINIMUM_LIFT_M,
+        # Freeze close commands after acquire; force-servo unload drops index
+        # during LIFT on the taller c3_2 mug mesh.
+        hold_finger_positions=True,
     )
 
 
