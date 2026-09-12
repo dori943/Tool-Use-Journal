@@ -88,12 +88,28 @@ def _apply_absolute_scale(root: ET.Element, scale: float) -> None:
         for mesh in asset.findall("mesh"):
             mesh.set("scale", scale_str)
 
-    bbox = root.find(".//geom[@name='reg_bbox']")
-    if bbox is not None and ratio != 1.0:
-        if bbox.get("size") is not None:
-            bbox.set("size", _fmt_floats(v * ratio for v in _as_floats(bbox.get("size"))))
-        if bbox.get("pos") is not None:
-            bbox.set("pos", _fmt_floats(v * ratio for v in _as_floats(bbox.get("pos"))))
+    # 0912: 예전에는 reg_bbox 하나만 같이 줄였다. 그런데 cutting_board 의 충돌은
+    # 이름 없는 box geom 이고(model.xml 19행, size 0.0736 x 0.1227 x 0.0073),
+    # 그 geom 은 mesh scale 을 따르지 않는다. 그래서 scale 을 주면 보이는 것만
+    # 줄고 충돌 기하는 원래 크기로 남았다. c2_2 는 재료 도마를 0.19 로 줄여
+    # 놓고도 충돌이 245mm 라 자리 간격 220mm 안에서 이웃과 25mm 씩 겹쳤고,
+    # 겹친 도마가 서로 밀어내며 치즈가 조리대 바닥까지 떨어졌다.
+    # 명시적 size 를 가진 geom 과 site 를 전부 같은 비율로 맞춘다. 메시 geom 은
+    # size 가 없으므로 영향을 받지 않는다.
+    if ratio != 1.0:
+        body = root.find("./worldbody/body")
+        if body is not None:
+            for element in body.iter():
+                if element.tag not in {"geom", "site"}:
+                    continue
+                for attribute in ("size", "pos"):
+                    value = element.get(attribute)
+                    if value is None:
+                        continue
+                    element.set(
+                        attribute,
+                        _fmt_floats(v * ratio for v in _as_floats(value)),
+                    )
 
 
 def _ensure_placement_sites(root: ET.Element) -> None:

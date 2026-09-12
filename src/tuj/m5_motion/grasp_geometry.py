@@ -554,7 +554,7 @@ def _support_surface_under_footprint(
         return None
     points = _finite_points(support_record.get("collision_points_m"))
     if points is None or len(points) < _SUPPORT_SURFACE_MIN_POINTS:
-        return None
+        return _resting_plane_within_span(support_record, object_bottom_z)
     position = _finite_vector(
         _mapping_get(support_record.get("pose"), "position_m"), 3
     )
@@ -576,8 +576,42 @@ def _support_surface_under_footprint(
         & (world[:, 2] <= object_bottom_z + tolerance_m)
     )
     if int(np.count_nonzero(under)) < _SUPPORT_SURFACE_MIN_POINTS:
-        return None
+        return _resting_plane_within_span(support_record, object_bottom_z)
     return float(world[under, 2].max())
+
+
+def _resting_plane_within_span(
+    support_record: Mapping[str, object],
+    object_bottom_z: float,
+) -> float | None:
+    """Contact plane inferred without a usable point cloud, or None.
+
+    A record collision vertex set can be decimated to a handful of points in a
+    rebuilt world snapshot (c2_2 carries 512 of them for tomato_plate in one
+    request and 8 in a later one), and then no vertex lies under the object
+    footprint at all.  Falling back to the bbox top puts a dish rim about 10 mm
+    above the face the object actually rests on, and the support goes
+    unrecognised exactly as it did before this measurement existed.
+
+    When the object bottom sits inside the candidate own vertical span it is
+    resting in or on that candidate whatever the shape of its interior, so take
+    the object bottom as the contact plane.  A flat slab reports the same value
+    as its bbox top, since that is where the object bottom already is; a
+    candidate the object merely hovers over is outside the span and still
+    returns None.
+    """
+
+    bounds = _object_world_bounds(support_record)
+    if bounds is None:
+        return None
+    support_minimum, support_maximum = bounds
+    if not (
+        float(support_minimum[2]) - 1e-9
+        <= object_bottom_z
+        <= float(support_maximum[2]) + 1e-9
+    ):
+        return None
+    return float(object_bottom_z)
 
 
 def support_clearance_context_from_world(
