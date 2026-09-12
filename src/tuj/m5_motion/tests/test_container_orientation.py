@@ -46,3 +46,71 @@ def test_other_objects_keep_existing_path():
     g,_=fixture(0.);g.request.world.objects['rod']['packing_metadata']={}
     configure_packing_orientation(g)
     assert not hasattr(g,'packing_bounds')
+
+
+def test_unreachable_nearest_orientation_uses_next_fit(monkeypatch):
+    from tuj.m5_motion.scripted_grasps import container_orientation as module
+    g, _ = fixture(.7)
+    g.task = NS(action_type='TRANSPORT', metadata={})
+    g.retention = NS()
+    original = g.destination_rotation.copy()
+    calls = []
+    def reachable(probe):
+        np.testing.assert_array_equal(g.destination_rotation, original)
+        calls.append(probe.destination_rotation.copy())
+        return len(calls) == 2
+    monkeypatch.setattr(module, 'packing_transport_has_ik', reachable)
+    configure_packing_orientation(g)
+    assert len(calls) == 2
+    np.testing.assert_allclose(g.destination_rotation, calls[1])
+    assert not np.allclose(calls[0], calls[1])
+
+
+def test_all_fitting_orientations_unreachable_fail(monkeypatch):
+    from tuj.m5_motion.scripted_grasps import container_orientation as module
+    g, _ = fixture(0.)
+    g.task = NS(action_type='TRANSPORT', metadata={}); g.retention = NS()
+    original = g.destination_rotation.copy()
+    monkeypatch.setattr(module, 'packing_transport_has_ik', lambda probe: False)
+    with pytest.raises(ValueError, match='NO_REACHABLE_FIT'):
+        configure_packing_orientation(g)
+    np.testing.assert_array_equal(g.destination_rotation, original)
+    assert not hasattr(g, 'packing_bounds')
+
+
+@pytest.mark.parametrize('yaw', [-.7, .5])
+def test_ik_probe_equals_published_transport_goal_with_rotated_region(monkeypatch, yaw):
+    from tuj.m5_motion.tests.test_container_stable_face import request
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding, ground_held_transport
+    from tuj.m5_motion.scripted_grasps.frames import inverse, transform
+    req, oid = request()
+    req.task.action_type = 'TRANSPORT'
+    req.task.metadata['scripted_m4_implicit_object_pose'] = True
+    req.world.objects[oid]['packing_metadata'] = {
+        'orientation_frame': 'TARGET_REGION', 'orientation_candidates': [{
+            'orientation_xyzw': [0., 0., 0., 1.],
+            'dimensions_m': [.04, .12, .15], 'center_offset_m': [.01, -.02, .015]}]}
+    region = req.world.objects['tray']
+    region['pose']['orientation_xyzw'] = Rotation.from_euler('z', yaw).as_quat().tolist()
+    initial = _Grounding(req, None, oid)
+    calls = []
+    def solve(position, quaternion, **kwargs):
+        calls.append(transform(position, quaternion_xyzw=quaternion))
+        return NS(solutions=[object()])
+    c = NS(body_pose=lambda: initial.T_WB.copy(), grip_pose=lambda: initial.T_WE.copy(),
+           center_in_body=initial.center_in_body, local_size=initial.local_size,
+           kinematics=NS(solve_all_ik=solve), data=NS(qpos=np.zeros(6)), arm_ids=np.arange(6))
+    retention = NS(entry=NS(object_id=oid), context=c)
+    def rim(g, destination, retention):
+        raised = destination.copy(); raised[2, 3] += .013
+        return raised, {'container_release_lift_m': .013}
+    monkeypatch.setattr('tuj.m5_motion.scripted_grasps.container_release.clear_container_rim', rim)
+    ground_held_transport(req, retention)
+    hint = req.task.metadata['held_transport_goal']
+    world_from_region = transform(region['pose']['position_m'],
+                                  quaternion_xyzw=region['pose']['orientation_xyzw'])
+    position = (world_from_region @ np.r_[region['anchors'][hint['anchor']], 1.])[:3]
+    body = transform(position, quaternion_xyzw=hint['object_orientation_xyzw'])
+    expected = body @ inverse(inverse(initial.T_WE) @ initial.T_WB)
+    assert len(calls) == 1
+    np.testing.assert_allclose(calls[0], expected, rtol=0., atol=1e-12)
