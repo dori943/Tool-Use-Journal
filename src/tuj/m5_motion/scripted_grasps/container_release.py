@@ -20,7 +20,8 @@ def opening_points_in_body(context):
     configured = open_joint_positions(c)
     opened = np.array([configured[n] for n in c.gripper.joints])
     closed = c.data.qpos[addresses].copy()
-    count = max(2, 1 + math.ceil(float(np.max(np.abs(opened - closed))) / .05))
+    count = (max(2, 1 + math.ceil(float(np.max(np.abs(opened - closed))) / .05))
+             if addresses else 1)
     body_from_world = inverse(c.body_pose())
     geometry = [(gid, _geom_local_points(c.model, gid)) for gid in sorted(c.gripper_geoms)
                 if c.model.geom_contype[gid] or c.model.geom_conaffinity[gid]]
