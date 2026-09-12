@@ -58,7 +58,7 @@ def test_invalid_clearance_rejected(margin,tolerance):
 
 def test_zero_requested_margin_still_samples_and_rejects_intersection():
     result=OpenHandDropCorridor(context(),0.,.005).evaluate(np.eye(3))
-    assert not result['clear'] and result['sample_interval_m']<=.005
+    assert not result['clear'] and result['sample_interval_m']<=.005+1e-12
 
 
 def test_missing_geometry_fails_closed():
@@ -86,3 +86,42 @@ def test_corridor_rejection_happens_before_ik_and_remains_explicit(monkeypatch):
     calls=[];monkeypatch.setattr(module,'packing_transport_has_ik',lambda *args:calls.append(args))
     with pytest.raises(ValueError,match='NO_OPEN_HAND_RELEASE_CORRIDOR'):module.configure_packing_orientation(g)
     assert not calls and g.task.metadata['packing_release_corridors']
+
+
+def test_actual_clearance_refines_inconclusive_grid_without_reducing_margin():
+    c = context()
+    c.data.qpos[0] = .0365  # sphere passes the box side with 6.5 mm clearance
+    mujoco.mj_forward(c.model, c.data)
+    result = OpenHandDropCorridor(c, .005, .005).evaluate(np.eye(3))
+    assert result['clear'] and result['status'] == 'CLEAR'
+    assert result['refinement_history'][0]['status'] == 'UNRESOLVED_SAMPLING'
+    assert result['minimum']['distance_m'] == pytest.approx(.0065)
+    assert result['minimum']['distance_m'] >= result['required_sample_distance_m']
+    assert result['margin_m'] == .005
+
+
+def test_refinement_detects_margin_violation_between_initial_samples():
+    model = mujoco.MjModel.from_xml_string('''<mujoco><worldbody>
+    <geom name="hand" type="sphere" size=".0001" pos=".00515 0 -.0025"/>
+    <body name="item"><freejoint/><geom name="item_geom" type="sphere" size=".0001" mass=".01"/></body>
+    </worldbody></mujoco>''')
+    data = mujoco.MjData(model)
+    mujoco.mj_forward(model, data)
+    c = NS(mj=mujoco, model=model, data=data, body_id=model.body('item').id,
+           gripper=NS(joints=[]), gripper_actuator_ids=[],
+           gripper_geoms={model.geom('hand').id}, object_geoms={model.geom('item_geom').id})
+    result = OpenHandDropCorridor(c, .005, .005).evaluate(np.eye(3))
+    first = result['refinement_history'][0]
+    assert first['status'] == 'UNRESOLVED_SAMPLING' and first['minimum']['distance_m'] > .005
+    assert not result['clear'] and result['status'] == 'MARGIN_VIOLATION'
+    assert result['minimum']['distance_m'] < .005
+
+
+def test_almost_exact_margin_cannot_pass_on_refinement_budget_exhaustion():
+    c = context()
+    c.data.qpos[0] = .035001
+    mujoco.mj_forward(c.model, c.data)
+    result = OpenHandDropCorridor(c, .005, .005).evaluate(np.eye(3))
+    assert not result['clear'] and result['status'] == 'UNRESOLVED_SAMPLING'
+    assert result['minimum']['distance_m'] > .005
+    assert result['sample_count'] <= 4097 and len(result['refinement_history']) <= 9
