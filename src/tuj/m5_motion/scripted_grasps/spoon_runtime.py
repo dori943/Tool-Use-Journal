@@ -188,7 +188,26 @@ class SpoonContext(GraspMotionContext):
         if not np.isfinite(q).all() or any(self.data.warning[i].number for i in (4,5,6)):
             raise GraspFailure('PHYSICS_NUMERICAL_INSTABILITY')
         if error.max()>self.recipe.maximum_joint_limit_error_rad:
-            raise GraspFailure(f'GRIPPER_JOINT_LIMIT_EXCEEDED: physics substep {error.max():.6f} rad')
+            # 0912: 한계를 넘었다는 사실만으로는 원인을 못 짚는다. 어느 관절이
+            # 어느 쪽 한계를 얼마나 넘었는지, 그 순간 그리퍼에 간 명령과 손가락
+            # 간격이 얼마인지를 같이 남긴다. 파이프라인에서만 나는 위반은
+            # 진입 시점의 손 상태가 스모크와 다르기 때문이라 이 값들이 갈린다.
+            worst=int(np.argmax(error))
+            joint=self.model.joint(int(self.hand_joint_ids[worst])).name
+            side='lower' if limits[worst,0]-q[worst]>q[worst]-limits[worst,1] else 'upper'
+            try:
+                command=np.asarray(self.gripper.current_action,dtype=float).round(4).tolist()
+            except Exception:
+                command=None
+            try:
+                aperture=round(float(self.runtime.fingerpad_separation_m()),5)
+            except Exception:
+                aperture=None
+            raise GraspFailure(
+                f'GRIPPER_JOINT_LIMIT_EXCEEDED: physics substep {error.max():.6f} rad '
+                f'(stage={self.stage} joint={joint} {side} '
+                f'q={q[worst]:.6f} range=[{limits[worst,0]:.6f},{limits[worst,1]:.6f}] '
+                f'command={command} aperture_m={aperture})')
 
 
 

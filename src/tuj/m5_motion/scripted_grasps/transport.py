@@ -36,6 +36,10 @@ HELD_PLACE_START_ANCHOR = 'held_place_start'
 # fallback floor thickness when the region has no usable collision points.
 REGION_WALL_ALLOWANCE_M = 0.02
 REGION_FLOOR_FALLBACK_M = 0.005
+# Thickness of the band at the floor top whose vertices define the interior
+# footprint.  Wide enough to catch a slab meshed a few millimetres apart,
+# narrow enough to exclude the wall above it.
+_FLOOR_BAND_M = 0.004
 FREE_SPOT_GRID_M = 0.01
 # Occupants whose tops agree to within this share the load of what is put
 # on them; below it only the higher one is touched.
@@ -269,6 +273,14 @@ class _Grounding:
         walls, and its highest point at or below the body center is the floor
         top.  Falls back to bottom + a nominal slab thickness.
         """
+        floor_local = self.floor_top_local()
+        return float((self.T_WR @ np.r_[self.region_center_local[0], self.region_center_local[1], floor_local, 1.])[2])
+
+    def floor_top_local(self):
+        """Floor top in region-local z; shared with interior_half_xy()."""
+        cached = getattr(self, '_floor_local_cache', None)
+        if cached is not None:
+            return cached
         bottom_local = self.region_center_local[2] - self.region_dims[2] / 2.
         floor_local = bottom_local + REGION_FLOOR_FALLBACK_M
         points = self.record.get('collision_points_m')
@@ -283,7 +295,44 @@ class _Grounding:
                     if lower.size:
                         floor_local = max(floor_local, float(lower.max()))
                     break
-        return float((self.T_WR @ np.r_[self.region_center_local[0], self.region_center_local[1], floor_local, 1.])[2])
+        self._floor_local_cache = float(floor_local)
+        return self._floor_local_cache
+
+    def interior_half_xy(self):
+        """Region interior half extent (XY), measured rather than assumed.
+
+        ``dimensions_m`` is the region's bounding box, and a tray whose rim
+        flares outward sets that box by the rim alone: blue_tray measures
+        0.1966 m in y at the top band and about 0.172 m at every band below it.
+        Subtracting a fixed wall allowance from the box therefore reports
+        interior that does not exist (0.1766 m in y against a floor that ends
+        at 0.1672 m), and a place aimed there rests the object on the wall --
+        13.6 mm above its commanded pose, pushed sideways until one finger pad
+        unloads and the grasp monitor stops the task (c3_1 apple).
+
+        The floor slab is the honest interior: take the collision vertices at
+        the floor top and use their extent.  Falls back to the bounding box
+        when a region carries no collision geometry, so regions without points
+        behave exactly as before.
+        """
+        cached = getattr(self, '_interior_half_cache', None)
+        if cached is not None:
+            return cached
+        half = self.region_half[:2].copy()
+        points = self.record.get('collision_points_m')
+        if points is not None and len(points) >= 8:
+            P = np.asarray(points, dtype=float)
+            floor_local = self.floor_top_local()
+            band = P[np.abs(P[:, 2] - floor_local) <= _FLOOR_BAND_M]
+            if len(band) >= 4:
+                measured = np.abs(band[:, :2] - self.region_center_local[:2]).max(axis=0)
+                half = np.minimum(half, measured)
+        self._interior_half_cache = half
+        return half
+
+    def usable_half_xy(self):
+        """Interior minus the wall allowance: where a footprint may be centred."""
+        return np.maximum(self.interior_half_xy() - REGION_WALL_ALLOWANCE_M, 0.)
 
     def _occupants(self):
         """World XY footprints (and tops) of scene objects already in the region."""
@@ -329,7 +378,7 @@ class _Grounding:
         uv = slot.get('uv')
         if not (isinstance(uv, (list, tuple)) and len(uv) >= 2):
             return None
-        inner = np.maximum(self.region_half[:2] - REGION_WALL_ALLOWANCE_M, 0.)
+        inner = self.usable_half_xy()
         offset = np.clip(np.asarray(uv[:2], dtype=float), -1., 1.) * inner
         limit = np.maximum(inner - self.half[:2], 0.)
         return self.region_world[:2] + np.clip(offset, -limit, limit)
@@ -367,7 +416,7 @@ class _Grounding:
             anchor = self.region_world[:2]
         if clearance(anchor) >= 0.:
             return anchor
-        limit = self.region_half[:2] - REGION_WALL_ALLOWANCE_M - mine
+        limit = self.usable_half_xy() - mine
         if np.any(limit <= 0.):
             return anchor
         center_xy = self.region_world[:2]

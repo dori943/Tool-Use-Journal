@@ -2309,6 +2309,13 @@ class ToolUseJournalKinematicTrajectoryPlayer:
     """Replay timed joint samples and execute runtime EE exchange events."""
 
     _TIME_TOLERANCE_S = 1e-9
+    # A settle wait is abandoned once the tracking error has failed to improve
+    # by this much for this many consecutive control ticks.  0.5 mm is a tenth
+    # of the default 5 mm EEF tolerance, so an arm still closing on its goal
+    # keeps resetting the counter; 50 ticks is one second at the 50 Hz control
+    # rate, which a blocked pose never escapes.
+    _SETTLE_IMPROVEMENT_M = 0.0005
+    _SETTLE_STALL_TICKS = 50
     _PLAYER_ID = "TOOL_USE_JOURNAL_KINEMATIC_V2"
     _PLAYBACK_MODE = "DIRECT_QPOS_MJ_FORWARD"
     _CONTROLLER_TRACKING = False
@@ -4080,12 +4087,47 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     wait_duration = executed_time - float(
                         settle_state["started_at_execution_s"]
                     )
+                    # max_wait_s means "wait until it converges", but an arm
+                    # whose commanded pose is unreachable never converges and
+                    # spends the whole budget pressing.  Carrying an object,
+                    # that press is what breaks the grasp: the c3_1 apple came
+                    # to rest 13.6 mm above its commanded pose and was squeezed
+                    # for five seconds until a finger pad unloaded, so the task
+                    # failed as SCRIPTED_GRASP_CONTACT_LOST and named the grasp
+                    # instead of the unreachable goal.  Stop once the error has
+                    # stopped improving: a genuinely slow convergence keeps
+                    # gaining (the loaded arm climbs millimetres per second, far
+                    # above this threshold) and is untouched, while a blocked
+                    # pose is reported for what it is, sooner.
+                    best_error = settle_state.get("best_error_m")
+                    step_error = (
+                        target_eef_error
+                        if target_eef_error is not None
+                        else step_joint_error
+                    )
+                    if (
+                        best_error is None
+                        or step_error
+                        <= float(best_error) - self._SETTLE_IMPROVEMENT_M
+                    ):
+                        settle_state["best_error_m"] = float(step_error)
+                        settle_state["stalled_ticks"] = 0
+                    else:
+                        settle_state["stalled_ticks"] = (
+                            int(settle_state.get("stalled_ticks", 0)) + 1
+                        )
+                    stalled = int(
+                        settle_state.get("stalled_ticks", 0)
+                    ) >= self._SETTLE_STALL_TICKS
                     if int(settle_state["consecutive_ticks"]) >= int(
                         settle_config["required_consecutive_ticks"]
                     ):
                         settle_state["settled"] = True
                         settle_state["wait_duration_s"] = wait_duration
-                    elif wait_duration >= float(settle_config["max_wait_s"]):
+                    elif stalled or wait_duration >= float(
+                        settle_config["max_wait_s"]
+                    ):
+                        settle_state["stalled"] = stalled
                         settle_state["wait_duration_s"] = wait_duration
                         segment_tracking.append(
                             {
@@ -4107,6 +4149,9 @@ class ToolUseJournalControllerTrajectoryPlayer(
                                 "adaptive_settle_requested": True,
                                 "adaptive_settle_succeeded": False,
                                 "adaptive_settle_wait_s": wait_duration,
+                                "settle_stalled": bool(
+                                    settle_state.get("stalled", False)
+                                ),
                             }
                         )
                         failure = _PlaybackFailure(
@@ -4124,6 +4169,12 @@ class ToolUseJournalControllerTrajectoryPlayer(
                                 ),
                                 "settle_config": dict(settle_config),
                                 "wait_duration_s": wait_duration,
+                                "settle_stalled": bool(
+                                    settle_state.get("stalled", False)
+                                ),
+                                "best_eef_error_m": settle_state.get(
+                                    "best_error_m"
+                                ),
                                 "custom_settle": settle_state.get(
                                     "custom_settle"
                                 ),
