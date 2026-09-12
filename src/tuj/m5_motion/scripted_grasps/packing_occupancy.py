@@ -17,7 +17,22 @@ def packing_occupants(g):
             region_id=g.task.goal.target_region_id, include_vertical=True))
 
 
-def packing_overlap_preference(g, occupants):
+def packing_translation_bounds(g):
+    """Body-origin limits in the container frame, with existing collision margin."""
+    metadata = g.record['packing_metadata']
+    center = np.asarray(metadata['interior_center_m'], dtype=float)
+    half = np.asarray(metadata['interior_dimensions_m'], dtype=float) / 2.
+    margin = float(g.request.constraints.collision_margin_m)
+    lower, upper = g.packing_bounds
+    if not math.isfinite(margin) or margin < 0.:
+        raise ValueError('PACKING_PROBE_INVALID_RESOLUTION_OR_MARGIN')
+    low, high = center - half + margin - lower, center + half - margin - upper
+    if not np.isfinite(low).all() or not np.isfinite(high).all() or np.any(high < low):
+        raise ValueError('PACKING_PROBE_NO_VERTICAL_FIT')
+    return low, high
+
+
+def packing_overlap_preference(g, occupants, *, body_xy_in_region=None):
     """Minimum over sampled Z of the worst occupant contact depth at each Z.
 
 XY remains the exact grounded transport XY. Probe Z spans collision-vertex
@@ -43,16 +58,12 @@ colliding pose to execution or changing the existing release height.
                              if c.descendant(int(model.geom_bodyid[i]), body))
     if not occupant_geoms:
         raise ValueError('PACKING_PROBE_OCCUPANT_GEOMETRY_REQUIRED')
-    metadata = g.record['packing_metadata']
-    center = np.asarray(metadata['interior_center_m'])
-    half = np.asarray(metadata['interior_dimensions_m']) / 2.
     margin = float(g.request.constraints.collision_margin_m)
     resolution = float(g.request.constraints.position_tolerance_m)
     if not math.isfinite(resolution) or resolution <= 0 or not math.isfinite(margin) or margin < 0:
         raise ValueError('PACKING_PROBE_INVALID_RESOLUTION_OR_MARGIN')
-    lower, upper = g.packing_bounds
-    low = float((center - half + margin - lower)[2])
-    high = float((center + half - margin - upper)[2])
+    minimum, maximum = packing_translation_bounds(g)
+    low, high = float(minimum[2]), float(maximum[2])
     if not math.isfinite(low + high) or high < low:
         raise ValueError('PACKING_PROBE_NO_VERTICAL_FIT')
     count = max(2, 1 + math.ceil((high - low) / resolution))
@@ -60,6 +71,12 @@ colliding pose to execution or changing the existing release height.
         raise ValueError('PACKING_PROBE_SAMPLE_BUDGET_EXCEEDED')
     body = transport_destination_center(g) - g.destination_rotation @ g.center_in_body
     local = g.T_WR[:3, :3].T @ (body - g.T_WR[:3, 3])
+    if body_xy_in_region is not None:
+        xy = np.asarray(body_xy_in_region, dtype=float)
+        if (xy.shape != (2,) or not np.isfinite(xy).all()
+                or np.any(xy < minimum[:2]) or np.any(xy > maximum[:2])):
+            raise ValueError('PACKING_PROBE_XY_OUTSIDE_BOUNDS')
+        local[:2] = xy
     quaternion = Rotation.from_matrix(g.destination_rotation).as_quat()[[3, 0, 1, 2]]
     probe = mujoco.MjData(model)
     samples = []
@@ -84,6 +101,19 @@ colliding pose to execution or changing the existing release height.
     g.task.metadata.setdefault('packing_occupancy_preferences', []).append({
         'basis': 'STATIC_OCCUPIED_VOLUME_RANKING_ONLY',
         'orientation_xyzw': Rotation.from_matrix(g.destination_rotation).as_quat().tolist(),
+        'body_xy_in_region_m': local[:2].tolist(),
         'occupant_ids': occupants, 'sample_count': count,
         'score_m': score, 'samples': samples})
     return score
+
+
+def bounded_packing_xy(g, value):
+    """Snap only floating-point roundoff at an already margin-inset boundary."""
+    minimum, maximum = packing_translation_bounds(g)
+    xy = np.asarray(value, dtype=float)
+    roundoff = 32. * np.finfo(float).eps * max(1., float(np.abs(np.r_[minimum, maximum]).max()))
+    if (xy.shape != (2,) or not np.isfinite(xy).all()
+            or np.any(xy < minimum[:2] - roundoff)
+            or np.any(xy > maximum[:2] + roundoff)):
+        raise ValueError('PACKING_POSITION_OUTSIDE_BOUNDS')
+    return np.clip(xy, minimum[:2], maximum[:2])

@@ -22,6 +22,9 @@ def configure_packing_orientation(g):
     points = np.asarray(record.get('collision_points_m'), dtype=float)
     if points.ndim != 2 or points.shape[1] != 3 or not np.isfinite(points).all():
         raise ValueError('PACKING_COLLISION_VERTICES_REQUIRED')
+    from .packing_position import restore_packing_position, select_clear_packing_position
+    if restore_packing_position(g, points):
+        return
     dimensions = np.asarray(container['interior_dimensions_m'], dtype=float)
     margin = float(g.request.constraints.collision_margin_m)
     current = g.T_WR[:3, :3].T @ g.T_WB[:3, :3]
@@ -76,6 +79,7 @@ def configure_packing_orientation(g):
     g.preserve_destination_rotation = True
     g.half = np.ptp(points @ g.destination_rotation.T, axis=0) / 2.
     g.packing_bounds = (lower, upper)
+    select_clear_packing_position(g)
 
 
 def packing_transport_has_ik(g):
@@ -120,8 +124,13 @@ def packing_destination_center(g, desired_center, *, place):
     # object bbox. The measured grasp transform is still used by retargeting.
     body = desired_center - g.destination_rotation @ g.center_in_body
     local = g.T_WR[:3, :3].T @ (body - g.T_WR[:3, 3])
-    local[:2] = np.clip(local[:2], (center-half+margin-lower)[:2],
-                       (center+half-margin-upper)[:2])
+    minimum, maximum = (center-half+margin-lower)[:2], (center+half-margin-upper)[:2]
+    from .packing_position import POSITION_POLICY
+    if container.get('position_policy') == POSITION_POLICY and hasattr(g, 'packing_body_xy'):
+        from .packing_occupancy import bounded_packing_xy
+        local[:2] = bounded_packing_xy(g, g.packing_body_xy)
+    else:
+        local[:2] = np.clip(local[:2], minimum, maximum)
     clearance = max(margin, .005) if place else max(.02, 2. * margin)
     # Release above the opening, matching the existing PackingBinding policy.
     # Physical settling and the unchanged 3D containment gate determine success.
