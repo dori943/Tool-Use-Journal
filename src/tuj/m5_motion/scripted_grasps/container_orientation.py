@@ -40,10 +40,20 @@ def configure_packing_orientation(g):
     if getattr(g, 'retention', None) is not None and _is_transport(g.task):
         from copy import copy
         from .packing_occupancy import packing_occupants, packing_overlap_preference
+        from .release_corridor import OpenHandDropCorridor
+        corridor = OpenHandDropCorridor(g.retention.context, margin,
+                                       g.request.constraints.position_tolerance_m)
         occupants = packing_occupants(g)
         feasible = []
+        eligible = 0
         for choice in sorted(choices, key=lambda row: row[0]):
             _, rotation, lower, upper = choice
+            evidence = corridor.evaluate(g.T_WR[:3, :3] @ rotation)
+            evidence['object_orientation_xyzw'] = Rotation.from_matrix(g.T_WR[:3, :3] @ rotation).as_quat().tolist()
+            g.task.metadata.setdefault('packing_release_corridors', []).append(evidence)
+            if not evidence['clear']:
+                continue
+            eligible += 1
             # Probe candidate-local geometry without contaminating the winner
             # or the next candidate with a prior half extent / packing bound.
             probe = copy(g)
@@ -57,6 +67,8 @@ def configure_packing_orientation(g):
                 if not occupants:
                     break
         if not feasible:
+            if not eligible:
+                raise ValueError('PACKING_NO_OPEN_HAND_RELEASE_CORRIDOR')
             raise ValueError('PACKING_NO_REACHABLE_FIT_ORIENTATION')
         choices = [min(feasible, key=lambda row: (row[0], row[1]))[2]]
     _, rotation, lower, upper = min(choices, key=lambda row: row[0])
