@@ -347,18 +347,13 @@ class _Grounding:
         margin = max(.01, float(self.request.constraints.collision_margin_m) * 2.)
         occupants = self._occupants()
         mine = self.half[:2]
-        center_xy = self.region_world[:2]
-        if not occupants:
-            return center_xy
-
-        def clearance(xy):
-            # Minimum per-occupant gap: how far this footprint clears each
-            # occupant along its least-separated axis (negative = overlap).
-            gaps = [
-                float(np.max(np.abs(xy - c) - (h + mine)))
-                for c, h in occupants
-            ]
-            return min(gaps) if gaps else float("inf")
+        # 0912: 여기에 "점유자가 없으면 영역 중심을 돌려준다" 는 이른 리턴이
+        # 있었다. 영역이 비어 있는 때가 바로 첫 물체를 놓는 순간이라, 계획이
+        # 배정한 칸이 가장 필요한 그 배치에서 _slot_xy() 를 아예 보지 못하고
+        # 모두가 중심을 겨눴다. 빈 영역은 아래 clearance(anchor) 가 무한대를
+        # 돌려주어 슬롯을 그대로 쓰므로 따로 처리할 필요가 없다.
+        # (같은 자리에 clearance 가 두 번 정의돼 있었다. 첫 정의는 두 번째에
+        # 가려진 죽은 코드인데 occupants 를 2개씩 풀어 실행되면 터진다. 지운다.)
 
         def clearance(xy):
             """Smallest per-object AABB separation; >= 0 means no contact."""

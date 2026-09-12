@@ -245,6 +245,15 @@ def test_invalid_observed_bbox_dimensions_remain_fail_closed(dimensions):
 
 def test_disjoint_planar_required_geometry_still_stops_planning_contract():
     m1 = _planar_m1(center=(1400.0, 100.0, 500.0))
+    # 0912: build_m1 은 노드에 geometry 를 넣지 않는다 (ground_scene 이 채운다).
+    # 이 테스트는 백엔드 없이 build_m1 결과를 바로 넘기고 있어 노드가
+    # INVALID_NODE 로 떨어졌고, 보려던 DISJOINT 판정까지 가지 못했다. 관측
+    # 표면만의 평면 bbox 를 그대로 기하로 붙여 의도한 경로를 타게 한다.
+    node = m1["nodes"][0]
+    node["geometry"] = {
+        "center": list(node["center_mm"]),
+        "aabb_size": list(node["bbox_mm"]),
+    }
 
     _, report = integrate_m1_geometry(
         _world(),
