@@ -128,15 +128,21 @@ _SANDWICH_STACK_XY_TOL_M = 0.09
 # 와 겹치므로 축은 y 로 고정한다 (도마의 긴 축도 로컬 y 다).
 _BREAD_SIDE_BY_SIDE_DY_M = 0.06
 
+# 0912: 터키와 치즈를 세 장씩 쌓아 두었는데, 샌드위치는 각 한 장만 쓰므로
+# 나머지 두 장은 실패 경로만 늘렸다. 두 가지가 겹쳤다.
+#  1) 분해가 흔들린다. 시각 언어 모델이 실행마다 터키를 한 층으로도, 두 층으로도
+#     나눴다. 두 층으로 나눈 실행에서는 아래 깔린 turkey_1 이 대상이 되는데
+#     top_exposed 가 unsat 이라 M4 가 그룹 공통 EE 를 못 찾고 EMPTY_FEASIBLE_EE
+#     로 멈췄다.
+#  2) 맨 위 한 장만 집는 것이 기하적으로 불가능했다. 2.5mm 슬라이스가 0.2mm
+#     간격으로 쌓여 있으면 흡착컵이 바로 아래 장과 5mm 마진을 지킬 수 없다
+#     (실측 여유 -1.85 ~ +0.63mm).
+# 한 장씩 두면 두 문제가 동시에 사라지고 태스크 의미는 그대로다.
 _SANDWICH_ITEMS = (
     "bread_a",
     "bread_b",
     "turkey_1",
-    "turkey_2",
-    "turkey_3",
     "cheese_1",
-    "cheese_2",
-    "cheese_3",
     "tomato_slice",
 )
 
@@ -418,23 +424,11 @@ class C2_2_SandwichAssembly(KitchenBase):
             "turkey_1":
                 TurkeySliceObject,
 
-            "turkey_2":
-                TurkeySliceObject,
-
-            "turkey_3":
-                TurkeySliceObject,
-
             # Cheese
             "cheese_plate":
                 _ingredient_board,
 
             "cheese_1":
-                CheeseObject,
-
-            "cheese_2":
-                CheeseObject,
-
-            "cheese_3":
                 CheeseObject,
 
             # Tomato
@@ -474,11 +468,7 @@ class C2_2_SandwichAssembly(KitchenBase):
             target_thickness = {
                 "spatula": _SPATULA_THICKNESS,
                 "turkey_1": _HAM_THICKNESS,
-                "turkey_2": _HAM_THICKNESS,
-                "turkey_3": _HAM_THICKNESS,
                 "cheese_1": _CHEESE_THICKNESS,
-                "cheese_2": _CHEESE_THICKNESS,
-                "cheese_3": _CHEESE_THICKNESS,
             }.get(name)
 
             if target_thickness is not None:
@@ -587,14 +577,10 @@ class C2_2_SandwichAssembly(KitchenBase):
             # Turkey
             "turkey_plate",
             "turkey_1",
-            "turkey_2",
-            "turkey_3",
 
             # Cheese
             "cheese_plate",
             "cheese_1",
-            "cheese_2",
-            "cheese_3",
 
             # Tomato
             "tomato_plate",
@@ -1098,8 +1084,6 @@ class C2_2_SandwichAssembly(KitchenBase):
             turkey_top,
             [
                 "turkey_1",
-                "turkey_2",
-                "turkey_3",
             ],
             clearance=0.0002,
             underside_clearance=_SLICE_UNDERSIDE_CLEARANCE,
@@ -1121,8 +1105,6 @@ class C2_2_SandwichAssembly(KitchenBase):
             cheese_top,
             [
                 "cheese_1",
-                "cheese_2",
-                "cheese_3",
             ],
             clearance=0.0002,
             underside_clearance=_SLICE_UNDERSIDE_CLEARANCE,
@@ -1513,11 +1495,7 @@ class C2_2_SandwichAssembly(KitchenBase):
             "bread_a",
             "bread_b",
             "turkey_1",
-            "turkey_2",
-            "turkey_3",
             "cheese_1",
-            "cheese_2",
-            "cheese_3",
             "tomato_slice",
             "knife",
             "spatula",
@@ -1547,25 +1525,13 @@ class C2_2_SandwichAssembly(KitchenBase):
                 "Turkey Plate",
 
             "turkey_1":
-                "Turkey Slice 1",
-
-            "turkey_2":
-                "Turkey Slice 2",
-
-            "turkey_3":
-                "Turkey Slice 3",
+                "Turkey Slice",
 
             "cheese_plate":
                 "Cheese Plate",
 
             "cheese_1":
-                "Cheese 1",
-
-            "cheese_2":
-                "Cheese 2",
-
-            "cheese_3":
-                "Cheese 3",
+                "Cheese",
 
             "tomato_plate":
                 "Tomato Plate",
