@@ -14,7 +14,7 @@ def fixture(yaw):
         'orientation_frame': 'TARGET_REGION', 'orientation_candidates': [{
         'orientation_xyzw': q, 'dimensions_m': [.1,.1,.1], 'center_offset_m': [0.,0.,0.]}]}}
     T = np.eye(4); T[:3,:3] = Rotation.from_euler('z', yaw).as_matrix(); T[:3,3] = [1.,-2.,.9]
-    return NS(object_id='rod', request=NS(world=NS(objects={'rod':rec}), constraints=NS(collision_margin_m=.005)),
+    return NS(object_id='rod', request=NS(world=NS(objects={'rod':rec}), constraints=NS(collision_margin_m=.005, position_tolerance_m=.005)),
         record={'packing_metadata': {'kind':'CONTAINER','interior_dimensions_m':[.26,.26,.26],
                 'interior_center_m':[.01,-.02,.14],'opening_top_z_m':.27}},
         T_WR=T, T_WB=T.copy(), center_in_body=np.array([.02,.01,-.005]),
@@ -48,11 +48,18 @@ def test_other_objects_keep_existing_path():
     assert not hasattr(g,'packing_bounds')
 
 
+def clear_corridor_for_ik_unit_test(monkeypatch):
+    # These tests isolate IK selection; native corridor geometry has its own suite.
+    monkeypatch.setattr('tuj.m5_motion.scripted_grasps.release_corridor.OpenHandDropCorridor',
+                        lambda *args: NS(evaluate=lambda rotation: {'clear': True}))
+
+
 def test_unreachable_nearest_orientation_uses_next_fit(monkeypatch):
+    clear_corridor_for_ik_unit_test(monkeypatch)
     from tuj.m5_motion.scripted_grasps import container_orientation as module
     g, _ = fixture(.7)
     g.task = NS(action_type='TRANSPORT', metadata={})
-    g.retention = NS()
+    g.retention = NS(context=NS())
     original = g.destination_rotation.copy()
     calls = []
     def reachable(probe):
@@ -67,9 +74,10 @@ def test_unreachable_nearest_orientation_uses_next_fit(monkeypatch):
 
 
 def test_all_fitting_orientations_unreachable_fail(monkeypatch):
+    clear_corridor_for_ik_unit_test(monkeypatch)
     from tuj.m5_motion.scripted_grasps import container_orientation as module
     g, _ = fixture(0.)
-    g.task = NS(action_type='TRANSPORT', metadata={}); g.retention = NS()
+    g.task = NS(action_type='TRANSPORT', metadata={}); g.retention = NS(context=NS())
     original = g.destination_rotation.copy()
     monkeypatch.setattr(module, 'packing_transport_has_ik', lambda probe: False)
     with pytest.raises(ValueError, match='NO_REACHABLE_FIT'):
@@ -80,6 +88,7 @@ def test_all_fitting_orientations_unreachable_fail(monkeypatch):
 
 @pytest.mark.parametrize('yaw', [-.7, .5])
 def test_ik_probe_equals_published_transport_goal_with_rotated_region(monkeypatch, yaw):
+    clear_corridor_for_ik_unit_test(monkeypatch)
     from tuj.m5_motion.tests.test_container_stable_face import request
     from tuj.m5_motion.scripted_grasps.transport import _Grounding, ground_held_transport
     from tuj.m5_motion.scripted_grasps.frames import inverse, transform
