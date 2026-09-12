@@ -189,6 +189,10 @@ class CatalogContext(SpoonContext):
         try:
             self.record_input()
             targets=build_catalog_targets(self.body_pose(),self.center_in_body,self.local_size,recipe)
+            from .release_grasp import resolve_release_clearance_targets
+            targets, release_clearance = resolve_release_clearance_targets(self, targets)
+            if release_clearance is not None:
+                save_json(self.output/'release_grasp_geometry.json',release_clearance)
             save_json(self.output/'targets.json',targets)
             q=self.data.qpos[self.arm_ids].copy()
             if recipe.ee_id=='2F':opening,aperture=self.preshape()

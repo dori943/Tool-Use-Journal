@@ -45,6 +45,7 @@ class CatalogRecipe:
     maximum_joint_limit_error_rad: float = .01
     suction_command: float = 1.
     finger_attachment_policy: str = 'FREE_HOLD_THEN_ATTACH'
+    open_hand_clearance_axis: tuple | None = None
 
     @property
     def model_class(self):
@@ -57,6 +58,11 @@ class CatalogRecipe:
         return f'{self.object_id}_{self.ee_id.lower()}_center_{version}'
 
     def __post_init__(self):
+        if self.open_hand_clearance_axis is not None:
+            axis = np.asarray(self.open_hand_clearance_axis, dtype=float)
+            if (self.ee_id == 'vac' or axis.shape != (3,) or not np.isfinite(axis).all()
+                    or not np.isclose(np.linalg.norm(axis), 1., atol=1e-9, rtol=0.)):
+                raise ValueError('Open hand clearance requires a unit body axis and finger EE')
         if self.finger_attachment_policy not in {'FREE_HOLD_THEN_ATTACH', 'STABLE_CONTACT'}:
             raise ValueError('Invalid finger attachment policy')
         if self.finger_attachment_policy == 'STABLE_CONTACT' and self.ee_id != '2F':

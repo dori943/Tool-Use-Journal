@@ -2,8 +2,11 @@
 from tuj.m5_motion.scripted_grasps.catalog_types import CatalogRecipe,build_catalog_targets,dispatch_grasp
 
 def cereal_recipe():
+    # Flat placement makes the closing axis vertical. An open finger must
+    # clear the carton end so it cannot tip the carton during free fall.
     return CatalogRecipe('cereal','c4_2','2F',(.038963,.123253,.150000),
-        offset_fraction=(0.,0.,.36),preshape_aperture_m=.050,preshape_closure_command=0.,two_finger_force_target_n=8.)
+        offset_fraction=(0.,0.,.36),preshape_aperture_m=.050,preshape_closure_command=0.,two_finger_force_target_n=8.,
+        open_hand_clearance_axis=(0.,0.,1.))
 def build_cereal_targets(T_WB,center_in_body_m,local_size_m,recipe=None):
     return build_catalog_targets(T_WB,center_in_body_m,local_size_m,recipe or cereal_recipe())
 def grasp_cereal(context,object_id='cereal',recipe=None):

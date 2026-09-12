@@ -29,6 +29,7 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     cls = getattr(module, entry.driver.title() + "Context")
     c = cls()
     c.runtime, c.env, c.recipe, c.object_id = runtime, env, recipe, entry.object_id
+    c.request_collision_margin_m = float(request.constraints.collision_margin_m) if request is not None else 0.
     c.output = Path(output)
     c.output.mkdir(parents=True, exist_ok=False)
     c.mj = mujoco
