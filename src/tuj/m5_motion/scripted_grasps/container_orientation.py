@@ -39,6 +39,8 @@ def configure_packing_orientation(g):
     from .transport import _is_transport
     if getattr(g, 'retention', None) is not None and _is_transport(g.task):
         from copy import copy
+        from .packing_occupancy import packing_occupants, packing_overlap_preference
+        occupants = packing_occupants(g)
         feasible = []
         for choice in sorted(choices, key=lambda row: row[0]):
             _, rotation, lower, upper = choice
@@ -50,11 +52,13 @@ def configure_packing_orientation(g):
             probe.half = np.ptp(points @ probe.destination_rotation.T, axis=0) / 2.
             probe.packing_bounds = (lower, upper)
             if packing_transport_has_ik(probe):
-                feasible.append(choice)
-                break
+                score = packing_overlap_preference(probe, occupants) if occupants else 0.
+                feasible.append((score, choice[0], choice))
+                if not occupants:
+                    break
         if not feasible:
             raise ValueError('PACKING_NO_REACHABLE_FIT_ORIENTATION')
-        choices = feasible
+        choices = [min(feasible, key=lambda row: (row[0], row[1]))[2]]
     _, rotation, lower, upper = min(choices, key=lambda row: row[0])
     g.destination_rotation = g.T_WR[:3, :3] @ rotation
     g.preserve_destination_rotation = True
