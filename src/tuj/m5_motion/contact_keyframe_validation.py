@@ -62,11 +62,11 @@ _CONTACT_ABOVE_ENGAGEMENT_SLACK_M = 0.08
 # Keep the held-tool underside clear of the support by this margin.
 _CONTACT_TOOL_ABOVE_SUPPORT_CLEARANCE_M = 0.005
 # Shallow soft-contact press into sweep targets (not a zero-penetration kiss).
-# Deep press tunnels free bodies through thin held tools; keep this small.
-# Matches the physical C1 rim-push profile (~1 mm).
-_CONTACT_SWEEP_PRESS_M = 0.0015
+# Keep well below held-tool thickness; mid-height embed visually sinks blocks
+# through dish meshes even when a solid AABB fill is active.
+_CONTACT_SWEEP_PRESS_M = 0.0025
 # Never press more than this fraction of held-tool thickness (anti-tunnel).
-_CONTACT_SWEEP_PRESS_THICKNESS_FRAC = 0.15
+_CONTACT_SWEEP_PRESS_THICKNESS_FRAC = 0.25
 # When sweeping targets that rest on the support, allow the tool underside this
 # close to the bare table while clamping max press.
 _CONTACT_SWEEP_SUPPORT_CLEARANCE_M = 0.001
@@ -75,8 +75,6 @@ _CONTACT_SWEEP_SUPPORT_CLEARANCE_M = 0.001
 _HOLLOW_INNER_RADIUS_FRAC = 0.45
 _HOLLOW_MIN_INNER_POINT_FRAC = 0.05
 _HOLLOW_RIM_Z_BAND_M = 0.002
-# Side-push contact height for hollow tools: fraction from support→target top.
-_HOLLOW_RIM_CONTACT_HEIGHT_FRAC = 0.50
 # Fallback band width when only the support surface is known.
 _CONTACT_MAX_ABOVE_SUPPORT_M = 0.18
 # If CONTACT_START is farther than this from the target-cluster centroid, snap
@@ -539,31 +537,15 @@ def _sweep_engagement_press_m(request: MotionPlanRequest) -> float:
 def _contact_engagement_tcp_z_m(request: MotionPlanRequest) -> float | None:
     """TCP z for held-tool sweep engagement.
 
-    Flat tools: shallow underside press into target tops.
-    Hollow dishes: mid-target height so the solid AABB fill (enabled at playback)
-    side-pushes instead of only friction-dragging across tops. The fill closes
-    the empty cavity so mid-height no longer tunnels bodies into the vac cup.
+    Shallow underside press into target tops. Hollow dishes rely on a temporary
+    solid AABB fill + kinematic tool velocity at playback for drag/push — not
+    mid-height embedding (that visually sinks blocks through the dish mesh).
     """
 
     tool_below = _held_tool_below_tcp_m(request)
     target_top = _sweep_target_top_z_m(request)
     support_z = _support_surface_z_m(request)
     press = _sweep_engagement_press_m(request)
-    rim_r = _held_tool_hollow_rim_inner_radius_m(request)
-    if (
-        target_top is not None
-        and support_z is not None
-        and rim_r is not None
-        and rim_r > 1e-4
-    ):
-        mid_z = float(support_z) + float(_HOLLOW_RIM_CONTACT_HEIGHT_FRAC) * (
-            float(target_top) - float(support_z)
-        )
-        underside = mid_z - press
-        underside = max(
-            underside, float(support_z) + float(_CONTACT_SWEEP_SUPPORT_CLEARANCE_M)
-        )
-        return float(underside + tool_below)
     if target_top is not None:
         if support_z is not None:
             max_press = max(
@@ -925,12 +907,12 @@ def canonicalize_sweep_contact_start_over_targets(
     *,
     resolver: RelativePoseResolver | None = None,
 ) -> list[RelativeKeyframeSpec]:
-    """Snap CONTACT_START onto the sweep-target cluster centroid in XY.
+    """Snap CONTACT_START onto a sweep-ready XY over the target cluster.
 
-    VLM paths often start on one corner block, so a short plate never covers the
-    group. When START is far from the target centroid, retarget it (and lift
-    PRE_CONTACT above the new XY) before the region push. Hollow dishes rely on
-    a temporary solid collision fill at playback rather than a rim-plow offset.
+    Flat tools: start on the target centroid.
+    Hollow dishes: shift start away from the goal by the rim radius so the
+    solid AABB fill's trailing face begins behind the cluster and scoops toward
+    the region (without mid-height mesh embedding).
     """
 
     if not is_tool_act_contact_geometry_scope(request) or not keyframes:
@@ -940,6 +922,14 @@ def canonicalize_sweep_contact_start_over_targets(
         return list(keyframes)
     desired_xy = np.asarray(centroid, dtype=float)
     metadata_flag = "sweep_contact_start_centroid"
+    rim_r = _held_tool_hollow_rim_inner_radius_m(request)
+    region_xy = _goal_region_center_xy_m(request)
+    if rim_r is not None and region_xy is not None and float(rim_r) > 1e-4:
+        away = desired_xy - np.asarray(region_xy, dtype=float)
+        away_norm = float(np.linalg.norm(away))
+        if away_norm > 1e-6:
+            desired_xy = desired_xy + (away / away_norm) * float(rim_r)
+            metadata_flag = "sweep_hollow_rim_plow_start"
 
     active_resolver = resolver or RelativePoseResolver(request.world)
     start_index = next(

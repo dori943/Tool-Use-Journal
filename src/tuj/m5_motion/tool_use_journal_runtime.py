@@ -595,6 +595,8 @@ class ToolUseJournalEERuntime:
         # Prior (contype, conaffinity) for temporarily enabled hollow-tool fill
         # geoms (``*_reg_bbox``) during tabletop push / tool_act sweeps.
         self._held_tool_fill_geom_backup: dict[int, tuple[int, int]] = {}
+        # Prior contype/conaffinity for vac cup geoms disabled while a tool is held.
+        self._vac_cup_collision_backup: dict[int, tuple[int, int]] = {}
         # Last synchronized attached-object pose for finite-difference qvel.
         self._attached_sync_state: tuple[np.ndarray, np.ndarray, float] | None = None
         self._set_declared_active_ee(env, self._active_ee)
@@ -2376,12 +2378,68 @@ class ToolUseJournalEERuntime:
         inner_count = sum(1 for radius in radii if radius <= inner + 1e-9)
         return inner_count <= max(1, int(0.05 * len(radii)))
 
+    def _vac_cup_geom_ids(self) -> list[int]:
+        if self._active_ee != "vac":
+            return []
+        model, _ = _raw_model_data(self.env)
+        geom_ids: list[int] = []
+        for geom_id in range(int(model.ngeom)):
+            name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+            if name is None:
+                continue
+            lowered = str(name).lower()
+            if "vac_cup" in lowered or "cup_collision" in lowered:
+                geom_ids.append(int(geom_id))
+        return geom_ids
+
+    def suppress_vac_cup_free_body_collisions(self) -> list[int]:
+        """Disable vac-cup collision while a non-cup body is attached.
+
+        Mid-sweep soft contacts can still kiss the cup through a thin dish even
+        with adhesion suppressed; turning the cup geom off keeps free bodies
+        interacting with the held tool fill instead of clipping into the cup.
+        """
+
+        self.restore_vac_cup_free_body_collisions()
+        if self._attachment is None:
+            return []
+        model, data = _raw_model_data(self.env)
+        disabled: list[int] = []
+        for geom_id in self._vac_cup_geom_ids():
+            self._vac_cup_collision_backup[geom_id] = (
+                int(model.geom_contype[geom_id]),
+                int(model.geom_conaffinity[geom_id]),
+            )
+            model.geom_contype[geom_id] = 0
+            model.geom_conaffinity[geom_id] = 0
+            disabled.append(geom_id)
+        if disabled:
+            mujoco.mj_forward(model, data)
+            print(
+                f"[M5][VAC_CUP] disabled cup collision while holding "
+                f"{self._attachment.object_id!r} geoms={disabled}"
+            )
+        return disabled
+
+    def restore_vac_cup_free_body_collisions(self) -> None:
+        if not self._vac_cup_collision_backup:
+            return
+        model, data = _raw_model_data(self.env)
+        for geom_id, (contype, conaffinity) in list(
+            self._vac_cup_collision_backup.items()
+        ):
+            if 0 <= int(geom_id) < int(model.ngeom):
+                model.geom_contype[geom_id] = int(contype)
+                model.geom_conaffinity[geom_id] = int(conaffinity)
+        self._vac_cup_collision_backup.clear()
+        mujoco.mj_forward(model, data)
+
     def enable_held_tool_collision_fill(self) -> list[int]:
         """Enable inactive AABB fill geoms so hollow dishes can push tabletop targets.
 
-        Dish collision meshes leave an empty center; kinematic mid-height sweeps
-        then let free bodies occupy the cavity and reach the vac cup. Turning on
-        ``reg_bbox`` (collision-only) closes that cavity without changing visuals.
+        Dish collision meshes leave an empty center. Turning on ``reg_bbox``
+        (collision-only) closes that cavity without changing visuals. Also
+        disables vac-cup collisions so free bodies cannot clip into the cup.
         """
 
         self.disable_held_tool_collision_fill()
@@ -2394,16 +2452,9 @@ class ToolUseJournalEERuntime:
             body_id, _, _ = self._object_free_joint(self.env, tool_id)
         except ToolUseJournalRuntimeError:
             return []
-        # Enable fill whenever an inactive AABB slab exists. Hollow detection is
-        # only a preference signal; tabletop push plans already gate activation.
         fill_ids = self._held_tool_inactive_fill_geom_ids(body_id)
         if not fill_ids:
             return []
-        if not self._body_collision_underside_is_hollow(body_id):
-            # Still enable: a solid AABB matching the tool footprint is harmless
-            # for already-solid tools and required when geom-center heuristics
-            # miss a hollow dish.
-            pass
         model, data = _raw_model_data(self.env)
         template_id = next(
             (
@@ -2425,22 +2476,28 @@ class ToolUseJournalEERuntime:
             )
             model.geom_contype[geom_id] = 1
             model.geom_conaffinity[geom_id] = 1
+            # High tangential friction so kinematic plate motion with finite-
+            # difference qvel can drag tabletop targets without mid-height embed.
+            model.geom_friction[geom_id] = np.asarray(
+                (1.5, 0.5, 0.1), dtype=float
+            )
             if template_id is not None:
-                model.geom_friction[geom_id] = model.geom_friction[template_id]
                 model.geom_solref[geom_id] = model.geom_solref[template_id]
                 model.geom_solimp[geom_id] = model.geom_solimp[template_id]
             enabled.append(geom_id)
         mujoco.mj_forward(model, data)
+        self.suppress_vac_cup_free_body_collisions()
         if enabled:
             print(
                 f"[M5][TOOL_FILL] enabled solid collision fill for "
-                f"hollow held tool {tool_id!r} geoms={enabled}"
+                f"held tool {tool_id!r} geoms={enabled}"
             )
         return enabled
 
     def disable_held_tool_collision_fill(self) -> None:
         """Restore contype/conaffinity for temporarily enabled fill geoms."""
 
+        self.restore_vac_cup_free_body_collisions()
         if not self._held_tool_fill_geom_backup:
             return
         model, data = _raw_model_data(self.env)

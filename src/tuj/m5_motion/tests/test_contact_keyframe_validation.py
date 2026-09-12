@@ -514,18 +514,17 @@ def test_engagement_presses_held_tool_into_target_tops() -> None:
     assert top is not None and eng is not None
     press = float(top) - float(eng - below)
     # Soft-contact overlap, but shallow enough not to tunnel thin tools.
-    assert 0.0005 <= press <= 0.003
+    assert 0.001 <= press <= 0.004
     thickness = _held_tool_thickness_m(request)
     assert thickness is not None
-    assert press <= 0.15 * float(thickness) + 1e-9
+    assert press <= 0.25 * float(thickness) + 1e-9
 
 
-def test_hollow_dish_uses_mid_height_with_fill_policy() -> None:
+def test_hollow_dish_uses_shallow_top_press_not_mid_height() -> None:
     from tuj.m5_motion.contact_keyframe_validation import (
         _contact_engagement_tcp_z_m,
         _held_tool_below_tcp_m,
         _held_tool_hollow_rim_inner_radius_m,
-        _support_surface_z_m,
         _sweep_target_top_z_m,
     )
 
@@ -542,14 +541,11 @@ def test_hollow_dish_uses_mid_height_with_fill_policy() -> None:
     request.world.objects["tool_pusher"]["collision_points_m"] = ring
     assert _held_tool_hollow_rim_inner_radius_m(request) is not None
     top = _sweep_target_top_z_m(request)
-    support = _support_surface_z_m(request)
     below = _held_tool_below_tcp_m(request)
     eng = _contact_engagement_tcp_z_m(request)
-    assert top is not None and support is not None and eng is not None
-    mid = 0.5 * (float(support) + float(top))
-    underside = float(eng - below)
-    assert underside == pytest.approx(mid - 0.0015, abs=2e-3)
-    assert underside < float(top) - 0.002
+    assert top is not None and eng is not None
+    press = float(top) - float(eng - below)
+    assert 0.001 <= press <= 0.004
 
 
 def test_engagement_press_capped_by_thin_held_tool_thickness() -> None:
@@ -576,7 +572,7 @@ def test_engagement_press_capped_by_thin_held_tool_thickness() -> None:
     eng = _contact_engagement_tcp_z_m(request)
     assert top is not None and eng is not None
     press = float(top) - float(eng - below)
-    assert press == pytest.approx(0.0006, abs=1e-6)
+    assert press == pytest.approx(0.0010, abs=1e-6)
 
 
 def test_canonicalizes_contact_start_onto_target_centroid() -> None:
