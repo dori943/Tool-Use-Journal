@@ -2083,6 +2083,9 @@ class ToolUseJournalEERuntime:
             raise ToolUseJournalRuntimeError(
                 f"attached free joint {attachment.free_joint_name!r} is absent"
             )
+        # Integration updates qpos before refreshing site/body transforms.
+        # Project from the current hand pose, not the preceding physics step.
+        mujoco.mj_kinematics(model, data)
         reference_position, reference_rotation = self._reference_pose(
             self.env,
             attachment.reference_kind,
