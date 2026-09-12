@@ -5,7 +5,7 @@
 씬:
 - UR5e
 - EE 랙 (3F / Vacuum / 2F)
-- 레고 블록 12개
+- 레고 블록 12개 (고정 배치)
 - Plate
 - 국자 / 포크 / 가위
 - 병
@@ -72,28 +72,32 @@ BLOCK_DENSITY = 500.0
 
 
 # ============================================================
-# 레고 랜덤 배치 영역
+# 레고 고정 배치 (table_offset XY 기준, yaw rad about z)
 # ============================================================
 #
-# 기존:
-# X = 0.12 ~ 0.16
-# Y = -0.10 ~ 0.10
-#
-# 12개를 non-overlap으로 놓기에는 너무 좁아서
-# RandomizationError가 발생할 수 있으므로 약간 확대.
-#
-# 여전히 로봇에서 먼 쪽의 제한된 영역에만 생성된다.
+# Captured from the live C1_1 episode used while debugging plate sweeps
+# (output/c1_1/m5/live/0002-... / seed-stable across that session).
+# Sampler reference_pos is TABLE_OFFSET=(0,0,0.8), so XY matches world XY.
 # ============================================================
 
-BLOCK_SPAWN_X_RANGE = (
-    0.12,
-    0.22,
+FIXED_BLOCK_PLACEMENTS = (
+    # (x_m, y_m, yaw_rad)
+    (0.204509, 0.124231, 0.934712),   # block_0
+    (0.193119, -0.005438, 1.460042),  # block_1
+    (0.153228, 0.010579, 2.781898),   # block_2
+    (0.200911, -0.124850, -1.683855), # block_3
+    (0.158835, -0.018939, -0.213238), # block_4
+    (0.174463, -0.065520, 1.518493),  # block_5
+    (0.143075, -0.057514, -2.600465), # block_6
+    (0.173879, 0.084153, -2.761611),  # block_7
+    (0.192814, 0.034374, -0.257123),  # block_8
+    (0.160322, -0.114493, -2.182687), # block_9
+    (0.153781, 0.055064, -0.353106),  # block_10
+    (0.143237, 0.099116, 0.373624),   # block_11
 )
 
-BLOCK_SPAWN_Y_RANGE = (
-    -0.15,
-    0.15,
-)
+if len(FIXED_BLOCK_PLACEMENTS) != NUM_BLOCKS:
+    raise ValueError("FIXED_BLOCK_PLACEMENTS must list every lego block")
 
 
 # ============================================================
@@ -693,37 +697,27 @@ class C1_1_LegoSweep(ManipulationEnv):
             )
 
             # =================================================
-            # Blocks
+            # Blocks (fixed layout from live C1_1 episode)
             # =================================================
 
-            self.placement_initializer.append_sampler(
-                sampler=UniformRandomSampler(
-                    name="BlockSampler",
-
-                    x_range=list(
-                        BLOCK_SPAWN_X_RANGE
-                    ),
-
-                    y_range=list(
-                        BLOCK_SPAWN_Y_RANGE
-                    ),
-
-                    rotation=None,
-
-                    rotation_axis="z",
-
-                    # 레고는 서로 겹치면 안 됨
-                    ensure_object_boundary_in_range=True,
-
-                    ensure_valid_placement=True,
-
-                    reference_pos=self.table_offset,
-
-                    z_offset=0.01,
-
-                    rng=self.rng,
+            for block_index, (block_x, block_y, block_yaw) in enumerate(
+                FIXED_BLOCK_PLACEMENTS
+            ):
+                self.placement_initializer.append_sampler(
+                    sampler=UniformRandomSampler(
+                        name=f"BlockSampler_{block_index}",
+                        x_range=[block_x, block_x],
+                        y_range=[block_y, block_y],
+                        rotation=float(block_yaw),
+                        rotation_axis="z",
+                        ensure_object_boundary_in_range=False,
+                        # Fixed layout: skip sampler collision rejection.
+                        ensure_valid_placement=False,
+                        reference_pos=self.table_offset,
+                        z_offset=0.01,
+                        rng=self.rng,
+                    )
                 )
-            )
 
             # =================================================
             # Plate
@@ -940,10 +934,11 @@ class C1_1_LegoSweep(ManipulationEnv):
         # Object 등록
         # ----------------------------------------------------
 
-        self.placement_initializer.add_objects_to_sampler(
-            "BlockSampler",
-            self.blocks,
-        )
+        for block_index, block in enumerate(self.blocks):
+            self.placement_initializer.add_objects_to_sampler(
+                f"BlockSampler_{block_index}",
+                block,
+            )
 
         self.placement_initializer.add_objects_to_sampler(
             "PlateSampler",
