@@ -67,11 +67,14 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     ("spoon", "C2_1_ObjectSorting", "2F", "spoon"),
     ("spoon", "C2_1_ObjectSorting", "3F", "spoon"),
     ("plate", "C2_1_ObjectSorting", "vac", "catalog", "plate_vac"),
+    # 0912: C3_1 도 정렬 태스크라 M4 가 접시에 vac EE 를 물리는데, C3_1 용 plate
+    # 항목이 없어 resolve() 가 매칭 실패(matches 빈 리스트) → generic M5 파지로
+    # 폴백했고, 그 진공 파지가 접시 표면을 못 짚어 CONTACT_COUNT=0, normal_force=0
+    # 으로 BREAKABLE_WELD 접촉 계약이 깨졌다 (C1_1/C2_1 주석의 그 실패 모드).
+    # 같은 접시 자산이므로 C2_1 에서 검증된 흡착 레시피(objects/plate_vac.py)를
+    # 그대로 재사용한다. plate_vac_recipe().task_id 는 'c2_1' 고정이라 실행 기록에
+    # C3_1 작업도 c2_1 로 남지만 동작에는 영향 없다 (C1_1 항목과 동일).
     ("plate", "C3_1_ObjectSorting", "vac", "catalog", "plate_vac"),
-    ("spoon", "C3_1_ObjectSorting", "2F", "spoon"),
-    ("spoon", "C3_1_ObjectSorting", "3F", "spoon"),
-    ("plate_a", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac"),
-    ("plate_b", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac"),
     ("apple", "C2_1_ObjectSorting", "3F", "catalog"),
     ("bread", "C2_1_ObjectSorting", "3F", "catalog"),
     ("mug", "C2_1_ObjectSorting", "3F", "catalog"),
@@ -87,13 +90,18 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # 여지가 없었던 결과다 (실제로 고른 것은 스푼 하나뿐이다). 두 EE 를 모두
     # 등록해야 2F 시도가 진짜 시도가 되고, 미끄러져 실패하면 그것이 "2F 는
     # 차선" 의 물리적 근거가 된다.
-    # 사과 2F 는 도희님 #76 (파지 place 까지 성공) 이 등록한다. 여기서 같이
-    # 올리면 같은 키가 두 번 들어간다.
     ("apple", "C3_1_ObjectSorting", "3F", "catalog"),
     ("bread", "C3_1_ObjectSorting", "2F", "catalog", "bread_2f"),
     ("bread", "C3_1_ObjectSorting", "3F", "catalog"),
     ("mug", "C3_1_ObjectSorting", "2F", "catalog", "mug_2f"),
     ("mug", "C3_1_ObjectSorting", "3F", "catalog"),
+    # 0912: C3_1 mounts the 2F gripper for the apple (C2_1 used 3F). Without a
+    # 2F entry the grasp fell back to the generic M5 path, which closed on the
+    # apple but left the grip site 20.4 mm from centre - past the 20 mm attach
+    # limit. A dedicated centred 2F recipe (objects/apple_2f.py) seats the grip
+    # on the body centre. Distinct module name keeps it apart from the 3F
+    # ``apple`` catalog recipe used at C2_1.
+    ("apple", "C3_1_ObjectSorting", "2F", "catalog", "apple_2f"),
     ("knife", "C2_2_SandwichAssembly", "2F", "catalog"),
     ("rolling_pin", "C4_2_DiagonalFitPacking", "2F", "catalog"),
     ("baguette", "C4_2_DiagonalFitPacking", "2F", "catalog"),
