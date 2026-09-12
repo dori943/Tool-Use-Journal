@@ -81,9 +81,27 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     if hasattr(recipe, "thin_contact_timeconstant_s"):
         relevant = c.gripper_geoms | c.object_geoms | c.support_gids
         original = {c.model.geom(i).name: c.model.geom_solref[i].tolist() for i in relevant}
+        solimp = getattr(recipe, "thin_contact_solimp", None)
+        original_solimp = (
+            {c.model.geom(i).name: c.model.geom_solimp[i].tolist() for i in relevant}
+            if solimp is not None else None)
         for i in relevant:
             c.model.geom_solref[i] = [recipe.thin_contact_timeconstant_s, 1.]
-        c.thin_contact_profile = {"timeconstant_s": recipe.thin_contact_timeconstant_s, "original_solref": original}
+            if solimp is not None:
+                c.model.geom_solimp[i][:3] = list(solimp)
+        c.thin_contact_profile = {"timeconstant_s": recipe.thin_contact_timeconstant_s, "original_solref": original,
+            "solimp": list(solimp) if solimp is not None else None, "original_solimp": original_solimp}
+    c.vacuum_cup_margin_profile = None
+    cup_margin = getattr(recipe, "vacuum_cup_margin_m", None)
+    if cup_margin is not None and entry.ee == "vac":
+        # 흡착이 받침을 통해 딸려 올라가지 않도록 컵의 접촉 탐지 범위를 좁힌다.
+        # gap 을 margin 과 같게 유지해야 접촉력 발생 시점(dist<0)이 안 바뀐다.
+        cup_ids = sorted(c.finger_groups["suction"])
+        c.vacuum_cup_margin_profile = {"margin_m": float(cup_margin),
+            "original": {c.model.geom(i).name: [float(c.model.geom_margin[i]), float(c.model.geom_gap[i])] for i in cup_ids}}
+        for i in cup_ids:
+            c.model.geom_margin[i] = float(cup_margin)
+            c.model.geom_gap[i] = float(cup_margin)
     c.ee_spec = next(s for s in env.robot_spec["ee_pool"] if s["ee_id"] == entry.ee)
     c.gripper_actuator_ids = np.array([i for i in range(c.model.nu) if c.model.actuator(i).name.startswith(c.gripper.naming_prefix)])
     if entry.driver == "plate":

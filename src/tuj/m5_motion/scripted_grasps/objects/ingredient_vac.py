@@ -53,6 +53,15 @@ def ingredient_vac_recipe(environment='C2_2_SandwichAssembly', object_id='turkey
         close_duration_s=.2,
         # 평평한 면에 평평한 컵 하나는 MuJoCo 접촉점이 하나다.
         minimum_vacuum_contact_count=1,
+        # 슬라이스 충돌 geom 은 solimp 가 없어 기본값(.9 .95)으로 떨어진다.
+        # MuJoCo 소프트 접촉은 질량 정규화라 관통이 흡착력/질량에 비례하고,
+        # 14 g 토마토는 4.4 mm 끌려들어가 attach 관통 게이트(2 mm)에 걸렸다.
+        # 자산이 원래 의도한 값(cheese 충돌 geom 과 동일)을 실제 충돌 geom 에 건다.
+        thin_contact_solimp=(.998, .998, .001),
+        # 자산 기본 margin 10 mm 는 슬라이스를 뚫고 도마까지 흡착 범위에 넣는다.
+        # 실측: 토마토를 들자 tomato_plate 가 +76 mm 떠오르며 101도 뒤집혀 컵에
+        # 부딪혔다. 가장 얇은 turkey_1 기준 여유가 2.0 mm 이므로 그 아래로 둔다.
+        vacuum_cup_margin_m=.0015,
         contact_ticks=5,
         prelift_stabilization_s=.5,
         maximum_vacuum_attach_penetration_m=.002,

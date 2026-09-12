@@ -29,6 +29,17 @@ class CatalogRecipe:
     physics_timestep_s: float = .001
     physics_integrator: str = 'implicitfast'
     thin_contact_timeconstant_s: float = .004
+    # 충돌 geom 의 solimp. 자산이 선언한 solimp 는 contype=0 인 visual geom 에만
+    # 붙어 있어서 실제로 충돌하는 geom 은 MuJoCo 기본값(.9 .95 .001)으로 떨어진다.
+    # 그 물렁한 접촉 때문에 가벼운 슬라이스가 흡착(gain 80 N)에 컵 안으로 끌려
+    # 들어간다. cheese 자산만 충돌 geom 에 .998 을 제대로 달고 있다.
+    # None 이면 기존 동작 그대로다.
+    thin_contact_solimp: tuple | None = None
+    # 흡착컵 geom 의 margin/gap. 자산 기본값은 10 mm 인데, MuJoCo 흡착은 margin
+    # 안의 모든 접촉에 작용하므로 얇은 슬라이스를 집으면 그 아래 받침까지 같이
+    # 빨아올린다 (토마토 4.74 mm 를 .5 mm 눌러 앉으면 도마 윗면이 4.2 mm,
+    # 터키 2.52 mm 면 2.0 mm 거리다). None 이면 자산 값 그대로다.
+    vacuum_cup_margin_m: float | None = None
     two_finger_parallel_linkage: bool = True
     two_finger_force_target_n: float = 5.
     two_finger_force_gain: float = .002
@@ -89,6 +100,13 @@ class CatalogRecipe:
             raise ValueError('Invalid post-grasp arm gain')
         if not 0<=self.suction_command<=1: raise ValueError('Invalid suction command')
         if self.ee_id=='vac' and self.suction_command<.5: raise ValueError('Vacuum attachment requires suction command >= .5')
+        if self.vacuum_cup_margin_m is not None:
+            if self.ee_id!='vac': raise ValueError('Cup margin requires the vacuum EE')
+            if not 0<self.vacuum_cup_margin_m<.01: raise ValueError('Invalid cup margin')
+        if self.thin_contact_solimp is not None:
+            if len(self.thin_contact_solimp)!=3: raise ValueError('Invalid contact solimp')
+            if not all(0<v<1 for v in self.thin_contact_solimp[:2]): raise ValueError('Invalid contact solimp')
+            if self.thin_contact_solimp[2]<=0: raise ValueError('Invalid contact solimp')
         if not isinstance(self.linear_lift_start,bool): raise ValueError('Invalid lift easing policy')
         if self.physics_timestep_s not in (.0005,.001,.002): raise ValueError('Invalid timestep')
         if self.physics_integrator!='implicitfast': raise ValueError('Invalid integrator')
