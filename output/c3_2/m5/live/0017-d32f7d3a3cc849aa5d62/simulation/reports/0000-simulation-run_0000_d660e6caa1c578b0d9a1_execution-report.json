@@ -1,0 +1,198 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:d660e6caa1c578b0d9a1:execution-report",
+  "run_id": "simulation-run:0000:d660e6caa1c578b0d9a1",
+  "plan_id": "motion-plan:3a0f1590664d70504e489820",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:d660e6caa1c578b0d9a1:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:d660e6caa1c578b0d9a1",
+    "input_artifact_ids": [
+      "simulation-run-artifact:d660e6caa1c578b0d9a1ea23",
+      "motion-plan-artifact:3a0f1590664d70504e489820"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "SUCCESS",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      0.40628802667788094,
+      -1.7640922445300777,
+      1.7707989991422373,
+      -1.5751306142283095,
+      -1.682114715604866,
+      -1.1671972701818198
+    ],
+    "joint_velocities_rad_s": [
+      0.010879090063824618,
+      0.0008594845580708048,
+      -0.08129991615916381,
+      0.08165442469489652,
+      -3.33178776854569e-6,
+      0.010943472506359199
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        2.205479252747917,
+        -2.963096671678423,
+        1.1034246887859522
+      ],
+      "orientation_xyzw": [
+        0.7050131935263865,
+        0.7070079563629499,
+        -0.021757762401581882,
+        0.05121275591576111
+      ]
+    },
+    "gripper": {
+      "mode": "OPEN",
+      "command": -1.0
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 9.479999999775828,
+    "max_joint_tracking_error_rad": 0.0488787894529068,
+    "max_eef_tracking_error_m": 0.01591717533169157,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG4_s2_d3:s1_direct:2:s1_kf2:event:0:DETACH_OBJECT",
+      "scheduled_time_s": 7.714857085046491,
+      "actual_time_s": 7.779999999816027,
+      "status": "SUCCESS",
+      "message": "detached fruit_b and preserved world pose"
+    },
+    {
+      "event_id": "SG4_s2_d3:s1_direct:2:s1_kf2:event:1:GRIPPER_OPEN",
+      "scheduled_time_s": 7.714857085046491,
+      "actual_time_s": 7.779999999816027,
+      "status": "SUCCESS",
+      "message": "finger gripper open command set to -1.000"
+    }
+  ],
+  "failure": null,
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "3F",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": -1.0,
+    "ee_transition_count": 3,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 474,
+    "nominal_plan_duration_s": 8.435645292823374,
+    "final_plan_time_s": 8.435645292823374,
+    "adaptive_settle_extra_duration_s": 1.0443547069524541,
+    "segment_tracking": [
+      {
+        "segment_id": "SG4_s2_d3:s1_direct:0:SG4_s2_d3:s1_direct:1:s1_kf1",
+        "keyframe_id": "SG4_s2_d3:s1_direct:1:s1_kf1",
+        "target_block_id": null,
+        "nominal_end_time_s": 3.7955526529589445,
+        "actual_execution_time_s": 3.799999999910142,
+        "max_joint_error_rad": 0.012656003619248679,
+        "eef_position_error_m": 0.004179976678912899,
+        "eef_orientation_error_rad": 0.004207162857909453,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG4_s2_d3:s1_direct:1:SG4_s2_d3:s1_direct:2:s1_kf2",
+        "keyframe_id": "SG4_s2_d3:s1_direct:2:s1_kf2",
+        "target_block_id": null,
+        "nominal_end_time_s": 7.714857085046491,
+        "actual_execution_time_s": 7.779999999816027,
+        "max_joint_error_rad": 0.006757085033610277,
+        "eef_position_error_m": 0.0009596822208786482,
+        "eef_orientation_error_rad": 0.004777629118781748,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.05999999999858119,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG4_s2_d3:s1_direct:2:SG4_s2_d3:s1_direct:3:s1_kf3",
+        "keyframe_id": "SG4_s2_d3:s1_direct:3:s1_kf3",
+        "target_block_id": null,
+        "nominal_end_time_s": 8.435645292823374,
+        "actual_execution_time_s": 9.479999999775828,
+        "max_joint_error_rad": 0.009334346537642757,
+        "eef_position_error_m": 0.0036511384692507463,
+        "eef_orientation_error_rad": 0.00007745383361076537,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      }
+    ],
+    "gripper_release_waits": [
+      {
+        "object_id": "fruit_b",
+        "wait_duration_s": 0.959999999977299,
+        "open_target": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "current_target": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "target_reached": true,
+        "ee_object_contact_count": 0,
+        "consecutive_ticks": 3,
+        "max_wait_s": 5.94,
+        "command_mode": "INCREMENTAL",
+        "succeeded": true
+      }
+    ],
+    "goal_evaluation": {
+      "request_id": "motion-request:live:d32f7d3a3cc849aa5d62",
+      "goal_type": "POSE",
+      "status": "SATISFIED",
+      "detail": "all target footprints are inside the goal region",
+      "position_error_m": null,
+      "orientation_error_rad": null,
+      "joint_error_rad": null,
+      "observed": {
+        "region_id": "plate_b",
+        "inside_target_ids": [
+          "fruit_b"
+        ],
+        "outside_target_ids": [],
+        "geometry_errors": {},
+        "inset_margin_m": 0.0,
+        "include_vertical": false
+      }
+    }
+  }
+}
