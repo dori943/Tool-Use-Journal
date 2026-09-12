@@ -201,6 +201,13 @@ class CatalogContext(SpoonContext):
                 for _ in range(75):self.step(q,opening)
                 aperture=None
             save_json(self.output/'preshape.json',{'aperture_m':aperture,'opening_command':opening})
+            if recipe.contact_region_endpoint_policy is not None:
+                from .endpoint_grasp import resolve_endpoint_support_clearance
+                # Measure the real preshaped hand and the current object pose.
+                targets=build_catalog_targets(self.body_pose(),self.center_in_body,self.local_size,recipe)
+                targets, endpoint_clearance = resolve_endpoint_support_clearance(self, targets)
+                save_json(self.output/'endpoint_grasp_geometry.json',endpoint_clearance)
+                save_json(self.output/'targets.json',targets)
             approach_spoon(self,targets,opening)
             q=self.move(targets['GRASP'],'GRASP',opening,cartesian=True)
             np.savez_compressed(self.output/'grasp_state.npz',qpos=self.data.qpos,qvel=self.data.qvel,ctrl=self.data.ctrl,time=self.data.time)
