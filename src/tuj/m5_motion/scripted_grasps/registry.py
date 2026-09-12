@@ -75,6 +75,14 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # 그대로 재사용한다. plate_vac_recipe().task_id 는 'c2_1' 고정이라 실행 기록에
     # C3_1 작업도 c2_1 로 남지만 동작에는 영향 없다 (C1_1 항목과 동일).
     ("plate", "C3_1_ObjectSorting", "vac", "catalog", "plate_vac"),
+    # 0912: 아래 네 줄은 main 에서 사라져 있었다. 테스트는 그대로 남아 있어
+    # (test_excluded_unknown_and_wrong_hand 의 스푼 6개 경로,
+    # test_plate_vac_routes_are_task_and_instance_scoped 의 plate_a/plate_b)
+    # main 단독으로도 빨간 상태였다. PR #71 이 스푼 4줄을 날린 것과 같은 사고다.
+    ("spoon", "C3_1_ObjectSorting", "2F", "spoon"),
+    ("spoon", "C3_1_ObjectSorting", "3F", "spoon"),
+    ("plate_a", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac"),
+    ("plate_b", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac"),
     ("apple", "C2_1_ObjectSorting", "3F", "catalog"),
     ("bread", "C2_1_ObjectSorting", "3F", "catalog"),
     ("mug", "C2_1_ObjectSorting", "3F", "catalog"),
