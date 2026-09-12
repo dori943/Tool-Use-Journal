@@ -504,6 +504,13 @@ class _Grounding:
             'start_object_orientation_xyzw': Rotation.from_matrix(self.T_WB[:3, :3]).as_quat().tolist(),
             'eef_orientation_xyzw': Rotation.from_matrix(self.T_WE[:3, :3]).as_quat().tolist(),
             'object_id': self.object_id, 'source': self.source, **extra}
+        if goal_key == HELD_PLACE_GOAL_ANCHOR:
+            # Withdrawal targets the empty hand, not the held object's origin.
+            # This measured entry is a candidate; post-release collision checks
+            # must still validate the open hand and the entire return path.
+            entry_eef_anchor = goal_key + '_entry_eef'
+            anchors[entry_eef_anchor] = (inverse(self.T_WR) @ self.T_WE)[:3, 3].tolist()
+            self.task.metadata[goal_key]['entry_eef_anchor'] = entry_eef_anchor
         return destination
 
 
