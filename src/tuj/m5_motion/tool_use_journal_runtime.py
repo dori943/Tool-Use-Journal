@@ -2360,18 +2360,24 @@ class ToolUseJournalEERuntime:
             now,
         )
         mujoco.mj_forward(model, data)
-        # Drag partners on any planar tool teleport, including dt≈0 jumps.
-        # Vac scripted retention snaps arm ``goal_qpos`` after each control
-        # tick; the next pre-step sync sees a large pose delta with no sim-time
-        # advance. Skipping those jumps leaves blocks behind while the hollow
-        # dish sweeps through them. Double-driving from FD qvel is avoided by
-        # zeroing tool velocity above when assist owns the push.
-        if delta_xy is not None and float(np.linalg.norm(delta_xy)) > 1e-9:
-            self._apply_held_tool_kinematic_push_assist(
-                delta_xy=delta_xy,
-                tool_position=object_position,
-                tool_rotation=object_rotation,
+        # Drag partners on planar teleports (incl. dt≈0 vac goal snaps). When a
+        # fill paddle is armed, also re-run with a zero delta so vertical
+        # anti-penetration still fires while the tool is stationary over
+        # partners (end settle). Partner set alone without fill only assists
+        # on nonzero XY motion.
+        if self._held_tool_push_partner_ids:
+            assist_delta = (
+                np.asarray(delta_xy, dtype=float).reshape(2)
+                if delta_xy is not None
+                else np.zeros(2, dtype=float)
             )
+            has_xy = float(np.linalg.norm(assist_delta)) >= 1e-9
+            if has_xy or self._held_tool_fill_geom_backup:
+                self._apply_held_tool_kinematic_push_assist(
+                    delta_xy=assist_delta,
+                    tool_position=object_position,
+                    tool_rotation=object_rotation,
+                )
         self.suppress_native_adhesion_actuators()
         self.log_vac_non_target_cup_contacts()
 
@@ -2493,8 +2499,9 @@ class ToolUseJournalEERuntime:
         solidifies the dish cavity so free bodies look like they tunnel through
         the plate. Instead:
 
-        1. disable hollow rim mesh collisions,
-        2. morph the inactive AABB into a thin bottom paddle,
+        1. morph the inactive AABB into a thin bottom paddle,
+        2. keep hollow rim mesh collisions (so the visual rim cannot pass
+           through partners),
         3. disable vac-cup collisions,
         4. remember free-object partners for kinematic XY push assist (soft
            contacts alone do not drag when the tool free-joint is teleported).
@@ -2528,21 +2535,8 @@ class ToolUseJournalEERuntime:
             .endswith("tool_act_collision_slab")
         ]
         active_ids = preferred or fill_ids
-        fill_id_set = {int(geom_id) for geom_id in active_ids}
-        # Hollow rim meshes stay active otherwise and let free bodies climb
-        # into the visual bowl above the thin paddle.
-        for geom_id in range(int(model.ngeom)):
-            if int(model.geom_bodyid[geom_id]) != int(body_id):
-                continue
-            if int(geom_id) in fill_id_set:
-                continue
-            contype = int(model.geom_contype[geom_id])
-            conaffinity = int(model.geom_conaffinity[geom_id])
-            if not (contype or conaffinity):
-                continue
-            self._held_tool_rim_collision_backup[geom_id] = (contype, conaffinity)
-            model.geom_contype[geom_id] = 0
-            model.geom_conaffinity[geom_id] = 0
+        # Keep rim mesh collisions enabled. Disabling them lets the visual
+        # dish rim teleport through blocks at engagement press / settle.
         enabled: list[int] = []
         for geom_id in active_ids:
             size = np.asarray(model.geom_size[geom_id], dtype=float).copy()
@@ -2590,7 +2584,7 @@ class ToolUseJournalEERuntime:
             print(
                 f"[M5][TOOL_FILL] enabled solid underside push paddle for "
                 f"held tool {tool_id!r} geoms={enabled} "
-                f"rim_disabled={len(self._held_tool_rim_collision_backup)} "
+                f"rim_kept=1 "
                 f"push_partners={sorted(partners)} "
                 f"push_region={self._held_tool_push_region_id!r}"
             )
@@ -2632,18 +2626,16 @@ class ToolUseJournalEERuntime:
         tool_position: np.ndarray,
         tool_rotation: np.ndarray,
     ) -> None:
-        """Drag plan partners that are in underside contact by the tool XY delta.
+        """Drag / vertically separate partners under the held-tool paddle.
 
         Soft contacts cannot reliably push when a kinematic attached tool is
-        teleported each substep. Partners listed at fill-enable time that:
+        teleported each substep. Partners listed at fill-enable time that lie
+        under the paddle footprint:
 
-        1. lie under the paddle footprint, and
-        2. have their top face within a small vertical band of the paddle
-           underside (actual near-contact — not merely XY overlap),
-
-        inherit the same planar displacement. Optionally clamp those partners
-        into the plan's goal-region AABB so yawed footprints do not fail
-        containment by a millimetre after a rigid herd.
+        1. are always pushed down out of the paddle volume (even with a zero
+           XY delta, so settle / end-of-sweep does not leave embeds), and
+        2. when near underside contact and ``delta_xy`` is nonzero, inherit
+           the same planar displacement (optional goal-region AABB pack).
         """
 
         if not self._held_tool_fill_geom_backup:
@@ -2651,8 +2643,7 @@ class ToolUseJournalEERuntime:
         if not self._held_tool_push_partner_ids:
             return
         delta = np.asarray(delta_xy, dtype=float).reshape(2)
-        if float(np.linalg.norm(delta)) < 1e-9:
-            return
+        has_xy = float(np.linalg.norm(delta)) >= 1e-9
         model, data = _raw_model_data(self.env)
         half_xy = np.zeros(2, dtype=float)
         center_xy = np.asarray(tool_position[:2], dtype=float)
@@ -2696,12 +2687,29 @@ class ToolUseJournalEERuntime:
                 data.qpos[qpos_start : qpos_start + 2], dtype=float
             )
             partner_z = float(data.qpos[qpos_start + 2])
-            if partner_z > 0.86 or partner_z < 0.70:
+            support_z = self._table_support_surface_z_m()
+            in_table_band = (
+                support_z - 0.10 <= partner_z <= support_z + 0.06
+            )
+            # Also admit partners near the live paddle (unit fixtures may place
+            # ``table_collision`` far below the workcell objects).
+            near_paddle = abs(partner_z - float(paddle_bottom_z)) <= 0.20
+            if not (in_table_band or near_paddle):
                 continue
             if float(np.max(np.abs(partner_xy - center_xy) - half_xy)) > 0.0:
                 continue
             half_height = self._body_collision_half_height_m(model, body_id)
             half_xy_partner = self._body_collision_half_xy_m(model, body_id)
+            # Always push partners down out of the paddle volume, even when the
+            # tool is stationary (zero XY delta at settle / end of sweep).
+            max_center_z = float(paddle_bottom_z - half_height - 0.0005)
+            table_floor = support_z - 0.10
+            if max_center_z >= table_floor and partner_z > max_center_z:
+                data.qpos[qpos_start + 2] = max_center_z
+                partner_z = max_center_z
+                moved = True
+            if not has_xy:
+                continue
             partner_top_z = partner_z + half_height
             # gap > 0: paddle above partner top (separation)
             # gap < 0: paddle pressed into / through the partner top
@@ -2737,10 +2745,6 @@ class ToolUseJournalEERuntime:
                     if inside_before or tool_over_region:
                         new_xy = np.clip(new_xy, lo, hi)
             data.qpos[qpos_start : qpos_start + 2] = new_xy
-            max_center_z = float(paddle_bottom_z - half_height - 0.0005)
-            if max_center_z >= 0.70 and partner_z > max_center_z:
-                data.qpos[qpos_start + 2] = max_center_z
-                partner_z = max_center_z
             qvel_start = int(model.jnt_dofadr[joint_id])
             data.qvel[qvel_start : qvel_start + 2] = 0.0
             data.qvel[qvel_start + 2] = min(float(data.qvel[qvel_start + 2]), 0.0)
@@ -2750,6 +2754,27 @@ class ToolUseJournalEERuntime:
             moved = True
         if moved:
             mujoco.mj_forward(model, data)
+
+    def _table_support_surface_z_m(self) -> float:
+        """World-z of the workcell support top (table), else a C1-compatible fallback."""
+
+        model, data = _raw_model_data(self.env)
+        for name in ("table_collision", "table"):
+            geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name)
+            if geom_id < 0:
+                continue
+            pos = np.asarray(data.geom_xpos[geom_id], dtype=float)
+            size = np.asarray(model.geom_size[geom_id], dtype=float)
+            gtype = int(model.geom_type[geom_id])
+            if gtype == int(mujoco.mjtGeom.mjGEOM_BOX):
+                return float(pos[2] + size[2])
+            if gtype == int(mujoco.mjtGeom.mjGEOM_PLANE):
+                return float(pos[2])
+            # Sphere / cylinder / mesh: use geom AABB top when available.
+            if hasattr(model, "geom_rbound"):
+                return float(pos[2] + float(model.geom_rbound[geom_id]))
+            return float(pos[2])
+        return 0.8
 
     def _body_collision_half_height_m(
         self, model: mujoco.MjModel, body_id: int
@@ -3129,12 +3154,22 @@ def _tabletop_held_tool_push_partners(plan: MotionPlan) -> list[str]:
     }
     if not partners:
         return []
-    # Tabletop push targets sit near support (~0.80 m). Cargo on a raised
-    # attached plate is near the plate height and must not trigger fill.
+    # Tabletop push targets sit near the support. Cargo on a raised attached
+    # plate sits well above the lowest collision-pair partners and must not
+    # trigger fill. Band matches prior 0.70–0.86 at a 0.80 m table.
+    partner_zs = [
+        float(free_z_by_id[name])
+        for name in partners
+        if name in free_z_by_id and math.isfinite(float(free_z_by_id[name]))
+    ]
+    if not partner_zs:
+        return []
+    support_anchor = float(min(partner_zs))
     tabletop = {
         name
         for name in partners
-        if name in free_z_by_id and float(free_z_by_id[name]) <= 0.86
+        if name in free_z_by_id
+        and float(free_z_by_id[name]) <= support_anchor + 0.06
     }
     # Prefer the task's declared target_ids so nontarget distractors are not
     # kinematically herded into (or out of) the goal region.

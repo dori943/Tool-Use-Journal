@@ -35,7 +35,11 @@ def three_finger_ready(samples, ticks=5):
 
 
 def thin_handle_ready(samples, ticks=5):
-    """Thumb + one opposing finger on a thin utensil handle (c3_2 spoon/fork)."""
+    """Thumb + one opposing finger on a thin utensil handle (c3_2 spoon/fork).
+
+    Thin-handle contacts often flicker for only a few policy ticks; recipes may
+    lower ``contact_ticks`` (fork/spoon use 3) so a brief seated pinch can pass.
+    """
     return len(samples)>=ticks and all(thin_handle_pinch_event(s) for s in samples[-ticks:])
 
 
@@ -68,25 +72,98 @@ def three_finger_contact_established(sample):
         and .5*other<=forces['thumb']<=2.*other)
 
 
+def thin_handle_nominal_lateral_m(recipe):
+    """Body-frame lateral used by catalog ``offset_m.x`` or spoon ``lateral_offset_m``."""
+    if hasattr(recipe, 'lateral_offset_m'):
+        return float(recipe.lateral_offset_m)
+    return float(np.asarray(recipe.offset_m, dtype=float)[0])
+
+
+def recipe_with_thin_handle_lateral(recipe, lateral_m):
+    """Return a copy of ``recipe`` with the thin-handle lateral set to ``lateral_m``."""
+    from dataclasses import replace
+    lateral_m = float(lateral_m)
+    if hasattr(recipe, 'lateral_offset_m'):
+        return replace(recipe, lateral_offset_m=lateral_m)
+    offset = np.asarray(recipe.offset_m, dtype=float).copy()
+    offset[0] = lateral_m
+    return replace(recipe, offset_m=tuple(float(v) for v in offset))
+
+
+def thin_handle_lateral_retry_schedule(recipe):
+    """Absolute laterals to try after the nominal thin-handle CLOSE fails.
+
+    Yields up to ``thin_handle_close_retries`` values alternating
+    ``nominal ± k * thin_handle_lateral_retry_m`` for k = 1, 2, ...
+    Empty when the recipe is not a thin-handle pinch or retries are disabled.
+    """
+    if not getattr(recipe, 'thin_handle_pinch', False):
+        return ()
+    retries = int(getattr(recipe, 'thin_handle_close_retries', 0) or 0)
+    if retries <= 0:
+        return ()
+    step = float(getattr(recipe, 'thin_handle_lateral_retry_m', 0.002) or 0.002)
+    if not np.isfinite(step) or step <= 0:
+        raise ValueError('Invalid thin_handle_lateral_retry_m')
+    base = thin_handle_nominal_lateral_m(recipe)
+    extras = []
+    k = 1
+    while len(extras) < retries:
+        extras.append(base + k * step)
+        if len(extras) >= retries:
+            break
+        extras.append(base - k * step)
+        k += 1
+    return tuple(extras[:retries])
+
+
+def prepare_thin_handle_close_retry(context, q, opening, targets, *, open_steps=50):
+    """Open fingers then retreat to PRE before a thin-handle lateral re-grasp.
+
+    After a failed CLOSE the pads may still penetrate the handle. Staging the
+    reopen as ``CLOSE`` keeps finger↔handle contacts expected; retreating to
+    ``PRE_GRASP`` clears the mesh before the next lateral GRASP.
+    """
+    context.stage = 'CLOSE'
+    context.three_finger_force_hold = False
+    context.three_finger_commands = None
+    if hasattr(context, 'two_finger_force_hold'):
+        context.two_finger_force_hold = False
+    for _ in range(open_steps):
+        context.step(q, opening)
+    pre = targets.get('PRE_GRASP')
+    if pre is not None:
+        q = context.move(pre, 'PRE_GRASP', opening, cartesian=True)
+    return q
+
+
 def thin_handle_pinch_event(sample):
     """Accept a thumb↔index/pinky pinch when the handle is too thin for 3 fingers.
 
     c3_2 utensil collision meshes are narrow; the third Jaco finger often cannot
-    seat. A sustained thumb+secondary pinch with span is enough to lift.
-    Fork handles are ~25 mm wide with nearly coplanar pad normals, so the
-    opposition floor is lower than the spoon enclosure gate while still
-    requiring a real two-finger contact pair and span across the handle.
+    seat. After prior live transports the pinch often shows only ~15–18 mm span
+    and light pad forces even when both fingers touch. Require dual-pad contact
+    across the handle; kinematic attach then carries LIFT.
     """
     forces=sample['finger_force_n']
     contacts=set(sample['finger_contacts'])
     if 'thumb' not in contacts:
         return False
-    secondary=[name for name in ('index','pinky') if name in contacts and forces[name]>=.05]
+    # Contact listing uses ~0.01 N; keep secondary slightly above noise.
+    secondary=[name for name in ('index','pinky') if name in contacts and forces[name]>=.02]
     if not secondary:
         return False
-    other=sum(forces[name] for name in secondary)
-    return (sample['contact_span_m']>=.018 and forces['thumb']>=1.0
-            and other>=.05 and sample['normal_opposition']>=0.
+    thumb=float(forces['thumb'])
+    other=float(sum(forces[name] for name in secondary))
+    span=float(sample['contact_span_m'] or 0.)
+    seated=(
+        (thumb>=1.0 and other>=.02)
+        or (other>=.5 and thumb>=.25)
+        or (thumb>=.35 and other>=.35)
+        or (thumb>=.05 and other>=.02)
+    )
+    return (span>=.015 and seated
+            and sample['normal_opposition']>=0.
             and sum(forces.values())<=12.)
 
 
@@ -458,10 +535,38 @@ class SpoonContext(GraspMotionContext):
         self.player._advance_controller(action)
         return self.sample()
 
-
-
-
-
+    def _spoon_close_until_ready(self,q,opening,recipe):
+        """Ramp CLOSE and return `(acquired, hold_opening, q)`."""
+        self.stage='CLOSE'
+        acquired=False
+        hold_opening=-1.
+        for f in np.linspace(0,1,math.ceil(recipe.close_duration_s*50)):
+            hold_opening=opening+(-1.-opening)*f
+            row=self.step(q,hold_opening)
+            if recipe.ee_id=='2F' and not self.two_finger_force_hold and any(v>.05 for v in row['finger_force_n'].values()):
+                self.two_finger_command=float(np.asarray(self.gripper.current_action).mean())
+                self.two_finger_force_hold=True
+            if recipe.ee_id=='3F' and not self.three_finger_force_hold and three_finger_contact_established(row):
+                self.three_finger_commands=np.asarray(
+                    self.gripper.current_action).copy()
+                self.three_finger_force_hold=True
+            acquired=grasp_contact_ready(recipe,self.trace,recipe.contact_ticks)
+            if acquired:
+                break
+        for _ in range(100):
+            if acquired:
+                break
+            hold_opening=-1.
+            row=self.step(q,-1.)
+            if recipe.ee_id=='2F' and not self.two_finger_force_hold and any(v>.05 for v in row['finger_force_n'].values()):
+                self.two_finger_command=float(np.asarray(self.gripper.current_action).mean())
+                self.two_finger_force_hold=True
+            if recipe.ee_id=='3F' and not self.three_finger_force_hold and three_finger_contact_established(row):
+                self.three_finger_commands=np.asarray(
+                    self.gripper.current_action).copy()
+                self.three_finger_force_hold=True
+            acquired=grasp_contact_ready(recipe,self.trace,recipe.contact_ticks)
+        return acquired,hold_opening,q
 
     def execute_spoon(self,recipe):
         self.recipe=recipe
@@ -505,37 +610,38 @@ class SpoonContext(GraspMotionContext):
                 approach_spoon(self,targets,opening)
             q=self.move(targets['GRASP'],'GRASP',opening,cartesian=True)
             np.savez_compressed(self.output/'grasp_state.npz',qpos=self.data.qpos,qvel=self.data.qvel,ctrl=self.data.ctrl,time=self.data.time)
-            self.stage='CLOSE'
             if recipe.ee_id=='2F':
                 self.runtime.set_finger_gripper_actuator_gains(kp=recipe.closure_kp)
-            acquired=False
-            hold_opening=-1.
-            for f in np.linspace(0,1,math.ceil(recipe.close_duration_s*50)):
-                hold_opening=opening+(-1.-opening)*f
-                row=self.step(q,hold_opening)
-                if recipe.ee_id=='2F' and not self.two_finger_force_hold and any(v>.05 for v in row['finger_force_n'].values()):
-                    self.two_finger_command=float(np.asarray(self.gripper.current_action).mean())
-                    self.two_finger_force_hold=True
-                if recipe.ee_id=='3F' and not self.three_finger_force_hold and three_finger_contact_established(row):
-                    self.three_finger_commands=np.asarray(
-                        self.gripper.current_action).copy()
-                    self.three_finger_force_hold=True
-                acquired=grasp_contact_ready(recipe,self.trace,recipe.contact_ticks)
-                if acquired: break
-            for _ in range(100):
-                if acquired: break
-                hold_opening=-1.
-                row=self.step(q,-1.)
-                if recipe.ee_id=='2F' and not self.two_finger_force_hold and any(v>.05 for v in row['finger_force_n'].values()):
-                    self.two_finger_command=float(np.asarray(self.gripper.current_action).mean())
-                    self.two_finger_force_hold=True
-                if recipe.ee_id=='3F' and not self.three_finger_force_hold and three_finger_contact_established(row):
-                    self.three_finger_commands=np.asarray(
-                        self.gripper.current_action).copy()
-                    self.three_finger_force_hold=True
-                acquired=grasp_contact_ready(recipe,self.trace,recipe.contact_ticks)
+            close_attempts=[]
+            acquired,hold_opening,q=self._spoon_close_until_ready(q,opening,recipe)
+            close_attempts.append({
+                'lateral_m':thin_handle_nominal_lateral_m(recipe) if getattr(recipe,'thin_handle_pinch',False) else None,
+                'acquired':bool(acquired),
+            })
+            if (not acquired) and getattr(recipe,'thin_handle_pinch',False):
+                for lateral in thin_handle_lateral_retry_schedule(recipe):
+                    q=prepare_thin_handle_close_retry(self,q,opening,targets)
+                    recipe=recipe_with_thin_handle_lateral(recipe,lateral)
+                    self.recipe=recipe
+                    targets=build_spoon_targets(
+                        self.body_pose(),self.center_in_body,self.local_size,recipe)
+                    save_json(self.output/'targets.json',targets)
+                    q=self.move(targets['PRE_GRASP'],'PRE_GRASP',opening,cartesian=True)
+                    q=self.move(targets['GRASP'],'GRASP',opening,cartesian=True)
+                    acquired,hold_opening,q=self._spoon_close_until_ready(q,opening,recipe)
+                    close_attempts.append({
+                        'lateral_m':float(lateral),'acquired':bool(acquired)})
+                    if acquired:
+                        break
+            if getattr(recipe,'thin_handle_pinch',False) and (
+                    len(close_attempts)>1 or not acquired):
+                save_json(self.output/'thin_handle_close_retry.json',{
+                    'attempts':close_attempts,
+                    'final_lateral_m':thin_handle_nominal_lateral_m(recipe),
+                })
             if not acquired:
                 raise GraspFailure('HANDLE_CONTACT_NOT_STABLE')
+            result['recipe']=recipe.to_dict()
             if recipe.ee_id=='3F':
                 # Freeze the pinch pose. A hard snap to -1 ejects thin utensils.
                 self.three_finger_commands=np.asarray(self.gripper.current_action).copy()

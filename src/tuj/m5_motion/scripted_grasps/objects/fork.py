@@ -11,9 +11,10 @@ from tuj.m5_motion.scripted_grasps.catalog_types import (
 # Compiled C3_2 fork AABB (fork_a / fork_b share the same asset).
 FORK_EXPECTED_SIZE_M = (0.025003964, 0.153709715, 0.018469741)
 
-# Mirror spoon yaw-90 pinch; lateral is more negative than spoon because the
-# fork handle is narrower (~25 mm vs ~45 mm) and needs the thumb+index pair
-# centered on the mesh.
+# Fork handle is ~25 mm wide (spoon is thinner). Spoon's lateral -0.004 leaves
+# the TCP ~4 mm shy of the pinch station: live CLOSE then gets thumb-only
+# presses and dual-contact span ~16 mm (<18 mm thin_handle gate). Validated
+# controller runs (fork_a/fork_b) and the intended pinch use -0.008.
 HANDLE_FRACTION_Y = -0.15
 HEIGHT_OFFSET_M = 0.014
 LATERAL_OFFSET_M = -0.008
@@ -40,6 +41,8 @@ def fork_recipe():
         preshape_closure_command=0.05,
         thin_handle_pinch=True,
         hold_finger_positions=True,
+        # Dual-pad seating flickers for only a few 50 Hz ticks on this mesh.
+        contact_ticks=3,
     )
 
 

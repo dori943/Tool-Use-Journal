@@ -256,14 +256,15 @@ def world_down_vacuum_grip_pose(grip_pose, body_pose=None):
     return leveled
 
 
-def straighten_vacuum_tool_world_down(context, q, opening):
-    """Level a tilted vac tool after LIFT so M5 held motions can track.
+def straighten_tool_world_down(
+        context, q, opening, *, move_fn, artifact_name='tool_level.json',
+        sync_absolute_joints=False):
+    """Level tool -Z to world -Z after LIFT so held M5 place approaches stay vertical.
 
-    Skips when already within ``VACUUM_POST_LIFT_LEVEL_TILT_RAD``. Uses
-    kinematic Cartesian playback only: live bread_b showed that a post-LEVEL
-    absolute-joint PD settle sagged ~35 mm / 0.083 rad and cut HOLD
-    ``lift_m`` from 0.124 to 0.090. Vertical tool (like plate_vac) is what
-    M5 can track; do not re-settle into the tilted equilibrium here.
+    Vac and tilted 3F catalog grasps (live fruit_b) leave ~6–7° TCP tilt. Place
+    PRE_PLACE then offsets along that approach and introduces XY that precise IK
+    cannot reach near a wrist singularity. Level while the kinematic weld owns
+    the object; ``move_fn`` is vac FK playback or catalog Cartesian ``move``.
     """
 
     grip = np.asarray(context.grip_pose(), dtype=float)
@@ -275,7 +276,11 @@ def straighten_vacuum_tool_world_down(context, q, opening):
         'threshold_rad': float(VACUUM_POST_LIFT_LEVEL_TILT_RAD),
     }
     if tilt <= float(VACUUM_POST_LIFT_LEVEL_TILT_RAD) + 1e-12:
-        save_json(context.output / 'vacuum_tool_level.json', record)
+        save_json(context.output / artifact_name, record)
+        return np.asarray(q, dtype=float), record
+    if getattr(context.runtime, 'attachment', None) is None:
+        record['skipped'] = 'NO_KINEMATIC_ATTACHMENT'
+        save_json(context.output / artifact_name, record)
         return np.asarray(q, dtype=float), record
     body = np.asarray(context.body_pose(), dtype=float)
     initial_z = float(np.asarray(context.initial_body, dtype=float)[2, 3])
@@ -285,21 +290,19 @@ def straighten_vacuum_tool_world_down(context, q, opening):
         'body_z_before_m': float(body[2, 3]),
     })
     target = world_down_vacuum_grip_pose(grip, body_pose=body)
-    # settle_steps=0: PD after FK reintroduces the transport lag that LEVEL
-    # exists to remove (live: tilt 3.9° → 4.8°, body z -35 mm).
-    q = move_vacuum_cartesian_kinematic(
-        context, target, 'LEVEL', opening, settle_steps=0)
+    q = move_fn(context, target, 'LEVEL', opening)
     body_mid = np.asarray(context.body_pose(), dtype=float)
     lift_mid = float(body_mid[2, 3] - initial_z)
-    # Cartesian mid-segments can still dip the payload; restore body z.
     restore_m = lift_before - lift_mid
     if restore_m > 1e-4:
         raised = np.asarray(context.grip_pose(), dtype=float).copy()
         raised[2, 3] = float(raised[2, 3]) + restore_m
-        q = move_vacuum_cartesian_kinematic(
-            context, raised, 'LEVEL', opening, settle_steps=0)
+        q = move_fn(context, raised, 'LEVEL', opening)
         record['height_restore_m'] = float(restore_m)
-    _sync_absolute_joint_goal(context, q)
+    if sync_absolute_joints:
+        _sync_absolute_joint_goal(context, q)
+    if getattr(context.runtime, 'attachment', None) is not None:
+        context.runtime.synchronize_attached_object()
     body_after = np.asarray(context.body_pose(), dtype=float)
     tilt_after = vacuum_tool_tilt_from_world_down_rad(context.grip_pose())
     lift_after = float(body_after[2, 3] - initial_z)
@@ -313,11 +316,36 @@ def straighten_vacuum_tool_world_down(context, q, opening):
             np.asarray(context.grip_pose(), dtype=float)[:3, 3] - grip[:3, 3]
         ).tolist(),
         'mode': 'KINEMATIC_PATH_PRESERVE_BODY_ORIGIN',
-        'pd_settle_after_level': False,
     })
     if getattr(context, 'carried_pose', None) is not None:
         context.carried_pose = inverse(context.grip_pose()) @ context.body_pose()
-    save_json(context.output / 'vacuum_tool_level.json', record)
+    save_json(context.output / artifact_name, record)
+    return np.asarray(q, dtype=float), record
+
+
+def straighten_vacuum_tool_world_down(context, q, opening):
+    """Level a tilted vac tool after LIFT so M5 held motions can track.
+
+    Skips when already within ``VACUUM_POST_LIFT_LEVEL_TILT_RAD``. Uses
+    kinematic Cartesian playback only: live bread_b showed that a post-LEVEL
+    absolute-joint PD settle sagged ~35 mm / 0.083 rad and cut HOLD
+    ``lift_m`` from 0.124 to 0.090. Vertical tool (like plate_vac) is what
+    M5 can track; do not re-settle into the tilted equilibrium here.
+    """
+
+    def _vac_move(ctx, target, stage, opening_cmd):
+        # settle_steps=0: PD after FK reintroduces the transport lag that LEVEL
+        # exists to remove (live: tilt 3.9° → 4.8°, body z -35 mm).
+        return move_vacuum_cartesian_kinematic(
+            ctx, target, stage, opening_cmd, settle_steps=0)
+
+    q, record = straighten_tool_world_down(
+        context, q, opening, move_fn=_vac_move,
+        artifact_name='vacuum_tool_level.json',
+        sync_absolute_joints=True)
+    if record.get('applied'):
+        record['pd_settle_after_level'] = False
+        save_json(context.output / 'vacuum_tool_level.json', record)
     return q, record
 
 

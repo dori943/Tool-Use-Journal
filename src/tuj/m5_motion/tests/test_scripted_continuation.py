@@ -212,11 +212,73 @@ def test_vac_retention_snaps_arm_to_absolute_joint_goal(monkeypatch):
     retention = GraspRetention(context, entry)
     # Pretend PD sagged away from the absolute goal before after_tick.
     data.qpos[:6] = np.arange(6, dtype=float) * 0.5
-    assert retention._snap_vac_arm_to_controller_goal() is True
+    assert retention._snap_arm_to_controller_goal() is True
     assert np.allclose(data.qpos[:6], controller.goal_qpos)
     assert synced['n'] == 1
     retention.after_tick(0.0)
     assert np.allclose(data.qpos[:6], controller.goal_qpos)
+
+
+def test_kinematic_3f_retention_snaps_arm_while_attached(monkeypatch):
+    """Thin-handle spoon place: finger soft contacts sag PD; snap while welded."""
+    from dataclasses import replace
+    from tuj.m5_motion.scripted_grasps.retention import GraspRetention
+    from tuj.m5_motion.tests.test_scripted_grasps import _c3_2_entry
+
+    entry = replace(_c3_2_entry("spoon"), body_object_id="spoon_a")
+    assert entry.ee == "3F"
+    class FakeData:
+        def __init__(self):
+            self.qpos = np.zeros(10)
+            self.qvel = np.zeros(10)
+
+    data = FakeData()
+    synced = {'n': 0}
+    controller = SimpleNamespace(goal_qpos=np.arange(6, dtype=float) * 0.02)
+    context = SimpleNamespace(
+        grip_pose=lambda: np.eye(4),
+        body_pose=lambda: np.eye(4),
+        arm_ids=np.arange(6),
+        object_dadr=6,
+        data=data,
+        mj=SimpleNamespace(mj_fwdPosition=lambda *a, **k: None),
+        robot=SimpleNamespace(
+            part_controllers={'right': controller},
+            _ref_joint_vel_indexes=[0, 1, 2, 3, 4, 5],
+        ),
+        runtime=SimpleNamespace(
+            attached_object_id='spoon_a',
+            attachment=object(),
+            synchronize_attached_object=lambda: synced.__setitem__('n', synced['n'] + 1),
+        ),
+        recipe=SimpleNamespace(hold_finger_positions=True, thin_handle_pinch=True),
+        gripper=SimpleNamespace(current_action=np.zeros(3)),
+        body_id=0,
+        finger_groups={},
+        model=SimpleNamespace(
+            body_jntadr=np.array([0]),
+            joint=lambda _jid: SimpleNamespace(name="spoon_a_joint0"),
+        ),
+        three_finger_force_hold=False,
+        two_finger_force_hold=False,
+        env=object(),
+    )
+    context.runtime.env = context.env
+    monkeypatch.setattr(
+        GraspRetention, "_forces",
+        lambda self: {"thumb": 10.0, "index": 0.0, "pinky": 0.0},
+    )
+    retention = GraspRetention(context, entry)
+    data.qpos[:6] = np.arange(6, dtype=float) * 0.4
+    retention.after_tick(0.0)
+    assert np.allclose(data.qpos[:6], controller.goal_qpos)
+    assert synced['n'] == 1
+    # After detach, friction-only holds must not snap.
+    context.runtime.attachment = None
+    context.runtime.attached_object_id = None
+    data.qpos[:6] = np.arange(6, dtype=float) * 0.4
+    retention.after_tick(0.01)
+    assert not np.allclose(data.qpos[:6], controller.goal_qpos)
 
 
 def test_vac_retention_contact_false_for_wrong_instance_keeps_loss_timer(monkeypatch):

@@ -676,11 +676,13 @@ def canonicalize_contact_tcp_height(
     in_band = floor_z - 1e-6 <= z_m and (
         ceiling_z is None or z_m <= ceiling_z + 1e-6
     )
-    # Hover phases only lift; CONTACT_* both lift and lower into engagement.
+    # Hover phases only lift into the band. CONTACT_* must pin to the
+    # engagement plane — "in band" alone still allows ~5–8 cm lifts that lose
+    # underside contact so kinematic push stops mid-sweep (SG2 failure mode).
     if keyframe.keyframe_type in _HOVER_PHASE_TYPES:
         if in_band or z_m >= floor_z - 1e-6:
             return keyframe
-    elif in_band:
+    elif abs(z_m - target_z) <= 1e-3:
         return keyframe
 
     candidate = _retarget_tcp_height(
@@ -1107,6 +1109,15 @@ def canonicalize_sweep_lateral_toward_region(
     except GeometryResolutionError:
         return list(keyframes)
     end_xy = np.asarray(end_pose.position_m[:2], dtype=float)
+    engagement = _contact_engagement_tcp_z_m(request)
+    contact_z = (
+        float(engagement) if engagement is not None else float(start_z)
+    )
+    # Prefer the already-canonicalized CONTACT_START height when it is near
+    # engagement (start may include shallow press).
+    if abs(float(start_z) - contact_z) <= 0.02:
+        contact_z = float(start_z)
+
     if float(np.linalg.norm(end_xy - path_end)) <= _SWEEP_CORRIDOR_DEVIATION_M:
         corridor_ok = True
         for keyframe in keyframes:
@@ -1124,6 +1135,11 @@ def canonicalize_sweep_lateral_toward_region(
             ):
                 corridor_ok = False
                 break
+            if abs(float(sweep_pose.position_m[2]) - contact_z) > 1e-3:
+                corridor_ok = False
+                break
+        if abs(float(end_pose.position_m[2]) - contact_z) > 1e-3:
+            corridor_ok = False
         if corridor_ok:
             return list(keyframes)
 
@@ -1149,7 +1165,7 @@ def canonicalize_sweep_lateral_toward_region(
             result[index],
             resolver=active_resolver,
             target_xy=target_xy,
-            target_z=start_z,
+            target_z=contact_z,
             packing_xyzw=packing,
             metadata_flag="sweep_lateral_canonicalized",
         )
@@ -1753,7 +1769,11 @@ def _support_surface_z_m(request: MotionPlanRequest) -> float | None:
     for obstacle in request.world.obstacles:
         if not isinstance(obstacle, Mapping):
             continue
-        label = f"{obstacle.get('id', '')} {obstacle.get('kind', '')}".lower()
+        label = (
+            f"{obstacle.get('id', '')} "
+            f"{obstacle.get('obstacle_id', '')} "
+            f"{obstacle.get('kind', '')}"
+        ).lower()
         if not any(token in label for token in ("table", "counter", "support")):
             continue
         maximum = _finite_vector(obstacle.get("aabb_max_m"), 3)

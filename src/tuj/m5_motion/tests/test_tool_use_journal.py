@@ -769,6 +769,51 @@ def test_held_tool_kinematic_push_assist_moves_tabletop_partner() -> None:
     runtime.close()
 
 
+def test_kinematic_push_assist_separates_z_with_zero_xy_delta() -> None:
+    """Stationary paddle still pushes partners down out of its volume."""
+
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    data.qpos[apple_qpos : apple_qpos + 3] = [0.0, 0.0, 0.80]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+
+    box_geom = next(
+        geom_id
+        for geom_id in range(int(model.ngeom))
+        if int(model.geom_type[geom_id]) == int(mujoco.mjtGeom.mjGEOM_BOX)
+    )
+    runtime._held_tool_fill_geom_backup[box_geom] = (
+        0,
+        0,
+        np.asarray(model.geom_size[box_geom], dtype=float).copy(),
+        np.asarray(model.geom_pos[box_geom], dtype=float).copy(),
+    )
+    model.geom_size[box_geom] = np.asarray([0.10, 0.10, 0.0025], dtype=float)
+    model.geom_pos[box_geom] = np.asarray([0.0, 0.0, 0.0], dtype=float)
+    runtime._held_tool_push_partner_ids = frozenset({"apple"})
+
+    before_xy = data.qpos[apple_qpos : apple_qpos + 2].copy()
+    before_z = float(data.qpos[apple_qpos + 2])
+    runtime._apply_held_tool_kinematic_push_assist(
+        delta_xy=np.zeros(2, dtype=float),
+        tool_position=np.asarray([0.0, 0.0, 0.822], dtype=float),
+        tool_rotation=np.eye(3, dtype=float),
+    )
+    assert data.qpos[apple_qpos : apple_qpos + 2] == pytest.approx(before_xy, abs=1e-9)
+    assert float(data.qpos[apple_qpos + 2]) < before_z - 1e-4
+    # Sphere r=0.03 → center must sit below paddle_bottom - r - 0.5mm.
+    assert float(data.qpos[apple_qpos + 2]) == pytest.approx(
+        0.822 - 0.0025 - 0.03 - 0.0005, abs=1e-6
+    )
+    runtime.close()
+
+
 def test_kinematic_push_assist_packs_partner_when_tool_over_region() -> None:
     """When the paddle is over the goal region, pack footprints into the AABB."""
 

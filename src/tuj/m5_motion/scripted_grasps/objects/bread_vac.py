@@ -1,8 +1,8 @@
 """C3_2 bread vacuum: top-face cup contact (lid-style catalog vac path).
 
-C2_1 bread remains the separate 3F catalog recipe in ``bread.py``. The breakfast
-loaf has a solid upper surface, so contact is at the AABB top center rather than
-a rim annulus.
+C3_2 bread also has a 3F enclosure in ``bread.py``. M4 may mount either EE;
+``resolve`` picks the matching recipe. The breakfast loaf has a solid upper
+surface, so vac contact is at the AABB top center rather than a rim annulus.
 
 Vertical seating: the VacuumGripper ``vac_cup`` contact face coincides with the
 grip site. ``offset_fraction`` z=0.5 already places GRASP on the AABB top face;

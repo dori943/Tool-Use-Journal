@@ -30,8 +30,10 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     c = cls()
     scene_object_id = entry.scene_object_id
     c.runtime, c.env, c.recipe, c.object_id = runtime, env, recipe, scene_object_id
-    c.output = Path(output)
-    c.output.mkdir(parents=True, exist_ok=False)
+    c.output = Path(output).resolve()
+    # Re-runs reuse the same step hash; allow an existing empty/partial grasp
+    # tree instead of failing closed with FileExistsError / missing parents.
+    c.output.mkdir(parents=True, exist_ok=True)
     c.mj = mujoco
     c.adapter = ToolUseJournalEnvironmentAdapter(env)
     c.model, c.data = c.adapter.model, c.adapter.data

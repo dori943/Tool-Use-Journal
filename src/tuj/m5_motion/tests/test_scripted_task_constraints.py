@@ -55,3 +55,16 @@ def test_spoon_contract_keeps_both_m4_hand_candidates_and_selected_order():
         'execution_compatibility']
     assert contract['supported_ee']==['2F','3F']
     assert contract['selected_feasible_ee']==['3F','2F']
+
+
+def test_c3_2_bread_instance_contract_keeps_3f_and_vac():
+    """bread_a shares type-keyed recipes; M4 may keep either mounted EE."""
+    constrained,changes=constrain_task_request(
+        make_request(['vac','3F'],tool_id='bread_a'),
+        'C3_2_BreakfastTrayPreparation')
+    assert constrained.task_graph.subgoals[0].feasible_ee==['vac','3F']
+    assert changes[0]['object_id']=='bread'
+    assert changes[0]['scripted_feasible_ee']==['vac','3F']
+    contract=constrained.task_graph.subgoals[0].action_parameters[
+        'execution_compatibility']
+    assert set(contract['supported_ee'])=={'3F','vac'}

@@ -141,7 +141,7 @@ def test_c3_2_remaining_instances_resolve_and_build_targets():
     from tuj.m5_motion.scripted_grasps.registry import integration_status
 
     cases = (
-        ("bread", "vac", "bread_vac", "bread_vac_"),
+        ("bread", "3F", "bread", "bread_3f_"),
         ("fruit", "3F", None, "fruit_3f_"),
         ("spoon", "3F", None, "spoon_3f_c3_2_"),
         ("mug", "3F", "mug_c3_2", "mug_3f_"),
@@ -149,7 +149,12 @@ def test_c3_2_remaining_instances_resolve_and_build_targets():
     body = transform([0.35, -0.05, 0.92], rotation=np.eye(3))
     center = np.zeros(3)
     for object_id, ee, module_name, recipe_prefix in cases:
-        entry = _c3_2_entry(object_id)
+        entry = next(
+            e for e in ENTRIES
+            if e.object_id == object_id
+            and e.environment == "C3_2_BreakfastTrayPreparation"
+            and e.ee == ee
+        )
         assert entry.ee == ee
         assert entry.module_name == module_name
         assert integration_status(entry) == "EXPERIMENTAL"
@@ -172,6 +177,20 @@ def test_c3_2_remaining_instances_resolve_and_build_targets():
                 targets["LIFT"][:3, 3] - targets["GRASP"][:3, 3],
                 [0, 0, recipe.lift_distance_m],
             )
+    # Same type also resolves when M4 mounts vac for bread.
+    bread_vac = next(
+        e for e in ENTRIES
+        if e.object_id == "bread"
+        and e.environment == "C3_2_BreakfastTrayPreparation"
+        and e.ee == "vac"
+    )
+    for instance in ("bread_a", "bread_b"):
+        resolved = resolve(request_for(bread_vac, object_id=instance))
+        assert resolved.ee == "vac"
+        assert resolved.module_name == "bread_vac"
+        assert resolved.scene_object_id == instance
+        assert resolved.recipe().recipe_id.startswith("bread_vac_")
+
     # Prior c2_1 / c1_2 exact-id recipes unchanged and remain validated.
     c2_bread = next(e for e in ENTRIES if e.object_id == "bread" and e.environment.startswith("C2_1"))
     c2_mug = next(e for e in ENTRIES if e.object_id == "mug" and e.environment.startswith("C2_1"))
@@ -248,6 +267,15 @@ def test_c3_2_plate_vac_tunes_rim_to_measured_aabb():
         half - plate_vac.CUP_CLEARANCE_RADIUS_M - plate_vac.RIM_EDGE_MARGIN_M)
     stale_radial = measured[0] * recipe.offset_fraction[0]
     assert radial > stale_radial + 0.001
+
+
+def test_c3_2_fruit_enables_kinematic_carry_for_post_lift_level():
+    """fruit_b place IK failed when a tilted friction hold skewed PRE_PLACE."""
+    from tuj.m5_motion.scripted_grasps.objects.fruit import fruit_recipe
+
+    recipe = fruit_recipe()
+    assert recipe.hold_finger_positions is True
+    assert recipe.ee_id == "3F"
 
 
 def test_c3_2_bread_vac_does_not_seat_below_aabb_top():

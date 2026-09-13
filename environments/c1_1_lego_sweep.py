@@ -597,6 +597,9 @@ class C1_1_LegoSweep(ManipulationEnv):
             / 2.0
         )
 
+        # Opaque (alpha=1): MuJoCo's built-in renderer does not depth-test
+        # translucent geoms reliably, so a semi-transparent zone draws through
+        # the plate mesh. Opaque zone still sits under free objects by Z order.
         self.collection_zone_visual = (
             BoxObject(
                 name="collection_zone_visual",
@@ -604,20 +607,20 @@ class C1_1_LegoSweep(ManipulationEnv):
                 size_min=[
                     zone_half_x,
                     zone_half_y,
-                    0.001,
+                    0.0005,
                 ],
 
                 size_max=[
                     zone_half_x,
                     zone_half_y,
-                    0.001,
+                    0.0005,
                 ],
 
                 rgba=[
                     0.20,
                     0.85,
                     0.35,
-                    0.30,
+                    1.0,
                 ],
 
                 joints=None,
@@ -918,7 +921,9 @@ class C1_1_LegoSweep(ManipulationEnv):
 
                     reference_pos=self.table_offset,
 
-                    z_offset=0.002,
+                    # Thin slab flush with the table top so free objects and
+                    # the plate mesh sit clearly above it in depth.
+                    z_offset=0.0005,
 
                     rng=self.rng,
                 )

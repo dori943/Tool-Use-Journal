@@ -5,6 +5,7 @@ import pytest
 from tuj.m5_motion.orchestration import (
     MotionPlanStore,
     SelectedPlanMotionOrchestrator,
+    _resource_transition_requests,
 )
 from tuj.m5_motion.physical_grasp import releases_contact_friction
 from tuj.m5_motion.schema import (
@@ -16,6 +17,7 @@ from tuj.m5_motion.schema import (
     MotionConstraints,
     MotionPlan,
     MotionPlanRequest,
+    PlannerOptions,
     RobotState,
     SceneRef,
     SegmentType,
@@ -113,6 +115,31 @@ def _world() -> WorldSnapshot:
         },
         metadata={"physical_active_ee": "2F"},
     )
+
+
+def test_resource_transitions_skip_exchange_when_destination_ee_already_mounted() -> None:
+    """--start-from-object remounts the destination EE; do not re-exchange."""
+
+    world = _world()
+    world.metadata["physical_active_ee"] = "3F"
+    constraints = MotionConstraints(
+        joint_limits={
+            "j1": JointDynamicLimit(
+                max_velocity_rad_s=1.0,
+                max_acceleration_rad_s2=2.0,
+            )
+        }
+    )
+    requests = _resource_transition_requests(
+        parent_subgoal_id="pick-part",
+        steps=_selected().steps,
+        world=world,
+        constraints=constraints,
+        options=PlannerOptions(),
+        selected_plan_artifact_id="selected-plan:test",
+        fallback_ee="3F",
+    )
+    assert requests == []
 
 
 def _fake_planner(request):

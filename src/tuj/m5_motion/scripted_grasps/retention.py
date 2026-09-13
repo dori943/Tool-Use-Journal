@@ -50,14 +50,24 @@ class GraspRetention:
                     forces[name] += max(0., float(force[0]))
         return forces
 
-    def _snap_vac_arm_to_controller_goal(self):
-        """Overwrite vac arm joints to the absolute JOINT_POSITION goal.
+    def _held_kinematic_attachment_active(self):
+        """True when retention still owns a MuJoCo kinematic weld for this body."""
+        runtime = getattr(self.context, "runtime", None)
+        if runtime is None:
+            return False
+        return (
+            getattr(runtime, "attached_object_id", None) == self.entry.scene_object_id
+            and getattr(runtime, "attachment", None) is not None
+        )
 
-        Live bread_b stays attached but absolute-joint PD sags ~35 mm / 0.083 rad
-        through M5 transport/place, so DETACH settle never converges. Plate_vac
-        tracks; bread does not. Snapping to ``goal_qpos`` after each control tick
-        (then re-syncing the kinematic attach) makes held vac M5 playback match
-        the commanded waypoints the same way catalog LEVEL/HOLD already does.
+    def _snap_arm_to_controller_goal(self):
+        """Overwrite arm joints to the absolute JOINT_POSITION goal.
+
+        Live bread_b vac and thin-handle 3F (spoon_a place) stay attached while
+        absolute-joint PD sags under soft finger/cup contact, so the next
+        contact-sensitive settle never converges. Snapping to ``goal_qpos`` after
+        each control tick (then re-syncing the kinematic attach) makes held M5
+        playback match commanded waypoints the same way catalog LEVEL/HOLD does.
         """
 
         c = self.context
@@ -93,6 +103,9 @@ class GraspRetention:
             c.mj.mj_fwdPosition(c.model, c.data)
         return True
 
+    # Backward-compatible alias for older unit tests / callers.
+    _snap_vac_arm_to_controller_goal = _snap_arm_to_controller_goal
+
     def before_tick(self, action):
         c, recipe = self.context, self.context.recipe
         if c.runtime.env is not c.env:
@@ -126,18 +139,18 @@ class GraspRetention:
 
     def after_tick(self, time_s):
         c = self.context
-        if self.entry.ee == "vac":
-            self._snap_vac_arm_to_controller_goal()
+        # Vac always snaps (historical bread_b place settle). Kinematic 3F/2F
+        # carries snap only while the weld is still owned — friction-only holds
+        # keep ordinary absolute-joint tracking.
+        if self.entry.ee == "vac" or self._held_kinematic_attachment_active():
+            self._snap_arm_to_controller_goal()
         self.forces = self._forces()
         actual = inverse(c.grip_pose()) @ c.body_pose()
         slip = float(np.linalg.norm(actual[:3, 3] - self.reference[:3, 3]))
         angle = float(np.rad2deg(Rotation.from_matrix(self.reference[:3, :3].T @ actual[:3, :3]).magnitude()))
         # Attachments are keyed by scene instance (fruit_a / plate_b), not recipe
         # type id. Vac multi-instance holds compare those ids alone.
-        attached = (
-            getattr(c.runtime, "attached_object_id", None) == self.entry.scene_object_id
-            and getattr(c.runtime, "attachment", None) is not None
-        )
+        attached = self._held_kinematic_attachment_active()
         if self.entry.ee == "vac":
             contact = (
                 getattr(c.runtime, "attached_object_id", None)

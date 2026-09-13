@@ -49,6 +49,9 @@ class CatalogRecipe:
     # Thin utensil handles: accept thumb+index/pinky pinch instead of full 3F.
     thin_handle_pinch: bool = False
     hold_finger_positions: bool = False
+    # After a failed thin-handle CLOSE, retry GRASP+CLOSE at offset_m.x ± k*step.
+    thin_handle_close_retries: int = 0
+    thin_handle_lateral_retry_m: float = 0.002
 
     @property
     def model_class(self):
@@ -92,6 +95,14 @@ class CatalogRecipe:
         if not isinstance(self.contact_ticks,int) or self.contact_ticks<1: raise ValueError('Invalid contact ticks')
         if not isinstance(self.thin_handle_pinch,bool) or not isinstance(self.hold_finger_positions,bool):
             raise ValueError('Invalid boolean recipe flag')
+        if not isinstance(self.thin_handle_close_retries,int) or self.thin_handle_close_retries<0:
+            raise ValueError('Invalid thin_handle_close_retries')
+        if self.thin_handle_close_retries and not self.thin_handle_pinch:
+            raise ValueError('thin_handle_close_retries requires thin_handle_pinch')
+        if not (self.thin_handle_lateral_retry_m>0 and np.isfinite(self.thin_handle_lateral_retry_m)):
+            raise ValueError('Invalid thin_handle_lateral_retry_m')
+        if self.thin_handle_lateral_retry_m>.01:
+            raise ValueError('thin_handle_lateral_retry_m out of range')
 
     def to_dict(self):
         result={**asdict(self),'model_class':self.model_class,'recipe_id':self.recipe_id}

@@ -15,7 +15,9 @@ from tuj.m5_motion.scripted_grasps.frames import transform, inverse, pose_dict
 from tuj.m5_motion.scripted_grasps.objects.plate import PlateRecipe, build_plate_targets
 
 def save_json(path, value):
-    Path(path).write_text(json.dumps(value, indent=2, ensure_ascii=False,
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    path.write_text(json.dumps(value, indent=2, ensure_ascii=False,
         default=lambda x: x.tolist() if isinstance(x, np.ndarray) else
             x.item() if isinstance(x, np.generic) else str(x)), encoding="utf-8")
 

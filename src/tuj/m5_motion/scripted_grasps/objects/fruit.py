@@ -25,6 +25,9 @@ def fruit_recipe():
         # fruit_a also fails IK at the default 0.18 m LIFT height.
         lift_distance_m=0.12,
         minimum_lift_m=0.08,
+        # Kinematic carry + post-LIFT LEVEL: live fruit_b place failed when a
+        # ~6° grasp tilt skewed PRE_PLACE into an unreachable precise-IK pose.
+        hold_finger_positions=True,
     )
 
 

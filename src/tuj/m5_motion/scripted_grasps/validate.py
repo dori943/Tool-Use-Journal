@@ -28,8 +28,8 @@ C3_2_ENVIRONMENT = "C3_2_BreakfastTrayPreparation"
 C3_2_EXPECTED_ACQUIRES: tuple[tuple[str, str], ...] = (
     ("plate_a", "vac"),
     ("plate_b", "vac"),
-    ("bread_a", "vac"),
-    ("bread_b", "vac"),
+    ("bread_a", "3F"),
+    ("bread_b", "3F"),
     ("fruit_a", "3F"),
     ("fruit_b", "3F"),
     ("spoon_a", "3F"),
@@ -83,7 +83,13 @@ def resolve_case(
     environment: str = C3_2_ENVIRONMENT,
 ) -> dict[str, Any]:
     """Resolve one acquire. Never invents a recipe for an unregistered type."""
-    from tuj.m5_motion.scripted_grasps.registry import ScriptedGraspUnavailable
+    from tuj.m5_motion.scripted_grasps.registry import (
+        ALTERNATIVE_ENTRIES,
+        ENTRIES,
+        ScriptedGraspUnavailable,
+        VALIDATOR_EXPERIMENTAL_ENTRIES,
+        _recipe_keys_for_target,
+    )
 
     request = _acquire_request(environment, object_id, ee)
     try:
@@ -107,6 +113,30 @@ def resolve_case(
             "detail": str(error),
         }
     if entry is None:
+        # Live M5 falls back when the type is registered for another EE. The
+        # validator still reports EE_MISMATCH so operators can tell mismatch
+        # from a completely missing recipe.
+        candidates = ENTRIES + ALTERNATIVE_ENTRIES
+        if request.task.metadata.get("scripted_grasp_validator_experimental", False):
+            candidates += VALIDATOR_EXPERIMENTAL_ENTRIES
+        type_matches = []
+        for key in _recipe_keys_for_target(object_id, environment):
+            type_matches = [
+                e for e in candidates
+                if (e.object_id, e.environment) == (key, environment)
+            ]
+            if type_matches:
+                break
+        if type_matches:
+            supported = "/".join(dict.fromkeys(e.ee for e in type_matches))
+            return {
+                "status": "EE_MISMATCH",
+                "object_id": object_id,
+                "ee": ee,
+                "environment": environment,
+                "entry": None,
+                "detail": f"recipe expects {supported}, requested {ee}",
+            }
         return {
             "status": "NOT_REGISTERED",
             "object_id": object_id,

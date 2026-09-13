@@ -112,6 +112,7 @@ def _world(*, attached: AttachedObjectTransform | None = None) -> WorldSnapshot:
                     "position_m": [0.6, 0.0, 0.1],
                     "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
                 },
+                "dimensions_m": [0.25, 0.18, 0.002],
             },
         },
         rack={
@@ -946,12 +947,12 @@ def test_held_tool_sweep_allows_ee_and_tool_to_touch_targets() -> None:
         "object_id": "block_a",
         "free_joint_name": "block_a_free",
         "pose": {
-            "position_m": [0.35, 0.05, 0.2],
+            "position_m": [0.35, 0.05, 0.805],
             "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
         },
         "dimensions_m": [0.04, 0.04, 0.04],
     }
-    # Neighbor not in target_ids / allowed_touch: within plate-reach of block_a.
+    # Neighbor not in target_ids / allowed_touch: within held-tool reach of block_a.
     world.objects["block_10"] = {
         "object_id": "block_10",
         "free_joint_name": "block_10_free",
@@ -961,16 +962,45 @@ def test_held_tool_sweep_allows_ee_and_tool_to_touch_targets() -> None:
         },
         "dimensions_m": [0.04, 0.04, 0.04],
     }
-    # Far tabletop block: same support band, but outside plate-reach of seeds.
+    # Far tabletop block: same support band, but outside tool-reach of seeds
+    # and outside the goal-region tool halo.
     world.objects["block_far"] = {
         "object_id": "block_far",
         "free_joint_name": "block_far_free",
         "pose": {
-            "position_m": [0.85, 0.05, 0.805],
+            "position_m": [1.05, 0.05, 0.805],
             "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
         },
         "dimensions_m": [0.04, 0.04, 0.04],
     }
+    # Prior-pass block already packed into the goal region (far from seeds).
+    world.objects["block_settled"] = {
+        "object_id": "block_settled",
+        "free_joint_name": "block_settled_free",
+        "pose": {
+            "position_m": [0.60, 0.02, 0.805],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.04, 0.04, 0.04],
+    }
+    # Neighbor tool already near the goal region (not a sweep-target stem).
+    # CONTACT_END over the zone must allow vac/EE↔ladle grazes.
+    world.objects["ladle"] = {
+        "object_id": "ladle",
+        "free_joint_name": "ladle_free",
+        "pose": {
+            "position_m": [0.55, 0.04, 0.805],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.08, 0.04, 0.04],
+    }
+    world.obstacles = [
+        {
+            "obstacle_id": "table_collision",
+            "aabb_min_m": [-1.0, -1.0, 0.75],
+            "aabb_max_m": [1.0, 1.0, 0.80],
+        }
+    ]
     world.metadata["physical_active_ee"] = "vac"
     request = MotionPlanRequest(
         request_id="request-sweep-touch",
@@ -1031,10 +1061,122 @@ def test_held_tool_sweep_allows_ee_and_tool_to_touch_targets() -> None:
     assert ("block_a", "vac") in pairs
     assert ("block_10", "plate") in pairs
     assert ("block_10", "vac") in pairs
+    assert ("block_settled", "plate") in pairs
+    assert ("block_settled", "vac") in pairs
+    assert ("ladle", "plate") in pairs
+    assert ("ladle", "vac") in pairs
     assert ("block_far", "plate") not in pairs
     assert ("block_far", "vac") not in pairs
     assert ("bottle", "plate") not in pairs
     assert ("other", "vac") not in pairs
+
+
+def test_held_tool_transport_allows_breakaway_under_tool_footprint() -> None:
+    """Post-sweep TRANSPORT start must allow residual held-tool↔under-tool contact."""
+
+    attachment = AttachedObjectTransform(
+        object_id="plate",
+        free_joint_name="plate_free",
+        reference_kind="body",
+        reference_name="robot0_right_hand",
+        position_in_reference_m=(0.0, 0.0, 0.0),
+        orientation_in_reference_xyzw=(0.0, 0.0, 0.0, 1.0),
+    )
+    world = _world(attached=attachment)
+    world.robot_state = world.robot_state.model_copy(
+        update={"held_tool_id": "plate", "attached_object_id": "plate"}
+    )
+    # Plate still over the swept pile when returning to tool_rest.
+    world.objects["plate"] = {
+        "object_id": "plate",
+        "free_joint_name": "plate_free",
+        "pose": {
+            "position_m": [-0.15, 0.0, 0.82],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.2, 0.2, 0.01],
+    }
+    world.objects["block_6"] = {
+        "object_id": "block_6",
+        "free_joint_name": "block_6_free",
+        "pose": {
+            "position_m": [-0.12, 0.02, 0.805],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.04, 0.04, 0.04],
+    }
+    world.objects["block_far"] = {
+        "object_id": "block_far",
+        "free_joint_name": "block_far_free",
+        "pose": {
+            "position_m": [1.05, 0.05, 0.805],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.04, 0.04, 0.04],
+    }
+    world.obstacles = [
+        {
+            "obstacle_id": "table_collision",
+            "aabb_min_m": [-1.0, -1.0, 0.75],
+            "aabb_max_m": [1.0, 1.0, 0.80],
+        }
+    ]
+    world.metadata["physical_active_ee"] = "vac"
+    request = MotionPlanRequest(
+        request_id="request-transport-breakaway",
+        provenance=ArtifactProvenance(
+            artifact_id="request-artifact",
+            artifact_type="MotionPlanRequest",
+            produced_by=ModuleName.TASK_PLANNER,
+            invocation_id="task-planner",
+        ),
+        world=world,
+        task=MotionTask(
+            task_id="transport-rest-1",
+            subgoal_id="sg-transport",
+            action_type="transport",
+            ee="vac",
+            tool="plate",
+            target_ids=["plate"],
+            allowed_touch_objects=[],
+            goal=MotionGoal(
+                goal_type=GoalType.POSE,
+                target_region_id="tool_rest",
+            ),
+        ),
+        constraints=_constraints(),
+    )
+    source = _artifact(
+        (
+            RelativeKeyframeSpec(
+                keyframe_id="start",
+                keyframe_type=KeyframeType.TRANSFER,
+                frame_ref="object:plate",
+                anchor="center",
+                approach_axis_xyz=(0.0, 0.0, 1.0),
+                offset_along_approach_m=0.0,
+                planner=KeyframePlannerType.CARTESIAN,
+            ),
+            RelativeKeyframeSpec(
+                keyframe_id="goal",
+                keyframe_type=KeyframeType.TRANSFER,
+                frame_ref="object:tool_rest",
+                anchor="center",
+                approach_axis_xyz=(0.0, 0.0, 1.0),
+                offset_along_approach_m=0.05,
+                planner=KeyframePlannerType.CARTESIAN,
+            ),
+        )
+    )
+
+    setup = _factory().prepare(request, source)
+    context = setup.collision_contexts[setup.initial_collision_context_id]
+    pairs = {tuple(pair) for pair in context.allowed_collision_pairs}
+
+    assert ("block_6", "plate") in pairs
+    assert ("block_6", "vac") in pairs
+    assert ("block_far", "plate") not in pairs
+    assert ("block_far", "vac") not in pairs
 
 
 def test_exchange_entry_uses_only_the_current_attached_ee_for_motion() -> None:

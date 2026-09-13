@@ -18,6 +18,8 @@ from tuj.m5_motion.scripted_grasps.catalog_timing import RUNTIME_VERSION,synchro
 from tuj.m5_motion.scripted_grasps.spoon_runtime import (
     SpoonContext, approach_spoon, grasp_contact_ready, hold_contact_fraction,
     thin_handle_pinch_event, attach_thin_handle_pinch, attach_catalog_kinematic_carry,
+    thin_handle_lateral_retry_schedule, recipe_with_thin_handle_lateral,
+    thin_handle_nominal_lateral_m, prepare_thin_handle_close_retry,
 )
 
 
@@ -220,6 +222,25 @@ class CatalogContext(SpoonContext):
                 and not getattr(self.recipe,'hold_finger_positions',False)):
             self.three_finger_commands=np.asarray(self.gripper.current_action).copy();self.three_finger_force_hold=True
 
+    def _close_fingers_until_ready(self,q,opening,recipe):
+        """Ramp CLOSE and return ``(acquired, hold_opening, q)``."""
+        self.stage='CLOSE'
+        acquired=False
+        hold_opening=-1.
+        for f in np.linspace(0,1,math.ceil(recipe.close_duration_s*50)):
+            hold_opening=opening+(-1.-opening)*f
+            row=self.step(q,hold_opening);self.engage_feedback(row)
+            if self.ready():
+                acquired=True
+                break
+        for _ in range(100):
+            if acquired:
+                break
+            row=self.step(q,-1.);self.engage_feedback(row)
+            acquired=self.ready()
+            hold_opening=-1.
+        return acquired,hold_opening,q
+
     def preshape(self):
         self.stage='PRESHAPE';q=self.data.qpos[self.arm_ids].copy()
         opening=-self.recipe.preshape_closure_command
@@ -326,17 +347,39 @@ class CatalogContext(SpoonContext):
             self.grasp_T_GB=inverse(self.grasp_grip_pose)@self.grasp_object_pose
             np.savez_compressed(self.output/'grasp_state.npz',qpos=self.data.qpos,qvel=self.data.qvel,ctrl=self.data.ctrl,time=self.data.time,
                 grasp_T_GB=self.grasp_T_GB,grasp_object_pose=self.grasp_object_pose,grasp_grip_pose=self.grasp_grip_pose)
-            self.stage='CLOSE'
             if recipe.ee_id=='2F':self.runtime.set_finger_gripper_actuator_gains(kp=recipe.closure_kp)
-            acquired=False;hold_opening=-1.
-            for f in np.linspace(0,1,math.ceil(recipe.close_duration_s*50)):
-                hold_opening=opening+(-1.-opening)*f
-                row=self.step(q,hold_opening);self.engage_feedback(row)
-                if self.ready():acquired=True;break
-            for _ in range(100):
-                if acquired:break
-                row=self.step(q,-1.);self.engage_feedback(row);acquired=self.ready();hold_opening=-1.
+            close_attempts=[]
+            acquired,hold_opening,q=self._close_fingers_until_ready(q,opening,recipe)
+            close_attempts.append({
+                'lateral_m':thin_handle_nominal_lateral_m(recipe) if getattr(recipe,'thin_handle_pinch',False) else None,
+                'acquired':bool(acquired),
+            })
+            if (not acquired) and getattr(recipe,'thin_handle_pinch',False):
+                for lateral in thin_handle_lateral_retry_schedule(recipe):
+                    q=prepare_thin_handle_close_retry(self,q,opening,targets)
+                    recipe=recipe_with_thin_handle_lateral(recipe,lateral)
+                    self.recipe=recipe
+                    targets=build_catalog_targets(
+                        self.body_pose(),self.center_in_body,self.local_size,recipe)
+                    save_json(self.output/'targets.json',targets)
+                    q=self.move(targets['PRE_GRASP'],'PRE_GRASP',opening,cartesian=True)
+                    q=self.move(targets['GRASP'],'GRASP',opening,cartesian=True)
+                    self.grasp_grip_pose=self.grip_pose().copy()
+                    self.grasp_object_pose=self.body_pose().copy()
+                    self.grasp_T_GB=inverse(self.grasp_grip_pose)@self.grasp_object_pose
+                    acquired,hold_opening,q=self._close_fingers_until_ready(q,opening,recipe)
+                    close_attempts.append({
+                        'lateral_m':float(lateral),'acquired':bool(acquired)})
+                    if acquired:
+                        break
+            if getattr(recipe,'thin_handle_pinch',False) and (
+                    len(close_attempts)>1 or not acquired):
+                save_json(self.output/'thin_handle_close_retry.json',{
+                    'attempts':close_attempts,
+                    'final_lateral_m':thin_handle_nominal_lateral_m(recipe),
+                })
             if not acquired:raise GraspFailure('GRASP_CONTACT_NOT_STABLE')
+            result['recipe']=recipe.to_dict()
             if recipe.ee_id=='3F' and (
                 getattr(recipe,'thin_handle_pinch',False) or getattr(recipe,'hold_finger_positions',False)
             ):
@@ -407,6 +450,18 @@ class CatalogContext(SpoonContext):
                 settle_vacuum_arm_tracking(self, q, hold_opening)
             else:
                 q=self.move(targets['LIFT'],'LIFT',hold_opening,cartesian=True)
+                if (recipe.ee_id=='3F'
+                        and getattr(self.runtime,'attachment',None) is not None):
+                    from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
+                        straighten_tool_world_down)
+                    # Live fruit_b: ~6° post-grasp tilt made place PRE_PLACE
+                    # offset along a skewed approach; precise IK then failed.
+                    def _catalog_level_move(ctx, target, stage, opening_cmd):
+                        return ctx.move(target, stage, opening_cmd, cartesian=True)
+                    q, level = straighten_tool_world_down(
+                        self, q, hold_opening, move_fn=_catalog_level_move,
+                        artifact_name='tool_level.json')
+                    result['tool_level'] = level
             if recipe.ee_id=='vac':
                 from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
                     run_kinematic_vacuum_hold,
@@ -461,6 +516,7 @@ class CatalogContext(SpoonContext):
                 result['thin_handle_attachment']=self.thin_handle_attachment_record
         except Exception as exc:
             import traceback
+            self.output.mkdir(parents=True, exist_ok=True)
             (self.output/'error.txt').write_text(traceback.format_exc(),encoding='utf-8')
             result.update(failure_stage=self.stage,failure_reason=str(exc),error_type=type(exc).__name__)
         finally:

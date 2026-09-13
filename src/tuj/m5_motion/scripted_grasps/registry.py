@@ -85,6 +85,9 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # suffix → type, with body_object_id = request target.
     ("plate", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac", None, "plate_vac_c3_2_recipe"),
     ("fork", "C3_2_BreakfastTrayPreparation", "3F", "catalog"),
+    # Breakfast bread: M4 may mount 3F or vac. Both keep a scripted path —
+    # 3F enclosure (C2_1 pattern + C3_2 AABB) and vac top-face attach.
+    ("bread", "C3_2_BreakfastTrayPreparation", "3F", "catalog", "bread", None, "bread_3f_c3_2_recipe"),
     ("bread", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "bread_vac"),
     ("fruit", "C3_2_BreakfastTrayPreparation", "3F", "catalog"),
     ("spoon", "C3_2_BreakfastTrayPreparation", "3F", "spoon"),

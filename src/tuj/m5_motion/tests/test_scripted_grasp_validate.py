@@ -23,7 +23,7 @@ def test_c3_2_validator_can_resolve_type_level_2f_experiments(instance):
 
 @pytest.mark.parametrize(
     ("instance", "ee"),
-    [("bread_b", "vac"), ("spoon_b", "3F"), ("fork_b", "3F")],
+    [("bread_b", "3F"), ("bread_b", "vac"), ("spoon_b", "3F"), ("fork_b", "3F")],
 )
 def test_c3_2_primary_registrations_remain_available(instance, ee):
     resolved = resolve_case(instance, ee)
@@ -37,8 +37,8 @@ def test_c3_2_2f_experiments_are_not_visible_to_normal_m5_resolution():
 
     request = _acquire_request("C3_2_BreakfastTrayPreparation", "bread_b", "2F")
     request.task.metadata.pop("scripted_grasp_validator_experimental")
-    with pytest.raises(ValueError, match="SCRIPTED_GRASP_EE_MISMATCH"):
-        resolve(request)
+    # Primary C3_2 bread is 3F/vac; 2F stays validator-only and must not resolve.
+    assert resolve(request) is None
 
 
 @pytest.mark.parametrize("instance", ["plate_a", "plate_b"])
@@ -67,6 +67,27 @@ def test_fork_instances_resolve_and_bind_independently(instance):
     report = static_validate_case(instance, "3F")
     assert report["static_status"] == "PASS"
     assert report["body_object_id"] == instance
+
+
+def test_fork_c3_2_thin_handle_lateral_and_close_retries():
+    """Fork uses a wider handle lateral than spoon; close retries stay off."""
+    from tuj.m5_motion.scripted_grasps.objects.fork import fork_recipe
+    from tuj.m5_motion.scripted_grasps.objects.spoon import spoon_recipe
+    from tuj.m5_motion.scripted_grasps.spoon_runtime import (
+        thin_handle_lateral_retry_schedule,
+    )
+
+    spoon = spoon_recipe("3F", environment="C3_2_BreakfastTray")
+    fork = fork_recipe()
+    assert fork.offset_m[0] == pytest.approx(-0.008)
+    assert spoon.lateral_offset_m == pytest.approx(-0.004)
+    assert fork.thin_handle_pinch is True
+    assert fork.thin_handle_close_retries == 0
+    assert spoon.thin_handle_close_retries == 0
+    assert fork.contact_ticks == 3
+    assert spoon.contact_ticks == 5
+    assert thin_handle_lateral_retry_schedule(fork) == ()
+    assert thin_handle_lateral_retry_schedule(spoon) == ()
 
 
 def test_recipe_ee_mismatch_is_detected():

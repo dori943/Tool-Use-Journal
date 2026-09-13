@@ -909,11 +909,17 @@ class ToolUseJournalCollisionContextFactory:
         ``active_ee ↔ touch`` exemptions so CONTACT_* can make intended contact
         while unrelated obstacles stay blocked.
 
-        Large held dishes (C1_1 plate sweeps) also graze non-target tabletop
-        blocks beside the declared targets. Admit free ``block*`` neighbors that
-        lie within plate-reach of a sweep seed (``target_ids`` /
-        block ``allowed_touch_objects``) so CONTACT_SWEEP does not fail on
-        incidental contacts while distant blocks / bottles stay blocked.
+        Large held tools (e.g. dish sweeps) also graze non-target tabletop
+        partners beside the declared targets. Admit free bodies that share a
+        name stem with the sweep seeds near those seeds, and admit any free
+        tabletop body already in/near the goal region (prior-pass herd or
+        neighboring tools) so CONTACT_SWEEP / CONTACT_END do not fail on
+        incidental EE/tool contacts while distant distractors stay blocked.
+
+        The same policy also covers post-contact TRANSPORT/MOVE of a held tool
+        (return-to-rest): free bodies still under the tool footprint after a
+        sweep must be breakaway-exempt so the transport start keyframe is not
+        rejected for residual plate↔target margin.
         """
 
         if not base.attached_object_ids:
@@ -922,7 +928,7 @@ class ToolUseJournalCollisionContextFactory:
             selector for selector in request.task.allowed_touch_objects if selector
         ]
         touch.extend(
-            self._tabletop_incidental_block_touch_ids(request, base)
+            self._tabletop_incidental_held_tool_touch_ids(request, base)
         )
         # Preserve order while dropping duplicates.
         seen: set[str] = set()
@@ -959,80 +965,224 @@ class ToolUseJournalCollisionContextFactory:
         return float(0.5 * max(float(values[0]), float(values[1])))
 
     @classmethod
-    def _tabletop_incidental_block_touch_ids(
+    def _goal_region_xy_aabb_m(
+        cls,
+        request: MotionPlanRequest,
+    ) -> tuple[np.ndarray, np.ndarray] | None:
+        """World XY center and half-extents of ``task.goal.target_region_id``."""
+
+        region_id = request.task.goal.target_region_id
+        if not region_id:
+            return None
+        record = request.world.objects.get(str(region_id))
+        if not isinstance(record, Mapping):
+            return None
+        pose = record.get("pose")
+        if not isinstance(pose, Mapping):
+            return None
+        position = pose.get("position_m")
+        if position is None:
+            return None
+        center = np.asarray(position[:2], dtype=float)
+        if center.shape != (2,) or not np.isfinite(center).all():
+            return None
+        half = cls._object_xy_half_extent_m(request, str(region_id))
+        # Prefer full XY half-extents when both dimensions exist.
+        dims = record.get("dimensions_m")
+        if dims is not None:
+            values = np.asarray(dims, dtype=float).reshape(-1)
+            if values.size >= 2 and np.isfinite(values[:2]).all():
+                half_xy = np.asarray(
+                    (max(float(values[0]) * 0.5, 0.0), max(float(values[1]) * 0.5, 0.0)),
+                    dtype=float,
+                )
+                return center, half_xy
+        return center, np.asarray((half, half), dtype=float)
+
+    @staticmethod
+    def _object_name_stem(object_id: str) -> str:
+        """Leading alphabetic token of an object id (``block_10`` → ``block``)."""
+
+        token = str(object_id).strip().lower().split("_", 1)[0]
+        return token if token.isalpha() and len(token) >= 2 else ""
+
+    @classmethod
+    def _sweep_target_name_stems(cls, seed_ids: set[str]) -> set[str]:
+        """Shared name stems among sweep seeds; empty when seeds are mixed/unnamed."""
+
+        stems = {cls._object_name_stem(name) for name in seed_ids}
+        stems.discard("")
+        return stems
+
+    @classmethod
+    def _tabletop_support_z_m(
+        cls,
+        request: MotionPlanRequest,
+        free_z: Sequence[float],
+    ) -> float:
+        """Support/table height for tabletop partner filters (scene-relative)."""
+
+        from tuj.m5_motion.contact_keyframe_validation import _support_surface_z_m
+
+        support = _support_surface_z_m(request)
+        if support is not None and math.isfinite(float(support)):
+            return float(support)
+        finite = [float(z) for z in free_z if math.isfinite(float(z))]
+        if finite:
+            return float(np.median(np.asarray(finite, dtype=float)))
+        return 0.8
+
+    @classmethod
+    def _held_tool_center_xy_m(
+        cls,
+        request: MotionPlanRequest,
+        tool_id: str,
+    ) -> np.ndarray | None:
+        record = request.world.objects.get(tool_id)
+        if not isinstance(record, Mapping):
+            return None
+        pose = record.get("pose")
+        if not isinstance(pose, Mapping):
+            return None
+        position = pose.get("position_m")
+        if position is None or len(position) < 2:
+            return None
+        center = np.asarray(position[:2], dtype=float)
+        if center.shape != (2,) or not np.isfinite(center).all():
+            return None
+        return center
+
+    @classmethod
+    def _tabletop_incidental_held_tool_touch_ids(
         cls,
         request: MotionPlanRequest,
         base: CollisionContext,
     ) -> list[str]:
-        """Free tabletop blocks within plate-reach of sweep seeds (dynamic neighbors)."""
+        """Free tabletop partners near a held tool for sweep contact or transport lift-off."""
 
         from tuj.m5_motion.task_semantics import task_operation
 
-        if task_operation(request.task) != "TOOL_ACT":
+        operation = task_operation(request.task)
+        if operation not in {"TOOL_ACT", "TRANSPORT", "MOVE"}:
             return []
-        attached = {str(object_id) for object_id in base.attached_object_ids}
+        attached = {
+            str(object_id).strip()
+            for object_id in base.attached_object_ids
+            if str(object_id).strip()
+        }
         tool = str(request.task.tool or "").strip()
         held = str(
             getattr(request.world.robot_state, "held_tool_id", None)
             or getattr(request.world.robot_state, "attached_object_id", None)
             or ""
         ).strip()
-        if "plate" not in attached and tool != "plate" and held != "plate":
-            return []
-        plate_id = next(
+        tool_id = next(
             (
                 name
-                for name in (
-                    tool if tool == "plate" else None,
-                    held if held == "plate" else None,
-                    *(name for name in attached if name == "plate"),
-                    "plate",
-                )
-                if name
+                for name in (tool, held, *sorted(attached))
+                if name and cls._object_xy_half_extent_m(request, name) > 0.0
             ),
-            "plate",
+            None,
         )
-        plate_half_m = cls._object_xy_half_extent_m(request, plate_id)
-        if plate_half_m <= 0.0:
+        if tool_id is None:
+            return []
+        tool_half_m = cls._object_xy_half_extent_m(request, tool_id)
+        if tool_half_m <= 0.0:
             return []
         margin_m = float(getattr(request.constraints, "collision_margin_m", 0.0) or 0.0)
+        # Centers sitting near the support (±band). Matches prior 0.70–0.86 at
+        # a 0.80 m table without baking that absolute height in.
+        free_z_samples = [
+            float(free_pose.pose.position_m[2]) for free_pose in base.free_object_poses
+        ]
+        support_z = cls._tabletop_support_z_m(request, free_z_samples)
+        tabletop_z_min_m = support_z - 0.10
+        tabletop_z_max_m = support_z + 0.06
         free_xy: dict[str, np.ndarray] = {}
-        # Same support band as TOOL_FILL push partners (~table height).
-        tabletop_z_max_m = 0.86
         for free_pose in base.free_object_poses:
             object_id = str(free_pose.object_id)
             if object_id in attached:
                 continue
-            if float(free_pose.pose.position_m[2]) > tabletop_z_max_m:
+            z = float(free_pose.pose.position_m[2])
+            if z < tabletop_z_min_m or z > tabletop_z_max_m:
                 continue
             free_xy[object_id] = np.asarray(free_pose.pose.position_m[:2], dtype=float)
+
+        # After a contact tool_act, TRANSPORT/MOVE lift-off still overlaps the
+        # bodies that were just pushed. Exempt whatever currently sits under
+        # the held-tool footprint (generic breakaway; not task-id specific).
+        if operation in {"TRANSPORT", "MOVE"}:
+            tool_xy = cls._held_tool_center_xy_m(request, tool_id)
+            if tool_xy is None:
+                return []
+            ids: list[str] = []
+            for object_id, xy in free_xy.items():
+                neighbor_half_m = cls._object_xy_half_extent_m(request, object_id)
+                limit_m = tool_half_m + neighbor_half_m + margin_m
+                if float(np.linalg.norm(xy - tool_xy)) <= limit_m + 1e-9:
+                    ids.append(object_id)
+            return ids
+
         seed_ids = {
             str(name)
             for name in (*request.task.target_ids, *request.task.allowed_touch_objects)
             if str(name).strip()
         }
+        seed_stems = cls._sweep_target_name_stems(seed_ids)
         seed_xy = [
             (seed_id, free_xy[seed_id])
             for seed_id in seed_ids
             if seed_id in free_xy
         ]
-        if not seed_xy:
-            return []
-        ids: list[str] = []
+        # Seeds may sit slightly below the tabletop band in sparse fixtures;
+        # still use their XY from the request world when needed for reach.
+        for seed_id in seed_ids:
+            if seed_id in free_xy:
+                continue
+            record = request.world.objects.get(seed_id)
+            if not isinstance(record, Mapping):
+                continue
+            pose = record.get("pose")
+            if not isinstance(pose, Mapping):
+                continue
+            position = pose.get("position_m")
+            if position is None or len(position) < 2:
+                continue
+            seed_xy.append(
+                (seed_id, np.asarray(position[:2], dtype=float))
+            )
+        region_aabb = cls._goal_region_xy_aabb_m(request)
+        ids = []
         for object_id, xy in free_xy.items():
             if object_id in attached or object_id in seed_ids:
                 continue
-            if not object_id.lower().startswith("block"):
-                continue
             neighbor_half_m = cls._object_xy_half_extent_m(request, object_id)
-            # Plate centered near a seed can reach this far in XY to another block.
-            reach_m = plate_half_m + neighbor_half_m + margin_m
-            for seed_id, seed in seed_xy:
-                seed_half_m = cls._object_xy_half_extent_m(request, seed_id)
-                limit_m = reach_m + seed_half_m
-                if float(np.linalg.norm(xy - seed)) <= limit_m + 1e-9:
+            # Tool centered near a seed can reach this far in XY to another partner.
+            reach_m = tool_half_m + neighbor_half_m + margin_m
+            same_cohort = (not seed_stems) or (
+                cls._object_name_stem(object_id) in seed_stems
+            )
+            # Seed neighborhood: keep the target name family (block_*, …) so
+            # unrelated distractors beside the cluster stay filtered.
+            if same_cohort:
+                near_seed = False
+                for seed_id, seed in seed_xy:
+                    seed_half_m = cls._object_xy_half_extent_m(request, seed_id)
+                    limit_m = reach_m + seed_half_m
+                    if float(np.linalg.norm(xy - seed)) <= limit_m + 1e-9:
+                        near_seed = True
+                        break
+                if near_seed:
                     ids.append(object_id)
-                    break
+                    continue
+            # Goal-region halo: any free tabletop body (ladle, fork, prior-pass
+            # targets, …). CONTACT_END over a packed zone often grazes the EE
+            # (vac cup) against neighboring tools that are not sweep targets.
+            if region_aabb is not None:
+                region_center, region_half = region_aabb
+                expanded = region_half + (tool_half_m + neighbor_half_m + margin_m)
+                if float(np.max(np.abs(xy - region_center) - expanded)) <= 1e-9:
+                    ids.append(object_id)
         return ids
 
     def _bind_default(

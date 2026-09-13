@@ -879,6 +879,7 @@ def test_canonicalizes_low_contact_height_into_engagement_band() -> None:
 
 def test_canonicalizes_high_contact_height_down_to_engagement() -> None:
     from tuj.m5_motion.contact_keyframe_validation import (
+        _contact_engagement_tcp_z_m,
         canonicalize_contact_tcp_height,
     )
 
@@ -899,6 +900,33 @@ def test_canonicalizes_high_contact_height_down_to_engagement() -> None:
     after = RelativePoseResolver(request.world).resolve(fixed)
     assert float(after.position_m[2]) < 0.92
     validate_resolved_contact_keyframe(request, fixed, after)
+
+
+def test_canonicalizes_in_band_contact_down_to_engagement_plane() -> None:
+    """In-band but above engagement still loses paddle contact — pin to plane."""
+
+    from tuj.m5_motion.contact_keyframe_validation import (
+        _contact_engagement_tcp_z_m,
+        canonicalize_contact_tcp_height,
+    )
+
+    request = _sweep_request()
+    request.world.robot_state.held_tool_id = "tool_pusher"
+    request.world.robot_state.attached_object_id = "tool_pusher"
+    engagement = _contact_engagement_tcp_z_m(request)
+    assert engagement is not None
+    # ~4 cm above engagement but still inside the ±8 cm contact band.
+    mid = _keyframe(
+        keyframe_id="mid_band",
+        frame_ref="object:block_a",
+        offset=0.05,
+        keyframe_type=KeyframeType.CONTACT_SWEEP,
+    )
+    before = RelativePoseResolver(request.world).resolve(mid)
+    assert float(before.position_m[2]) > float(engagement) + 0.02
+    fixed = canonicalize_contact_tcp_height(request, mid)
+    after = RelativePoseResolver(request.world).resolve(fixed)
+    assert abs(float(after.position_m[2]) - float(engagement)) < 5e-3
 
 
 def test_canonicalizes_horizontal_approach_low_contact_height() -> None:

@@ -57,6 +57,9 @@ class SpoonRecipe:
     thin_handle_pinch: bool = False
     # Freeze finger commands after pinch (spatula pattern); avoids force-servo unload.
     hold_finger_positions: bool = False
+    # After a failed thin-handle CLOSE, retry GRASP+CLOSE at lateral ± k*step.
+    thin_handle_close_retries: int = 0
+    thin_handle_lateral_retry_m: float = 0.002
 
     def __post_init__(self):
         values=asdict(self)
@@ -81,6 +84,14 @@ class SpoonRecipe:
             raise ValueError('contact_ticks must be a positive integer')
         if not isinstance(self.thin_handle_pinch,bool) or not isinstance(self.hold_finger_positions,bool):
             raise ValueError('Invalid boolean recipe flag')
+        if not isinstance(self.thin_handle_close_retries,int) or self.thin_handle_close_retries<0:
+            raise ValueError('Invalid thin_handle_close_retries')
+        if self.thin_handle_close_retries and not self.thin_handle_pinch:
+            raise ValueError('thin_handle_close_retries requires thin_handle_pinch')
+        if not (self.thin_handle_lateral_retry_m>0 and np.isfinite(self.thin_handle_lateral_retry_m)):
+            raise ValueError('Invalid thin_handle_lateral_retry_m')
+        if self.thin_handle_lateral_retry_m>.01:
+            raise ValueError('thin_handle_lateral_retry_m out of range')
         if not .008<=self.preshape_aperture_m<=.06: raise ValueError('Invalid handle pre-shape aperture')
         if not 0<self.preshape_closure_command<1: raise ValueError('Invalid handle pre-shape command')
         if self.physics_timestep_s not in (.0005,.001,.002): raise ValueError('Unsupported physics timestep')
