@@ -499,6 +499,90 @@ def test_pipeline_uses_structured_collision_feedback_repair_batch() -> None:
     assert result.keyframe_artifact.candidates[0].provenance.attempt_index == 2
 
 
+def test_pipeline_regrounds_held_place_before_collision_repair_generate(
+    monkeypatch,
+) -> None:
+    seen = []
+
+    def fake_reground(request, feedback):
+        seen.append(
+            {
+                "repair_attempt": feedback.get("repair_attempt"),
+                "has_observations": bool(
+                    feedback.get("failed_strategies")
+                ),
+            }
+        )
+        request.task.metadata["held_place_goal"] = {
+            "destination_center_xy_m": [0.11, -0.22],
+            "anchor": "held_place_goal",
+            "frame_ref": "object:tray",
+        }
+        feedback["reground_place_xy_m"] = [0.11, -0.22]
+        return True
+
+    monkeypatch.setattr(
+        "tuj.m5_motion.scripted_grasps.transport."
+        "reground_held_place_from_collision_feedback",
+        fake_reground,
+    )
+
+    class _PlaceFeedbackProvider(_FeedbackAwareProvider):
+        def generate(self, request):
+            feedback = request.task.metadata.get("collision_repair_feedback")
+            goal = request.task.metadata.get("held_place_goal")
+            xy = (
+                list(goal.get("destination_center_xy_m") or [])
+                if isinstance(goal, dict)
+                else None
+            )
+            self.calls.append((feedback, xy))
+            artifact = self.delegate.generate(request)
+            if feedback is None or self.repair_on_attempt is None:
+                return artifact
+            if int(feedback["repair_attempt"]) < self.repair_on_attempt:
+                return artifact
+            repaired = artifact.model_copy(deep=True)
+            for candidate in repaired.candidates:
+                for keyframe in candidate.keyframes:
+                    keyframe.keyframe_id = f"repaired:{keyframe.keyframe_id}"
+            return repaired
+
+    provider = _PlaceFeedbackProvider()
+    original = _request()
+    original.task.metadata["held_place_goal"] = {
+        "destination_center_xy_m": [0.0, 0.0],
+        "anchor": "held_place_goal",
+        "frame_ref": "object:tray",
+    }
+    pipeline = MotionPlanningPipeline(provider, _FakeKinematics())
+    context = CollisionContext(
+        context_id="default",
+        active_ee="2F",
+        collision_model_version="test-model",
+    )
+
+    result = pipeline.plan(
+        original,
+        state_validator=_RepairAwareCollisionValidator(),
+        collision_contexts={context.context_id: context},
+        initial_collision_context_id=context.context_id,
+        final_segment_validator=lambda waypoints, selected_context: True,
+    )
+
+    assert seen and seen[0]["repair_attempt"] == 1
+    assert len(provider.calls) == 2
+    assert provider.calls[0][0] is None
+    assert provider.calls[0][1] == [0.0, 0.0]
+    assert provider.calls[1][0] is not None
+    assert provider.calls[1][1] == [0.11, -0.22]
+    assert "held_place_goal" in original.task.metadata
+    assert original.task.metadata["held_place_goal"][
+        "destination_center_xy_m"
+    ] == [0.0, 0.0]
+    assert result.compilation.connected is not None
+
+
 def test_pipeline_repairs_collision_candidates_in_mixed_failure_batch() -> None:
     provider = _FeedbackAwareProvider()
     pipeline = MotionPlanningPipeline(provider, _MixedFailureKinematics())

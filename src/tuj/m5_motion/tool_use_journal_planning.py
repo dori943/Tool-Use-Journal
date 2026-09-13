@@ -1504,6 +1504,15 @@ class ToolUseJournalCollisionContextFactory:
                 # that candidate-specific pose, not at the stale task goal
                 # pose captured before keyframe generation.
                 detached_target_pose = resolved_place
+            elif physical_release:
+                # Contact-friction holds have no kinematic weld. After
+                # GRIPPER_OPEN the free body must sit at the task's world
+                # target_pose. Untagged PLACE keyframes still resolve as
+                # grasp-frame poses; re-applying the friction transform would
+                # leave the free object at EEF⊕T_GB instead of the seat, so
+                # RETREAT collision prediction and later subgoals see the
+                # wrong scene.
+                detached_target_pose = target_pose
             else:
                 # Untagged generated keyframes describe the grasp reference,
                 # not the object. Keep geometry continuous across DETACH.

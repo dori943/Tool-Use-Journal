@@ -547,6 +547,29 @@ def test_vacuum_support_breakaway_lift_uses_mesh_penetration_when_worse():
     )
 
 
+def test_enclosure_support_breakaway_omits_vac_dip_margin():
+    """3F mug CLOSE immersion must not stack the vac 10 mm LIFT-dip budget."""
+    from tuj.m5_motion.scripted_grasps.runtime import GraspFailure
+    from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
+        EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
+        MAX_VACUUM_SUPPORT_BREAKAWAY_M,
+        vacuum_support_breakaway_lift_m,
+    )
+
+    # Live mug_b: vac defaults requested ~22.9 mm and tripped the 20 mm bound.
+    mesh_pen = 0.01037
+    with pytest.raises(GraspFailure, match='SUPPORT_BREAKAWAY_EXCEEDS_BOUND'):
+        vacuum_support_breakaway_lift_m(0.0, mesh_penetration_m=mesh_pen)
+    enclosure = vacuum_support_breakaway_lift_m(
+        0.0,
+        mesh_penetration_m=mesh_pen,
+        pad_m=EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
+        dip_margin_m=0.0,
+    )
+    assert enclosure == pytest.approx(mesh_pen + EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M)
+    assert enclosure <= MAX_VACUUM_SUPPORT_BREAKAWAY_M
+
+
 def test_move_vacuum_cartesian_kinematic_plays_path_then_settles(tmp_path):
     from types import SimpleNamespace
     from tuj.m5_motion.scripted_grasps.catalog_vacuum import move_vacuum_cartesian_kinematic
@@ -834,11 +857,12 @@ def test_catalog_breakaway_exempts_vac_cup_held_object_contact():
 def test_early_lift_support_exemption_includes_island_top_1():
     """Resting plate may contact top_1 or top_2; early-LIFT exemption must cover both."""
     from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
+        EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
         VACUUM_SUPPORT_CLEARANCE_PAD_M,
     )
 
     support_names = {"island_island_group_top_1", "island_island_group_top_2"}
-    object_names = {"plate_b_g8", "plate_b_g26"}
+    object_names = {"plate_b_g8", "plate_b_g26", "mug_b_g1"}
     bad = [
         {
             "geoms": ["island_island_group_top_1", "plate_b_g8"],
@@ -854,6 +878,12 @@ def test_early_lift_support_exemption_includes_island_top_1():
             "geoms": ["table_collision", "plate_g2"],
             "penetration_m": 0.00203,
         },
+        # 3F enclosure CLOSE can press a mug into the island before LIFT
+        # (live mug_b PLAN_LIFT ~5.94 mm).
+        {
+            "geoms": ["island_island_group_top_1", "mug_b_g1"],
+            "penetration_m": 0.00594,
+        },
         {"geoms": ["robot0_link", "wall"], "penetration_m": 0.002},
     ]
     filtered = [
@@ -862,11 +892,12 @@ def test_early_lift_support_exemption_includes_island_top_1():
         if not (
             any(name in contact["geoms"] for name in support_names | {"table_collision"})
             and any(name in object_names | {"plate_g2"} for name in contact["geoms"])
-            and contact["penetration_m"] <= VACUUM_SUPPORT_CLEARANCE_PAD_M
+            and contact["penetration_m"] <= EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M
         )
     ]
-    assert filtered == [bad[3]]
-    assert VACUUM_SUPPORT_CLEARANCE_PAD_M >= 0.00203
+    assert filtered == [bad[4]]
+    assert EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M >= 0.00594
+    assert EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M >= VACUUM_SUPPORT_CLEARANCE_PAD_M
 
 
 def test_c3_2_plate_vac_does_not_seat_below_aabb_top():

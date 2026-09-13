@@ -956,13 +956,33 @@ class MotionPlanningPipeline:
             and _collision_repair_eligible(compilation)
         ):
             retry_request = request.model_copy(deep=True)
+            repair_feedback = _collision_repair_feedback(
+                request,
+                compilation,
+            )
+            # Carry prior rejected place seats across repair batches so the
+            # deterministic reground cannot republish the same XY.
+            previous_feedback = request.task.metadata.get(
+                _COLLISION_REPAIR_FEEDBACK_KEY
+            )
+            if isinstance(previous_feedback, Mapping):
+                prior_rejected = previous_feedback.get("rejected_place_xy_m")
+                if isinstance(prior_rejected, list) and prior_rejected:
+                    repair_feedback["rejected_place_xy_m"] = [
+                        item for item in prior_rejected
+                        if isinstance(item, (list, tuple)) and len(item) >= 2
+                    ]
             retry_request.task.metadata = {
                 **retry_request.task.metadata,
-                _COLLISION_REPAIR_FEEDBACK_KEY: _collision_repair_feedback(
-                    request,
-                    compilation,
-                ),
+                _COLLISION_REPAIR_FEEDBACK_KEY: repair_feedback,
             }
+            from tuj.m5_motion.scripted_grasps.transport import (
+                reground_held_place_from_collision_feedback,
+            )
+            reground_held_place_from_collision_feedback(
+                retry_request,
+                repair_feedback,
+            )
             retry_arguments = {
                 "edge_planner": edge_planner,
                 "final_plan_validator": final_plan_validator,

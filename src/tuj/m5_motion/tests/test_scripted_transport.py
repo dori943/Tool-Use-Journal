@@ -337,7 +337,9 @@ def test_place_without_collision_points_uses_a_nominal_floor_slab():
 
 
 def test_region_goals_avoid_objects_already_inside_the_region():
-    from tuj.m5_motion.scripted_grasps.transport import ground_held_place
+    from tuj.m5_motion.scripted_grasps.transport import (
+        ground_held_place, OCCUPANT_CONTACT_TOLERANCE_M,
+    )
     request=_tray_request(.005)
     request.task.action_type='place'
     request.world.objects['tray']['dimensions_m']=[.6,.4,.1]
@@ -351,8 +353,10 @@ def test_region_goals_avoid_objects_already_inside_the_region():
     destination=REGION@request.world.objects['tray']['anchors'][hint['anchor']]+REGION_POSITION
     carried_center=destination+BODY[:3,:3]@CENTER_IN_BODY
     my_half=np.abs(BODY[:2,:3])@LOCAL_SIZE/2.
-    gap=np.abs(carried_center[:2]-plate_center[:2])-(my_half+np.array([.06,.06]))
-    assert gap.max()>=.01-1e-9, gap
+    # Soft nested platforms allow a small graze inside the planner margin.
+    margin=max(.01,2.*.005)
+    gap=np.abs(carried_center[:2]-plate_center[:2])-(my_half+np.array([.06,.06])+margin)
+    assert gap.max()>=-OCCUPANT_CONTACT_TOLERANCE_M-1e-9, gap
     # ...but stays inside the tray footprint minus the wall allowance.
     tray_half=np.abs(REGION[:2,:])@np.array([.6,.4,.1])/2.
     assert np.all(np.abs(carried_center[:2]-np.asarray(REGION_POSITION[:2])-(REGION@np.array([.02,0,0]))[:2])<=tray_half-my_half-.02+1e-9)
@@ -390,76 +394,132 @@ def test_place_uses_the_slot_the_plan_assigned_inside_the_region():
     hint=request.task.metadata['held_place_goal']
     destination=REGION@request.world.objects['tray']['anchors'][hint['anchor']]+REGION_POSITION
     carried_center=destination+BODY[:3,:3]@CENTER_IN_BODY
-    tray_half=np.abs(REGION[:2,:])@np.array([.6,.4,.1])/2.
     region_center=(REGION@np.array([.02,0,0])+REGION_POSITION)[:2]
-    expected=region_center+np.array([.5,-.5])*(tray_half-.02)
+    inner=np.array([.6,.4])*.5-.02
+    expected=region_center+(REGION@np.r_[np.array([.5,-.5])*inner,0.])[:2]
     np.testing.assert_allclose(carried_center[:2],expected,atol=1e-9)
 
 
-def test_a_full_region_stacks_squarely_instead_of_being_driven_into_the_occupant():
-    """No free spot left: rest on the occupant's top, fully supported."""
+def test_rotated_region_slot_clips_in_region_frame_not_world_aabb():
+    """A near-edge slot must remain inside a rotated region's local footprint."""
     from tuj.m5_motion.scripted_grasps.transport import ground_held_place
     request=_tray_request(.005)
     request.task.action_type='place'
+    request.world.objects['tray']['dimensions_m']=[.16755,.16709,.01]
     _generic_held(request,ENTRIES[4].object_id)
-    # A plate that covers the whole tray interior — nothing can land beside it.
-    plate_center=_plate_in_tray(request,half_xy=(.14,.09),thickness=.01)
+    request.world.objects[ENTRIES[4].object_id]['dimensions_m']=[.06421,.09998,.05342]
+    request.task.metadata['action_parameters']={'placement_slot':{
+        'region':'obj_tray_tray','uv':[-.4869,0.],
+        'source':'m2_container_layout'}}
     ground_held_place(request)
     hint=request.task.metadata['held_place_goal']
     destination=REGION@request.world.objects['tray']['anchors'][hint['anchor']]+REGION_POSITION
-    carried_center=destination+BODY[:3,:3]@CENTER_IN_BODY
-    my_half=np.abs(BODY[:2,:3])@LOCAL_SIZE/2.
-    # Fully on the plate, not hanging off its rim.
-    assert np.all(np.abs(carried_center[:2]-plate_center[:2])+my_half
-                  <=np.array([.14,.09])+1e-9)
-    # Released above the plate's top, not the tray floor, and clear of the margin.
-    half_height=float(np.abs(BODY[2,:3])@LOCAL_SIZE/2.)
-    plate_top=plate_center[2]+.005
-    assert carried_center[2]-half_height>=plate_top+.005-1e-9
-    assert hint['release_clearance_m']>=.01-1e-12
+    destination_rotation=Rotation.from_quat(
+        hint['object_orientation_xyzw']).as_matrix()
+    carried_center=destination+destination_rotation@CENTER_IN_BODY
+    center_local=(REGION.T@(
+        np.r_[carried_center[:2],REGION_POSITION[2]]-np.asarray(REGION_POSITION)
+    ))[:2]
+    object_in_region=REGION.T@destination_rotation
+    object_half=np.abs(object_in_region[:2,:])@np.array([.06421,.09998,.05342])*.5
+    limit=np.array([.16755,.16709])*.5-.02-object_half
+    assert np.all(np.abs(center_local-np.array([.02,0.]))<=limit+1e-9)
 
 
-def test_a_full_region_stacks_on_the_flat_support_not_astride_a_taller_neighbour():
-    """The resting surface is the highest overlapped occupant, not the widest.
-
-    c3_1: the bread's slot lay on the plate, which the search rejected as
-    occupied, and then ranked a spot that was fully on the plate *by area* yet
-    straddled the mug standing on it.  Only the mug ever touches the bread
-    there, so the release had to clear the mug's rim by a few millimetres and
-    the place never settled.
-    """
-    from tuj.m5_motion.scripted_grasps.transport import ground_held_place
-    request=_tray_request(.005)
-    request.task.action_type='place'
-    # An axis-aligned tray holding a wide flat plate with a tall mug standing
-    # on one end of it -- the c3_1 layout, with no free spot left beside them.
-    request.world.objects['tray']={'pose':{'frame_id':'world','position_m':REGION_POSITION,
-        'orientation_xyzw':[0.,0.,0.,1.]},'dimensions_m':[.40,.50,.064],
-        'anchors':{'center':[0.,0.,0.]}}
-    plate_center=np.asarray(REGION_POSITION)+np.array([.03,0.,-.01])
-    request.world.objects['plate']={'pose':{'frame_id':'world',
-        'position_m':plate_center.tolist(),'orientation_xyzw':[0.,0.,0.,1.]},
-        'dimensions_m':[.27,.50,.012],'anchors':{'center':[0.,0.,0.]}}
-    mug_center=np.asarray(REGION_POSITION)+np.array([-.07,0.,.04])
-    request.world.objects['mug']={'pose':{'frame_id':'world',
-        'position_m':mug_center.tolist(),'orientation_xyzw':[0.,0.,0.,1.]},
-        'dimensions_m':[.09,.09,.09],'anchors':{'center':[0.,0.,0.]}}
-    _generic_held(request,ENTRIES[4].object_id)
-    request.task.metadata['action_parameters']={'placement_slot':{
-        'region':'obj_tray_tray','uv':[.9,0.],'source':'m2_container_layout'}}
+def test_tray_place_avoids_stacking_on_nested_platform():
+    """Plate on a tray is a stacking-forbidden support; seat the tray floor."""
+    from tuj.m5_motion.scripted_grasps.transport import (
+        ground_held_place, OCCUPANT_CONTACT_TOLERANCE_M,
+    )
+    request = _tray_request(.005)
+    request.task.action_type = 'place'
+    request.world.objects['tray']['dimensions_m'] = [.6, .4, .1]
+    _generic_held(request, ENTRIES[4].object_id)
+    # Plate covers the default centre slot but leaves free tray floor beside it.
+    plate_center = _plate_in_tray(request, half_xy=(.08, .08), thickness=.01)
+    request.task.metadata['action_parameters'] = {'placement_slot': {
+        'region': 'obj_tray_tray', 'uv': [0., 0.], 'source': 'm2_container_layout'}}
     ground_held_place(request)
-    hint=request.task.metadata['held_place_goal']
-    destination=np.asarray(request.world.objects['tray']['anchors'][hint['anchor']])+REGION_POSITION
-    carried_center=destination+BODY[:3,:3]@CENTER_IN_BODY
-    my_half=np.abs(BODY[:2,:3])@LOCAL_SIZE/2.
-    # Clear of the mug's footprint, so nothing is balanced on its rim...
-    gap=np.abs(carried_center[:2]-mug_center[:2])-(my_half+np.array([.045,.045]))
-    assert gap.max()>0., gap
-    # ...and released just over the plate rather than over the mug's top.
-    half_height=float(np.abs(BODY[2,:3])@LOCAL_SIZE/2.)
-    plate_top=plate_center[2]+.006
-    assert carried_center[2]-half_height==pytest.approx(plate_top+.01)
-    assert carried_center[2]-half_height<mug_center[2]+.045
+    hint = request.task.metadata['held_place_goal']
+    destination = REGION @ request.world.objects['tray']['anchors'][hint['anchor']] + REGION_POSITION
+    carried_center = destination + BODY[:3, :3] @ CENTER_IN_BODY
+    my_half = np.abs(BODY[:2, :3]) @ LOCAL_SIZE / 2.
+    plate_half = np.array([.08, .08])
+    gap = np.max(np.abs(carried_center[:2] - plate_center[:2]) - (my_half + plate_half))
+    # Soft contact allowed; deep seating on the plate is not.
+    assert gap >= -OCCUPANT_CONTACT_TOLERANCE_M - 1e-9, gap
+    half_height = float(np.abs(BODY[2, :3]) @ LOCAL_SIZE / 2.)
+    # Region floor, not the plate top.
+    assert carried_center[2] - half_height < plate_center[2] + .005 + 1e-6
+
+
+def test_a_full_region_prefers_least_overlap_not_stacking_on_occupant():
+    """No clear tray floor left: minimize penetration, still do not stack on plate."""
+    from tuj.m5_motion.scripted_grasps.transport import ground_held_place
+    request = _tray_request(.005)
+    request.task.action_type = 'place'
+    _generic_held(request, ENTRIES[4].object_id)
+    plate_center = _plate_in_tray(request, half_xy=(.14, .09), thickness=.01)
+    ground_held_place(request)
+    hint = request.task.metadata['held_place_goal']
+    destination = REGION @ request.world.objects['tray']['anchors'][hint['anchor']] + REGION_POSITION
+    carried_center = destination + BODY[:3, :3] @ CENTER_IN_BODY
+    my_half = np.abs(BODY[:2, :3]) @ LOCAL_SIZE / 2.
+    # Must not sit fully on the plate (old stacking behaviour).
+    assert np.any(
+        np.abs(carried_center[:2] - plate_center[:2]) + my_half
+        > np.array([.14, .09]) + 1e-9
+    )
+    half_height = float(np.abs(BODY[2, :3]) @ LOCAL_SIZE / 2.)
+    plate_top = plate_center[2] + .005
+    # Released on the tray floor, not stacked on the plate top.
+    assert carried_center[2] - half_height < plate_top - 1e-6
+
+
+def test_tray_place_keeps_clear_of_taller_neighbour_without_stacking_on_plate():
+    """Mug/plate on a tray: prefer free floor; never rest on the nested plate."""
+    from tuj.m5_motion.scripted_grasps.transport import (
+        ground_held_place, OCCUPANT_CONTACT_TOLERANCE_M,
+    )
+    request = _tray_request(.005)
+    request.task.action_type = 'place'
+    # Wide tray with plate+mug on the -x half and free floor on +x.
+    request.world.objects['tray'] = {
+        'pose': {'frame_id': 'world', 'position_m': REGION_POSITION,
+                 'orientation_xyzw': [0., 0., 0., 1.]},
+        'dimensions_m': [.60, .50, .064], 'anchors': {'center': [0., 0., 0.]}}
+    plate_center = np.asarray(REGION_POSITION) + np.array([-.08, 0., -.01])
+    request.world.objects['plate'] = {
+        'pose': {'frame_id': 'world', 'position_m': plate_center.tolist(),
+                 'orientation_xyzw': [0., 0., 0., 1.]},
+        'dimensions_m': [.22, .40, .012], 'anchors': {'center': [0., 0., 0.]}}
+    mug_center = np.asarray(REGION_POSITION) + np.array([-.18, 0., .04])
+    request.world.objects['mug'] = {
+        'pose': {'frame_id': 'world', 'position_m': mug_center.tolist(),
+                 'orientation_xyzw': [0., 0., 0., 1.]},
+        'dimensions_m': [.09, .09, .09], 'anchors': {'center': [0., 0., 0.]}}
+    _generic_held(request, ENTRIES[4].object_id)
+    request.task.metadata['action_parameters'] = {'placement_slot': {
+        'region': 'obj_tray_tray', 'uv': [-.5, 0.], 'source': 'm2_container_layout'}}
+    ground_held_place(request)
+    hint = request.task.metadata['held_place_goal']
+    destination = np.asarray(
+        request.world.objects['tray']['anchors'][hint['anchor']]) + REGION_POSITION
+    carried_center = destination + BODY[:3, :3] @ CENTER_IN_BODY
+    my_half = np.abs(BODY[:2, :3]) @ LOCAL_SIZE / 2.
+    mug_gap = np.max(
+        np.abs(carried_center[:2] - mug_center[:2]) - (my_half + np.array([.045, .045])))
+    plate_gap = np.max(
+        np.abs(carried_center[:2] - plate_center[:2])
+        - (my_half + np.array([.11, .20])))
+    # Mug is a soft nested platform too (broad); both may graze within tolerance.
+    assert mug_gap >= -OCCUPANT_CONTACT_TOLERANCE_M - 1e-9, mug_gap
+    assert plate_gap >= -OCCUPANT_CONTACT_TOLERANCE_M - 1e-9, plate_gap
+    half_height = float(np.abs(BODY[2, :3]) @ LOCAL_SIZE / 2.)
+    plate_top = plate_center[2] + .006
+    assert carried_center[2] - half_height < plate_top - 1e-6
+    # Prefer the free +x tray floor over the plate centre.
+    assert carried_center[0] > plate_center[0]
 
 
 def _vacuum_place_request(margin=.005, *, object_id='held_vac', support_floor_z=-.029,
@@ -603,6 +663,127 @@ def test_vacuum_held_place_logic_is_not_tied_to_a_scene_instance_name():
         assert request.task.ee == 'vac'
 
 
+def test_vacuum_place_slot_reserves_off_center_cup_footprint_from_region_rim():
+    from tuj.m5_motion.scripted_grasps.transport import (
+        REGION_WALL_ALLOWANCE_M, VACUUM_CUP_RADIUS_M, ground_held_place,
+    )
+    request, body, grip, _size = _vacuum_place_request(
+        object_id='generic_plate', local_size=(.1675, .1671, .0102),
+        body_z=.90, grip_z=.895)
+    request.task.metadata['action_parameters']={'placement_slot':{
+        'region':'obj_tray_tray','uv':[-.49,0.],
+        'source':'m2_container_layout'}}
+    # Reproduce a rim grasp: the cup is displaced from the plate body center.
+    grip[:3, 3] = body[:3, 3] + body[:3, :3] @ np.array([.048, 0., -.005])
+    request.world.robot_state.eef_pose = Pose(
+        frame_id='world', position_m=tuple(grip[:3, 3]),
+        orientation_xyzw=tuple(Rotation.from_matrix(grip[:3, :3]).as_quat()))
+    t_gb=inverse(grip)@body
+    request.world.metadata['attached_object_transforms']['generic_plate'].update({
+        'position_in_reference_m':t_gb[:3,3].tolist(),
+        'orientation_in_reference_xyzw':Rotation.from_matrix(
+            t_gb[:3,:3]).as_quat().tolist(),
+    })
+    ground_held_place(request)
+    destination=transform(
+        request.task.goal.target_pose.position_m,
+        quaternion_xyzw=request.task.goal.target_pose.orientation_xyzw)
+    t_be=inverse(body)@grip
+    tcp=destination@t_be
+    tcp_local=REGION.T@(tcp[:3,3]-np.asarray(REGION_POSITION))
+    tray_dims=np.asarray(request.world.objects['tray']['dimensions_m'])
+    margin=float(request.constraints.collision_margin_m)
+    mesh_pad=max(2.0*margin, .01)
+    limit=(
+        tray_dims[:2]*.5
+        -REGION_WALL_ALLOWANCE_M
+        -VACUUM_CUP_RADIUS_M
+        -mesh_pad
+        -0.001
+    )
+    assert np.all(np.abs(tcp_local[:2]-np.array([.02,0.]))<=limit+1e-6)
+
+
+def test_vacuum_plate_place_slot_pulls_eccentric_cup_off_live_tray_rim():
+    """Live plate_a failure: AABB cup clip was satisfied but rim geom was not."""
+    import json
+    from pathlib import Path
+    from tuj.m5_motion.schema import MotionPlanRequest
+    from tuj.m5_motion.scripted_grasps.transport import (
+        ground_held_place, HELD_PLACE_GOAL_ANCHOR, VACUUM_CUP_RADIUS_M,
+        REGION_WALL_ALLOWANCE_M, _grounding_for, _is_region_place,
+    )
+    from tuj.m5_motion.scripted_grasps.frames import inverse, transform
+
+    root = Path('output/c3_2/m5/live/run-20260913-162930-c5faac98')
+    if not root.exists():
+        pytest.skip('live failure artifact not present')
+    man = json.loads((root / 'live-execution-manifest.json').read_text(encoding='utf-8'))
+    raw = json.loads(Path(man['steps'][3]['request']).read_text(encoding='utf-8'))
+    req = MotionPlanRequest.model_validate(raw)
+    req.task.metadata.pop(HELD_PLACE_GOAL_ANCHOR, None)
+    ground_held_place(req)
+    g = _grounding_for(req, None, _is_region_place)
+    dest = transform(
+        req.task.goal.target_pose.position_m,
+        quaternion_xyzw=req.task.goal.target_pose.orientation_xyzw,
+    )
+    t_be = inverse(g.T_WB) @ g.T_WE
+    tcp_local = (inverse(g.T_WR) @ np.r_[(dest @ t_be)[:3, 3], 1])[:3]
+    mesh_pad = max(2.0 * float(req.constraints.collision_margin_m), 0.01)
+    limit = (
+        g.region_dims[:2] * .5
+        - REGION_WALL_ALLOWANCE_M
+        - VACUUM_CUP_RADIUS_M
+        - mesh_pad
+        - 0.001
+    )
+    assert np.all(
+        np.abs(tcp_local[:2] - g.region_center_local[:2]) <= limit + 1e-6
+    )
+    # Must move off the failing M2 uv seat (cup was at ~-0.123 m in region y).
+    assert abs(float(tcp_local[1] - g.region_center_local[1])) < 0.123 - 1e-4
+
+
+
+def test_packed_region_place_ignores_enclosing_container_as_occupant():
+    """Tray under a plate must not force bread onto fork/spoon already on the plate."""
+    import json
+    from pathlib import Path
+    from tuj.m5_motion.schema import MotionPlanRequest
+    from tuj.m5_motion.scripted_grasps.transport import (
+        ground_held_place, HELD_PLACE_GOAL_ANCHOR, _grounding_for, _is_region_place,
+    )
+
+    root = Path('output/c3_2/m5/live/run-20260913-170640-631341be')
+    if not root.exists():
+        pytest.skip('live failure artifact not present')
+    man = json.loads((root / 'live-execution-manifest.json').read_text(encoding='utf-8'))
+    raw = json.loads(Path(man['steps'][23]['request']).read_text(encoding='utf-8'))
+    req = MotionPlanRequest.model_validate(raw)
+    g = _grounding_for(req, None, _is_region_place)
+    occupants = g._occupants()
+    assert all(
+        float(np.linalg.norm(c - g.region_world[:2])) < 0.2
+        for c, _h, _t, _s in occupants
+    )
+    # Enclosing tray is no longer an occupant of plate_a.
+    tray = np.asarray(raw['world']['objects']['tray_a']['pose']['position_m'][:2])
+    assert all(float(np.linalg.norm(c - tray)) > 1e-6 for c, _h, _t, _s in occupants)
+    # Utensils on the plate are hard blockers (not soft nested platforms).
+    assert occupants and all(not soft for _c, _h, _t, soft in occupants)
+    fork = np.asarray(raw['world']['objects']['fork_a']['pose']['position_m'][:2])
+    failing = np.asarray([2.197513799663473, -3.2477456935174187])
+    req.task.metadata.pop(HELD_PLACE_GOAL_ANCHOR, None)
+    req.world.objects['plate_a'].setdefault('anchors', {}).pop(
+        HELD_PLACE_GOAL_ANCHOR, None)
+    ground_held_place(req)
+    seat = np.asarray(
+        req.task.metadata[HELD_PLACE_GOAL_ANCHOR]['destination_center_xy_m'])
+    assert float(np.linalg.norm(seat - fork)) > float(
+        np.linalg.norm(failing - fork)) + 0.04
+
+
 def test_non_vacuum_held_place_ignores_vacuum_ee_clearance_branch():
     """Existing 2F spoon place seating must not gain vacuum cup lift."""
     from tuj.m5_motion.scripted_grasps.transport import ground_held_place
@@ -614,3 +795,101 @@ def test_non_vacuum_held_place_ignores_vacuum_ee_clearance_branch():
     hint = request.task.metadata['held_place_goal']
     assert hint['release_clearance_m'] == pytest.approx(.005)
     assert 'vacuum_ee_clearance_lift_m' not in hint
+
+
+def _crowded_place_request():
+    """Held object + in-region neighbor for place-margin repair tests."""
+    from tuj.m5_motion.scripted_grasps.transport import ground_held_place
+    request = _tray_request(.005)
+    request.task.action_type = 'place'
+    request.task.metadata['scripted_m4_implicit_object_pose'] = True
+    request.world.objects['tray']['collision_points_m'] = _tray_collision_points()
+    object_id = ENTRIES[4].object_id
+    _generic_held(request, object_id)
+    slot_xy = (REGION @ np.array([.02, 0., 0.]) + REGION_POSITION)[:2]
+    neighbor_xy = slot_xy + np.array([.03, .0])
+    request.world.objects['neighbor'] = {
+        'object_id': 'neighbor',
+        'free_joint_name': 'neighbor_free',
+        'pose': {
+            'frame_id': 'world',
+            'position_m': [float(neighbor_xy[0]), float(neighbor_xy[1]), float(REGION_POSITION[2])],
+            'orientation_xyzw': [0., 0., 0., 1.],
+        },
+        'dimensions_m': [.04, .04, .02],
+        'anchors': {'center': [0., 0., 0.]},
+    }
+    ground_held_place(request)
+    return request, slot_xy, neighbor_xy
+
+
+def test_reground_held_place_moves_away_from_hand_neighbor_margin_partner():
+    from tuj.m5_motion.scripted_grasps.transport import (
+        reground_held_place_from_collision_feedback,
+    )
+    request, _slot_xy, neighbor_xy = _crowded_place_request()
+    first = np.asarray(
+        request.task.metadata['held_place_goal']['destination_center_xy_m'],
+        dtype=float,
+    )
+    feedback = {
+        'contract_version': 'COLLISION_REPAIR_V1',
+        'repair_attempt': 1,
+        'maximum_repair_attempts': 2,
+        'required_collision_margin_m': 0.005,
+        'failed_strategies': [{
+            'source_repair_attempt': 0,
+            'strategy_id': 'place-1',
+            'failure_code': 'COLLISION_FILTERED_ALL',
+            'ik_diagnostics': [],
+            'collision_observations': [{
+                'geometry_a': 'gripper0_right_hand_collision',
+                'geometry_b': 'neighbor_g0',
+                'measured_clearance_m': 0.003635,
+                'required_clearance_m': 0.005,
+            }],
+        }],
+    }
+    assert reground_held_place_from_collision_feedback(request, feedback) is True
+    second = np.asarray(
+        request.task.metadata['held_place_goal']['destination_center_xy_m'],
+        dtype=float,
+    )
+    assert float(np.linalg.norm(second - first)) >= 0.005 - 1e-9
+    assert float(np.linalg.norm(second - neighbor_xy)) > float(
+        np.linalg.norm(first - neighbor_xy)
+    ) - 1e-9
+    assert feedback['reground_place_partner_id'] == 'neighbor'
+    assert feedback['rejected_place_xy_m']
+    feedback2 = {
+        **feedback,
+        'repair_attempt': 2,
+        'rejected_place_xy_m': list(feedback['rejected_place_xy_m']),
+    }
+    assert reground_held_place_from_collision_feedback(request, feedback2) is True
+    third = np.asarray(
+        request.task.metadata['held_place_goal']['destination_center_xy_m'],
+        dtype=float,
+    )
+    assert float(np.linalg.norm(third - second)) >= 0.005 - 1e-9
+    assert float(np.linalg.norm(third - first)) >= 0.005 - 1e-9
+
+
+def test_reground_held_place_ignores_non_robot_margin_observations():
+    from tuj.m5_motion.scripted_grasps.transport import (
+        reground_held_place_from_collision_feedback,
+    )
+    request, _slot_xy, _neighbor_xy = _crowded_place_request()
+    before = request.task.metadata['held_place_goal']['destination_center_xy_m']
+    feedback = {
+        'failed_strategies': [{
+            'collision_observations': [{
+                'geometry_a': 'held_object_g0',
+                'geometry_b': 'neighbor_g0',
+                'measured_clearance_m': 0.001,
+                'required_clearance_m': 0.005,
+            }],
+        }],
+    }
+    assert reground_held_place_from_collision_feedback(request, feedback) is False
+    assert request.task.metadata['held_place_goal']['destination_center_xy_m'] == before

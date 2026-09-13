@@ -19,6 +19,10 @@ VACUUM_SUPPORT_CONTACT_EPS_M = 1e-4
 # plate vac routinely reports ~2.03 mm; keep a half-millimetre margin above the
 # historical 2 mm pad so LIFT does not fail on the first tick after attach.
 VACUUM_SUPPORT_CLEARANCE_PAD_M = 0.0025
+# Early-LIFT object↔support whitelist while the body has barely left rest.
+# Vac soft-contact noise is ~2 mm; 3F enclosure CLOSE can press a mug into
+# the island ~6 mm before kinematic carry (live mug_b PLAN_LIFT ~5.94 mm).
+EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M = 0.008
 # Extra headroom so early-LIFT controller dip after kinematic breakaway does not
 # re-immerse the held object. Live bread_b: post-breakaway TCP dipped ~9.5 mm
 # on the first LIFT ticks (clr +1.9 mm → -7.1 mm).
@@ -57,32 +61,51 @@ def support_bottom_clearance_m(context):
     return float(context.bottom_height() - context.support_top_z)
 
 
-def vacuum_support_breakaway_lift_m(clearance_m, mesh_penetration_m=0.0):
-    """Bounded lift so a vac-held object clears known support.
+def vacuum_support_breakaway_lift_m(
+    clearance_m,
+    mesh_penetration_m=0.0,
+    *,
+    pad_m=None,
+    dip_margin_m=None,
+    max_breakaway_m=None,
+):
+    """Bounded lift so a kinematically held object clears known support.
 
     Uses the worse of AABB bottom immersion and direct object↔support mesh
-    penetration. Always leaves ``pad + post-breakaway dip margin`` of clearance
-    so the first impedance LIFT ticks cannot re-immerse the object when the
-    AABB looked "clear" but soft contacts remain (live C1_1 plate↔table).
+    penetration. Vac defaults leave ``pad + post-breakaway dip margin`` so the
+    first impedance LIFT ticks cannot re-immerse the object.  3F enclosure
+    carry passes ``dip_margin_m=0`` — it has no vac-style TCP dip, and adding
+    the 10 mm margin on top of mug CLOSE immersion exceeded the 20 mm bound
+    (live mug_b: need 0.0229 m).
     Returns 0 when already at/above that target. Raises when required lift
     exceeds the safety bound (deep/invalid immersion, not soft resting contact).
     """
 
     clearance = float(clearance_m)
     mesh_pen = max(0.0, float(mesh_penetration_m))
-    desired_clearance = (
-        VACUUM_SUPPORT_CLEARANCE_PAD_M
-        + VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M
+    pad = (
+        VACUUM_SUPPORT_CLEARANCE_PAD_M if pad_m is None else float(pad_m)
     )
+    dip = (
+        VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M
+        if dip_margin_m is None
+        else float(dip_margin_m)
+    )
+    max_lift = (
+        MAX_VACUUM_SUPPORT_BREAKAWAY_M
+        if max_breakaway_m is None
+        else float(max_breakaway_m)
+    )
+    desired_clearance = pad + dip
     lift = max(0.0, desired_clearance - clearance)
     if mesh_pen > VACUUM_SUPPORT_CONTACT_EPS_M:
         lift = max(lift, mesh_pen + desired_clearance)
     if lift <= VACUUM_SUPPORT_CONTACT_EPS_M:
         return 0.0
-    if lift > MAX_VACUUM_SUPPORT_BREAKAWAY_M + 1e-12:
+    if lift > max_lift + 1e-12:
         raise GraspFailure(
             'SUPPORT_BREAKAWAY_EXCEEDS_BOUND: '
-            f'need {lift:.6f} m > max {MAX_VACUUM_SUPPORT_BREAKAWAY_M:.6f} m'
+            f'need {lift:.6f} m > max {max_lift:.6f} m'
         )
     return float(lift)
 
@@ -391,16 +414,35 @@ def _vacuum_desired_support_clearance_m():
     )
 
 
-def breakaway_vacuum_from_support(context, q, opening):
-    """If vac-held object is below the LIFT dip-safe clearance, lift before LIFT.
+def breakaway_vacuum_from_support(
+    context,
+    q,
+    opening,
+    *,
+    pad_m=None,
+    dip_margin_m=None,
+    max_breakaway_m=None,
+):
+    """If a kinematically held object is immersed in support, lift before LIFT.
 
-    Skips only when AABB clearance already meets pad+dip-margin and mesh
-    penetration is within eps. Uses residual, geometry-driven chunks bounded by
-    ``MAX_VACUUM_SUPPORT_BREAKAWAY_M``. Does not rewrite free-object initial
-    poses or widen collision thresholds.
+    Vac defaults keep pad+dip-margin clearance.  Enclosure (3F) callers pass
+    ``dip_margin_m=0`` so mug CLOSE immersion does not request >20 mm of climb.
     """
 
-    desired = _vacuum_desired_support_clearance_m()
+    pad = (
+        VACUUM_SUPPORT_CLEARANCE_PAD_M if pad_m is None else float(pad_m)
+    )
+    dip = (
+        VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M
+        if dip_margin_m is None
+        else float(dip_margin_m)
+    )
+    max_lift = (
+        MAX_VACUUM_SUPPORT_BREAKAWAY_M
+        if max_breakaway_m is None
+        else float(max_breakaway_m)
+    )
+    desired = pad + dip
     clearance = support_bottom_clearance_m(context)
     mesh_pen = object_support_penetration_m(context)
     record = {
@@ -408,24 +450,30 @@ def breakaway_vacuum_from_support(context, q, opening):
         'mesh_penetration_before_m': mesh_pen,
         'lift_m': 0.0,
         'applied': False,
-        'pad_m': VACUUM_SUPPORT_CLEARANCE_PAD_M,
-        'lift_dip_margin_m': VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M,
+        'pad_m': pad,
+        'lift_dip_margin_m': dip,
         'desired_clearance_m': desired,
-        'max_breakaway_m': MAX_VACUUM_SUPPORT_BREAKAWAY_M,
+        'max_breakaway_m': max_lift,
         'chunks': [],
         'mode': 'KINEMATIC_PATH',
     }
     total_lift = 0.0
     # Residual loop covers tilt / AABB vs mesh mismatch after one chunk.
     for _ in range(4):
-        chunk = vacuum_support_breakaway_lift_m(clearance, mesh_pen)
+        chunk = vacuum_support_breakaway_lift_m(
+            clearance,
+            mesh_pen,
+            pad_m=pad,
+            dip_margin_m=dip,
+            max_breakaway_m=max_lift,
+        )
         if chunk <= 0.0:
             break
-        if total_lift + chunk > MAX_VACUUM_SUPPORT_BREAKAWAY_M + 1e-12:
+        if total_lift + chunk > max_lift + 1e-12:
             raise GraspFailure(
                 'SUPPORT_BREAKAWAY_EXCEEDS_BOUND: '
                 f'need {total_lift + chunk:.6f} m > max '
-                f'{MAX_VACUUM_SUPPORT_BREAKAWAY_M:.6f} m'
+                f'{max_lift:.6f} m'
             )
         grip = np.asarray(context.grip_pose(), dtype=float)
         direction = _breakaway_direction(grip)

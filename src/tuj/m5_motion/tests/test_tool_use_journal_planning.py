@@ -794,7 +794,9 @@ def test_place_binds_detach_and_stationary_target_pose_for_retreat(release_conta
     setup = _factory().prepare(request, source)
     transfer, place, retreat, *clear = setup.keyframe_artifact.candidates[0].keyframes
 
-    assert transfer.collision_context_id == place.collision_context_id
+    # No region occupants: approach stays on the attached/base context; only
+    # PLACE opens destination contact pairs.
+    assert transfer.collision_context_id == setup.initial_collision_context_id
     assert place.collision_context_id.startswith("place-contact:bottle:")
     assert place.collision_context_after_events_id.startswith(
         "object-release-contact:bottle:" if release_contact else "object-detached:bottle:"
@@ -815,6 +817,83 @@ def test_place_binds_detach_and_stationary_target_pose_for_retreat(release_conta
         assert not setup.collision_contexts[clear[0].collision_context_id].allowed_collision_pairs
     contact = setup.collision_contexts[place.collision_context_id]
     assert ("bottle", "table_collision") in contact.allowed_collision_pairs
+    # Hand/EE must still clear destination bodies; only the held object may
+    # touch the region / allowed_touch selectors during PLACE contact.
+    assert ("2F", "table_collision") not in contact.allowed_collision_pairs
+    assert ("robot0_right_hand", "table_collision") not in contact.allowed_collision_pairs
+
+
+def test_place_contact_does_not_exempt_ee_or_hand_against_region_occupants() -> None:
+    attached = AttachedObjectTransform(
+        object_id="bottle",
+        free_joint_name="bottle_free",
+        reference_kind="body",
+        reference_name="robot0_right_hand",
+        position_in_reference_m=(0.0, 0.0, 0.1),
+        orientation_in_reference_xyzw=(0.0, 0.0, 0.0, 1.0),
+    )
+    target_pose = Pose(
+        frame_id="world",
+        position_m=(0.55, 0.0, 0.15),
+        orientation_xyzw=(0.0, 0.0, 0.0, 1.0),
+    )
+    request = _request(
+        MotionGoal(
+            goal_type=GoalType.POSE,
+            target_object_id="bottle",
+            target_pose=target_pose,
+            target_region_id="tray",
+        ),
+        action_type="PLACE",
+        attached=attached,
+    )
+    request.world.objects["tray"] = {
+        "object_id": "tray",
+        "pose": {
+            "frame_id": "world",
+            "position_m": [0.55, 0.0, 0.05],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.4, 0.4, 0.04],
+        "anchors": {"center": [0.0, 0.0, 0.0]},
+    }
+    request.world.objects["neighbor"] = {
+        "object_id": "neighbor",
+        "free_joint_name": "neighbor_free",
+        "pose": {
+            "frame_id": "world",
+            "position_m": [0.62, 0.05, 0.08],
+            "orientation_xyzw": [0.0, 0.0, 0.0, 1.0],
+        },
+        "dimensions_m": [0.05, 0.05, 0.02],
+    }
+    source = _artifact(
+        (
+            _keyframe("transfer", KeyframeType.TRANSFER),
+            _keyframe(
+                "place",
+                KeyframeType.PLACE,
+                events=(
+                    KeyframeEventType.DETACH_OBJECT,
+                    KeyframeEventType.GRIPPER_OPEN,
+                ),
+            ),
+            _keyframe("retreat", KeyframeType.RETREAT),
+        )
+    )
+
+    setup = _factory().prepare(request, source)
+    transfer, place, retreat = setup.keyframe_artifact.candidates[0].keyframes
+    assert transfer.collision_context_id == place.collision_context_id
+    contact = setup.collision_contexts[place.collision_context_id]
+    assert ("bottle", "neighbor") in contact.allowed_collision_pairs
+    assert ("bottle", "tray") in contact.allowed_collision_pairs
+    assert ("2F", "neighbor") not in contact.allowed_collision_pairs
+    assert ("neighbor", "robot0_right_hand") not in contact.allowed_collision_pairs
+    assert ("2F", "tray") not in contact.allowed_collision_pairs
+    assert ("robot0_right_hand", "tray") not in contact.allowed_collision_pairs
+    # Detached retreat stays strict (no destination grazing after release).
+    assert not setup.collision_contexts[retreat.collision_context_id].allowed_collision_pairs
 
 
 def test_contact_friction_place_uses_collision_proxy_then_opens_gripper() -> None:
@@ -861,12 +940,16 @@ def test_contact_friction_place_uses_collision_proxy_then_opens_gripper() -> Non
     initial = setup.collision_contexts[setup.initial_collision_context_id]
     assert initial.metadata["attachment_proxy"] == "CONTACT_FRICTION"
     assert initial.attached_object_ids == ["bottle"]
-    assert transfer.collision_context_id == place.collision_context_id
+    assert transfer.collision_context_id == setup.initial_collision_context_id
     assert place.collision_context_id.startswith("place-contact:bottle:")
     assert place.collision_context_after_events_id.startswith(
         "object-detached:bottle:"
     )
     assert retreat.collision_context_id == place.collision_context_after_events_id
+    contact = setup.collision_contexts[place.collision_context_id]
+    assert ("bottle", "table_collision") in contact.allowed_collision_pairs
+    assert ("2F", "table_collision") not in contact.allowed_collision_pairs
+    assert ("robot0_right_hand", "table_collision") not in contact.allowed_collision_pairs
 
 
 def test_default_motion_gets_explicit_context_on_every_keyframe() -> None:
