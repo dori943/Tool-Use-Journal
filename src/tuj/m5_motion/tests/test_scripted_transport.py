@@ -176,6 +176,7 @@ def test_conceptual_tool_rest_returns_to_measured_pregrasp_home():
     ground_held_region_goal(request,_home_retention(request))
 
     assert 'held_transport_goal' not in request.task.metadata
+
     hint=request.task.metadata['held_place_goal']
     assert hint['object_id']==ENTRIES[4].object_id
     goal=request.task.goal.target_pose
@@ -460,3 +461,20 @@ def test_a_full_region_stacks_on_the_flat_support_not_astride_a_taller_neighbour
     plate_top=plate_center[2]+.006
     assert carried_center[2]-half_height==pytest.approx(plate_top+.01)
     assert carried_center[2]-half_height<mug_center[2]+.045
+
+def test_place_entry_retreat_anchor_is_measured_hand_pose_in_rotated_region():
+    from tuj.m5_motion.scripted_grasps.transport import ground_held_place
+    request=_tray_request(.005)
+    request.task.action_type='place'
+    _generic_held(request,ENTRIES[4].object_id)
+    ground_held_place(request)
+    hint=request.task.metadata['held_place_goal']
+    anchors=request.world.objects['tray']['anchors']
+    entry=REGION@anchors[hint['entry_eef_anchor']]+REGION_POSITION
+    object_entry=REGION@anchors[hint['start_anchor']]+REGION_POSITION
+    np.testing.assert_allclose(entry,GRIP[:3,3],atol=1e-10)
+    np.testing.assert_allclose(object_entry,BODY[:3,3],atol=1e-10)
+    assert not np.allclose(entry,object_entry)
+    np.testing.assert_allclose(
+        Rotation.from_quat(hint['eef_orientation_xyzw']).as_matrix(),
+        GRIP[:3,:3],atol=1e-10)

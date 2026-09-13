@@ -595,6 +595,18 @@ class TaskAwareGoalEvaluator:
                     f"placed object {target!r} is still attached",
                     observed={"attached_object_id": state.attached_object_id},
                 )
+            from .container_surface import is_container_surface_task, surface_report_result
+            if is_container_surface_task(task, request.world.objects):
+                if evaluation_world is None:
+                    return _result(request, GoalEvaluationStatus.UNKNOWN, 'observed cover state unavailable')
+                try:
+                    evidence = surface_report_result(request, report, evaluation_world)
+                except (ValueError, KeyError, TypeError) as error:
+                    return _result(request, GoalEvaluationStatus.UNKNOWN,
+                                   'container cover evidence unavailable', observed={'error_type': type(error).__name__})
+                return _result(request,
+                    GoalEvaluationStatus.SATISFIED if evidence['succeeded'] else GoalEvaluationStatus.FAILED,
+                    'container opening coverage, physical support and packed contents', observed=evidence)
             if operation == "PLACE_ON" and region_evaluator is self._region:
                 # place_on names a base object to stack onto, so support is the
                 # success condition rather than containment.  Containers keep

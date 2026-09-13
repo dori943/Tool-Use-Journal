@@ -29,6 +29,7 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     cls = getattr(module, entry.driver.title() + "Context")
     c = cls()
     c.runtime, c.env, c.recipe, c.object_id = runtime, env, recipe, entry.object_id
+    c.request_collision_margin_m = float(request.constraints.collision_margin_m) if request is not None else 0.
     c.output = Path(output)
     c.output.mkdir(parents=True, exist_ok=False)
     c.mj = mujoco
@@ -178,11 +179,13 @@ def execute_grasp(runtime, entry, output, *, seed=0, request=None):
     except Exception as error:
         result.update(status="FAILED", failure_stage="POST_GRASP_ATTACHMENT",
                       failure_reason=str(error), error_type=type(error).__name__,
-                      attachment_used=runtime.attachment is not None)
+                      attachment_used=runtime.attachment is not None,
+                      attachment_geometry_audit=getattr(runtime, 'last_attachment_geometry_audit', None))
         save_json(c.output / "result.json", result)
         raise
     result.update(attachment_used=True, attachment_mode=runtime.attachment.mode.value,
-                  attachment_phase="POST_VALIDATED_GRASP" if not result["acquisition_attachment_used"] else "ACQUISITION")
+                  attachment_phase="POST_VALIDATED_GRASP" if not result["acquisition_attachment_used"] else "ACQUISITION",
+                  attachment_geometry_audit=getattr(runtime, 'last_attachment_geometry_audit', None))
     from .retention import GraspRetention
     runtime.scripted_grasp_retention = GraspRetention(c, entry)
     result.update(final_robot_q=c.data.qpos[c.arm_ids].tolist(), object_pose_in_gripper=pose_dict(inverse(c.grip_pose()) @ c.body_pose()))

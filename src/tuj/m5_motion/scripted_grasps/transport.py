@@ -217,6 +217,7 @@ class _Grounding:
         if pose.get('frame_id', 'world') != 'world':
             raise ValueError('TRANSPORT_REGION_WORLD_FRAME_REQUIRED')
         self.request, self.task, self.record, self.object_id = request, task, record, object_id
+        self.retention = retention
         self.T_WR = transform(pose['position_m'], rotation=Rotation.from_quat(pose['orientation_xyzw']).as_matrix())
         self.region_dims = np.asarray(record['dimensions_m'], dtype=float)
         self.region_center_local = np.asarray(record.get('anchors', {}).get('center', [0., 0., 0.]), dtype=float)
@@ -246,6 +247,8 @@ class _Grounding:
         )
         self.preserve_destination_rotation = home_orientation is not None
         self.half = np.abs(self.destination_rotation) @ self.local_size / 2.
+        from .container_orientation import configure_packing_orientation
+        configure_packing_orientation(self)
 
     def bottom_below_origin(self):
         """Depth of the object's lowest point under its body origin (world z).
@@ -497,6 +500,14 @@ class _Grounding:
         floor height then drives the object through what is already there.
         """
         floor = self.floor_top_world_z()
+        container = self.record.get('packing_metadata', {})
+        if _action(self.task) == 'PLACE_ON' and container.get('kind') == 'CONTAINER':
+            # Rest on the container's opening plane, not its interior contents.
+            # Use the same explicit rim metadata as PackingBinding.
+            rim = float(container['opening_top_z_m'])
+            if not math.isfinite(rim) or not np.allclose(self.T_WR[:3, 2], [0., 0., 1.], atol=1e-6):
+                raise ValueError('PLACE_ON_UPRIGHT_CONTAINER_RIM_REQUIRED')
+            floor = max(floor, float(self.T_WR[2, 3] + rim))
         mine = self.half[:2]
         tops = [t for c, h, t in self._occupants()
                 if np.all(np.abs(np.asarray(xy, dtype=float) - c) < h + mine)]
@@ -560,8 +571,16 @@ class _Grounding:
             'offset_along_approach_m': 0., 'preserve_grasp_orientation': True,
             'pose_subject': ATTACHED_OBJECT_POSE_SUBJECT,
             'object_orientation_xyzw': Rotation.from_matrix(destination[:3, :3]).as_quat().tolist(),
+            'start_object_orientation_xyzw': Rotation.from_matrix(self.T_WB[:3, :3]).as_quat().tolist(),
             'eef_orientation_xyzw': Rotation.from_matrix(self.T_WE[:3, :3]).as_quat().tolist(),
             'object_id': self.object_id, 'source': self.source, **extra}
+        if goal_key == HELD_PLACE_GOAL_ANCHOR:
+            # Withdrawal targets the empty hand, not the held object's origin.
+            # This measured entry is a candidate; post-release collision checks
+            # must still validate the open hand and the entire return path.
+            entry_eef_anchor = goal_key + '_entry_eef'
+            anchors[entry_eef_anchor] = (inverse(self.T_WR) @ self.T_WE)[:3, 3].tolist()
+            self.task.metadata[goal_key]['entry_eef_anchor'] = entry_eef_anchor
         return destination
 
 
@@ -578,6 +597,19 @@ def _grounding_for(request, retention, predicate):
     return _Grounding(request, retention, object_id)
 
 
+def transport_destination_center(g):
+    """Shared exact center for transport grounding and orientation IK probes."""
+    desired_center = g.region_world.copy()
+    desired_center[:2] = g.free_destination_xy()
+    # Keep the measured object bbox clear of the rim without an arbitrary 5 cm
+    # standoff that can place a reachable kitchen destination outside UR5e reach.
+    clearance = max(.02, g.request.constraints.collision_margin_m * 2.)
+    desired_center[2] = max(g.center[2],
+                            g.interior_top_world_z() + g.half[2] + clearance)
+    from .container_orientation import packing_destination_center
+    return packing_destination_center(g, desired_center, place=False)
+
+
 def ground_held_transport(request, retention=None):
     """Carry the held object to a free spot above the region with rim clearance."""
     _materialize_conceptual_tool_home(request, retention)
@@ -586,15 +618,14 @@ def ground_held_transport(request, retention=None):
     g = _grounding_for(request, retention, _is_transport)
     if g is None:
         return
-    desired_center = g.region_world.copy()
-    desired_center[:2] = g.free_destination_xy()
-    # Keep the measured object bbox clear of the rim without an arbitrary 5 cm
-    # standoff that can place a reachable kitchen destination outside UR5e reach.
-    clearance = max(.02, request.constraints.collision_margin_m * 2.)
-    desired_center[2] = max(g.center[2],
-                            g.interior_top_world_z() + g.half[2] + clearance)
+    desired_center = transport_destination_center(g)
     g.task.goal.target_pose = None
-    g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, {})
+    destination = g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, {})
+    from .container_release import clear_container_rim
+    raised, evidence = clear_container_rim(g, destination, retention)
+    if evidence:
+        desired_center[2] += raised[2, 3] - destination[2, 3]
+        g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, evidence)
 
 
 def ground_held_place(request, retention=None):
@@ -631,10 +662,18 @@ def ground_held_place(request, retention=None):
         release_clearance = max(release_clearance,
                                 float(request.constraints.collision_margin_m) * 2.)
     origin_z = support_z + release_clearance + g.bottom_below_origin()
-    desired_center[2] = g.center[2] + (origin_z - g.T_WB[2, 3])
+    desired_center[2] = origin_z + float(g.destination_rotation[2, :] @ g.center_in_body)
+    from .container_orientation import packing_destination_center
+    desired_center = packing_destination_center(g, desired_center, place=True)
     destination = g.publish(
         HELD_PLACE_GOAL_ANCHOR, HELD_PLACE_START_ANCHOR, desired_center,
         {'release_clearance_m': release_clearance})
+    from .container_release import clear_container_rim
+    raised, evidence = clear_container_rim(g, destination, retention)
+    if evidence:
+        desired_center[2] += raised[2, 3] - destination[2, 3]
+        destination = g.publish(HELD_PLACE_GOAL_ANCHOR, HELD_PLACE_START_ANCHOR,
+            desired_center, {'release_clearance_m': release_clearance, **evidence})
     g.task.goal.target_pose = Pose(
         frame_id='world',
         position_m=tuple(float(v) for v in destination[:3, 3]),

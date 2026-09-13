@@ -26,7 +26,41 @@ class GraspMotionContext:
         center=body[:3,3]+body[:3,:3]@self.center_in_body
         return float(center[2]-np.abs(body[2,:3])@(self.local_size/2))
 
+    def _prepare_approach_clearance(self, stage):
+        self._approach_clearance = None
+        margin = getattr(self, 'request_collision_margin_m', 0.)
+        if stage not in {'PRE_GRASP', 'PRE_CLEARANCE'} or margin == 0:
+            return
+        from tuj.m5_motion.mujoco_collision import MuJoCoCollisionValidator
+        pairs = [(self.model.geom(a).name, self.model.geom(b).name)
+                 for a, b in sorted(self.fixed_mount_pairs)]
+        # Match existing internal-hand allowances; no scene contact is exempted.
+        pairs.append(('scripted_hand', 'scripted_hand'))
+        self._approach_clearance = MuJoCoCollisionValidator(
+            self.model, joint_names=self.robot.robot_model.joints,
+            robot_root_body_name=self.robot.robot_model.root_body,
+            baseline_qpos=self.data.qpos.copy(), collision_margin_m=margin,
+            entity_geoms={'scripted_hand': sorted(self.gripper_geoms)},
+            allowed_collision_pairs=pairs)
+
     def valid_state(self,q,key):
+        validator = getattr(self, '_approach_clearance', None)
+        if validator is not None and key.keyframe_id in {'PRE_GRASP', 'PRE_CLEARANCE'}:
+            checked = validator.check(q)
+            self.last_planning_collision = self.bad_contacts(validator.data, key.keyframe_id)
+            if not checked.valid:
+                violations = [contact for contact in checked.contacts
+                              if not contact.allowed and contact.distance_m < validator.collision_margin_m]
+                self.last_planning_collision.extend({
+                    'geoms': [contact.geom_a, contact.geom_b],
+                    'distance_m': contact.distance_m,
+                    'required_clearance_m': validator.collision_margin_m,
+                    'failure_code': checked.failure_code,
+                } for contact in violations)
+                if not self.last_planning_collision:
+                    self.last_planning_collision = [{'geoms': [],
+                        'failure_code': checked.failure_code, 'detail': checked.detail}]
+            return checked.valid and not self.last_planning_collision
         self.probe.qpos[:]=self.data.qpos
         self.probe.qpos[self.arm_ids]=q
         self.mj.mj_fwdPosition(self.model,self.probe)
@@ -42,6 +76,8 @@ class GraspMotionContext:
     def plan_to(self,target,stage,cartesian=False):
         from tuj.m5_motion.path_planning import RRTConnectEdgePlanner,validate_joint_segment
         self.stage='PLAN_'+stage
+        # Freeze the actual preshaped hand and scene once per planning call.
+        self._prepare_approach_clearance(stage)
         q=self.data.qpos[self.arm_ids].copy()
         key=SimpleNamespace(keyframe_id=stage)
         quat=Rotation.from_matrix(target[:3,:3]).as_quat()

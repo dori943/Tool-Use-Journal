@@ -72,6 +72,9 @@ class CatalogRecipe:
     # Default stays 3 so existing recipes are unchanged; a flat single-cup
     # target sets this to 1.
     vacuum_min_contacts: int = 3
+    finger_attachment_policy: str = 'FREE_HOLD_THEN_ATTACH'
+    open_hand_clearance_axis: tuple | None = None
+    contact_region_endpoint_policy: str | None = None
 
     @property
     def model_class(self):
@@ -80,9 +83,23 @@ class CatalogRecipe:
     @property
     def recipe_id(self):
         version='v2_attach' if self.ee_id=='vac' else 'v1'
+        if self.finger_attachment_policy == 'STABLE_CONTACT':version='v2_contact_attach'
         return f'{self.object_id}_{self.ee_id.lower()}_center_{version}'
 
     def __post_init__(self):
+        if self.contact_region_endpoint_policy not in {None, 'MIN_LONG_AXIS', 'MAX_LONG_AXIS'}:
+            raise ValueError('Invalid contact region endpoint policy')
+        if self.contact_region_endpoint_policy is not None and self.open_hand_clearance_axis is not None:
+            raise ValueError('Choose one grasp clearance proposal policy')
+        if self.open_hand_clearance_axis is not None:
+            axis = np.asarray(self.open_hand_clearance_axis, dtype=float)
+            if (self.ee_id == 'vac' or axis.shape != (3,) or not np.isfinite(axis).all()
+                    or not np.isclose(np.linalg.norm(axis), 1., atol=1e-9, rtol=0.)):
+                raise ValueError('Open hand clearance requires a unit body axis and finger EE')
+        if self.finger_attachment_policy not in {'FREE_HOLD_THEN_ATTACH', 'STABLE_CONTACT'}:
+            raise ValueError('Invalid finger attachment policy')
+        if self.finger_attachment_policy == 'STABLE_CONTACT' and self.ee_id != '2F':
+            raise ValueError('Stable bilateral contact attachment requires 2F')
         if self.ee_id not in {'2F','3F','vac'}: raise ValueError('UNSUPPORTED_EE')
         if self.task_id not in {'c1_1','c1_2','c2_1','c2_2','c3_1','c3_2','c4_2'}: raise ValueError('UNSUPPORTED_TASK')
         for name in ('expected_size_m','offset_fraction','offset_m','rotation_xyz_deg','contact_region_min','contact_region_max'):
@@ -136,6 +153,13 @@ def build_catalog_targets(T_WB,center_in_body_m,local_size_m,recipe):
     T_WC=body@T_BC
     rotation=Rotation.from_euler('xyz',recipe.rotation_xyz_deg,degrees=True).as_matrix()@np.diag([1.,-1.,-1.])
     T_CG=transform(size*np.asarray(recipe.offset_fraction)+np.asarray(recipe.offset_m),rotation=rotation)
+    if recipe.contact_region_endpoint_policy is not None:
+        if not np.isfinite(size).all() or np.any(size <= 0):
+            raise ValueError('Invalid endpoint grasp geometry')
+        axis = int(np.argmax(size))
+        region = (recipe.contact_region_min if recipe.contact_region_endpoint_policy == 'MIN_LONG_AXIS'
+                  else recipe.contact_region_max)
+        T_CG[axis, 3] = size[axis] * region[axis]
     grasp=T_WC@T_CG
     pre=grasp.copy();pre[:3,3]-=grasp[:3,2]*recipe.approach_distance_m
     lift=grasp.copy();lift[2,3]+=recipe.lift_distance_m
