@@ -213,11 +213,18 @@ def attach_catalog_kinematic_carry(context):
     recipe=context.recipe
     if not context.ready():
         raise GraspFailure('CONTACT_GATE_NOT_PASSED_BEFORE_ATTACH')
+    # Enclosure fingers wrap into the object mesh (fruit/mug ~2–4 cm). Keep the
+    # thin-handle pinch attach at 1 cm; only enclosure carry needs a wider limit.
     return _attach_kinematic_after_contact(
-        context, policy='CONTACT_GATED_KINEMATIC_ENCLOSURE')
+        context,
+        policy='CONTACT_GATED_KINEMATIC_ENCLOSURE',
+        max_attach_penetration_m=.05,
+    )
 
 
-def _attach_kinematic_after_contact(context, *, policy):
+def _attach_kinematic_after_contact(
+    context, *, policy, max_attach_penetration_m=.01,
+):
     from dataclasses import asdict
     context.runtime.command_gripper(engaged=True,suction=False,command=1.)
     try:
@@ -225,7 +232,7 @@ def _attach_kinematic_after_contact(context, *, policy):
             context.object_id,
             attachment_mode='KINEMATIC',
             max_attach_distance_m=.05,
-            max_attach_penetration_m=.01,
+            max_attach_penetration_m=float(max_attach_penetration_m),
         )
     except Exception as exc:
         raise GraspFailure(f'KINEMATIC_ATTACH_FAILED: {exc}') from exc
@@ -654,9 +661,13 @@ class SpoonContext(GraspMotionContext):
                 self.three_finger_force_hold=True
                 if getattr(recipe,'thin_handle_pinch',False) or getattr(recipe,'hold_finger_positions',False):
                     hold_opening=float(np.mean(self.three_finger_commands))
+            # Attach on the acquire sample before prelift hold can unload pads.
+            if getattr(recipe,'thin_handle_pinch',False):
+                attach_thin_handle_pinch(self)
             for _ in range(math.ceil(recipe.prelift_stabilization_s*50)):
                 self.step(q,hold_opening)
-            if not grasp_contact_ready(recipe,self.trace,recipe.contact_ticks):
+            if (self.runtime.attachment is None
+                    and not grasp_contact_ready(recipe,self.trace,recipe.contact_ticks)):
                 raise GraspFailure('HANDLE_CONTACT_LOST_BEFORE_LIFT')
             self.carried_pose=inverse(self.grip_pose())@self.body_pose()
             save_json(self.output/'contact_gate.json',{'status':'RELEASED',
@@ -667,8 +678,6 @@ class SpoonContext(GraspMotionContext):
                 'actual_gripper_command':np.asarray(self.gripper.current_action),
                 'force_targets_n':recipe.three_finger_force_targets_n if recipe.ee_id=='3F' else [recipe.two_finger_force_target_n]*2,
                 'sample':self.trace[-1]})
-            if getattr(recipe,'thin_handle_pinch',False):
-                attach_thin_handle_pinch(self)
             q=self.move(targets['LIFT'],'LIFT',hold_opening,cartesian=True)
             self.stage='SETTLE'
             for _ in range(math.ceil(recipe.settle_s*50)): self.step(q,hold_opening)

@@ -391,6 +391,16 @@ class CatalogContext(SpoonContext):
                     attach_vacuum, finalize_vacuum_grasp_continuity)
                 attach_vacuum(self)
                 hold_opening=1.-2.*recipe.suction_command
+            # Attach while the CLOSE gate sample is still in the trace tail.
+            # Thin utensil pad forces often bleed off during prelift hold even
+            # with frozen finger commands; kinematic carry is the retention plan.
+            if getattr(recipe,'thin_handle_pinch',False):
+                attach_thin_handle_pinch(self)
+            elif (recipe.ee_id=='3F'
+                  and getattr(recipe,'hold_finger_positions',False)):
+                # Larger enclosure bodies (c3_2 mug/fruit) unload fingers under
+                # force servo / inertia; contact still gates, attachment carries.
+                attach_catalog_kinematic_carry(self)
             run_timed_hold(self,q,hold_opening,recipe.prelift_stabilization_s)
             if recipe.ee_id=='vac':
                 if self.runtime.attached_object_id!=self.object_id:raise GraspFailure('VACUUM_ATTACHMENT_LOST')
@@ -407,14 +417,8 @@ class CatalogContext(SpoonContext):
                     'T_GB':inverse(self.grip_pose())@self.body_pose(),
                     'grasp_T_GB':self.grasp_T_GB,
                 })
-            elif not self.ready():raise GraspFailure('CONTACT_LOST_BEFORE_LIFT')
-            if getattr(recipe,'thin_handle_pinch',False):
-                attach_thin_handle_pinch(self)
-            elif (recipe.ee_id=='3F'
-                  and getattr(recipe,'hold_finger_positions',False)):
-                # Larger enclosure bodies (c3_2 mug) unload fingers under force
-                # servo / inertia; contact still gates, attachment carries LIFT.
-                attach_catalog_kinematic_carry(self)
+            elif self.runtime.attachment is None and not self.ready():
+                raise GraspFailure('CONTACT_LOST_BEFORE_LIFT')
             self.apply_post_grasp_arm_gains()
             # Snapshot grasp relative pose before any post-attach breakaway so
             # BREAKAWAY/LIFT collision probes carry the held object with the TCP.
