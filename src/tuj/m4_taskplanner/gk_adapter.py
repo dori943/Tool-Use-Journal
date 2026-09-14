@@ -8,7 +8,7 @@ kept for compatibility.
 
 from __future__ import annotations
 
-from collections.abc import Mapping
+from collections.abc import Mapping, Sequence, Set as AbstractSet
 from copy import deepcopy
 from typing import Any
 
@@ -262,6 +262,23 @@ def adapt_gk_m2_output(
             ):
                 goal_region_id = _canonical_id(
                     rough["container_id"], aliases, raw_to_canonical
+                )
+            if (
+                goal_region_id is None
+                and action_type == "tool_act"
+                and mode == "extract"
+            ):
+                # M2 가 extract 의 container_id 를 비워 보내면 M5 추출 평가기가
+                # 채널 축을 못 잡는다. 틈의 벽은 장면 기하로 결정되는 값이므로
+                # 여기서 유도한다 (_extract_gap_region_id 참고).
+                carried = {
+                    _canonical_id(item, aliases, raw_to_canonical)
+                    for item in _string_list(rough.get("tool_candidate_ids"))
+                }
+                if tool_id is not None:
+                    carried.add(tool_id)
+                goal_region_id = _extract_gap_region_id(
+                    target_ids, nodes, carried | set(target_ids)
                 )
 
             subgoals.append(
@@ -945,6 +962,77 @@ def _normalize_partial_order(
             }
         )
     return result
+
+
+def _horizontal_span(
+    node: Mapping[str, Any], axis: int
+) -> tuple[float, float] | None:
+    """노드의 수평 AABB 구간 (center_mm ± bbox_mm/2). 기하가 없으면 None."""
+    center = node.get("center_mm")
+    bbox = node.get("bbox_mm")
+    if not (isinstance(center, (list, tuple)) and len(center) == 3):
+        return None
+    if not (isinstance(bbox, (list, tuple)) and len(bbox) == 3):
+        return None
+    if not all(isinstance(v, (int, float)) for v in (center[axis], bbox[axis])):
+        return None
+    half = float(bbox[axis]) / 2.0
+    return float(center[axis]) - half, float(center[axis]) + half
+
+
+def _extract_gap_region_id(
+    target_ids: Sequence[str],
+    nodes: Mapping[str, Mapping[str, Any]],
+    exclude: AbstractSet[str],
+) -> str | None:
+    """extract 대상이 끼어 있는 틈의 벽을 장면 기하에서 유도한다 (0915).
+
+    M2 프롬프트는 kind=extract 일 때 container_id 가 무엇인지 정의하지 않아
+    제공자에 따라 null 이 온다. 반면 M5 의 추출 평가기(ToolExtractionEvaluator)는
+    그 자리에 '틈을 이루는 벽' 이 있어야 채널 축을 잡는다. 벽은 장면 기하로
+    결정되는 값이므로 LLM 에 묻지 않고 여기서 유도한다.
+
+    판정: 수평 두 축 중 하나에서 대상 구간을 완전히 포함하고(= 채널 축), 나머지
+    수평 축에서는 대상 중심을 품지 않는(= 대상이 위에 얹힌 게 아니라 옆 틈에
+    끼어 있는) 노드. 같은 틈의 양쪽 벽은 채널 축 구간이 같아 어느 쪽을 골라도
+    평가 결과가 같으므로, 재현성을 위해 (채널 폭, id) 순으로 하나를 고른다.
+    유도에 실패하면 None — 기존 동작(region 미지정)을 그대로 둔다.
+    """
+    target_span: dict[int, tuple[float, float]] = {}
+    for axis in (0, 1):
+        low = high = None
+        for target_id in target_ids:
+            span = _horizontal_span(_mapping(nodes.get(target_id)), axis)
+            if span is None:
+                continue
+            low = span[0] if low is None else min(low, span[0])
+            high = span[1] if high is None else max(high, span[1])
+        if low is None:
+            return None
+        target_span[axis] = (low, high)
+
+    candidates: list[tuple[float, str]] = []
+    for node_id, raw_node in nodes.items():
+        if node_id in exclude:
+            continue
+        node = _mapping(raw_node)
+        for axis in (0, 1):
+            channel = _horizontal_span(node, axis)
+            across = _horizontal_span(node, 1 - axis)
+            if channel is None or across is None:
+                continue
+            low, high = target_span[axis]
+            if not (channel[0] <= low and high <= channel[1]):
+                continue                      # 채널 축에서 대상을 품지 않음
+            other_low, other_high = target_span[1 - axis]
+            midpoint = (other_low + other_high) / 2.0
+            if across[0] <= midpoint <= across[1]:
+                continue                      # 옆 틈이 아니라 위/안에 있음
+            candidates.append((channel[1] - channel[0], node_id))
+            break
+    if not candidates:
+        return None
+    return min(candidates)[1]
 
 
 def _canonical_id(

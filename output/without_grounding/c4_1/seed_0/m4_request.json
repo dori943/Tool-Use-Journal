@@ -1,0 +1,1015 @@
+{
+  "task_graph": {
+    "task": {
+      "instruction": "가전 사이 틈에 떨어진 카드를 꺼내라"
+    },
+    "units": {
+      "length": "mm",
+      "mass": "kg"
+    },
+    "initial_state": {
+      "current_ee": null,
+      "rack": {
+        "ee-slot-2f": "2F",
+        "ee-slot-3f": "3F",
+        "ee-slot-vac": "vac"
+      },
+      "facts": [
+        {
+          "cond_id": "GK_INIT_hand_empty",
+          "type": "hand_empty",
+          "args": [],
+          "value": null,
+          "limit": null,
+          "check": null,
+          "pass": true,
+          "eval_by": "robot_state",
+          "depends_on": null,
+          "needs_observation": false,
+          "nl": null,
+          "negated": false
+        }
+      ],
+      "held_tool": null,
+      "rack_occupancy": null,
+      "scene_signature": null
+    },
+    "subgoals": [
+      {
+        "subgoal_id": "SG1_d1",
+        "description": "extract 도구 확보 (?tool: 후보 중 M4 선택)",
+        "action_type": "PICK_TOOL",
+        "mode": null,
+        "group_id": "G_SG1_tool",
+        "source_kg_subgoal_id": "SG1",
+        "source_binding": {
+          "?o": "?tool"
+        },
+        "condition_source": "upper-level-visual-semantic-v1",
+        "target_ids": [
+          "tool_4_spatula_c"
+        ],
+        "goal_region_id": null,
+        "tool_id": "tool_4_spatula_c",
+        "action_parameters": {},
+        "preconditions": [
+          {
+            "cond_id": "SG1_d1_p0",
+            "type": "reachable",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "reachable(?tool)",
+            "negated": false,
+            "status": "unknown",
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d1_p1",
+            "type": "top_exposed",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "top_exposed(?tool)",
+            "negated": false,
+            "status": "unknown",
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d1_p2",
+            "type": "ee_usable",
+            "args": [
+              "?EE",
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "ee_usable(?EE, ?tool)",
+            "negated": false,
+            "status": "unknown",
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d1_p3",
+            "type": "graspable_on_support",
+            "args": [
+              "?EE",
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "graspable_on_support(?EE, ?tool)",
+            "negated": false,
+            "status": "unknown",
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d1_p4",
+            "type": "batch_feasible",
+            "args": [
+              "?EE",
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "batch_feasible(?EE, ?tool)",
+            "negated": false,
+            "status": "unknown",
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d1_p5",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_d1_e0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "establish": [
+          {
+            "cond_id": "SG1_d1_e0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "destroy": [
+          {
+            "cond_id": "SG1_d1_d0",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "feasible_ee": [
+          "2F",
+          "3F"
+        ],
+        "required_capabilities": [],
+        "required_wrench": null,
+        "unique_solution": false,
+        "tool_required": true,
+        "tool_selection_source": "upstream_fixed",
+        "feasible_ee_source": "request",
+        "ee_hypothesis_source": "visual_semantic_unverified"
+      },
+      {
+        "subgoal_id": "SG1_d2",
+        "description": "obj_card_card를 틈에서 빼낸다",
+        "action_type": "tool_act",
+        "mode": "extract",
+        "group_id": "G_SG1_tool",
+        "source_kg_subgoal_id": "SG1",
+        "source_binding": {
+          "?t": "?tool",
+          "?o": "card"
+        },
+        "condition_source": "upper-level-visual-semantic-v1",
+        "target_ids": [
+          "card"
+        ],
+        "goal_region_id": null,
+        "tool_id": "tool_4_spatula_c",
+        "action_parameters": {},
+        "preconditions": [
+          {
+            "cond_id": "SG1_d2_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d2_p1",
+            "type": "gap_accessible",
+            "args": [
+              "?tool",
+              "card"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "gap_accessible(?tool, obj_card_card)",
+            "negated": false,
+            "status": "unknown",
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d2_p2",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "card"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, obj_card_card)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_d2_e0",
+            "type": "extracted",
+            "args": [
+              "card"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "extracted(obj_card_card)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "establish": [
+          {
+            "cond_id": "SG1_d2_e0",
+            "type": "extracted",
+            "args": [
+              "card"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "extracted(obj_card_card)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "destroy": [],
+        "feasible_ee": [
+          "2F",
+          "3F"
+        ],
+        "required_capabilities": [],
+        "required_wrench": null,
+        "unique_solution": false,
+        "tool_required": true,
+        "tool_selection_source": "upstream_fixed",
+        "feasible_ee_source": "request",
+        "ee_hypothesis_source": "visual_semantic_unverified"
+      },
+      {
+        "subgoal_id": "SG1_d2b",
+        "description": "도구를 거치 위치로 운반",
+        "action_type": "transport",
+        "mode": null,
+        "group_id": "G_SG1_tool",
+        "source_kg_subgoal_id": "SG1",
+        "source_binding": {
+          "?o": "?tool",
+          "?r": "tool_rest"
+        },
+        "condition_source": "upper-level-visual-semantic-v1",
+        "target_ids": [
+          "tool_4_spatula_c"
+        ],
+        "goal_region_id": "tool_rest",
+        "tool_id": "tool_4_spatula_c",
+        "action_parameters": {},
+        "preconditions": [
+          {
+            "cond_id": "SG1_d2b_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d2b_p1",
+            "type": "act_space_clear",
+            "args": [
+              "?EE",
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "act_space_clear(?EE, ?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d2b_p2",
+            "type": "path_clear",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "motion",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "path_clear(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d2b_p3",
+            "type": "extracted",
+            "args": [
+              "card"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "extracted(obj_card_card)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_d2b_e0",
+            "type": "above",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "establish": [
+          {
+            "cond_id": "SG1_d2b_e0",
+            "type": "above",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "destroy": [],
+        "feasible_ee": [
+          "2F",
+          "3F"
+        ],
+        "required_capabilities": [],
+        "required_wrench": null,
+        "unique_solution": false,
+        "tool_required": true,
+        "tool_selection_source": "upstream_fixed",
+        "feasible_ee_source": "request",
+        "ee_hypothesis_source": "visual_semantic_unverified"
+      },
+      {
+        "subgoal_id": "SG1_d3",
+        "description": "도구 반환",
+        "action_type": "RETURN_TOOL",
+        "mode": null,
+        "group_id": "G_SG1_tool",
+        "source_kg_subgoal_id": "SG1",
+        "source_binding": {
+          "?o": "?tool",
+          "?r": "tool_rest"
+        },
+        "condition_source": "upper-level-visual-semantic-v1",
+        "target_ids": [
+          "tool_4_spatula_c"
+        ],
+        "goal_region_id": "tool_rest",
+        "tool_id": "tool_4_spatula_c",
+        "action_parameters": {},
+        "preconditions": [
+          {
+            "cond_id": "SG1_d3_p0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d3_p1",
+            "type": "above",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d3_p2",
+            "type": "fits",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "fits(?tool, tool_rest)",
+            "negated": false,
+            "status": "unknown",
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d3_p3",
+            "type": "clear",
+            "args": [
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m3",
+            "depends_on": null,
+            "needs_observation": true,
+            "nl": "clear(tool_rest)",
+            "negated": false,
+            "status": "unknown",
+            "evidence": []
+          }
+        ],
+        "postconditions": [
+          {
+            "cond_id": "SG1_d3_e0",
+            "type": "in",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d3_e1",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "establish": [
+          {
+            "cond_id": "SG1_d3_e0",
+            "type": "in",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "in(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d3_e1",
+            "type": "hand_empty",
+            "args": [],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "hand_empty",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "destroy": [
+          {
+            "cond_id": "SG1_d3_d0",
+            "type": "holding",
+            "args": [
+              "?tool"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "holding(?tool)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          },
+          {
+            "cond_id": "SG1_d3_d1",
+            "type": "above",
+            "args": [
+              "?tool",
+              "tool_rest"
+            ],
+            "value": null,
+            "limit": null,
+            "check": null,
+            "pass": null,
+            "eval_by": "m2",
+            "depends_on": null,
+            "needs_observation": false,
+            "nl": "above(?tool, tool_rest)",
+            "negated": false,
+            "status": null,
+            "evidence": []
+          }
+        ],
+        "feasible_ee": [
+          "2F",
+          "3F"
+        ],
+        "required_capabilities": [],
+        "required_wrench": null,
+        "unique_solution": false,
+        "tool_required": true,
+        "tool_selection_source": "upstream_fixed",
+        "feasible_ee_source": "request",
+        "ee_hypothesis_source": "visual_semantic_unverified"
+      }
+    ],
+    "order_constraints": {
+      "edges": [
+        {
+          "from": "SG1_d1",
+          "to": "SG1_d2",
+          "reason": "causal_link: holding(?tool)"
+        },
+        {
+          "from": "SG1_d1",
+          "to": "SG1_d2b",
+          "reason": "causal_link: holding(?tool)"
+        },
+        {
+          "from": "SG1_d2",
+          "to": "SG1_d2b",
+          "reason": "causal_link: extracted(obj_card_card)"
+        },
+        {
+          "from": "SG1_d1",
+          "to": "SG1_d3",
+          "reason": "causal_link: holding(?tool)"
+        },
+        {
+          "from": "SG1_d2b",
+          "to": "SG1_d3",
+          "reason": "causal_link: above(?tool, tool_rest)"
+        },
+        {
+          "from": "SG1_d2",
+          "to": "SG1_d3",
+          "reason": "threat: SG1_d3가 holding(?tool)를 파괴"
+        }
+      ],
+      "cycle_detected": false,
+      "cycles": [],
+      "unestablishable": [],
+      "n_topological_orders": null
+    },
+    "constraints": {
+      "mutex": [],
+      "open_conditions": [],
+      "disjunctive_threats": [],
+      "deferred_conditions": [],
+      "sg_observation_requests": [],
+      "redecompose_signals": [],
+      "kg_order_audit": {
+        "verdicts": [],
+        "kg_missing": [],
+        "counts": {}
+      }
+    },
+    "log": {
+      "adapter": "gk-m2-v1",
+      "task_id": null,
+      "gk_proposed_order": [],
+      "id_aliases": {
+        "obj_appliance_left_appliance_left": "appliance_left",
+        "obj_appliance_right_appliance_right": "appliance_right",
+        "obj_card_card": "card",
+        "obj_tool_2_spatula_a_tool_2_spatula_a": "tool_2_spatula_a",
+        "obj_tool_3_spatula_b_tool_3_spatula_b": "tool_3_spatula_b",
+        "obj_tool_4_spatula_c_tool_4_spatula_c": "tool_4_spatula_c",
+        "obj_tool_5_cutting_board_tool_5_cutting_board": "tool_5_cutting_board"
+      },
+      "m2_stats": {
+        "n_subgoals": 1,
+        "n_details": 4,
+        "n_edges": 6,
+        "n_mutex": 0,
+        "llm_usage": {
+          "visual_decomposition": {
+            "calls": 1,
+            "prompt_tokens": 1878,
+            "completion_tokens": 101,
+            "tokens": 1979,
+            "seconds": 3.19
+          },
+          "visual_selection": {
+            "calls": 1,
+            "prompt_tokens": 2304,
+            "completion_tokens": 204,
+            "tokens": 2508,
+            "seconds": 2.39
+          }
+        }
+      },
+      "ablation": {
+        "mode": "without_grounding",
+        "policy_version": "upper-level-visual-semantic-v1"
+      }
+    }
+  },
+  "resource_catalog": {
+    "end_effectors": {
+      "2F": {
+        "capabilities": [
+          "contact_friction",
+          "opposed_finger_contact"
+        ],
+        "payload": 5.0,
+        "compatible_tools": [
+          "tool_4_spatula_c"
+        ],
+        "home_slot": "ee-slot-2f",
+        "robot_spec": {
+          "ee_id": "2F",
+          "type": "parallel_2f",
+          "capabilities": [
+            "contact_friction",
+            "opposed_finger_contact"
+          ],
+          "stroke_mm": 85,
+          "payload_kg": 5.0,
+          "grip_force_n": 235.0,
+          "fingerpad_friction": [
+            1.0,
+            0.005,
+            0.0001
+          ],
+          "home_slot": "ee-slot-2f",
+          "pass_height_mm": 160
+        }
+      },
+      "3F": {
+        "capabilities": [
+          "multi_finger_contact"
+        ],
+        "payload": 2.5,
+        "compatible_tools": [
+          "tool_4_spatula_c"
+        ],
+        "home_slot": "ee-slot-3f",
+        "robot_spec": {
+          "ee_id": "3F",
+          "type": "underactuated_3f",
+          "capabilities": [
+            "multi_finger_contact"
+          ],
+          "aperture_mm": 140,
+          "payload_kg": 2.5,
+          "grip_force_n": 60,
+          "home_slot": "ee-slot-3f",
+          "pass_height_mm": 185
+        }
+      },
+      "vac": {
+        "capabilities": [
+          "suction"
+        ],
+        "payload": 0.5,
+        "compatible_tools": [
+          "tool_4_spatula_c"
+        ],
+        "home_slot": "ee-slot-vac",
+        "robot_spec": {
+          "ee_id": "vac",
+          "type": "vacuum",
+          "capabilities": [
+            "suction"
+          ],
+          "payload_kg": 0.5,
+          "home_slot": "ee-slot-vac",
+          "pass_height_mm": 140,
+          "seal_diameter_mm": 30,
+          "flatness_tol_rms_mm": 1.5
+        }
+      }
+    },
+    "tools": {
+      "tool_4_spatula_c": {
+        "mass": null,
+        "capabilities": [],
+        "required_capabilities": [],
+        "deliverable_wrench": null,
+        "compatible_ee": [
+          "2F",
+          "3F",
+          "vac"
+        ],
+        "home_slot": "tool-slot-tool_4_spatula_c",
+        "gk": {
+          "id": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "canonical_id": "tool_4_spatula_c",
+          "class": "tool_4_spatula_c",
+          "source_name": "tool_4_spatula_c"
+        }
+      }
+    },
+    "objects": {
+      "appliance_left": {
+        "mass_kg": null,
+        "bbox_mm": null,
+        "material": null,
+        "center_mm": null,
+        "object_class": "appliance_left",
+        "source_id": "obj_appliance_left_appliance_left"
+      },
+      "appliance_right": {
+        "mass_kg": null,
+        "bbox_mm": null,
+        "material": null,
+        "center_mm": null,
+        "object_class": "appliance_right",
+        "source_id": "obj_appliance_right_appliance_right"
+      },
+      "card": {
+        "mass_kg": null,
+        "bbox_mm": null,
+        "material": null,
+        "center_mm": null,
+        "object_class": "card",
+        "source_id": "obj_card_card",
+        "gk": {
+          "id": "obj_card_card",
+          "canonical_id": "card",
+          "class": "card",
+          "source_name": "card"
+        }
+      },
+      "tool_2_spatula_a": {
+        "mass_kg": null,
+        "bbox_mm": null,
+        "material": null,
+        "center_mm": null,
+        "object_class": "tool_2_spatula_a",
+        "source_id": "obj_tool_2_spatula_a_tool_2_spatula_a"
+      },
+      "tool_3_spatula_b": {
+        "mass_kg": null,
+        "bbox_mm": null,
+        "material": null,
+        "center_mm": null,
+        "object_class": "tool_3_spatula_b",
+        "source_id": "obj_tool_3_spatula_b_tool_3_spatula_b"
+      },
+      "tool_4_spatula_c": {
+        "mass_kg": null,
+        "bbox_mm": null,
+        "material": null,
+        "center_mm": null,
+        "object_class": "tool_4_spatula_c",
+        "source_id": "obj_tool_4_spatula_c_tool_4_spatula_c",
+        "gk": {
+          "id": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "canonical_id": "tool_4_spatula_c",
+          "class": "tool_4_spatula_c",
+          "source_name": "tool_4_spatula_c"
+        }
+      },
+      "tool_5_cutting_board": {
+        "mass_kg": null,
+        "bbox_mm": null,
+        "material": null,
+        "center_mm": null,
+        "object_class": "tool_5_cutting_board",
+        "source_id": "obj_tool_5_cutting_board_tool_5_cutting_board"
+      }
+    }
+  },
+  "candidate_proposals": null,
+  "planning_policy": {
+    "candidate_score_threshold": 0.6,
+    "top_k_per_subgoal": 3,
+    "preserve_ee_coverage": true,
+    "unknown_feasibility_policy": "defer",
+    "in_search_geometry": "scene_independent",
+    "unknown_suitability_policy": "defer",
+    "motion_costs": {
+      "move_to_tool_rack": 2,
+      "move_to_ee_rack": 3,
+      "move_to_workspace": 1
+    },
+    "terminal": {
+      "return_tool_at_end": true,
+      "restore_initial_ee_at_end": false,
+      "require_empty_object_hand_at_end": true
+    },
+    "max_expansions": 200000,
+    "timeout_seconds": null
+  }
+}

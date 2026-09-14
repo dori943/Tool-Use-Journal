@@ -1,0 +1,168 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:6064930e44a2eb5844b2:execution-report",
+  "run_id": "simulation-run:0000:6064930e44a2eb5844b2",
+  "plan_id": "motion-plan:b1411969197034e9c7a1fc4a",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:6064930e44a2eb5844b2:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:6064930e44a2eb5844b2",
+    "input_artifact_ids": [
+      "simulation-run-artifact:6064930e44a2eb5844b28dd9",
+      "motion-plan-artifact:b1411969197034e9c7a1fc4a"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "FAILED",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      -0.5009609689044069,
+      -1.4985998578587731,
+      2.0597611961225857,
+      -2.1408575887865853,
+      -1.568548462449309,
+      -0.5016018269375672
+    ],
+    "joint_velocities_rad_s": [
+      0.01974896001230399,
+      -0.03447622411569031,
+      -0.09613179542816966,
+      -0.09695767956584123,
+      0.08046882298123595,
+      0.003547424151902919
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        2.317206597255159,
+        -3.3251558775661922,
+        0.9361825217888149
+      ],
+      "orientation_xyzw": [
+        0.999989414391157,
+        0.00032542707361427054,
+        0.004442556397726572,
+        0.001152777300138993
+      ]
+    },
+    "gripper": {
+      "mode": "HOLDING",
+      "command": 1.0
+    },
+    "attached_object_id": "tool_4_spatula_c",
+    "held_tool_id": "tool_4_spatula_c"
+  },
+  "metrics": {
+    "executed_duration_s": 8.140000000009948,
+    "max_joint_tracking_error_rad": 0.06720469829783726,
+    "max_eef_tracking_error_m": 0.010490073745323165,
+    "collision_count": 1,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG1_d1:SG1_d1:strategy_top_down:2:SG1_d1:strategy_top_down:2:grasp:event:0:GRIPPER_CLOSE",
+      "scheduled_time_s": 8.031408652345469,
+      "actual_time_s": 8.1000000000099,
+      "status": "SUCCESS",
+      "message": "finger gripper close command set to 1.000"
+    },
+    {
+      "event_id": "SG1_d1:SG1_d1:strategy_top_down:2:SG1_d1:strategy_top_down:2:grasp:event:1:ATTACH_OBJECT",
+      "scheduled_time_s": 8.031408652345469,
+      "actual_time_s": 8.1000000000099,
+      "status": "SUCCESS",
+      "message": "attached tool_4_spatula_c in BREAKABLE_WELD mode to site gripper0_right_grip_site at -0.0004 m; formation contacts=6, groups=['left_finger', 'left_fingertip', 'right_finger', 'right_fingertip'], normal_force=23.911 N"
+    }
+  ],
+  "failure": {
+    "code": "EXECUTION_COLLISION",
+    "category": "SIMULATION_RUNTIME",
+    "message": "island_island_group_top_2 <-> tool_4_spatula_c_g2 clearance -0.005188 m is below required -0.001000 m",
+    "segment_id": "SG1_d1:SG1_d1:strategy_top_down:2:SG1_d1:SG1_d1:strategy_top_down:3:SG1_d1:strategy_top_down:3:lift",
+    "waypoint_index": null,
+    "event_id": null,
+    "expected": {},
+    "observed": {
+      "failure_code": "BOUNDED_COLLISION_VIOLATION",
+      "min_clearance_m": -0.005187575729059119
+    },
+    "evidence_refs": []
+  },
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "2F",
+    "final_attached_object_id": "tool_4_spatula_c",
+    "final_held_tool_id": "tool_4_spatula_c",
+    "final_gripper_command": 1.0,
+    "ee_transition_count": 1,
+    "attachment_mode": "BREAKABLE_WELD",
+    "attachment_contact": {
+      "contact_count": 4,
+      "normal_force_n": 14.804253629994038,
+      "tangential_force_n": 44.41276088998212,
+      "total_force_n": 46.81516052959678,
+      "contact_groups": [
+        "left_finger",
+        "left_fingertip",
+        "right_finger",
+        "right_fingertip"
+      ]
+    },
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 407,
+    "nominal_plan_duration_s": 11.113420818345578,
+    "final_plan_time_s": 8.071408652345468,
+    "adaptive_settle_extra_duration_s": 0.06859134766447994,
+    "segment_tracking": [
+      {
+        "segment_id": "SG1_d1:SG1_d1:strategy_top_down:0:SG1_d1:SG1_d1:strategy_top_down:1:SG1_d1:strategy_top_down:1:pre_grasp",
+        "keyframe_id": "SG1_d1:SG1_d1:strategy_top_down:1:SG1_d1:strategy_top_down:1:pre_grasp",
+        "target_block_id": null,
+        "nominal_end_time_s": 5.260764426642523,
+        "actual_execution_time_s": 5.280000000006453,
+        "max_joint_error_rad": 0.007832895833044029,
+        "eef_position_error_m": 0.0008445271822673884,
+        "eef_orientation_error_rad": 0.007703498516087906,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_d1:SG1_d1:strategy_top_down:1:SG1_d1:SG1_d1:strategy_top_down:2:SG1_d1:strategy_top_down:2:grasp",
+        "keyframe_id": "SG1_d1:SG1_d1:strategy_top_down:2:SG1_d1:strategy_top_down:2:grasp",
+        "target_block_id": null,
+        "nominal_end_time_s": 8.031408652345469,
+        "actual_execution_time_s": 8.1000000000099,
+        "max_joint_error_rad": 0.006854908905284951,
+        "eef_position_error_m": 0.0031718786975237752,
+        "eef_orientation_error_rad": 0.0017482013736795123,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.06000000000007333,
+        "custom_settle": null
+      }
+    ],
+    "gripper_release_waits": []
+  }
+}

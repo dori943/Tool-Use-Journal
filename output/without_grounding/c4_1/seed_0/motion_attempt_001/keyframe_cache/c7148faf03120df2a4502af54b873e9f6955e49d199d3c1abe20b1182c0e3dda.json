@@ -1,0 +1,363 @@
+{
+  "schema_version": "3.2.0",
+  "artifact_id": "keyframe-plan:298a9eaaac63e657fc1e0813",
+  "provenance": {
+    "artifact_id": "keyframe-plan-artifact:298a9eaaac63e657fc1e0813",
+    "artifact_type": "KeyframePlanArtifact",
+    "produced_by": "MOTION_PLANNER",
+    "invocation_id": "gemini-keyframes:motion-request:live:2d6e8074ce4440351c26",
+    "input_artifact_ids": [
+      "motion-request-artifact:live:2d6e8074ce4440351c26"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "model": "gemini-3.5-flash-lite",
+      "prompt_version": "GEMINI_KEYFRAME_STRATEGY_JSON_V5",
+      "provider": "gemini",
+      "provider_request_id": "lhKoaofsJMr32roPxMrP2Qo",
+      "generation_attempt": 1,
+      "rejected_candidate_count": 0,
+      "rejected_candidates": []
+    }
+  },
+  "scene_signature": "tool-use-journal:90aeb46ca2d6335da56b73a3edecd4ba0955bc56cc97b658bb3e395f4030a4a6",
+  "subgoal_id": "SG1_d1",
+  "candidates": [
+    {
+      "strategy_id": "SG1_d1:strategy_top_down",
+      "keyframes": [
+        {
+          "keyframe_id": "SG1_d1:strategy_top_down:1:pre_grasp_top",
+          "keyframe_type": "PRE_GRASP",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "top",
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": 0.12,
+          "roll_rad": 0.0,
+          "planner": "CARTESIAN",
+          "events_after": [],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {}
+        },
+        {
+          "keyframe_id": "SG1_d1:strategy_top_down:2:grasp_top",
+          "keyframe_type": "GRASP",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "top",
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": 0.0,
+          "roll_rad": 0.0,
+          "planner": "CARTESIAN",
+          "events_after": [
+            "GRIPPER_CLOSE",
+            "ATTACH_OBJECT"
+          ],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {
+            "event_target_id": "tool_4_spatula_c",
+            "event_parameters": {
+              "ATTACH_OBJECT": {
+                "resource_kind": "tool"
+              }
+            }
+          }
+        },
+        {
+          "keyframe_id": "SG1_d1:strategy_top_down:3:lift_top",
+          "keyframe_type": "LIFT",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "top",
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": -0.15,
+          "roll_rad": 0.0,
+          "planner": "CARTESIAN",
+          "events_after": [],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {}
+        }
+      ],
+      "rationale": "Direct top-down vertical grasp approach aligning tool -z with object +z, followed by a vertical lift.",
+      "provenance": {
+        "generator_kind": "VLM",
+        "generator_id": "GEMINI_KEYFRAME_STRATEGY_JSON_V5",
+        "input_hash": "5bf22e318741e99f3851d67706e3cbe11a01720ef1a60383f89ca0d40a80d8df",
+        "model_id": "gemini-3.5-flash-lite",
+        "prompt_hash": "5bf22e318741e99f3851d67706e3cbe11a01720ef1a60383f89ca0d40a80d8df",
+        "temperature": null,
+        "provider_request_id": "lhKoaofsJMr32roPxMrP2Qo",
+        "attempt_index": 1
+      },
+      "metadata": {}
+    },
+    {
+      "strategy_id": "SG1_d1:strategy_side_approach",
+      "keyframes": [
+        {
+          "keyframe_id": "SG1_d1:strategy_side_approach:1:pre_grasp_side",
+          "keyframe_type": "PRE_GRASP",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "center",
+          "approach_axis_xyz": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": 0.15,
+          "roll_rad": 1.57,
+          "planner": "CARTESIAN",
+          "events_after": [],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {}
+        },
+        {
+          "keyframe_id": "SG1_d1:strategy_side_approach:2:grasp_side",
+          "keyframe_type": "GRASP",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "center",
+          "approach_axis_xyz": [
+            0.0,
+            1.0,
+            0.0
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": 0.0,
+          "roll_rad": 1.57,
+          "planner": "CARTESIAN",
+          "events_after": [
+            "GRIPPER_CLOSE",
+            "ATTACH_OBJECT"
+          ],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {
+            "event_target_id": "tool_4_spatula_c",
+            "event_parameters": {
+              "ATTACH_OBJECT": {
+                "resource_kind": "tool"
+              }
+            }
+          }
+        },
+        {
+          "keyframe_id": "SG1_d1:strategy_side_approach:3:lift_side",
+          "keyframe_type": "LIFT",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "top",
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": -0.12,
+          "roll_rad": 1.57,
+          "planner": "CARTESIAN",
+          "events_after": [],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {}
+        }
+      ],
+      "rationale": "Horizontal side approach to pick the spatula with rotated tool orientation, then vertical lift.",
+      "provenance": {
+        "generator_kind": "VLM",
+        "generator_id": "GEMINI_KEYFRAME_STRATEGY_JSON_V5",
+        "input_hash": "5bf22e318741e99f3851d67706e3cbe11a01720ef1a60383f89ca0d40a80d8df",
+        "model_id": "gemini-3.5-flash-lite",
+        "prompt_hash": "5bf22e318741e99f3851d67706e3cbe11a01720ef1a60383f89ca0d40a80d8df",
+        "temperature": null,
+        "provider_request_id": "lhKoaofsJMr32roPxMrP2Qo",
+        "attempt_index": 1
+      },
+      "metadata": {}
+    },
+    {
+      "strategy_id": "SG1_d1:strategy_angled_approach",
+      "keyframes": [
+        {
+          "keyframe_id": "SG1_d1:strategy_angled_approach:1:pre_grasp_angled",
+          "keyframe_type": "PRE_GRASP",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "top_center",
+          "approach_axis_xyz": [
+            0.5000110003630134,
+            0.0,
+            0.8660190526287391
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": 0.14,
+          "roll_rad": 0.785,
+          "planner": "SAMPLING_BASED",
+          "events_after": [],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {}
+        },
+        {
+          "keyframe_id": "SG1_d1:strategy_angled_approach:2:grasp_angled",
+          "keyframe_type": "GRASP",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "top_center",
+          "approach_axis_xyz": [
+            0.5000110003630134,
+            0.0,
+            0.8660190526287391
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": 0.0,
+          "roll_rad": 0.785,
+          "planner": "CARTESIAN",
+          "events_after": [
+            "GRIPPER_CLOSE",
+            "ATTACH_OBJECT"
+          ],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {
+            "event_target_id": "tool_4_spatula_c",
+            "event_parameters": {
+              "ATTACH_OBJECT": {
+                "resource_kind": "tool"
+              }
+            }
+          }
+        },
+        {
+          "keyframe_id": "SG1_d1:strategy_angled_approach:3:lift_angled",
+          "keyframe_type": "LIFT",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "top_center",
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": -0.15,
+          "roll_rad": 0.785,
+          "planner": "CARTESIAN",
+          "events_after": [],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {}
+        }
+      ],
+      "rationale": "Angled approach utilizing sampling-based planner for collision avoidance in cluttered shelf environments.",
+      "provenance": {
+        "generator_kind": "VLM",
+        "generator_id": "GEMINI_KEYFRAME_STRATEGY_JSON_V5",
+        "input_hash": "5bf22e318741e99f3851d67706e3cbe11a01720ef1a60383f89ca0d40a80d8df",
+        "model_id": "gemini-3.5-flash-lite",
+        "prompt_hash": "5bf22e318741e99f3851d67706e3cbe11a01720ef1a60383f89ca0d40a80d8df",
+        "temperature": null,
+        "provider_request_id": "lhKoaofsJMr32roPxMrP2Qo",
+        "attempt_index": 1
+      },
+      "metadata": {}
+    },
+    {
+      "strategy_id": "SG1_d1:strategy_low_profile",
+      "keyframes": [
+        {
+          "keyframe_id": "SG1_d1:strategy_low_profile:1:pre_grasp_low",
+          "keyframe_type": "PRE_GRASP",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "bottom_center",
+          "approach_axis_xyz": [
+            0.0,
+            -1.0,
+            0.0
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": 0.1,
+          "roll_rad": -1.57,
+          "planner": "CARTESIAN",
+          "events_after": [],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {}
+        },
+        {
+          "keyframe_id": "SG1_d1:strategy_low_profile:2:grasp_low",
+          "keyframe_type": "GRASP",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "bottom_center",
+          "approach_axis_xyz": [
+            0.0,
+            -1.0,
+            0.0
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": 0.0,
+          "roll_rad": -1.57,
+          "planner": "CARTESIAN",
+          "events_after": [
+            "GRIPPER_CLOSE",
+            "ATTACH_OBJECT"
+          ],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {
+            "event_target_id": "tool_4_spatula_c",
+            "event_parameters": {
+              "ATTACH_OBJECT": {
+                "resource_kind": "tool"
+              }
+            }
+          }
+        },
+        {
+          "keyframe_id": "SG1_d1:strategy_low_profile:3:lift_low",
+          "keyframe_type": "LIFT",
+          "frame_ref": "object:tool_4_spatula_c",
+          "anchor": "top",
+          "approach_axis_xyz": [
+            0.0,
+            0.0,
+            1.0
+          ],
+          "tool_axis_to_align": "-z",
+          "offset_along_approach_m": -0.18,
+          "roll_rad": -1.57,
+          "planner": "CARTESIAN",
+          "events_after": [],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {}
+        }
+      ],
+      "rationale": "Low-profile approach from the handle end, avoiding above obstacles, followed by a secure vertical lift.",
+      "provenance": {
+        "generator_kind": "VLM",
+        "generator_id": "GEMINI_KEYFRAME_STRATEGY_JSON_V5",
+        "input_hash": "5bf22e318741e99f3851d67706e3cbe11a01720ef1a60383f89ca0d40a80d8df",
+        "model_id": "gemini-3.5-flash-lite",
+        "prompt_hash": "5bf22e318741e99f3851d67706e3cbe11a01720ef1a60383f89ca0d40a80d8df",
+        "temperature": null,
+        "provider_request_id": "lhKoaofsJMr32roPxMrP2Qo",
+        "attempt_index": 1
+      },
+      "metadata": {}
+    }
+  ]
+}

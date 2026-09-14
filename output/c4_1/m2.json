@@ -23,27 +23,27 @@
         "obj_tool_4_spatula_c_tool_4_spatula_c",
         "obj_tool_5_cutting_board_tool_5_cutting_board"
       ],
-      "selection_reason": "카드를 가전 사이 틈에서 꺼내려면 대상 카드와 함께 사용할 수 있는 평평한 도구 후보들을 함께 고려해야 한다.",
+      "selection_reason": "카드를 가전 사이 틈에서 꺼내려면 대상 카드와 함께 가능한 도구 후보들을 물리적으로 고려해야 한다.",
       "confidence": {
         "before": {
           "decomposition": 0.86,
           "object_selection": 0.74,
           "uncertain_about": [
-            "스패튤라와 도마 중 실제로 틈에 넣어 카드에 닿을 수 있는 형상인지",
-            "카드가 어느 정도 깊이 끼어 있어 어떤 도구가 가장 적합한지"
+            "어떤 도구가 틈에 가장 잘 들어가 카드에 닿을지",
+            "카드가 실제로 어느 가전 쪽에 더 가깝게 끼어 있는지"
           ]
         },
         "after": {
           "decomposition": 0.86,
-          "object_selection": 0.93,
+          "object_selection": 0.74,
           "uncertain_about": [
-            "카드가 틈 안에서 얼마나 깊이 들어가 있는지"
+            "카드가 실제로 어느 가전 쪽에 더 가깝게 끼어 있는지"
           ],
-          "reason": "도구가 필요한 서브골은 유지되며, 측정 결과 gap_accessible가 true인 주걱 하나가 확인되어 도구 선택 신뢰도는 크게 올라갔지만 카드의 정확한 깊이는 아직 남아 있다."
+          "reason": "도구 접근 가능 여부가 실측으로 확인되어 도구 선택 불확실성은 대부분 해소됐고, 남은 불확실성은 카드의 정확한 끼임 위치뿐이다."
         },
         "delta": {
           "decomposition": 0.0,
-          "object_selection": 0.19
+          "object_selection": 0.0
         }
       },
       "details": [
@@ -1976,7 +1976,7 @@
           "core_value": false
         }
       ],
-      "selection_reason_tool": "틈에서 카드를 꺼내는 extract 작업에는 틈보다 얇고 카드까지 닿을 만큼 긴 도구가 적합하며, 후보 중 gap_accessible가 true인 것은 이 주걱뿐이라 가장 적합하다."
+      "selection_reason_tool": "틈에서 카드를 꺼내는 extract 작업에는 틈보다 얇고 카드까지 닿을 만큼 긴 도구가 적합하며, 측정 결과 gap_accessible가 true인 후보는 이 도구뿐이다."
     }
   ],
   "m2_partial_order": [
@@ -2030,21 +2030,21 @@
         "prompt_tokens": 1173,
         "completion_tokens": 62,
         "tokens": 1235,
-        "seconds": 1.91
+        "seconds": 1.62
       },
       "객체 선택": {
         "calls": 2,
         "prompt_tokens": 1798,
-        "completion_tokens": 457,
-        "tokens": 2255,
-        "seconds": 2.9
+        "completion_tokens": 442,
+        "tokens": 2240,
+        "seconds": 3.56
       },
       "confidence_update": {
         "calls": 1,
-        "prompt_tokens": 1750,
-        "completion_tokens": 167,
-        "tokens": 1917,
-        "seconds": 1.25
+        "prompt_tokens": 1743,
+        "completion_tokens": 173,
+        "tokens": 1916,
+        "seconds": 1.49
       }
     },
     "n_evaluations": 20,

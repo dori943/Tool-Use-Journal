@@ -1,0 +1,332 @@
+{
+  "task": "가전 사이 틈에 떨어진 카드를 꺼내라",
+  "m2_subgoals": [
+    {
+      "subgoal_id": "SG1",
+      "goal": "가전 사이 틈에 떨어진 카드를 꺼내라",
+      "kind": "extract",
+      "target_ids": [
+        "obj_card_card"
+      ],
+      "container_id": null,
+      "ordered": false,
+      "confidence": 1.0,
+      "tool_candidate_ids": [
+        "obj_tool_4_spatula_c_tool_4_spatula_c"
+      ],
+      "selected_tool_id": "obj_tool_4_spatula_c_tool_4_spatula_c",
+      "object_ids": [
+        "obj_card_card",
+        "obj_tool_4_spatula_c_tool_4_spatula_c"
+      ],
+      "selection_by": "visual_semantic",
+      "visual_decision": {
+        "subgoal_id": "SG1",
+        "selected_tool_id": "obj_tool_4_spatula_c_tool_4_spatula_c",
+        "ee_candidates_by_object": {
+          "obj_tool_4_spatula_c_tool_4_spatula_c": [
+            "2F",
+            "3F"
+          ]
+        },
+        "reason": "좁은 가전 사이 틈에 떨어진 카드를 꺼내기 위해 가장 얇고 작은 뒤집개(tool_4_spatula_c)를 도구로 사용하며, 이를 잡기 위해 평행 핑거 그리퍼(2F) 또는 3핑거 그리퍼(3F)를 활용할 수 있습니다.",
+        "confidence": 0.95
+      },
+      "details": [
+        {
+          "detail_id": "SG1_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "?tool"
+          },
+          "group_id": "G_SG1_tool",
+          "note": "extract 도구 확보 (?tool: 후보 중 M4 선택)",
+          "pre": [
+            {
+              "id": "SG1_d1_p0",
+              "expr": "reachable(?tool)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d1_p1",
+              "expr": "top_exposed(?tool)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d1_p2",
+              "expr": "ee_usable(?EE, ?tool)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d1_p3",
+              "expr": "graspable_on_support(?EE, ?tool)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d1_p4",
+              "expr": "batch_feasible(?EE, ?tool)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d1_e0",
+              "expr": "holding(?tool)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_d2",
+          "action_type": "tool_act:extract",
+          "binding": {
+            "?t": "?tool",
+            "?o": "obj_card_card"
+          },
+          "group_id": "G_SG1_tool",
+          "note": "obj_card_card를 틈에서 빼낸다",
+          "pre": [
+            {
+              "id": "SG1_d2_p0",
+              "expr": "holding(?tool)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d2_p1",
+              "expr": "gap_accessible(?tool, obj_card_card)",
+              "head": "gap_accessible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d2_p2",
+              "expr": "path_clear(?tool, obj_card_card)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d2_e0",
+              "expr": "extracted(obj_card_card)",
+              "head": "extracted",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_d2b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "?tool",
+            "?r": "tool_rest"
+          },
+          "group_id": "G_SG1_tool",
+          "note": "도구를 거치 위치로 운반",
+          "pre": [
+            {
+              "id": "SG1_d2b_p0",
+              "expr": "holding(?tool)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d2b_p1",
+              "expr": "act_space_clear(?EE, ?tool, tool_rest)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_d2b_p2",
+              "expr": "path_clear(?tool, tool_rest)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_d2b_p3",
+              "expr": "extracted(obj_card_card)",
+              "head": "extracted",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d2b_e0",
+              "expr": "above(?tool, tool_rest)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "?tool",
+            "?r": "tool_rest"
+          },
+          "group_id": "G_SG1_tool",
+          "note": "도구 반환",
+          "pre": [
+            {
+              "id": "SG1_d3_p0",
+              "expr": "holding(?tool)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p1",
+              "expr": "above(?tool, tool_rest)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p2",
+              "expr": "fits(?tool, tool_rest)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d3_p3",
+              "expr": "clear(tool_rest)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d3_e0",
+              "expr": "in(?tool, tool_rest)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d3_d0",
+              "expr": "holding(?tool)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_d1",
+              "expr": "above(?tool, tool_rest)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "m2_partial_order": [
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d2",
+      "why": "causal_link: holding(?tool)"
+    },
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d2b",
+      "why": "causal_link: holding(?tool)"
+    },
+    {
+      "from": "SG1_d2",
+      "to": "SG1_d2b",
+      "why": "causal_link: extracted(obj_card_card)"
+    },
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d3",
+      "why": "causal_link: holding(?tool)"
+    },
+    {
+      "from": "SG1_d2b",
+      "to": "SG1_d3",
+      "why": "causal_link: above(?tool, tool_rest)"
+    },
+    {
+      "from": "SG1_d2",
+      "to": "SG1_d3",
+      "why": "threat: SG1_d3가 holding(?tool)를 파괴"
+    }
+  ],
+  "m2_mutex": [],
+  "m2_invariants": [
+    {
+      "id": "INV_SG1",
+      "expr": "extracted(obj_card_card)",
+      "check_at": "final"
+    }
+  ],
+  "m2_stats": {
+    "n_subgoals": 1,
+    "n_details": 4,
+    "n_edges": 6,
+    "n_mutex": 0,
+    "llm_usage": {
+      "visual_decomposition": {
+        "calls": 1,
+        "prompt_tokens": 1878,
+        "completion_tokens": 101,
+        "tokens": 1979,
+        "seconds": 3.19
+      },
+      "visual_selection": {
+        "calls": 1,
+        "prompt_tokens": 2304,
+        "completion_tokens": 204,
+        "tokens": 2508,
+        "seconds": 2.39
+      }
+    }
+  },
+  "ablation": {
+    "mode": "without_grounding",
+    "policy_version": "upper-level-visual-semantic-v1"
+  }
+}

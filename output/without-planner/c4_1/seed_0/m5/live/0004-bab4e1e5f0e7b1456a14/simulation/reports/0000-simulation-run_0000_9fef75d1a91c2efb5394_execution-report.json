@@ -1,0 +1,196 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:9fef75d1a91c2efb5394:execution-report",
+  "run_id": "simulation-run:0000:9fef75d1a91c2efb5394",
+  "plan_id": "motion-plan:682c6f4aeab246a164948a0e",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:9fef75d1a91c2efb5394:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:9fef75d1a91c2efb5394",
+    "input_artifact_ids": [
+      "simulation-run-artifact:9fef75d1a91c2efb53944b31",
+      "motion-plan-artifact:682c6f4aeab246a164948a0e"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "SUCCESS",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      -0.29813180408194473,
+      -1.6997231538656499,
+      1.7157673548487922,
+      -1.6266099190769603,
+      -1.5566857361999318,
+      1.27674880252734
+    ],
+    "joint_velocities_rad_s": [
+      0.015678388912972577,
+      0.05284713055129748,
+      -0.08216105540586394,
+      0.02913916184001085,
+      -0.0005506147742421804,
+      0.015681082494848286
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        2.312534809672444,
+        -3.2198900948144282,
+        1.1393758338172524
+      ],
+      "orientation_xyzw": [
+        -0.7056036290756766,
+        0.7082926179325097,
+        -0.014234377913929152,
+        0.01557140016024074
+      ]
+    },
+    "gripper": {
+      "mode": "OPEN",
+      "command": -1.0
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 3.860000000018431,
+    "max_joint_tracking_error_rad": 0.04570217304242674,
+    "max_eef_tracking_error_m": 0.01713370704132312,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG1_d3:strat_direct_low:2:kf_direct_place:event:0:DETACH_OBJECT",
+      "scheduled_time_s": 1.734768778194707,
+      "actual_time_s": 1.8000000000085947,
+      "status": "SUCCESS",
+      "message": "detached tool_3_spatula_b and preserved world pose"
+    },
+    {
+      "event_id": "SG1_d3:strat_direct_low:2:kf_direct_place:event:1:GRIPPER_OPEN",
+      "scheduled_time_s": 1.734768778194707,
+      "actual_time_s": 1.8000000000085947,
+      "status": "SUCCESS",
+      "message": "finger gripper open command set to -1.000"
+    }
+  ],
+  "failure": null,
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "2F",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": -1.0,
+    "ee_transition_count": 1,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 193,
+    "nominal_plan_duration_s": 3.698954097482103,
+    "final_plan_time_s": 3.698954097482103,
+    "adaptive_settle_extra_duration_s": 0.161045902536328,
+    "segment_tracking": [
+      {
+        "segment_id": "SG1_d3:strat_direct_low:0:SG1_d3:strat_direct_low:1:kf_direct_preplace",
+        "keyframe_id": "SG1_d3:strat_direct_low:1:kf_direct_preplace",
+        "target_block_id": null,
+        "nominal_end_time_s": 0.9560741070224597,
+        "actual_execution_time_s": 0.9600000000045839,
+        "max_joint_error_rad": 0.010650080795882921,
+        "eef_position_error_m": 0.005160961675558398,
+        "eef_orientation_error_rad": 0.0037629119095633733,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_d3:strat_direct_low:1:SG1_d3:strat_direct_low:2:kf_direct_place",
+        "keyframe_id": "SG1_d3:strat_direct_low:2:kf_direct_place",
+        "target_block_id": null,
+        "nominal_end_time_s": 1.734768778194707,
+        "actual_execution_time_s": 1.8000000000085947,
+        "max_joint_error_rad": 0.006459112478117035,
+        "eef_position_error_m": 0.0028767560009867565,
+        "eef_orientation_error_rad": 0.001476354409971899,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.06000000000028649,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_d3:strat_direct_low:2:SG1_d3:strat_direct_low:3:kf_direct_retreat",
+        "keyframe_id": "SG1_d3:strat_direct_low:3:kf_direct_retreat",
+        "target_block_id": null,
+        "nominal_end_time_s": 3.698954097482103,
+        "actual_execution_time_s": 3.860000000018431,
+        "max_joint_error_rad": 0.009202292479965957,
+        "eef_position_error_m": 0.002902718041170669,
+        "eef_orientation_error_rad": 0.00010005609012840507,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      }
+    ],
+    "gripper_release_waits": [
+      {
+        "object_id": "tool_3_spatula_b",
+        "wait_duration_s": 0.08000000000038199,
+        "open_target": [
+          -1.0,
+          -1.0
+        ],
+        "current_target": [
+          -1.0,
+          -1.0
+        ],
+        "target_reached": true,
+        "ee_object_contact_count": 0,
+        "consecutive_ticks": 3,
+        "max_wait_s": 5.2,
+        "command_mode": "SCRIPTED_POSITION_TARGET",
+        "succeeded": true
+      }
+    ],
+    "goal_evaluation": {
+      "request_id": "motion-request:live:bab4e1e5f0e7b1456a14",
+      "goal_type": "POSE",
+      "status": "SATISFIED",
+      "detail": "all target footprints are inside the goal region",
+      "position_error_m": null,
+      "orientation_error_rad": null,
+      "joint_error_rad": null,
+      "observed": {
+        "region_id": "tool_rest",
+        "inside_target_ids": [
+          "tool_3_spatula_b"
+        ],
+        "outside_target_ids": [],
+        "geometry_errors": {},
+        "inset_margin_m": 0.0,
+        "include_vertical": false
+      }
+    }
+  }
+}
