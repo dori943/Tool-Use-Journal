@@ -43,6 +43,14 @@ class CatalogRecipe:
     two_finger_parallel_linkage: bool = True
     two_finger_force_target_n: float = 5.
     two_finger_force_gain: float = .002
+    # c4_1 IntervalFitExtraction: gap-insertion tool grasps (thin spatula/knife
+    # blades) present a narrow, near-parallel contact that the default readiness
+    # gate (.5) rejects; a per-recipe floor lets those grasps qualify.  When set,
+    # fingerpad_friction overrides the finger-pad contact friction so the blade
+    # can drag the card flat underneath it (MuJoCo takes the element-wise max of
+    # the two geoms' friction).
+    minimum_normal_opposition: float = .5
+    fingerpad_friction: tuple | None = None
     three_finger_force_targets_n: tuple = (6.,3.,3.)
     three_finger_force_gain: float = .002
     # Force-integrator deadband (N) shared by the 3F force hold

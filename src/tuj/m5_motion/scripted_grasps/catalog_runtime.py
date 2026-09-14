@@ -115,6 +115,30 @@ class CatalogContext(SpoonContext):
             EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
         )
         bad=super().bad_contacts(data,stage)
+        # A thin tool lying flush on the counter (c4_1 spatula/knife) can only be
+        # grasped by bringing the FINGERS (pad + tip) down past the tool's top
+        # toward the support: the finger contact geoms reach ~8 mm below the grip
+        # site, deeper than the tool is thick, so they must contact the island top
+        # to pinch the tool's sides (like fingers resting on a table beside a
+        # coin).  The base classes flag that as a robot collision (a finger is a
+        # robot geom) with no support exemption; the planner only checks kinematic
+        # overlap, while at execution the rigid island stops the finger so the
+        # real penetration stays ~0.  Tolerate any finger-contact-geom <-> support
+        # contact up to a generous cap during GRASP/CLOSE (self.finger_geoms names
+        # the pad/tip contact geoms), but keep only a shallow tol for the rest of
+        # the gripper (a body/knuckle/coupler hitting the island is a real one).
+        if stage in {'GRASP','CLOSE'}:
+            support_names={self.model.geom(g).name for g in self.support_gids}
+            gripper_names={self.model.geom(g).name for g in self.gripper_geoms}
+            finger_names={self.model.geom(g).name for g in self.finger_geoms}
+            tol=float(getattr(self.recipe,'gripper_support_clearance_tol_m',.0025))
+            tip_tol=float(getattr(self.recipe,'fingertip_support_clearance_tol_m',.012))
+            def support_ok(c):
+                if not any(n in support_names for n in c['geoms']):return False
+                if any(n in finger_names for n in c['geoms']):return c['penetration_m']<=tip_tol
+                if any(n in gripper_names for n in c['geoms']):return c['penetration_m']<=tol
+                return False
+            bad=[c for c in bad if not support_ok(c)]
         if stage in {'BREAKAWAY','LEVEL'}:
             # Spoon exemptions cover GRASP/CLOSE/LIFT/... but not BREAKAWAY /
             # LEVEL. Vac cup↔held-object contact is expected while attached.
@@ -242,7 +266,7 @@ class CatalogContext(SpoonContext):
                         or row['suction_alignment_mean']<.9
                         or row['suction_aligned_fraction']<.8
                         or min(row['gripper_ctrl'])<.5):return False
-            elif row['normal_opposition']<.5 or row['contact_span_m']<.0035 or min(row['finger_force_n'].values())<1.:
+            elif row['normal_opposition']<float(getattr(self.recipe,'minimum_normal_opposition',.5)) or row['contact_span_m']<.0035 or min(row['finger_force_n'].values())<1.:
                 return False
         return True
 
@@ -408,6 +432,17 @@ class CatalogContext(SpoonContext):
             np.savez_compressed(self.output/'grasp_state.npz',qpos=self.data.qpos,qvel=self.data.qvel,ctrl=self.data.ctrl,time=self.data.time,
                 grasp_T_GB=self.grasp_T_GB,grasp_object_pose=self.grasp_object_pose,grasp_grip_pose=self.grasp_grip_pose)
             if recipe.ee_id=='2F':self.runtime.set_finger_gripper_actuator_gains(kp=recipe.closure_kp)
+            # A very thin flat tool (c4_1 spatula/knife blade) is pinched on a
+            # ~2.5 mm-tall edge, so there is almost no vertical purchase: as the
+            # arm lifts, the light blade slides off the pad and the grip force
+            # decays to zero (CONTACT_LOST_DURING_LIFT).  The catalog path (unlike
+            # the plate driver) never applied the declared pad friction, so the
+            # pads use a low default with condim=3 (torsional/rolling ignored).
+            # Apply high pad friction with the 6-D contact model so the blade
+            # rides up WITH the pad instead of sliding, and torsional/rolling
+            # friction resists the blade rolling out of the pinch.
+            if getattr(recipe,'fingerpad_friction',None) is not None and recipe.ee_id in ('2F','3F'):
+                self.runtime.set_finger_gripper_contact_friction(recipe.fingerpad_friction)
             close_attempts=[]
             acquired,hold_opening,q=self._close_fingers_until_ready(q,opening,recipe)
             close_attempts.append({
