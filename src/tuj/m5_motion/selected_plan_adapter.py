@@ -448,9 +448,12 @@ def _contact_spec(
     action = _action_type(assignment, execution)
     mode = str(assignment.mode or "").strip()
     normalized = f"{action}:{mode}".lower()
-    if not any(token in normalized for token in ("push", "pull", "sweep", "flatten")):
+    if not any(token in normalized for token in ("push", "pull", "sweep", "extract")):
         return None
     surface = parameters.get("contact_surface", ContactSurfaceType.AUTO.value)
+    # Carry any grounded extraction geometry the planner attached (e.g. the M2
+    # gap descriptor) through to the motion provider; harmless when absent.
+    spec_metadata = parameters.get("contact_metadata")
     return ContactManipulationSpec(
         primitive=mode or action,
         contact_surface=surface,
@@ -459,6 +462,7 @@ def _contact_spec(
         target_grouping=str(parameters.get("target_grouping", "SINGLE")),
         maintain_contact=bool(parameters.get("maintain_contact", False)),
         max_contact_force_n=parameters.get("max_contact_force_n"),
+        metadata=dict(spec_metadata) if isinstance(spec_metadata, Mapping) else {},
     )
 def _source_value(
     source: Any,

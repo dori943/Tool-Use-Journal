@@ -68,6 +68,14 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     ("bottle", "C1_2_DoughFlatten", "3F", "bottle"),
     ("spatula", "C1_2_DoughFlatten", "3F", "spatula"),
     ("spoon", "C1_2_DoughFlatten", "2F", "spoon"),
+    # 0909: C3_1 also picks the spoon with the 2F gripper. Without an entry for
+    # this environment the generic path plans the grasp, and its pose put the
+    # object 10.6 cm from the grip site: the fingers closed on air (0 contacts,
+    # 0.08 mm lift against a 50 mm requirement).
+    ("spoon", "C3_1_ObjectSorting", "2F", "spoon"),
+    # M4's selected EE is preserved all the way to the hand-specific spoon
+    # recipe. Object-sorting can emit either combination; both must avoid the
+    # generic grasp path that previously closed on air.
     ("spoon", "C1_2_DoughFlatten", "3F", "spoon"),
     # C2_1 reuses the validated object-frame 2F spoon recipe so the tabletop
     # sorting pick uses the tuned scripted grasp (reliable formation/lift/
