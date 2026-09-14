@@ -11,6 +11,7 @@
       "container_id": "obj_appliance_left_appliance_left",
       "ordered": false,
       "tool_candidate_ids": [
+        "obj_tool_1_knife_tool_1_knife",
         "obj_tool_2_spatula_a_tool_2_spatula_a",
         "obj_tool_3_spatula_b_tool_3_spatula_b",
         "obj_tool_4_spatula_c_tool_4_spatula_c",
@@ -18,28 +19,29 @@
       ],
       "object_ids": [
         "obj_card_card",
+        "obj_tool_1_knife_tool_1_knife",
         "obj_tool_2_spatula_a_tool_2_spatula_a",
         "obj_tool_3_spatula_b_tool_3_spatula_b",
         "obj_tool_4_spatula_c_tool_4_spatula_c",
         "obj_tool_5_cutting_board_tool_5_cutting_board"
       ],
-      "selection_reason": "카드를 가전 사이 틈에서 꺼내려면 대상 카드와 함께 사용할 수 있는 평평한 도구 후보들을 함께 고려해야 한다.",
+      "selection_reason": "카드를 가전 사이 틈에서 꺼내려면 대상 카드와 함께, 틈에 넣어 밀거나 들어올릴 수 있는 모든 도구 후보를 함께 고려해야 한다.",
       "confidence": {
         "before": {
           "decomposition": 0.86,
           "object_selection": 0.74,
           "uncertain_about": [
-            "각 도구의 실제 두께와 강성이 카드 끼움 작업에 적합한지",
-            "카드가 어느 정도 깊이 끼어 있는지"
+            "각 도구의 실제 두께와 강성이 카드 틈에 들어갈 수 있는지",
+            "두 가전 사이 틈의 폭과 카드의 끼임 정도"
           ]
         },
         "after": {
           "decomposition": 0.86,
           "object_selection": 0.74,
           "uncertain_about": [
-            "카드가 실제로 얼마나 깊이 끼어 있는지"
+            "두 가전 사이 틈의 폭과 카드의 실제 끼임 정도"
           ],
-          "reason": "측정 결과 서브골과 도구 필요성은 그대로 타당하지만, 선택한 후보 중 실제로 틈에 접근 가능한 도구는 obj_tool_3_spatula_b_tool_3_spatula_b뿐이어서 객체 선택 신뢰도는 유지하되 약간 보정한다."
+          "reason": "서브골 분해는 그대로 타당하고, 측정 결과 카드 꺼내기 핵심 조건인 gap_accessible가 모든 후보에서 불충족이어서 도구 선택 신뢰도는 유지하되 추가 확신을 줄 수 없다."
         },
         "delta": {
           "decomposition": 0.0,
@@ -63,6 +65,11 @@
               "eval_by": "m3",
               "status": "sat",
               "evidence": [
+                {
+                  "node": "obj_tool_1_knife_tool_1_knife",
+                  "reachable": true,
+                  "margin_mm": 340.2
+                },
                 {
                   "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
                   "reachable": true,
@@ -93,6 +100,11 @@
               "status": "sat",
               "evidence": [
                 {
+                  "node": "obj_tool_1_knife_tool_1_knife",
+                  "top_exposed": true,
+                  "blockers": []
+                },
+                {
                   "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
                   "top_exposed": true,
                   "blockers": []
@@ -121,6 +133,13 @@
               "eval_by": "m3",
               "status": "sat",
               "evidence": [
+                {
+                  "node": "obj_tool_1_knife_tool_1_knife",
+                  "feasible_ees": [
+                    "2F",
+                    "3F"
+                  ]
+                },
                 {
                   "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
                   "feasible_ees": [
@@ -162,6 +181,17 @@
               "eval_by": "m3",
               "status": "sat",
               "evidence": [
+                {
+                  "node": "obj_tool_1_knife_tool_1_knife",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 0.8
+                },
                 {
                   "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
                   "graspable_on_support": true,
@@ -261,27 +291,32 @@
               "expr": "gap_accessible(?tool, obj_card_card)",
               "head": "gap_accessible",
               "eval_by": "m3",
-              "status": "sat",
+              "status": "unsat",
               "evidence": [
+                {
+                  "node": "obj_tool_1_knife_tool_1_knife",
+                  "gap_accessible": false,
+                  "margin_mm": -0.8
+                },
                 {
                   "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
                   "gap_accessible": false,
-                  "margin_mm": -21.7
+                  "margin_mm": -1.4
                 },
                 {
                   "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
-                  "gap_accessible": true,
-                  "margin_mm": 11.9
+                  "gap_accessible": false,
+                  "margin_mm": -2.4
                 },
                 {
                   "node": "obj_tool_4_spatula_c_tool_4_spatula_c",
                   "gap_accessible": false,
-                  "margin_mm": -2.8
+                  "margin_mm": -3.9
                 },
                 {
                   "node": "obj_tool_5_cutting_board_tool_5_cutting_board",
                   "gap_accessible": false,
-                  "margin_mm": -24.1
+                  "margin_mm": -22.9
                 }
               ]
             },
@@ -420,6 +455,143 @@
         {
           "subgoal_id": "SG1",
           "queried_by": "SG1_d1_p0",
+          "node_id": "obj_tool_1_knife_tool_1_knife",
+          "geometry": {
+            "length_mm": 206.8,
+            "diameter_mm": null,
+            "extents_mm": [
+              206.8,
+              11.8,
+              0.5
+            ],
+            "height_z_mm": 0.8,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.03,
+            "seal_patch_rms_mm": 99.9,
+            "footprint_mm": [
+              206.8,
+              11.2
+            ],
+            "height_mm": 0.8,
+            "center": [
+              465.2,
+              208.6,
+              921.7
+            ],
+            "aabb_size": [
+              206.8,
+              11.2,
+              0.8
+            ]
+          },
+          "material": "steel",
+          "density_kgm3": 6250.0,
+          "mass_kg": 0.009,
+          "youngs_gpa": 164.19,
+          "mu": {
+            "mu": 0.428,
+            "stage": 0,
+            "material": "steel",
+            "rms_mm": 0.03
+          },
+          "confidence": 0.381,
+          "caption": "Long narrow metal tool or blade",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.991,
+              "margin_unit": "kg",
+              "reason": "질량 0.009 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 11.2,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.009,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.103,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.491,
+              "margin_unit": "kg",
+              "reason": "질량 0.009 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 11.2,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.009,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.103,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": false,
+              "margin": -98.4,
+              "margin_unit": "mm",
+              "reason": "접촉면 폭 12 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.03,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.009,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 11.8,
+                  "pass": false
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 99.9,
+                  "limit": 1.5,
+                  "pass": false
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 509.8,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 340.2
+          }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p0",
           "node_id": "obj_tool_2_spatula_a_tool_2_spatula_a",
           "geometry": {
             "length_mm": 134.1,
@@ -968,6 +1140,15 @@
         {
           "subgoal_id": "SG1",
           "queried_by": "SG1_d1_p1",
+          "node_id": "obj_tool_1_knife_tool_1_knife",
+          "type": "top_exposed",
+          "value": true,
+          "pass": true,
+          "blockers": []
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p1",
           "node_id": "obj_tool_2_spatula_a_tool_2_spatula_a",
           "type": "top_exposed",
           "value": true,
@@ -1000,6 +1181,143 @@
           "value": true,
           "pass": true,
           "blockers": []
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p2",
+          "node_id": "obj_tool_1_knife_tool_1_knife",
+          "geometry": {
+            "length_mm": 206.8,
+            "diameter_mm": null,
+            "extents_mm": [
+              206.8,
+              11.8,
+              0.5
+            ],
+            "height_z_mm": 0.8,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.03,
+            "seal_patch_rms_mm": 99.9,
+            "footprint_mm": [
+              206.8,
+              11.2
+            ],
+            "height_mm": 0.8,
+            "center": [
+              465.2,
+              208.6,
+              921.7
+            ],
+            "aabb_size": [
+              206.8,
+              11.2,
+              0.8
+            ]
+          },
+          "material": "steel",
+          "density_kgm3": 6250.0,
+          "mass_kg": 0.009,
+          "youngs_gpa": 164.19,
+          "mu": {
+            "mu": 0.428,
+            "stage": 0,
+            "material": "steel",
+            "rms_mm": 0.03
+          },
+          "confidence": 0.381,
+          "caption": "Long narrow metal tool or blade",
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.991,
+              "margin_unit": "kg",
+              "reason": "질량 0.009 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 11.2,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.009,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.103,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.491,
+              "margin_unit": "kg",
+              "reason": "질량 0.009 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 11.2,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.009,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.103,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": false,
+              "margin": -98.4,
+              "margin_unit": "mm",
+              "reason": "접촉면 폭 12 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.03,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.009,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 11.8,
+                  "pass": false
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 99.9,
+                  "limit": 1.5,
+                  "pass": false
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 509.8,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 340.2
+          }
         },
         {
           "subgoal_id": "SG1",
@@ -1552,6 +1870,48 @@
         {
           "subgoal_id": "SG1",
           "queried_by": "SG1_d1_p3",
+          "node_id": "obj_tool_1_knife_tool_1_knife",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 0.8,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 0.8,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 0.8,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p3",
           "node_id": "obj_tool_2_spatula_a_tool_2_spatula_a",
           "type": "graspable_on_support",
           "value": true,
@@ -1716,6 +2076,36 @@
               "check": "no_support_node"
             }
           }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d2_p1",
+          "from": "obj_tool_1_knife_tool_1_knife",
+          "to": "obj_card_card",
+          "type": "gap_accessible",
+          "value_mm": -0.8,
+          "check": "thickness<gap & contact<=target & reach>=depth",
+          "checks": [
+            {
+              "rule": "thickness_lt_gap",
+              "value_mm": 0.8,
+              "limit_mm": 0.0,
+              "pass": false
+            },
+            {
+              "rule": "contact_le_target",
+              "value_mm": 11.2,
+              "limit_mm": 49.4,
+              "pass": true
+            },
+            {
+              "rule": "reach_ge_depth",
+              "value_mm": 206.8,
+              "limit_mm": 0.0,
+              "pass": true
+            }
+          ],
+          "pass": false
         },
         {
           "subgoal_id": "SG1",
@@ -1723,30 +2113,29 @@
           "from": "obj_tool_2_spatula_a_tool_2_spatula_a",
           "to": "obj_card_card",
           "type": "gap_accessible",
-          "value_mm": -21.7,
+          "value_mm": -1.4,
           "check": "thickness<gap & contact<=target & reach>=depth",
           "checks": [
             {
               "rule": "thickness_lt_gap",
               "value_mm": 1.4,
-              "limit_mm": 52.0,
-              "pass": true
+              "limit_mm": 0.0,
+              "pass": false
             },
             {
               "rule": "contact_le_target",
               "value_mm": 31.7,
-              "limit_mm": 48.2,
+              "limit_mm": 49.4,
               "pass": true
             },
             {
               "rule": "reach_ge_depth",
               "value_mm": 134.0,
-              "limit_mm": 155.7,
-              "pass": false
+              "limit_mm": 0.0,
+              "pass": true
             }
           ],
-          "pass": false,
-          "approach": "HORIZONTAL_SLIDE_FROM_OPEN_END"
+          "pass": false
         },
         {
           "subgoal_id": "SG1",
@@ -1754,30 +2143,29 @@
           "from": "obj_tool_3_spatula_b_tool_3_spatula_b",
           "to": "obj_card_card",
           "type": "gap_accessible",
-          "value_mm": 11.9,
+          "value_mm": -2.4,
           "check": "thickness<gap & contact<=target & reach>=depth",
           "checks": [
             {
               "rule": "thickness_lt_gap",
               "value_mm": 2.4,
-              "limit_mm": 52.0,
-              "pass": true
+              "limit_mm": 0.0,
+              "pass": false
             },
             {
               "rule": "contact_le_target",
               "value_mm": 36.3,
-              "limit_mm": 48.2,
+              "limit_mm": 49.4,
               "pass": true
             },
             {
               "rule": "reach_ge_depth",
               "value_mm": 204.2,
-              "limit_mm": 155.7,
+              "limit_mm": 0.0,
               "pass": true
             }
           ],
-          "pass": true,
-          "approach": "HORIZONTAL_SLIDE_FROM_OPEN_END"
+          "pass": false
         },
         {
           "subgoal_id": "SG1",
@@ -1785,30 +2173,29 @@
           "from": "obj_tool_4_spatula_c_tool_4_spatula_c",
           "to": "obj_card_card",
           "type": "gap_accessible",
-          "value_mm": -2.8,
+          "value_mm": -3.9,
           "check": "thickness<gap & contact<=target & reach>=depth",
           "checks": [
             {
               "rule": "thickness_lt_gap",
               "value_mm": 3.9,
-              "limit_mm": 52.0,
-              "pass": true
+              "limit_mm": 0.0,
+              "pass": false
             },
             {
               "rule": "contact_le_target",
               "value_mm": 51.0,
-              "limit_mm": 48.2,
+              "limit_mm": 49.4,
               "pass": false
             },
             {
               "rule": "reach_ge_depth",
               "value_mm": 215.1,
-              "limit_mm": 155.7,
+              "limit_mm": 0.0,
               "pass": true
             }
           ],
-          "pass": false,
-          "approach": "HORIZONTAL_SLIDE_FROM_OPEN_END"
+          "pass": false
         },
         {
           "subgoal_id": "SG1",
@@ -1816,30 +2203,29 @@
           "from": "obj_tool_5_cutting_board_tool_5_cutting_board",
           "to": "obj_card_card",
           "type": "gap_accessible",
-          "value_mm": -24.1,
+          "value_mm": -22.9,
           "check": "thickness<gap & contact<=target & reach>=depth",
           "checks": [
             {
               "rule": "thickness_lt_gap",
               "value_mm": 11.7,
-              "limit_mm": 52.0,
-              "pass": true
+              "limit_mm": 0.0,
+              "pass": false
             },
             {
               "rule": "contact_le_target",
               "value_mm": 72.3,
-              "limit_mm": 48.2,
+              "limit_mm": 49.4,
               "pass": false
             },
             {
               "rule": "reach_ge_depth",
               "value_mm": 220.1,
-              "limit_mm": 155.7,
+              "limit_mm": 0.0,
               "pass": true
             }
           ],
-          "pass": false,
-          "approach": "HORIZONTAL_SLIDE_FROM_OPEN_END"
+          "pass": false
         }
       ],
       "selected_tool_id": "obj_tool_3_spatula_b_tool_3_spatula_b",
@@ -1875,6 +2261,15 @@
           "batch_groups": null
         },
         {
+          "node": "obj_tool_1_knife_tool_1_knife",
+          "feasible_ees": [
+            "2F",
+            "3F"
+          ],
+          "reach_margin_mm": 340.2,
+          "batch_groups": null
+        },
+        {
           "node": "obj_tool_5_cutting_board_tool_5_cutting_board",
           "feasible_ees": [
             "2F",
@@ -1885,7 +2280,7 @@
           "batch_groups": null
         }
       ],
-      "selection_by": "llm",
+      "selection_by": "rule",
       "tool_candidates_measured": [
         {
           "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
@@ -1907,7 +2302,7 @@
           "batch_groups": null,
           "partition": null,
           "core_pred": "gap_accessible",
-          "core_value": true
+          "core_value": false
         },
         {
           "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
@@ -1954,6 +2349,27 @@
           "core_value": false
         },
         {
+          "node": "obj_tool_1_knife_tool_1_knife",
+          "extents_mm": [
+            206.8,
+            11.8,
+            0.5
+          ],
+          "length_mm": 206.8,
+          "cylinder_like": false,
+          "mass_kg": 0.009,
+          "material": "steel",
+          "feasible_ees": [
+            "2F",
+            "3F"
+          ],
+          "reach_margin_mm": 340.2,
+          "batch_groups": null,
+          "partition": null,
+          "core_pred": "gap_accessible",
+          "core_value": false
+        },
+        {
           "node": "obj_tool_5_cutting_board_tool_5_cutting_board",
           "extents_mm": [
             220.2,
@@ -1975,8 +2391,7 @@
           "core_pred": "gap_accessible",
           "core_value": false
         }
-      ],
-      "selection_reason_tool": "틈에서 꺼내기 작업에는 틈보다 얇고 카드까지 닿을 만큼 긴 도구가 적합하며, 후보 중 gap_accessible가 true인 것은 이 주걱뿐이다."
+      ]
     }
   ],
   "m2_partial_order": [
@@ -2026,31 +2441,31 @@
     "n_mutex": 0,
     "llm_usage": {
       "서브골 분해": {
-        "calls": 1,
-        "prompt_tokens": 1173,
-        "completion_tokens": 68,
-        "tokens": 1241,
-        "seconds": 2.33
+        "calls": 2,
+        "prompt_tokens": 2613,
+        "completion_tokens": 124,
+        "tokens": 2737,
+        "seconds": 1.75
       },
       "객체 선택": {
-        "calls": 2,
-        "prompt_tokens": 1798,
-        "completion_tokens": 437,
-        "tokens": 2235,
-        "seconds": 3.43
+        "calls": 4,
+        "prompt_tokens": 3698,
+        "completion_tokens": 985,
+        "tokens": 4683,
+        "seconds": 6.53
       },
       "confidence_update": {
         "calls": 1,
-        "prompt_tokens": 1736,
-        "completion_tokens": 182,
-        "tokens": 1918,
-        "seconds": 1.42
+        "prompt_tokens": 1838,
+        "completion_tokens": 167,
+        "tokens": 2005,
+        "seconds": 1.72
       }
     },
-    "n_evaluations": 20,
+    "n_evaluations": 25,
     "m3_predicates": {
-      "sat": 5,
-      "unsat": 0,
+      "sat": 4,
+      "unsat": 1,
       "unknown": 0,
       "not_queried": 3
     }

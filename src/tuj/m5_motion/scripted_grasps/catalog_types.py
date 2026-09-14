@@ -59,20 +59,6 @@ class CatalogRecipe:
     maximum_slip_m: float = .005
     maximum_slip_deg: float = 5.
     contact_ticks: int = 5
-    # Minimum antipodal-normal opposition for the 2F contact gate (ready()).
-    # 1.0 = the two finger normals point exactly at each other.  The default
-    # 0.5 suits chunky objects, but a very thin flat tool gripped across its
-    # width contacts only a ~2-3 mm-tall edge strip, so a firm squeeze rolls the
-    # blade slightly and the normals splay (opposition falls to ~0.1) even while
-    # both pads still clamp it with several N over a wide span.  A thin tool
-    # lowers this so the real, holding grip is not rejected as CONTACT_LOST.
-    minimum_normal_opposition: float = .5
-    # Optional (sliding, torsional, rolling) pad friction applied to the finger
-    # contact geoms with MuJoCo's 6-D contact model before CLOSE.  Default None
-    # leaves the model's pad friction untouched (existing recipes unchanged); a
-    # very thin flat tool sets a high value so the light blade rides up with the
-    # pad on lift instead of sliding off the ~2.5 mm edge.
-    fingerpad_friction: tuple | None = None
     minimum_vacuum_contact_count: int = 3
     maximum_vacuum_attach_penetration_m: float = .002
     maximum_support_separation_penetration_m: float = .002
