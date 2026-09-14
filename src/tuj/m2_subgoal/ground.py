@@ -43,14 +43,8 @@ def depth_clearance(a: dict, b: dict) -> dict:
     return _call(_rel.depth_clearance, a, b)
 
 
-def gap_access(tool: dict, target: dict, gap_width_mm=None,
-               insertion_depth_mm=None, tip_ratio=None) -> dict:
-    # insertion_depth_mm / tip_ratio 는 리치 검사를 실제 진입 깊이로 정밀화하는
-    # 확장 인자. 이 래퍼가 받지 못하면 ingest 가 넘길 때 TypeError 로 gap_access 가
-    # 통째로 죽어(리치 필터 무효화 -> 짧은 도구 선택). _call 이 하부 함수 시그니처에
-    # 있는 키워드만 전달하므로 구버전 relational 과도 안전하다.
-    return _call(_rel.gap_access, tool, target, gap_width_mm=gap_width_mm,
-                 insertion_depth_mm=insertion_depth_mm, tip_ratio=tip_ratio)
+def gap_access(tool: dict, target: dict, gap_width_mm=None) -> dict:
+    return _call(_rel.gap_access, tool, target, gap_width_mm=gap_width_mm)
 
 
 def top_exposed(node_id: str, edges: list[dict]) -> dict:

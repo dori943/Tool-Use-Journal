@@ -161,122 +161,6 @@ class RegionContainmentEvaluator:
         )
 
 
-def _world_aabb(obj: Any):
-    """Axis-aligned world centre and half-extents for an object snapshot.
-
-    Uses the observed collision points (body frame; equal to world axes for the
-    yaw-0 boxes in this scene) for the extents and the pose position (plus the
-    points' own centre offset) for the centre.  Falls back to dimensions_m.
-    Returns (None, None) when geometry is unavailable.
-    """
-    if not isinstance(obj, Mapping):
-        return None, None
-    pose = obj.get("pose") if isinstance(obj.get("pose"), Mapping) else {}
-    pos = np.asarray(pose.get("position_m", obj.get("position_m", [0.0, 0.0, 0.0])), dtype=float)
-    pts = obj.get("collision_points_m")
-    if pts is not None:
-        pts = np.asarray(pts, dtype=float)
-        if pts.ndim == 2 and pts.shape[1] == 3 and pts.shape[0] >= 2 and np.isfinite(pts).all():
-            lo, hi = pts.min(axis=0), pts.max(axis=0)
-            return pos + (lo + hi) / 2.0, (hi - lo) / 2.0
-    dims = obj.get("dimensions_m")
-    if dims is not None:
-        dims = np.asarray(dims, dtype=float)
-        if dims.shape == (3,) and np.all(np.isfinite(dims)):
-            return pos, dims / 2.0
-    return None, None
-
-
-class ToolExtractionEvaluator:
-    """Success when the extracted target has left the gap it was wedged in.
-
-    The extract goal names a flanking fixture (one wall of the gap) as its
-    region, but extraction does not place the card INTO that fixture -- it pulls
-    the card OUT of the channel between the flankers toward the open end.  So the
-    criterion is: the target, initially trapped inside the flanker's span along
-    the channel (the horizontal axis on which it started inside the flanker),
-    has moved fully outside that span (its footprint clears the flanker face) and
-    actually travelled a minimum distance (not merely jittered).
-    """
-
-    def __init__(self, *, min_travel_m: float = 0.05, exit_margin_m: float = 0.0) -> None:
-        self._min_travel = min_travel_m
-        self._exit_margin = exit_margin_m
-
-    def evaluate(
-        self,
-        request: MotionPlanRequest,
-        report: ExecutionReport,
-        observed_world: WorldSnapshot | None,
-    ) -> GoalEvaluation:
-        del report
-        region_id = request.task.goal.target_region_id
-        targets = list(request.task.target_ids)
-        if not region_id or not targets or observed_world is None:
-            return _result(
-                request,
-                GoalEvaluationStatus.UNKNOWN,
-                "extraction evaluation requires targets, a gap region, and an observed world",
-            )
-        region = observed_world.objects.get(region_id)
-        if not isinstance(region, Mapping):
-            region = request.world.objects.get(region_id)
-        rc, rh = _world_aabb(region)
-        if rc is None:
-            return _result(
-                request,
-                GoalEvaluationStatus.UNKNOWN,
-                "extraction gap-region geometry is unavailable",
-                observed={"region_id": region_id},
-            )
-        extracted: list[str] = []
-        remaining: list[str] = []
-        errors: dict[str, str] = {}
-        details: dict[str, Any] = {}
-        for target_id in targets:
-            ic, ih = _world_aabb(request.world.objects.get(target_id))
-            fc, fh = _world_aabb(observed_world.objects.get(target_id))
-            if ic is None or fc is None:
-                errors[target_id] = "target geometry unavailable"
-                continue
-            # Channel axis: the horizontal axis on which the target STARTED inside
-            # the flanker's span (that is the axis along which the gap traps it).
-            inside = [ax for ax in (0, 1) if abs(ic[ax] - rc[ax]) <= rh[ax]]
-            axis = max(inside, key=lambda a: rh[a]) if inside else (0 if rh[0] >= rh[1] else 1)
-            travel = float(abs(fc[axis] - ic[axis]))
-            cleared = (
-                (fc[axis] + fh[axis]) < (rc[axis] - rh[axis] - self._exit_margin)
-                or (fc[axis] - fh[axis]) > (rc[axis] + rh[axis] + self._exit_margin)
-            )
-            details[target_id] = {"axis": axis, "travel_m": travel, "cleared_span": bool(cleared)}
-            if cleared and travel >= self._min_travel:
-                extracted.append(target_id)
-            else:
-                remaining.append(target_id)
-        if remaining:
-            status = GoalEvaluationStatus.FAILED
-            detail = "one or more targets are still inside the gap"
-        elif errors:
-            status = GoalEvaluationStatus.UNKNOWN
-            detail = "extraction target geometry is unavailable"
-        else:
-            status = GoalEvaluationStatus.SATISFIED
-            detail = "all targets have been extracted from the gap"
-        return _result(
-            request,
-            status,
-            detail,
-            observed={
-                "region_id": region_id,
-                "extracted_target_ids": extracted,
-                "remaining_target_ids": remaining,
-                "geometry_errors": errors,
-                "per_target": details,
-                "min_travel_m": self._min_travel,
-            },
-        )
-
-
 class AboveRegionEvaluator:
     """Require each transported target to be horizontally over a region."""
 
@@ -631,7 +515,6 @@ class TaskAwareGoalEvaluator:
         self._above_region = AboveRegionEvaluator()
         self._stack_placement = StackPlacementEvaluator()
         self._grasp = GraspRetentionEvaluator()
-        self._extraction = ToolExtractionEvaluator()
 
     def evaluate(
         self,
@@ -640,13 +523,6 @@ class TaskAwareGoalEvaluator:
         observed_world: WorldSnapshot | None,
     ) -> GoalEvaluation:
         task = request.task
-        # An 'extract' contact pulls the target OUT of the gap; its named region
-        # is a flanking wall of the gap, not a container to place the target in,
-        # so the containment check never fits.  Judge it by whether the target
-        # left the gap instead.
-        contact = getattr(task, "contact", None)
-        if contact is not None and str(getattr(contact, "primitive", "")).lower() == "extract":
-            return self._extraction.evaluate(request, report, observed_world)
         from .flatten_contact import is_flatten_contact, flattening_outcome
         if is_flatten_contact(task):
             if observed_world is None or len(task.target_ids) != 1:
@@ -781,9 +657,7 @@ __all__ = [
     "CompositeGoalEvaluator",
     "GraspRetentionEvaluator",
     "RegionContainmentEvaluator",
-    "StackPlacementEvaluator",
     "SupportStabilityEvaluator",
     "TaskAwareGoalEvaluator",
     "ToolClearanceEvaluator",
-    "ToolExtractionEvaluator",
 ]

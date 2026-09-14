@@ -427,9 +427,6 @@ class RoutedKeyframeStrategyProvider:
         from .flatten_contact import FlattenContactProvider, is_flatten_contact
         if is_flatten_contact(request.task):
             return FlattenContactProvider().generate(request)
-        from .extract_contact import ExtractContactProvider, is_extract_contact
-        if is_extract_contact(request.task):
-            return ExtractContactProvider().generate(request)
         if is_ee_exchange_task(request.task):
             generate = getattr(self._ee_exchange, "generate", None)
             if not callable(generate):
