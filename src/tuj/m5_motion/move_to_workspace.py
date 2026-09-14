@@ -9,10 +9,10 @@ The commissioned ``bare_to_{ee}`` attach trajectory records a bare-flange
 workspace start as ``start_joint_positions_rad``, but that q is not guaranteed
 collision-free once the EE is mounted.  This planner therefore:
 
-1. Prefer a collision-checked reverse of the attach trajectory under the mounted
-   EE context (reuse commissioned joints; skip dock-contact-only poses).
-2. If reverse alone stops short of a mounted-valid workspace target, continue
-   with DIRECT / RRT from the reverse seed to that target.
+1. For an attached SAFE RACK EXIT, try a direct or RRT route to a mounted-valid
+   workspace target before retracing the rack corridor.
+2. For standalone workspace moves, prefer a collision-checked reverse of the
+   commissioned attach trajectory. If it stops short, connect to the target.
 3. Never accept a short reverse that remains in the rack corridor as SAFE EXIT.
 """
 
@@ -488,21 +488,31 @@ class MoveToWorkspacePlanner:
             wrap_joints=False,
         )
 
-        attempts: list[tuple[str, Any]] = []
+        reverse_attempts: list[tuple[str, Any]] = []
         if reverse_reaches_workspace:
-            attempts.append(("COMMISSIONED_REVERSE", lambda: reverse_path))
+            reverse_attempts.append(("COMMISSIONED_REVERSE", lambda: reverse_path))
         elif len(reverse_path) >= 2:
-            attempts.append(("COMMISSIONED_REVERSE_THEN_RRT", _composed_from_reverse))
+            reverse_attempts.append(("COMMISSIONED_REVERSE_THEN_RRT", _composed_from_reverse))
+        free_space_attempts: list[tuple[str, Any]] = []
         if direct.valid:
-            attempts.append(("DIRECT_JOINT", lambda: (start, target)))
-        attempts.append(("RRT_CONNECT", lambda: _connect(start)))
+            free_space_attempts.append(("DIRECT_JOINT", lambda: (start, target)))
+        free_space_attempts.append(("RRT_CONNECT", lambda: _connect(start)))
+        attempts = (
+            free_space_attempts + reverse_attempts
+            if request.task.metadata.get("safe_rack_exit") is True
+            else reverse_attempts + free_space_attempts
+        )
 
         final_detail = "timed trajectory failed final collision validation"
         planner_name = "RRT_CONNECT"
         timed = None
         minimum_clearance: float | None = None
         for planner_name, build_path in attempts:
-            geometric_path = build_path()
+            try:
+                geometric_path = build_path()
+            except MoveToWorkspacePlanningError as error:
+                final_detail = str(error)
+                continue
             minimum_clearance = _minimum_clearance(
                 geometric_path,
                 keyframe,

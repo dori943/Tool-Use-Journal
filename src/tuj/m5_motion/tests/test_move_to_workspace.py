@@ -273,6 +273,30 @@ def test_planner_uses_commissioned_reverse_not_bare_start() -> None:
     assert plan.expected_final_state.joint_positions_rad[0] != pytest.approx(0.0)
 
 
+def test_attached_safe_exit_prefers_free_space_route() -> None:
+    template = _template()
+    request = _request(joints=_q(2.0), z=1.2)
+    request.task.metadata["safe_rack_exit"] = True
+    context = CollisionContext(
+        context_id="ee-attached:vac",
+        active_ee="vac",
+        collision_model_version="v1",
+    )
+    planner = MoveToWorkspacePlanner(
+        registry=SimpleNamespace(),
+        joint_position_limits_rad=[(-3.14, 3.14)] * 6,
+        log=lambda *_a, **_k: None,
+    )
+    plan = planner.plan(
+        request,
+        collision_contexts={"ee-attached:vac": context},
+        collision_checker=_Checker(),
+        template=template,
+    )
+    assert plan.segments[0].metadata["planner"] == "DIRECT_JOINT"
+    assert plan.expected_final_state.joint_positions_rad[0] == pytest.approx(1.0)
+
+
 def test_short_reverse_continues_to_mounted_workspace_target() -> None:
     """A reverse that cannot leave the rack corridor must not finalize there."""
 
