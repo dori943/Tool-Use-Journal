@@ -1,283 +1,236 @@
-"""M0 Object Knowledge persistence and task-aware retrieval."""
+"""M1·M3 통합 — 씬 전체 접지 패스 (에피소드당 1회).
+
+build_m1(bbox 노드 + coarse 관계) 위에 씬의 **모든 객체**에 대해
+  ① 기하: 점군에서 1회 (extents / footprint / 상면 RMS / 흡착 패치) — M3 중복 계산 제거
+  ② 물성: M0 Object Knowledge (exact / BBox→C3 density) HIT 이면 재사용, miss 면 Full SiPhy
+  ③ EE 판정: robot_spec ee_pool 각 EE 의 {feasible, margin, reason, checks}
+  ④ 리치, 단항 술어: reachability / top_exposed / clear / flat_face
+를 채우고, 새로 접지된 물성은 memory.json 에 적재해 다음 에피소드부터 재사용한다.
+
+종전 M3 는 M2 가 고른 객체만 lazy 접지했다. 통합 후에는 씬의 모든 객체를 선접지하므로
+첫 씬의 VLM 콜은 늘지만 memory 가 쌓일수록 0 으로 수렴하고, M2 는 질의 왕복 없이
+m1.json 만 읽으면 된다. 집합·쌍 술어(batch/swept_space/fits/gap_accessible)는
+서브골이 있어야 계산할 수 있으므로 relations 모듈 함수로 M2 가 직접 호출한다.
+"""
+
 from __future__ import annotations
 
-import copy
-import json
-from datetime import datetime, timezone
 from pathlib import Path
 
-from .memory_store import UnifiedMemoryStore
+from tuj.m0_memory.object_knowledge import _as_size3
+
+from .ee_rules import evaluate_ee, reach_check
+from .grounding import (
+    FrictionHead,
+    MockBackend,
+    apply_memory_hit_to_observation,
+    ground_intrinsic,
+)
+from .relations import flat_face, region_clear, top_exposed
 
 
-SCHEMA_VERSION = "1.0"
-PROVISIONAL_BBOX_RELATIVE_THRESHOLD = 0.25
-PROVISIONAL_DENSITY_RELATIVE_THRESHOLD = 0.20
+def ground_scene(
+    m1: dict,
+    *,
+    backend=None,
+    memory=None,
+    ee_pool: list[dict] = (),
+    reach_mm: float | None = None,
+    crops_dir=None,
+    friction=None,
+    logger=None,
+    source: str = "m1",
+    density_infer=None,
+    retrieval_debug: dict | None = None,
+) -> dict:
+    """m1 = build_m1() 결과 (nodes 에 _points 필요). 노드를 제자리에서 채운다.
 
+    density_infer:
+        M0 cross-task C3 callback (crop → DensityOnlyResult).
 
-def _props_stage(props: dict) -> int:
-    return max(int(props.get("mass_stage", 0)),
-               int((props.get("mu") or {}).get("stage", 0)))
+    retrieval_debug:
+        optional dict filled per node_id with lookup_or_retrieve debug.
 
+    Returns:
+        {
+            "memory_hits",
+            "geom_refreshed",
+            "grounded",
+            "n_nodes",
+            ...
+        }
+    """
 
-def _finite_positive(value):
-    try:
-        if hasattr(value, "item") and not isinstance(value, (bytes, str)):
-            try:
-                value = value.item()
-            except (ValueError, AttributeError):
-                pass
-        value = float(value)
-        if value != value or value in (float("inf"), float("-inf")):
-            return None
-        return value if value > 0 else None
-    except (TypeError, ValueError):
-        return None
+    backend = backend or MockBackend()
+    friction = friction or FrictionHead()
+    log = logger or (lambda **kw: None)
+    crops_dir = Path(crops_dir) if crops_dir else None
 
+    edges = m1.get("edges", [])
 
-def _as_size3(value):
-    """Normalize bbox/extents to plain list[float] of length 3 (numpy-safe)."""
-    if value is None:
-        return None
-    try:
-        if hasattr(value, "tolist"):
-            value = value.tolist()
-        seq = list(value)
-    except TypeError:
-        return None
-    if len(seq) != 3:
-        return None
-    out = []
-    for x in seq:
-        f = _finite_positive(x)
-        if f is None:
-            return None
-        out.append(f)
-    return out
-
-
-def _memory_key(task_id: str, object_id: str) -> str:
-    # JSON pointer-like escaping makes the separator unambiguous.
-    esc = lambda s: str(s).replace("%", "%25").replace(":", "%3A")
-    return f"{esc(task_id)}::{esc(object_id)}"
-
-
-def props_to_entry(props: dict, task_id: str, object_id: str, *, episode=None,
-                   source_method="visual", old=None) -> dict:
-    geometry = props.get("geometry") or {}
-    mu = props.get("mu") or {}
-    now = datetime.now(timezone.utc).isoformat(timespec="seconds")
-    return {
-        "identity": {"object_id": object_id, "caption": props.get("caption")},
-        # 0908: geometry는 통째로 보존한다. 이전엔 6개 필드만 골라 저장해 footprint_mm,
-        # seal_patch_rms_mm, height_mm이 빠졌고, memory hit 뒤 EE 판정(plate vac → 2F/3F,
-        # lid vac → 없음)과 flat_face(전부 false)가 첫 측정과 달라졌다 (0908 8태스크 실행).
-        # 기존 memory.json 항목은 필드가 없으므로 지우고 다시 쌓아야 한다.
-        "geometry": {
-            **copy.deepcopy(geometry),
-            "height_z_mm": geometry.get("height_z_mm", geometry.get("height_mm")),
-        },
-        "physical_properties": {
-            "material": {"value": props.get("material"), "confidence": props.get("confidence")},
-            "density_kgm3": {"value": props.get("density_kgm3")},
-            "mass_kg": {"value": props.get("mass_kg"), "range": props.get("mass_range_kg")},
-            "youngs_gpa": {"value": props.get("youngs_gpa")},
-            "friction": {"value": mu.get("mu"), "stage": mu.get("stage"),
-                         "material_basis": mu.get("material"),
-                         "surface_rms_mm": mu.get("rms_mm")},
-        },
-        "material_hypotheses": copy.deepcopy(props.get("materials_topk") or []),
-        "metadata": {
-            "source_module": "M3", "source_method": source_method,
-            "source_task": task_id, "source_episode": episode,
-            "episodes_seen": int((old or {}).get("metadata", {}).get("episodes_seen", 0)) + 1,
-            "updated_at": now, "stale": False, "stale_reason": None,
-        },
+    stats = {
+        "memory_hits": 0,
+        "geom_refreshed": 0,
+        "grounded": 0,
+        "n_nodes": len(m1["nodes"]),
     }
 
+    cache: dict[str, dict] = {}
 
-def entry_to_props(entry: dict) -> dict:
-    p = entry["physical_properties"]
-    friction = p["friction"]
-    out = {
-        "geometry": copy.deepcopy(entry["geometry"]),
-        "material": p["material"].get("value"),
-        "density_kgm3": p["density_kgm3"].get("value"),
-        "mass_kg": p["mass_kg"].get("value"),
-        "youngs_gpa": p["youngs_gpa"].get("value"),
-        "mu": {"mu": friction.get("value"), "stage": friction.get("stage"),
-               "material": friction.get("material_basis"),
-               "rms_mm": friction.get("surface_rms_mm")},
-        "confidence": p["material"].get("confidence"),
-    }
-    if p["mass_kg"].get("range") is not None:
-        out["mass_range_kg"] = copy.deepcopy(p["mass_kg"]["range"])
-    if entry.get("material_hypotheses"):
-        out["materials_topk"] = copy.deepcopy(entry["material_hypotheses"])
-    if entry.get("identity", {}).get("caption") is not None:
-        out["caption"] = entry["identity"]["caption"]
-    return out
+    if retrieval_debug is None:
+        retrieval_debug = {}
 
+    task_id = getattr(memory, "task_id", None) if memory is not None else None
+    use_m0 = memory is not None and task_id is not None
 
-class ObjectKnowledgeManager:
-    def __init__(self, path=None, *, store=None,
-                 bbox_relative_threshold=PROVISIONAL_BBOX_RELATIVE_THRESHOLD,
-                 density_relative_threshold=PROVISIONAL_DENSITY_RELATIVE_THRESHOLD):
-        self.store = store or UnifiedMemoryStore(path)
-        self.path = self.store.path
-        self.bbox_relative_threshold = float(bbox_relative_threshold)
-        self.density_relative_threshold = float(density_relative_threshold)
-        self.data = self.store.document
+    for node in m1["nodes"]:
+        nid = node["id"]
 
-    @property
-    def objects(self):
-        return self.data["object_knowledge"]["objects"]
+        # 최신 main의 M1 → M5 geometry contract.
+        # 현재 episode에서 관측된 center / bbox는 항상 최신값을 사용한다.
+        observation_geometry = {
+            "center": list(node["center_mm"]),
+            "aabb_size": list(node["bbox_mm"]),
+        }
 
-    def load(self):
-        self.store.load()
-        self.data = self.store.document
-        return self.data
+        # cross-task C3 및 Full grounding 모두 동일 crop을 사용한다.
+        crop = crops_dir / f"{nid}.png" if crops_dir else None
+        crop = crop if (crop is not None and crop.exists()) else None
 
-    def save(self):
-        self.store.save()
+        intr = None
+        how = None
 
-    def update_entry(self, task_id, object_id, props, *, episode=None,
-                     source_method="visual", stage=None):
-        key = _memory_key(task_id, object_id)
-        old = self.objects.get(key)
-        new_stage = _props_stage(props) if stage is None else int(stage)
-        old_stage = int((old or {}).get("metadata", {}).get("stage", 0))
-        if old is not None and new_stage < old_stage:
-            old["metadata"]["episodes_seen"] = int(old["metadata"].get("episodes_seen", 0)) + 1
-            return old
-        self.objects[key] = props_to_entry(
-            props, task_id, object_id, episode=episode,
-            source_method=source_method, old=old)
-        self.objects[key]["metadata"]["stage"] = new_stage
-        return self.objects[key]
+        # -------------------------------------------------------------
+        # M0 Object Knowledge retrieval
+        #
+        # 1) same-task exact HIT
+        # 2) cross-task BBox candidate
+        # 3) candidate 존재 시 C3 density-only
+        # 4) density threshold HIT → Object Knowledge 재사용
+        # -------------------------------------------------------------
+        if use_m0:
+            bbox = _as_size3(node.get("bbox_mm"))
+            infer = density_infer or (lambda _crop: None)
 
-    # Public convenience name for direct ObjectKnowledgeManager users.
-    update = update_entry
+            reused, debug = memory.lookup_or_retrieve(
+                task_id,
+                nid,
+                bbox,
+                crop,
+                infer,
+            )
 
-    def update_from_m3(self, m3, task_id, *, episode=None):
-        raw = json.loads(Path(m3).read_text(encoding="utf-8")) if isinstance(m3, (str, Path)) else m3
-        found, skipped = {}, []
-        for response in raw.get("responses", []):
-            object_id = response.get("node_id")
-            if not object_id or not isinstance(response.get("geometry"), dict):
-                continue
-            required = ("material", "density_kgm3", "mass_kg", "youngs_gpa", "mu")
-            if not any(k in response for k in required):
-                skipped.append(object_id); continue
-            found[object_id] = response
-        for object_id, response in found.items():
-            self.update_entry(task_id, object_id, response, episode=episode)
-        self.save()
-        return {"updated": sorted(found), "skipped": sorted(set(skipped))}
+            retrieval_debug[nid] = debug
 
-    def lookup_exact(self, task_id, object_id):
-        for key, entry in self.objects.items():
-            if (entry.get("identity", {}).get("object_id") == object_id
-                    and entry.get("metadata", {}).get("source_task") == task_id):
-                if entry.get("metadata", {}).get("stale"):
-                    return None, key, "STALE_MEMORY"
-                return copy.deepcopy(entry), key, None
-        return None, None, None
+            if reused is not None:
+                # Intrinsic/material만 memory에서 재사용하고,
+                # geometry·mass는 항상 현재 observation으로 재결합한다.
+                # (과거 footprint/mass가 EE feasibility에 들어가면 안 됨)
+                intr = apply_memory_hit_to_observation(node, reused)
+                stats["memory_hits"] += 1
+                stats["geom_refreshed"] += 1
 
-    @staticmethod
-    def _bbox_difference(query_bbox, memory_extents):
-        q = _as_size3(query_bbox)
-        m = _as_size3(memory_extents)
-        if q is None or m is None:
-            return None          # 비정상 extents 항목은 후보에서 제외 (sorted 전에 걸러야 함)
-        q, m = sorted(q), sorted(m)
-        axis_diffs = [abs(a - b) / max(abs(b), 1e-9) for a, b in zip(q, m)]
-        return max(axis_diffs), axis_diffs
+                debug = retrieval_debug[nid]
+                debug["geometry_source"] = "current_observation"
+                debug["intrinsic_source"] = "memory"
 
-    def filter_bbox(self, task_id, bbox_mm):
-        candidates = []
-        for key, entry in self.objects.items():
-            meta = entry.get("metadata", {})
-            if meta.get("source_task") == task_id or meta.get("stale"):
-                continue
-            diff = self._bbox_difference(bbox_mm, entry.get("geometry", {}).get("extents_mm"))
-            if diff is None:
-                continue
-            maximum, axes = diff
-            if maximum <= self.bbox_relative_threshold:
-                candidates.append({"memory_entry_key": key,
-                    "source_task": meta.get("source_task"),
-                    "object_id": entry.get("identity", {}).get("object_id"),
-                    "bbox_max_relative_difference": maximum,
-                    "bbox_axis_relative_differences": axes})
-        return sorted(candidates, key=lambda x: x["bbox_max_relative_difference"])
+                log(
+                    module="m1",
+                    event="memory_hit",
+                    node=nid,
+                    lookup_type=debug.get("lookup_type"),
+                    geometry_source="current_observation",
+                    intrinsic_source="memory",
+                )
 
-    def retrieve_by_density(self, candidates, query_density):
-        qd = _finite_positive(query_density)
-        ranked = []
-        if qd is None:
-            return None, ranked
-        for candidate in candidates:
-            entry = self.objects[candidate["memory_entry_key"]]
-            md = _finite_positive(entry["physical_properties"]["density_kgm3"].get("value"))
-            if md is None:
-                continue
-            ranked.append({**candidate, "density_kgm3": md,
-                           "relative_difference": abs(qd - md) / max(abs(md), 1e-9)})
-        ranked.sort(key=lambda x: x["relative_difference"])
-        return (ranked[0] if ranked else None), ranked
+                how = "memory"
 
-    def lookup_or_retrieve(self, task_id, object_id, bbox_mm, crop_rgb, density_infer):
-        query_bbox = _as_size3(bbox_mm)
-        debug = {"query_task": task_id, "query_object_id": object_id,
-                 "bbox_threshold": self.bbox_relative_threshold,
-                 "density_threshold": self.density_relative_threshold,
-                 "threshold_status": "provisional", "c3_llm_called": False,
-                 "c3_token_usage": None, "full_m3_called": False,
-                 "full_m3_skipped": False, "full_m3_token_usage": None,
-                 "memory_entry_count": len(self.objects),
-                 "query_bbox_mm": query_bbox}
-        exact, key, exact_reason = self.lookup_exact(task_id, object_id)
-        if exact is not None:
-            return entry_to_props(exact), debug | {"lookup_type": "intra_task_exact",
-                "best_match": {"memory_entry_key": key, "source_task": task_id,
-                               "object_id": object_id}, "result": "HIT", "full_m3_skipped": True}
-        candidates = self.filter_bbox(task_id, query_bbox)
-        debug |= {"lookup_type": "cross_task", "bbox_candidates": candidates}
-        if not candidates:
-            stale_bbox_match = any(
-                entry.get("metadata", {}).get("source_task") != task_id
-                and entry.get("metadata", {}).get("stale")
-                and (diff := self._bbox_difference(
-                    query_bbox, entry.get("geometry", {}).get("extents_mm"))) is not None
-                and diff[0] <= self.bbox_relative_threshold
-                for entry in self.objects.values())
-            reason = exact_reason or ("STALE_MEMORY" if stale_bbox_match else "NO_BBOX_CANDIDATE")
-            return None, debug | {"density_candidates": [], "best_match": None,
-                                  "result": "MISS", "miss_reason": reason}
-        try:
-            density_result = density_infer(crop_rgb)
-        except Exception as exc:  # caller/backend errors are a safe retrieval miss
-            return None, debug | {"density_candidates": [], "best_match": None,
-                "result": "MISS", "miss_reason": "DENSITY_INFERENCE_FAILED",
-                "density_error": str(exc)}
-        debug |= {"c3_llm_called": density_result.llm_called,
-                  "c3_token_usage": density_result.token_usage,
-                  "query_density_kgm3": density_result.density_kgm3,
-                  "c3_materials_topk": getattr(density_result, "materials_topk", None),
-                  "c3_material_committed": getattr(density_result, "material_committed", None),
-                  "c3_top1_gap": getattr(density_result, "top1_gap", None)}
-        if density_result.density_kgm3 is None:
-            return None, debug | {"density_candidates": [], "best_match": None,
-                "result": "MISS", "miss_reason": "DENSITY_INFERENCE_FAILED",
-                "density_error": density_result.error}
-        best, ranked = self.retrieve_by_density(candidates, density_result.density_kgm3)
-        debug["density_candidates"] = ranked
-        if best is None:
-            return None, debug | {"best_match": None, "result": "MISS",
-                                  "miss_reason": "NO_VALID_DENSITY"}
-        debug["best_match"] = {k: best[k] for k in
-                               ("memory_entry_key", "source_task", "object_id")}
-        if best["relative_difference"] > self.density_relative_threshold:
-            return None, debug | {"result": "MISS", "miss_reason": "DENSITY_THRESHOLD_EXCEEDED"}
-        return entry_to_props(self.objects[best["memory_entry_key"]]), debug | {
-            "result": "HIT", "full_m3_skipped": True}
+        # -------------------------------------------------------------
+        # Memory MISS 또는 M0 미사용
+        # → 현재 observation에서 Full physical grounding
+        # -------------------------------------------------------------
+        if intr is None:
+            intr = ground_intrinsic(
+                node,
+                crop,
+                backend,
+                friction,
+            )
+
+            stats["grounded"] += 1
+
+            if use_m0:
+                debug = retrieval_debug.setdefault(nid, {})
+                debug.update(
+                    full_m3_called=True,
+                    full_m3_skipped=False,
+                )
+
+            log(
+                module="m1",
+                event="grounded",
+                node=nid,
+                mu_stage=intr["mu"]["stage"],
+            )
+
+            how = "backend"
+
+        # -------------------------------------------------------------
+        # Memory update용 intrinsic cache
+        # -------------------------------------------------------------
+        cache[nid] = intr
+
+        # material / density / mass / mu / geometry 등을 node에 반영
+        node.update(intr)
+
+        # intr["geometry"]는 reusable shape / surface 정보를 담고,
+        # center / aabb_size는 현재 episode의 관측값을 사용한다.
+        #
+        # M5가 현재 관측 geometry를 소비하므로 observation 값이 우선한다.
+        node["geometry"] = {
+            **intr.get("geometry", {}),
+            **observation_geometry,
+        }
+
+        node["grounding_source"] = how
+
+        # -------------------------------------------------------------
+        # End-effector evaluation
+        # -------------------------------------------------------------
+        node["ee"] = {
+            e["ee_id"]: evaluate_ee(e, intr)
+            for e in ee_pool
+        }
+
+        # -------------------------------------------------------------
+        # Reachability
+        # -------------------------------------------------------------
+        if reach_mm is not None:
+            node["reachability"] = reach_check(
+                reach_mm,
+                node["center_mm"],
+            )
+
+        # -------------------------------------------------------------
+        # Unary predicates
+        # -------------------------------------------------------------
+        node["predicates"] = {
+            "top_exposed": top_exposed(nid, edges),
+            "clear": region_clear(nid, edges),
+            "flat_face": flat_face(intr["geometry"]),
+        }
+
+    # -------------------------------------------------------------
+    # 새로 grounding한 값 및 현재 cache를 Object Knowledge에 반영
+    # MemoryStore가 기존 Failure-Recovery Experience는 보존한다.
+    # -------------------------------------------------------------
+    if memory is not None:
+        stats["memory_update"] = memory.update(
+            cache,
+            source=source,
+        )
+        memory.save()
+
+    stats["retrieval_debug"] = retrieval_debug
+
+    return stats
