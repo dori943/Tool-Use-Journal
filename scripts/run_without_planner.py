@@ -26,6 +26,20 @@ def _hash(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
+def _validate_task_instruction(task, m2_path):
+    """Reject M2 artifacts generated for an obsolete task instruction."""
+    from task_registry import instruction
+
+    recorded = _read(m2_path).get("task")
+    current = instruction(task)
+    if recorded != current:
+        raise ValueError(
+            f"M2 task instruction mismatch for {task}: "
+            f"stored={recorded!r}, current={current!r}. "
+            "Regenerate M2 from the current task registry before planning."
+        )
+
+
 def run(args, pipeline):
     if args.grounding_mode != "full":
         raise ValueError(
@@ -133,6 +147,7 @@ def run(args, pipeline):
             manifest["stages"][stage] = "completed"
             _write(manifest_path, manifest)
             _write(result_path, report)
+        _validate_task_instruction(task, out / "m2.json")
         if stop == 1:
             return
 

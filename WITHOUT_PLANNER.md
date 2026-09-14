@@ -36,6 +36,8 @@ python scripts/run.py c1_1 --seed 0 --planner-mode without-planner --provider op
 
 `--start-from m4`일 때 그 폴더에 `m1.json`, `m2.json`이 필요하다. M5 입력 검증
 또는 motion 실행에는 앞서 생성한 **동일한 출력 폴더**를 사용한다.
+저장된 `m2.json`의 task 문장이 현재 `task_registry.py` 지시문과 다르면 실행을
+중단한다. 지시문 변경 전 산출물은 M2부터 다시 생성해야 한다.
 
 ```powershell
 python scripts/run.py c1_1 --seed 0 --planner-mode without-planner --provider openai --model gpt-4o --start-from m5 --m5-validate-only --output-dir <same-run-directory>
