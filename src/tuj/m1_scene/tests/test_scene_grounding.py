@@ -81,6 +81,51 @@ class CountingBackend(MockBackend):
         return super().estimate(crop_rgb, cls_hint, points_mm)
 
 
+class TokenBackend(MockBackend):
+    """Records fake Full SiPhy usage like SiPhyBackend.last_usage."""
+
+    def __init__(self, usage=None):
+        self.calls = 0
+        self.last_usage = None
+        self._usage = usage or {
+            "input_tokens": 500,
+            "output_tokens": 120,
+            "total_tokens": 620,
+        }
+
+    def estimate(self, crop_rgb, cls_hint, points_mm=None):
+        self.calls += 1
+        self.last_usage = dict(self._usage)
+        return super().estimate(crop_rgb, cls_hint, points_mm)
+
+
+def test_ground_scene_records_full_siphy_token_usage_on_miss():
+    import tempfile
+    from pathlib import Path
+
+    with tempfile.TemporaryDirectory() as td:
+        memory = PropertyMemory(Path(td) / "m.json", task_id="now")
+        debug = {}
+        backend = TokenBackend()
+        stats = ground_scene(
+            _spoon_scene(),
+            backend=backend,
+            memory=memory,
+            retrieval_debug=debug,
+            source="mock",
+        )
+        assert stats["grounded"] == 1
+        assert backend.calls == 1
+        assert debug["obj_spoon_spoon"]["full_m3_called"] is True
+        assert debug["obj_spoon_spoon"]["full_m3_token_usage"] == {
+            "input_tokens": 500,
+            "output_tokens": 120,
+            "total_tokens": 620,
+        }
+        assert stats["full_m3_token_usage"]["calls"] == 1
+        assert stats["full_m3_token_usage"]["total_tokens"] == 620
+
+
 def _spoon_scene(
     center=(0, 0, 10),
     half=(50.0, 25.0, 20.0),

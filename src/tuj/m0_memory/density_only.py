@@ -75,44 +75,59 @@ class DensityOnlyBackend:
                             repo_root=repo_root, seed=seed)
         self.client, self.model = base.client, base.model
         self._supports_seed = base._supports_seed
+        self._is_gemini = base._is_gemini
         # Hypothesis JSON is larger than a single scalar; keep well below Full SiPhy.
-        self._max_tokens = 400 if getattr(base, "_is_gemini", False) else 256
+        self._max_tokens = 400 if self._is_gemini else 256
 
     def infer(self, crop_rgb) -> DensityOnlyResult:
         if crop_rgb is None:
             return DensityOnlyResult(None, False, error="crop image missing")
-        kwargs = {
-            "model": self.model,
-            "max_tokens": self._max_tokens,
-            "messages": [
-                {"role": "system", "content": DENSITY_ONLY_PROMPT},
-                {"role": "user", "content": [{"type": "image_url", "image_url": {
-                    "url": f"data:image/png;base64,{_to_b64_png(crop_rgb)}"}}]},
-            ],
-        }
-        if self._supports_seed:
-            kwargs["seed"] = 100
-        try:
-            response = self.client.chat.completions.create(**kwargs)
-            raw = (response.choices[0].message.content or "").replace("```json", "").replace("```", "").strip()
-            mats = _parse_density_hypotheses(json.loads(raw))
-            agg = aggregate_density_kgm3(mats)
-            usage = getattr(response, "usage", None)
-            tokens = None if usage is None else {
-                "input_tokens": getattr(usage, "prompt_tokens", None),
-                "output_tokens": getattr(usage, "completion_tokens", None),
-                "total_tokens": getattr(usage, "total_tokens", None),
+        # Same provider split as Full SiPhy: OpenAI wants max_completion_tokens,
+        # Gemini OpenAI-compat still wants max_tokens. Swap once if rejected.
+        token_param = "max_tokens" if self._is_gemini else "max_completion_tokens"
+        last_err = None
+        for _ in range(2):
+            kwargs = {
+                "model": self.model,
+                "messages": [
+                    {"role": "system", "content": DENSITY_ONLY_PROMPT},
+                    {"role": "user", "content": [{"type": "image_url", "image_url": {
+                        "url": f"data:image/png;base64,{_to_b64_png(crop_rgb)}"}}]},
+                ],
             }
-            topk = [
-                {"name": m["name"], "prob": round(float(p), 3),
-                 "density_kgm3": list(m["density"])}
-                for m, p in zip(mats, agg["probs_raw"])
-            ]
-            return DensityOnlyResult(
-                agg["density_kgm3"], True, tokens,
-                materials_topk=topk,
-                material_committed=agg["committed"],
-                top1_gap=round(agg["gap"], 3),
-            )
-        except Exception as exc:  # retrieval failure safely falls through to full M3
-            return DensityOnlyResult(None, True, error=str(exc))
+            kwargs[token_param] = self._max_tokens
+            if self._supports_seed:
+                kwargs["seed"] = 100
+            try:
+                response = self.client.chat.completions.create(**kwargs)
+                raw = (response.choices[0].message.content or "").replace(
+                    "```json", "").replace("```", "").strip()
+                mats = _parse_density_hypotheses(json.loads(raw))
+                agg = aggregate_density_kgm3(mats)
+                usage = getattr(response, "usage", None)
+                tokens = None if usage is None else {
+                    "input_tokens": getattr(usage, "prompt_tokens", None),
+                    "output_tokens": getattr(usage, "completion_tokens", None),
+                    "total_tokens": getattr(usage, "total_tokens", None),
+                }
+                topk = [
+                    {"name": m["name"], "prob": round(float(p), 3),
+                     "density_kgm3": list(m["density"])}
+                    for m, p in zip(mats, agg["probs_raw"])
+                ]
+                return DensityOnlyResult(
+                    agg["density_kgm3"], True, tokens,
+                    materials_topk=topk,
+                    material_committed=agg["committed"],
+                    top1_gap=round(agg["gap"], 3),
+                )
+            except Exception as exc:  # noqa: BLE001
+                last_err = exc
+                msg = str(exc)
+                if "max_completion_tokens" in msg and "max_tokens" in msg:
+                    token_param = ("max_completion_tokens"
+                                   if token_param == "max_tokens" else "max_tokens")
+                    continue
+                break
+        # retrieval failure safely falls through to full M3
+        return DensityOnlyResult(None, True, error=str(last_err))

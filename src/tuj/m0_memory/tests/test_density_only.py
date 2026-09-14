@@ -129,3 +129,66 @@ def test_density_only_backend_aggregates_like_siphy():
     assert msgs[0]["role"] == "system"
     assert msgs[0]["content"] == DENSITY_ONLY_PROMPT
     assert all(part.get("type") == "image_url" for part in msgs[1]["content"])
+    # OpenAI path mirrors Full SiPhy.
+    assert "max_completion_tokens" in client.chat.completions.last_kwargs
+    assert "max_tokens" not in client.chat.completions.last_kwargs
+
+
+def test_density_only_backend_uses_max_tokens_for_gemini():
+    import numpy as np
+
+    payload = {
+        "materials": [
+            {"name": "Wood", "density_kgm3": "600-800", "confidence_0_10": 9},
+            {"name": "Plastic", "density_kgm3": "900-1200", "confidence_0_10": 1},
+        ]
+    }
+    client = _Client(json.dumps(payload))
+    client.base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+    backend = DensityOnlyBackend(client=client, model="gemini-3.6-flash")
+    result = backend.infer(np.zeros((8, 8, 3), dtype=np.uint8))
+    assert result.error is None
+    assert "max_tokens" in client.chat.completions.last_kwargs
+    assert "max_completion_tokens" not in client.chat.completions.last_kwargs
+
+
+def test_density_only_backend_swaps_token_param_on_rejection():
+    import numpy as np
+
+    payload = {
+        "materials": [
+            {"name": "Wood", "density_kgm3": "600-800", "confidence_0_10": 9},
+            {"name": "Plastic", "density_kgm3": "900-1200", "confidence_0_10": 1},
+        ]
+    }
+
+    class _RejectThenAccept:
+        def __init__(self, content):
+            self._content = content
+            self.calls = []
+
+        def create(self, **kwargs):
+            self.calls.append(kwargs)
+            if "max_tokens" in kwargs and "max_completion_tokens" not in kwargs:
+                raise RuntimeError(
+                    "Unsupported parameter: 'max_tokens' is not supported "
+                    "with this model. Use 'max_completion_tokens' instead.")
+            return _Resp(self._content)
+
+    class _ChatSwap:
+        def __init__(self, content):
+            self.completions = _RejectThenAccept(content)
+
+    class _ClientSwap:
+        def __init__(self, content):
+            self.chat = _ChatSwap(content)
+            # Force Gemini default first, then swap after rejection.
+            self.base_url = "https://generativelanguage.googleapis.com/v1beta/openai/"
+
+    client = _ClientSwap(json.dumps(payload))
+    backend = DensityOnlyBackend(client=client, model="gemini-3.6-flash")
+    result = backend.infer(np.zeros((8, 8, 3), dtype=np.uint8))
+    assert result.error is None
+    assert len(client.chat.completions.calls) == 2
+    assert "max_tokens" in client.chat.completions.calls[0]
+    assert "max_completion_tokens" in client.chat.completions.calls[1]
