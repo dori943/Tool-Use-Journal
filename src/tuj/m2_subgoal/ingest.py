@@ -587,7 +587,10 @@ def evaluate(m2_out: dict, m1: dict) -> list[tuple[dict, dict]]:
                     r |= {"from": c["tool_id"], "to": c["target_id"],
                           "type": "gap_accessible"}
                     r |= ground.gap_access(nodes[c["tool_id"]], nodes[c["target_id"]],
-                                           gap_width_mm=c.get("gap_width_mm"))
+                                           gap_width_mm=c.get("gap_width_mm"),
+                                           insertion_depth_mm=c.get("insertion_depth_mm"))
+                    if c.get("approach") is not None:
+                        r["approach"] = c["approach"]
                 elif kind in ("batch", "swept_space"):
                     actor = c.get("actor") or {}
                     tool = nodes.get(actor["id"]) if actor.get("type") == "object" else None

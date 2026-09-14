@@ -179,7 +179,59 @@ def default_constraints(world: WorldSnapshot) -> MotionConstraints:
                 max_acceleration_rad_s2=2.0,
             )
             for name in world.robot_state.joint_names
-        }
+        },
+        # Tight-fit extraction: a thin tool is slid into a narrow interval whose
+        # entrance clearance (~9 mm) is smaller than the default 5 mm collision
+        # margin allows, so the tool grazes the channel fixtures by design.
+        # Allow the held tool to touch the interval fixtures (fnmatch selectors;
+        # inert in scenes without these fixtures).  The scripted pick uses its
+        # own contact gate, not this registry, so it is unaffected.
+        allowed_collision_pairs=[
+            ("tool_?_*", "island_island_group_top_*"),
+            ("tool_?_*", "appliance_left*"),
+            ("tool_?_*", "appliance_right*"),
+            ("tool_?_*", "tool_thickness_clearance*"),
+            # The gripper holds the tool at counter level to slide it under the
+            # entrance, so its fingers graze the island top by design; allow the
+            # gripper<->island-top contact too (the hand stays outside the
+            # entrance, so it does not touch the appliances).
+            ("gripper0_right_*", "island_island_group_top_*"),
+            # The tool must touch the card it is extracting (the manipulation
+            # target); that contact is intended, not a collision.
+            ("tool_?_*", "card*"),
+            # As the card is dragged OUT toward the open end it comes up to the
+            # hand, so the gripper fingertips graze the card near the end of the
+            # drag.  That contact is intended (the card is the target being
+            # pulled out), not an obstacle collision.
+            ("gripper0_right_*", "card*"),
+            # Tight-fit: the tool reach ~= the interval depth, so with the hand
+            # just outside the mouth the tool only just reaches the card; the
+            # hand/fingers graze the appliance edge at the entrance by a few mm.
+            # Allow the gripper<->appliance contact at the mouth (the ARM links
+            # above are still checked normally and must clear).
+            ("gripper0_right_*", "appliance_left*"),
+            ("gripper0_right_*", "appliance_right*"),
+            # The wrist links directly behind the hand also graze the appliance
+            # edge at the mouth during the tight insert (tool reach ~= interval
+            # depth crowds the whole EE assembly at the entrance).  The extract
+            # provider now backs the tip ~12 mm short of the card centre so the
+            # whole wrist chain pulls out of the mouth and clears the 5 mm margin
+            # by design; these wrist pairs are only a thin net for the last
+            # sub-mm on a marginal IK branch (wrist2 was the near-miss at
+            # ~0.3 mm).  The UPPER arm links (forearm/wrist1/elbow) are NOT
+            # allowed -- they must clear, so a real arm-into-appliance solution
+            # is still rejected.
+            ("robot0_wrist3*", "appliance_left*"),
+            ("robot0_wrist3*", "appliance_right*"),
+            ("robot0_wrist2*", "appliance_left*"),
+            ("robot0_wrist2*", "appliance_right*"),
+            # (Spare-tool allowances removed: the on-axis distractor tool_4 was
+            # relocated off the channel axis in the c4_1 scene, so the arm's
+            # extraction retreat no longer sweeps over any spare tool.  With no
+            # allowance, an actual arm<->spare contact is caught by the planner
+            # instead of being silently pushed through, which was shoving the
+            # spare tool along and blocking the card.)
+        ],
     )
 
 

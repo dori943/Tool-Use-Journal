@@ -21,13 +21,21 @@ from tuj.m5_motion.scripted_grasps.spoon_runtime import SpoonContext,approach_sp
 class CatalogContext(SpoonContext):
 
     def find_support_geoms(self):
-        try:return {self.model.geom('table_collision').id}
-        except KeyError:pass
-        geoms={i for i in range(self.model.ngeom)
-            if self.model.geom(i).name.startswith('island_island_group_top_')
-            and not self.model.geom(i).name.endswith('_visual')}
-        if geoms:return geoms
-        raise GraspFailure('SUPPORT_GEOMETRY_NOT_FOUND')
+        # Return ALL support-surface geoms as a set: the tabletop and every
+        # RoboCasa kitchen island-top segment (island_island_group_top_1/2/...).
+        # context.py takes support_gid=min(...) and support_top_z=max(top height)
+        # over these and unions the set into the thin-contact geom group.  The
+        # earlier single-geom find_support_geom missed island_island_group_top_1,
+        # so a pick over that segment was collision-filtered.
+        gids={gid for gid in range(self.model.ngeom)
+              if (self.model.geom(gid).name or '') == 'table_collision'
+              or (self.model.geom(gid).name or '').startswith('island_island_group_top')}
+        if not gids:
+            raise GraspFailure('SUPPORT_GEOMETRY_NOT_FOUND')
+        return gids
+
+    def find_support_geom(self):
+        return min(self.find_support_geoms())
 
     def geom_top_height(self,gid):
         import itertools
@@ -66,25 +74,39 @@ class CatalogContext(SpoonContext):
 
     def bad_contacts(self,data,stage):
         bad=super().bad_contacts(data,stage)
+        # A thin tool lying flush on the counter can only be grasped by bringing
+        # the FINGERS (pad + tip) down past the tool's top toward the support:
+        # the finger contact geoms reach ~8 mm below the grip site, deeper than
+        # the tool is thick, so they must contact the island top to pinch the
+        # tool's sides (like fingers resting on a table beside a coin).  The base
+        # classes flag that as a robot collision (a finger is a robot geom) with
+        # no support exemption; the planner only checks kinematic overlap, while
+        # at execution the rigid island stops the finger so the real penetration
+        # stays ~0.  So tolerate any finger-contact-geom <-> support contact up to
+        # a generous cap during the approach (self.finger_geoms already names the
+        # pad/tip contact geoms), but keep only a shallow tol for the rest of the
+        # gripper (a body/knuckle/coupler hitting the island is a real collision).
+        if stage in {'GRASP','CLOSE'}:
+            support_names={self.model.geom(g).name for g in self.support_gids}
+            gripper_names={self.model.geom(g).name for g in self.gripper_geoms}
+            finger_names={self.model.geom(g).name for g in self.finger_geoms}
+            tol=float(getattr(self.recipe,'gripper_support_clearance_tol_m',.0025))
+            tip_tol=float(getattr(self.recipe,'fingertip_support_clearance_tol_m',.012))
+            def support_ok(c):
+                if not any(n in support_names for n in c['geoms']):return False
+                if any(n in finger_names for n in c['geoms']):return c['penetration_m']<=tip_tol
+                if any(n in gripper_names for n in c['geoms']):return c['penetration_m']<=tol
+                return False
+            bad=[c for c in bad if not support_ok(c)]
         if stage!='LIFT' or self.support_released:return bad
         height=float(self.body_pose(data)[2,3]-self.initial_body[2,3])
-        if height<-.002:return bad
-        supports={self.model.geom(g).name for g in self.support_gids}
+        if not -.002<=height<=.005:return bad
+        support=self.model.geom(self.support_gid).name
         object_names={self.model.geom(g).name for g in self.object_geoms}
-        return [c for c in bad if not (supports.intersection(c['geoms'])
-            and any(n in object_names for n in c['geoms'])
-            and c['penetration_m']<=self.recipe.maximum_support_separation_penetration_m)]
+        return [c for c in bad if not (support in c['geoms'] and any(n in object_names for n in c['geoms']) and c['penetration_m']<=.002)]
 
     def sample(self):
-        if self.stage=='LIFT' and not self.support_released:
-            height=self.body_pose()[2,3]-self.initial_body[2,3]
-            touching=any(c.dist<=0 and (
-                (int(c.geom1) in self.support_gids and int(c.geom2) in self.object_geoms)
-                or (int(c.geom2) in self.support_gids and int(c.geom1) in self.object_geoms))
-                for c in self.data.contact[:self.data.ncon])
-            # Once the lifted object has physically cleared its original
-            # support, any later re-contact is an ordinary collision.
-            if height>.002 and not touching:self.support_released=True
+        if self.stage=='LIFT' and self.body_pose()[2,3]-self.initial_body[2,3]>.005:self.support_released=True
         forces={n:0. for n in self.finger_groups};points={n:[] for n in forces};normals={n:[] for n in forces}
         for i,c in enumerate(self.data.contact[:self.data.ncon]):
             a,b=int(c.geom1),int(c.geom2)
@@ -101,17 +123,7 @@ class CatalogContext(SpoonContext):
             for n,p in zip(normals[first],points[first]):
                 for v,q in zip(normals[other],points[other]):
                     opposition=max(opposition,float(-n@v));span=max(span,float(np.linalg.norm(p-q)))
-        # 0912: 이 지표는 접촉 법선 중 최솟값이라 "모든 접촉이 평평한가" 를
-        # 묻는다. 접촉이 하나뿐인 접시에서는 그게 곧 밀착 여부지만, 빵처럼
-        # 메시 표면이 울퉁불퉁해 접촉이 34개 나오는 면에서는 가장자리 미세
-        # 경사 하나가 값을 끌어내린다 (빵은 월드 수직과 0.06 도로 평평한데
-        # 최솟값이 0.784 로 나와 게이트에 막혔다). 판정은 그대로 두고 분포만
-        # 같이 남겨, 통계의 문제인지 컵이 실제로 경사에 앉은 것인지 가른다.
-        alignments=[abs(float(n@self.grip_pose()[:3,2])) for n in normals[first]]
-        suction_alignment=min(alignments,default=0.)
-        suction_alignment_mean=float(np.mean(alignments)) if alignments else 0.
-        suction_aligned_fraction=(
-            float(sum(a>=.9 for a in alignments))/len(alignments) if alignments else 0.)
+        suction_alignment=min((abs(float(n@self.grip_pose()[:3,2])) for n in normals[first]),default=0.)
         body=self.body_pose()
         contact_centers={name:((np.mean(group,axis=0)-body[:3,3])@body[:3,:3]-self.center_in_body).tolist()
                          for name,group in points.items() if group}
@@ -119,7 +131,7 @@ class CatalogContext(SpoonContext):
             'attachment_active':self.runtime.attached_object_id==self.object_id,
             'finger_contacts':[n for n in forces if forces[n]>.01],'finger_force_n':forces,
             'contact_count':sum(map(len,points.values())),'normal_opposition':opposition,'contact_span_m':span,
-            'suction_alignment':suction_alignment,'suction_alignment_mean':suction_alignment_mean,'suction_aligned_fraction':suction_aligned_fraction,'lift_m':float(self.body_pose()[2,3]-self.initial_body[2,3]),
+            'suction_alignment':suction_alignment,'lift_m':float(self.body_pose()[2,3]-self.initial_body[2,3]),
             'finger_contact_centers_from_object_center_m':contact_centers,
             'bottom_clearance_m':self.bottom_height()-self.support_top_z,'T_GB':inverse(self.grip_pose())@self.body_pose(),
             'gripper_q':self.data.qpos[self.model.jnt_qposadr[self.hand_joint_ids]],
@@ -153,23 +165,8 @@ class CatalogContext(SpoonContext):
         for row in self.trace[-self.recipe.contact_ticks:]:
             if set(row['finger_contacts'])!=set(self.finger_groups):return False
             if self.recipe.ee_id=='vac':
-                # 0912: 예전 조건은 suction_alignment(접촉 법선 정렬의 최솟값)
-                # 이었다. 접촉이 하나뿐인 접시에서는 그게 곧 밀착 여부지만,
-                # 메시 표면이 거친 면에서는 가장자리 미세 경사 하나가 값을
-                # 끌어내린다. c2_2 의 빵은 몸체 z 가 월드 수직과 0.06 도이고
-                # 컵도 수직으로 내려왔는데, 접촉 34개 중 32개가 평균 0.987 로
-                # 정렬된 상태에서 최솟값이 0.784 로 나와 막혔다.
-                #
-                # 밀봉이 성립하는 조건은 "모든 접촉이 평평한가" 가 아니라
-                # "컵 면이 평평한 자리에 앉았는가" 다. 평균과 정렬 비율을 함께
-                # 요구한다. 컵이 모서리에 걸치면 둘 다 같이 떨어지므로 판정은
-                # 느슨해지지 않는다. 접촉이 하나인 접시는 평균=비율=최솟값이라
-                # 기존 동작 그대로다. 최솟값은 진단용으로 계속 기록한다.
-                if (row['contact_count']<self.recipe.minimum_vacuum_contact_count
-                        or row['suction_alignment_mean']<.9
-                        or row['suction_aligned_fraction']<.8
-                        or min(row['gripper_ctrl'])<.5):return False
-            elif row['normal_opposition']<.5 or row['contact_span_m']<.0035 or min(row['finger_force_n'].values())<1.:
+                if row['contact_count']<self.recipe.vacuum_min_contacts or row['suction_alignment']<.9 or min(row['gripper_ctrl'])<.5:return False
+            elif row['normal_opposition']<float(getattr(self.recipe,'minimum_normal_opposition',.5)) or row['contact_span_m']<.0035 or min(row['finger_force_n'].values())<1.:
                 return False
         return True
 
@@ -180,36 +177,62 @@ class CatalogContext(SpoonContext):
         if self.recipe.ee_id=='3F' and not self.three_finger_force_hold:
             self.three_finger_commands=np.asarray(self.gripper.current_action).copy();self.three_finger_force_hold=True
 
+    def damp_finger_plant(self):
+        """Damp the finger position servo directly on the stepped model.
+
+        The kitchen 2F pre-shape aperture oscillates symmetrically about the
+        target with growing amplitude while the command is flat: a marginally
+        unstable finger PLANT (undamped position servo / parallel-linkage mode),
+        not an outer-loop problem.  Retuning through the runtime helper had no
+        effect on the physics, so damp the exact model this context steps
+        (self.model via self.gripper_actuator_ids) and record before/after so
+        the live lever is unambiguous.  Returns nothing; writes preshape_gains.json.
+        """
+        m=self.model;mj=self.mj
+        ratio=float(getattr(self.recipe,'finger_damping_ratio',2.0))
+        joint_floor_scale=float(getattr(self.recipe,'finger_joint_damping_scale',0.5))
+        affine=int(mj.mjtBias.mjBIAS_AFFINE)
+        ids=[int(i) for i in getattr(self,'gripper_actuator_ids',[])]
+        before=[];after=[]
+        for i in ids:
+            gp=[float(x) for x in m.actuator_gainprm[i,:3]]
+            bp=[float(x) for x in m.actuator_biasprm[i,:3]]
+            before.append({'name':m.actuator(i).name,'gaintype':int(m.actuator_gaintype[i]),
+                'biastype':int(m.actuator_biastype[i]),'gainprm':gp,'biasprm':bp,
+                'trn_joint':int(m.actuator_trnid[i,0])})
+            if int(m.actuator_biastype[i])==affine:
+                kp=abs(float(m.actuator_gainprm[i,0])) or abs(float(m.actuator_biasprm[i,1]))
+                m.actuator_biasprm[i,2]=-2.0*(kp**0.5)*ratio
+            after.append({'name':m.actuator(i).name,
+                'gainprm':[float(x) for x in m.actuator_gainprm[i,:3]],
+                'biasprm':[float(x) for x in m.actuator_biasprm[i,:3]]})
+        joint_damping=[]
+        for jid in [int(x) for x in getattr(self,'hand_joint_ids',[])]:
+            dadr=int(m.jnt_dofadr[jid]);orig=float(m.dof_damping[dadr])
+            m.dof_damping[dadr]=max(orig,joint_floor_scale)
+            joint_damping.append({'joint':m.joint(jid).name,'dof':dadr,
+                'orig_damping':orig,'new_damping':float(m.dof_damping[dadr]),
+                'armature':float(m.dof_armature[dadr])})
+        save_json(self.output/'preshape_gains.json',{'ratio':ratio,
+            'joint_floor_scale':joint_floor_scale,'before':before,'after':after,
+            'joint_damping':joint_damping})
+
     def preshape(self):
         self.stage='PRESHAPE';q=self.data.qpos[self.arm_ids].copy()
+        if self.recipe.ee_id in ('2F','3F'):self.damp_finger_plant()
         opening=-self.recipe.preshape_closure_command
-        # 0912: 한계값(1.)에서 목표로 직행하고 정착 구간이 없었다. Robotiq 85 는
-        # 패시브 링키지라 직전 동작이 남긴 과도 상태를 안고 들어오면 그 구간에서
-        # 관절이 한계를 타고 넘고, 모든 물리 서브스텝을 보는 audit_hand_range 가
-        # 이를 잡는다 (c3_1 머그 PRESHAPE 0.011472 rad, 허용 0.01). 파지 하나만
-        # 도는 스모크는 과도 상태가 작아 표가 안 났다.
-        #
-        # spoon_runtime.preshape_spoon 이 같은 문제를 이미 풀어 두었고 (주석:
-        # "Stabilize at the half-range controller target before arm travel"),
-        # 6개 경로에서 검증됐다. 중간(0.)을 거쳐 거기서 멈춰 링키지를 안정시킨
-        # 뒤 목표로 가고 다시 멈추는 그 순서를 그대로 쓴다.
-        for value in np.linspace(1.,0.,150):self.step(q,float(value))
-        for _ in range(100):self.step(q,0.)
-        for value in np.linspace(0.,opening,100):self.step(q,float(value))
-        for _ in range(150):self.step(q,opening)
-        # 0912: 여기에 이득 10, 틱당 +-0.025 짜리 빠른 루프가 75틱 먼저 돌았다.
-        # 명령이 손가락 응답보다 빠르게 움직여 목표 개구를 지나치고 기계적
-        # 스토퍼를 파고들었다 (c3_1 머그: 명령이 +0.60 에서 -0.7733 까지 가고
-        # 개구 86.87mm, Robotiq 85 최대 행정 85mm, 관절이 하한 0 을 0.010987 rad
-        # 침범해 audit_hand_range 가 중단). 아래 느린 루프는 그 빠른 루프가
-        # 오실레이션으로 끝나는 것을 수습하려고 이미 있던 것이고, 이득 1 에
-        # 틱당 +-0.005, 도달을 20틱 연속으로 요구한다. 빠른 단계를 없애고
-        # 처음부터 이쪽으로 수렴시킨다. 스푼 2F 는 애초에 피드백 루프 없이
-        # 열린 루프 명령과 정착만으로 개구를 맞춘다 (preshape_spoon).
+        for value in np.linspace(1.,opening,100):self.step(q,float(value))
+        for _ in range(75):
+            aperture=self.runtime.fingerpad_separation_m()
+            correction=np.clip(10.*(self.recipe.preshape_aperture_m-aperture),-.025,.025)
+            opening=float(np.clip(opening+correction,-1.,1.))
+            self.step(q,opening)
         aperture=self.runtime.fingerpad_separation_m()
         if abs(aperture-self.recipe.preshape_aperture_m)>.005:
+            # The original fixed wait can end during a finger oscillation.
+            # Recover with a slower aperture loop and require sustained arrival.
             recovery=[];stable=0;start=float(self.data.time)
-            for _ in range(300):
+            for _ in range(200):
                 correction=np.clip(self.recipe.preshape_aperture_m-aperture,-.005,.005)
                 opening=float(np.clip(opening+correction,-1.,1.))
                 self.step(q,opening)
@@ -234,7 +257,19 @@ class CatalogContext(SpoonContext):
             targets=build_catalog_targets(self.body_pose(),self.center_in_body,self.local_size,recipe)
             save_json(self.output/'targets.json',targets)
             q=self.data.qpos[self.arm_ids].copy()
-            if recipe.ee_id=='2F':opening,aperture=self.preshape()
+            if recipe.ee_id=='2F':
+                # Retune the finger position servo BEFORE pre-shape (it was set
+                # only before CLOSE, so pre-shape ran on the MuJoCo model
+                # default).  The real problem on the RoboCasa kitchen gripper was
+                # that its finger actuator is UNDAMPED (biasprm[2]==0): the
+                # aperture-feedback loop then drives a self-sustained oscillation
+                # (jaw swings 7 mm<->86 mm at a near-constant command) and never
+                # settles (PRESHAPE_APERTURE_NOT_SETTLED).  set_finger_gripper_
+                # actuator_gains now also sets the velocity-damping bias term, so
+                # the servo approaches its target monotonically and the settle
+                # band holds; closure_kp doubles as the pre-shape gain.
+                self.runtime.set_finger_gripper_actuator_gains(kp=recipe.closure_kp)
+                opening,aperture=self.preshape()
             else:
                 self.stage='OPEN';opening=1.
                 for _ in range(75):self.step(q,opening)
@@ -245,6 +280,17 @@ class CatalogContext(SpoonContext):
             np.savez_compressed(self.output/'grasp_state.npz',qpos=self.data.qpos,qvel=self.data.qvel,ctrl=self.data.ctrl,time=self.data.time)
             self.stage='CLOSE'
             if recipe.ee_id=='2F':self.runtime.set_finger_gripper_actuator_gains(kp=recipe.closure_kp)
+            # A very thin flat tool is pinched on a ~2.5 mm-tall edge, so there is
+            # almost no vertical purchase: as the arm lifts, the light blade
+            # slides off the pad and the grip force decays to zero
+            # (CONTACT_LOST_DURING_LIFT).  The catalog path (unlike the plate
+            # driver) never applied the declared pad friction, so the pads use a
+            # low default with condim=3 (torsional/rolling ignored).  Apply high
+            # pad friction with the 6-D contact model so the blade rides up WITH
+            # the pad instead of sliding, and torsional/rolling friction resists
+            # the blade rolling out of the pinch.
+            if getattr(recipe,'fingerpad_friction',None) is not None and recipe.ee_id in ('2F','3F'):
+                self.runtime.set_finger_gripper_contact_friction(recipe.fingerpad_friction)
             acquired=False;hold_opening=-1.
             for f in np.linspace(0,1,math.ceil(recipe.close_duration_s*50)):
                 hold_opening=opening+(-1.-opening)*f

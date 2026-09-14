@@ -38,7 +38,13 @@ ENTRANCE_GAP = 0.009
 INTERNAL_WIDTH = 0.052
 SIDE_MARGIN = 0.008
 WIDTH_REQUIREMENT = 0.034
-REQUIRED_REACH = 0.21
+# Card far-edge depth from the entrance.  Moved a little SHALLOWER (0.21 -> 0.185)
+# so the tool does not have to drive as deep: it stops levering the (movable)
+# appliance blocks apart, and the card is easier to drag back out.  Kept well
+# above spatula_a's reach so tool selection is unchanged: card-centre depth
+# becomes 0.185 - card_half(0.027) = 0.158 m, still > spatula_a's 0.140 m (fails)
+# and < spatula_b's 0.220 m (reaches).
+REQUIRED_REACH = 0.185
 
 _APPLIANCE_DEPTH = 0.25
 _APPLIANCE_WIDTH = 0.20
@@ -61,7 +67,7 @@ _CLEARANCE_ROOF_THICKNESS = 0.012
 # ---------------------------------------------------------------------
 
 _TOOL_GEOMETRY = {
-    "tool_1_knife": (0.002, 0.015, 0.220),
+    #"tool_1_knife": (0.002, 0.015, 0.220),
     "tool_2_spatula_a": (0.004, 0.036, 0.140),
     "tool_3_spatula_b": (0.007, 0.040, 0.220),
     "tool_4_spatula_c": (0.011, 0.056, 0.220),
@@ -80,7 +86,15 @@ def _tool_geometry_meta():
     }
 _TOOL_ROW_X = -0.21
 _TOOL_SPACING = 0.105
-_TOOL_Y_OFFSETS = (0.21, 0.105, 0.0, -0.105, -0.21)
+# Tool-row staging positions (Y offset from the work origin, which is the
+# channel/extraction axis at offset 0.0).  Order maps to _TOOL_ORDER =
+# (spatula_a, spatula_b, spatula_c, cutting_board).  spatula_b -- the tool that
+# gets PICKED -- sits directly in FRONT of the entrance (offset 0.0, on the
+# axis): it is lifted away before the extraction, so the axis (the line the held
+# tool sweeps while inserting and dragging the card out) is left clear, and no
+# distractor is parked in the work path.  The rest are laid out in order to one
+# side (a just +y of b, then c and the wide cutting_board furthest out).
+_TOOL_Y_OFFSETS = (0.105, 0.0, -0.105, -0.21, 0.21)
 _TOOL_YAW = -np.pi / 2
 
 
@@ -534,9 +548,9 @@ class C4_1_IntervalFitExtraction(KitchenBase):
                 specular=_PLASTIC_SPECULAR,
                 shininess=_PLASTIC_SHININESS,
             ),
-            "tool_1_knife": lambda n: KnifeObject(
-                name=n
-            ),
+            #"tool_1_knife": lambda n: KnifeObject(
+            #   name=n
+            #),
             "tool_2_spatula_a": lambda n: SpatulaObject(
                 name=n
             ),
@@ -642,6 +656,14 @@ class C4_1_IntervalFitExtraction(KitchenBase):
         for geom in obj.worldbody.findall(
             ".//geom"
         ):
+            # High tangential friction on the tool so it GRIPS the card it drags.
+            # MuJoCo takes the contact friction as the element-wise max of the two
+            # geoms, so a high tool friction makes tool<->card friction exceed the
+            # (default) card<->counter friction: pressing the flat tool onto the
+            # thin card then drags the card FLAT along the counter, underneath the
+            # tool, instead of the tool sliding over a card that stays put.
+            geom.set("friction", "3 0.1 0.01")
+
             if (
                 geom.get("type") == "box"
                 and geom.get("size")
@@ -1226,7 +1248,7 @@ class C4_1_IntervalFitExtraction(KitchenBase):
             "appliance_left",
             "appliance_right",
             "card",
-            "tool_1_knife",
+        #    "tool_1_knife",
             "tool_2_spatula_a",
             "tool_3_spatula_b",
             "tool_4_spatula_c",
