@@ -29,21 +29,21 @@
           "decomposition": 0.86,
           "object_selection": 0.74,
           "uncertain_about": [
-            "각 도구의 실제 두께와 강성이 카드 끼움 작업에 적합한지",
-            "카드가 어느 정도 깊이 끼어 있는지"
+            "스패튤라와 도마 중 실제로 틈에 넣어 카드에 닿을 수 있는 형상인지",
+            "카드가 어느 정도 깊이 끼어 있어 어떤 도구가 가장 적합한지"
           ]
         },
         "after": {
           "decomposition": 0.86,
-          "object_selection": 0.74,
+          "object_selection": 0.93,
           "uncertain_about": [
-            "카드가 실제로 얼마나 깊이 끼어 있는지"
+            "카드가 틈 안에서 얼마나 깊이 들어가 있는지"
           ],
-          "reason": "측정 결과 서브골과 도구 필요성은 그대로 타당하지만, 선택한 후보 중 실제로 틈에 접근 가능한 도구는 obj_tool_3_spatula_b_tool_3_spatula_b뿐이어서 객체 선택 신뢰도는 유지하되 약간 보정한다."
+          "reason": "도구가 필요한 서브골은 유지되며, 측정 결과 gap_accessible가 true인 주걱 하나가 확인되어 도구 선택 신뢰도는 크게 올라갔지만 카드의 정확한 깊이는 아직 남아 있다."
         },
         "delta": {
           "decomposition": 0.0,
-          "object_selection": 0.0
+          "object_selection": 0.19
         }
       },
       "details": [
@@ -1976,7 +1976,7 @@
           "core_value": false
         }
       ],
-      "selection_reason_tool": "틈에서 꺼내기 작업에는 틈보다 얇고 카드까지 닿을 만큼 긴 도구가 적합하며, 후보 중 gap_accessible가 true인 것은 이 주걱뿐이다."
+      "selection_reason_tool": "틈에서 카드를 꺼내는 extract 작업에는 틈보다 얇고 카드까지 닿을 만큼 긴 도구가 적합하며, 후보 중 gap_accessible가 true인 것은 이 주걱뿐이라 가장 적합하다."
     }
   ],
   "m2_partial_order": [
@@ -2028,23 +2028,23 @@
       "서브골 분해": {
         "calls": 1,
         "prompt_tokens": 1173,
-        "completion_tokens": 68,
-        "tokens": 1241,
-        "seconds": 2.33
+        "completion_tokens": 62,
+        "tokens": 1235,
+        "seconds": 1.91
       },
       "객체 선택": {
         "calls": 2,
         "prompt_tokens": 1798,
-        "completion_tokens": 437,
-        "tokens": 2235,
-        "seconds": 3.43
+        "completion_tokens": 457,
+        "tokens": 2255,
+        "seconds": 2.9
       },
       "confidence_update": {
         "calls": 1,
-        "prompt_tokens": 1736,
-        "completion_tokens": 182,
-        "tokens": 1918,
-        "seconds": 1.42
+        "prompt_tokens": 1750,
+        "completion_tokens": 167,
+        "tokens": 1917,
+        "seconds": 1.25
       }
     },
     "n_evaluations": 20,
