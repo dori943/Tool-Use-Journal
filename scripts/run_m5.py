@@ -15,6 +15,8 @@ planner 경로다. 태스크 전용 실험 runner는 examples에서 직접 실�
   python scripts/run_m5.py <task_id> --validate-input-only
   python scripts/run_m5.py <task_id> --simulate controller
   python scripts/run_m5.py <task_id> --simulate controller --headless
+  python scripts/run_m5.py c3_2 --simulate controller \
+      --start-from-object fork_b --stop-after-object mug_a
   python scripts/run_m5.py --task-planner plan.json \
       --environment RegisteredEnvironment --output-dir out/
 
@@ -63,7 +65,25 @@ def _expand_task(argv: list[str]) -> list[str]:
     if "--output-dir" not in rest:
         injected += ["--output-dir", str(out / "m5")]
     if "--scene-geometry" not in rest and (out / "m1.json").is_file():
-        injected += ["--scene-geometry", str(out / "m1.json")]
+        # M5 geometry reconciliation requires M1_GEOMETRY_V2 metadata. Legacy
+        # graphs are nodes/edges only; injecting them aborts before live start.
+        try:
+            import json
+
+            m1_payload = json.loads((out / "m1.json").read_text(encoding="utf-8"))
+        except (OSError, UnicodeError, json.JSONDecodeError):
+            m1_payload = None
+        if isinstance(m1_payload, dict) and isinstance(
+            m1_payload.get("geometry_metadata"), dict
+        ):
+            injected += ["--scene-geometry", str(out / "m1.json")]
+        else:
+            print(
+                "[M5] skip --scene-geometry: "
+                f"{out / 'm1.json'} has no geometry_metadata "
+                "(legacy M1); MuJoCo world geometry will be used alone",
+                flush=True,
+            )
     if "--id-aliases" not in rest and (out / "id_aliases.json").is_file():
         injected += ["--id-aliases", str(out / "id_aliases.json")]
     # Generic runs use common defaults or an explicitly supplied profile.

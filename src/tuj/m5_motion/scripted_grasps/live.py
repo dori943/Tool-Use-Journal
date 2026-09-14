@@ -40,7 +40,7 @@ def snapshot(runtime, previous=None):
     retention = getattr(runtime, "scripted_grasp_retention", None)
     if retention is not None and attachment is None:
         world.metadata["contact_friction_held_objects"] = {
-            retention.entry.object_id: retention.transform().model_dump(mode="json")}
+            retention.entry.scene_object_id: retention.transform().model_dump(mode="json")}
     world.metadata["scripted_grasps"] = True
     if retention is not None and retention.entry.ee in {"2F", "3F"}:
         from .open_geometry import open_joint_positions
@@ -58,7 +58,7 @@ class ScriptedGraspSession:
     """
     def __init__(self, runtime, repository, output, *, seed=0, provider=None,
                  planner_factory=None, executor_factory=None, **planner_options):
-        self.runtime, self.repository, self.output = runtime, Path(repository), Path(output)
+        self.runtime, self.repository, self.output = runtime, Path(repository), Path(output).resolve()
         self.seed, self.provider, self.planner_options = seed, provider, planner_options
         self.planner_factory, self.executor_factory = planner_factory, executor_factory
         self.world = snapshot(runtime)
@@ -77,6 +77,9 @@ class ScriptedGraspSession:
         # recorder has already opened here (Windows raises WinError 32 if we try
         # to delete a file another handle holds open, which aborted the run when
         # ``--video`` pointed inside the session output directory).
+        # Do not clear while another run shares this folder: parallel run_m5
+        # processes both targeting ``.../m5/live`` will delete each other's
+        # in-flight step dirs and surface as missing ``grasp/result.json``.
         import shutil
         self.output.mkdir(parents=True, exist_ok=True)
         for child in self.output.iterdir():
@@ -148,6 +151,12 @@ class ScriptedGraspSession:
             "metadata": {**request.provenance.metadata, "state_source": "LIVE_RUNTIME"}})
         index = len(self.records)
         directory = self.output / f"{index:04d}-{token}"
+        # Replace a stale same-hash step tree from a previous attempt so grasp/
+        # mkdir and plan artifacts do not collide mid-run.
+        if directory.exists():
+            import shutil
+            shutil.rmtree(directory, ignore_errors=True)
+        directory.mkdir(parents=True, exist_ok=True)
         store = MotionPlanStore(directory)
         request_path = store.save_request(request, index=0)
         record = {"request_id": request.request_id, "request": str(request_path), "status": "RUNNING"}

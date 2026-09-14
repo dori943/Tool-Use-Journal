@@ -392,22 +392,66 @@ def _resource_transition_requests(
             raise SelectedPlanAdapterError(
                 f"EE transition before {parent_subgoal_id!r} lacks required EE"
             )
-        if not initial_attach:
+        # Mid-plan windows (--start-from-object / --start-from-subgoal) remount
+        # the destination EE before replay. The sliced subgoal may still list
+        # DETACH/ATTACH from the prior EE; skipping avoids EE_EXCHANGE_ENTRY
+        # with source!=physical_active_ee.
+        already_on_destination = False
+        physical = world.metadata.get("physical_active_ee")
+        if physical is not None:
+            from tuj.m5_motion.precomputed_ee_attach import normalize_ee_id
+
+            try:
+                already_on_destination = (
+                    normalize_ee_id(physical) == normalize_ee_id(to_ee)
+                )
+            except ValueError:
+                already_on_destination = False
+        if not already_on_destination:
+            if not initial_attach:
+                requests.append(
+                    _transition_request(
+                        parent_subgoal_id=parent_subgoal_id,
+                        transition_index=len(requests),
+                        action_type="EE_EXCHANGE_ENTRY",
+                        world=world,
+                        constraints=constraints,
+                        options=options,
+                        ee=from_ee,
+                        target_ids=[from_ee],
+                        goal=MotionGoal(goal_type=GoalType.POSE),
+                        metadata={
+                            "entry_ee": from_ee,
+                            "from_ee": from_ee,
+                            "next_ee": to_ee,
+                            "task_planner_steps": [
+                                step.model_dump(mode="json")
+                                for step in exchange_steps
+                            ],
+                        },
+                        selected_plan_artifact_id=selected_plan_artifact_id,
+                    )
+                )
             requests.append(
                 _transition_request(
                     parent_subgoal_id=parent_subgoal_id,
                     transition_index=len(requests),
-                    action_type="EE_EXCHANGE_ENTRY",
+                    action_type="EE_ATTACH" if initial_attach else "EE_EXCHANGE",
                     world=world,
                     constraints=constraints,
                     options=options,
-                    ee=from_ee,
-                    target_ids=[from_ee],
-                    goal=MotionGoal(goal_type=GoalType.POSE),
+                    ee=to_ee,
+                    target_ids=(
+                        [to_ee] if initial_attach else [from_ee, to_ee]
+                    ),
+                    goal=MotionGoal(
+                        goal_type=GoalType.POSE,
+                        target_pose=_world_target_pose(world, to_ee, rack=True),
+                        target_object_id=to_ee,
+                    ),
                     metadata={
-                        "entry_ee": from_ee,
-                        "from_ee": from_ee,
-                        "next_ee": to_ee,
+                        "from_ee": from_ee or None,
+                        "to_ee": to_ee,
                         "task_planner_steps": [
                             step.model_dump(mode="json")
                             for step in exchange_steps
@@ -416,33 +460,11 @@ def _resource_transition_requests(
                     selected_plan_artifact_id=selected_plan_artifact_id,
                 )
             )
-        requests.append(
-            _transition_request(
-                parent_subgoal_id=parent_subgoal_id,
-                transition_index=len(requests),
-                action_type="EE_ATTACH" if initial_attach else "EE_EXCHANGE",
-                world=world,
-                constraints=constraints,
-                options=options,
-                ee=to_ee,
-                target_ids=(
-                    [to_ee] if initial_attach else [from_ee, to_ee]
-                ),
-                goal=MotionGoal(
-                    goal_type=GoalType.POSE,
-                    target_pose=_world_target_pose(world, to_ee, rack=True),
-                    target_object_id=to_ee,
-                ),
-                metadata={
-                    "from_ee": from_ee or None,
-                    "to_ee": to_ee,
-                    "task_planner_steps": [
-                        step.model_dump(mode="json") for step in exchange_steps
-                    ],
-                },
-                selected_plan_artifact_id=selected_plan_artifact_id,
-            )
-        )
+
+    # SAFE RACK EXIT is owned by the EE attach/exchange planner success
+    # contract (appended onto the attach/exchange plan).  M4 may still annotate
+    # MOVE_TO_WORKSPACE after KEEP_EE or ATTACH; never materialize it here as a
+    # separate request — that would re-run rack exit between manipulations.
 
     tool_actions = {
         "RETURN_TOOL",
