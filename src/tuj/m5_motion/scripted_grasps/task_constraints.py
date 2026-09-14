@@ -1,5 +1,5 @@
 """Expose scripted recipe compatibility to upstream task planning."""
-from .registry import ALIASES, ENABLED_ENTRIES, ALTERNATIVE_ENTRIES
+from .registry import ALIASES, ENABLED_ENTRIES, ALTERNATIVE_ENTRIES, _recipe_keys_for_target
 
 
 def scene_id_aliases(scene):
@@ -18,13 +18,21 @@ def scene_id_aliases(scene):
 def constrain_task_request(request, environment):
     result=request.model_copy(deep=True)
     changes=[]
+    candidates=ENABLED_ENTRIES + ALTERNATIVE_ENTRIES
     for subgoal in result.task_graph.subgoals:
         target=subgoal.tool_id
         if target is None and len(subgoal.target_ids)==1:
             target=subgoal.target_ids[0]
         object_id=ALIASES.get(target,target)
-        entries=[e for e in ENABLED_ENTRIES + ALTERNATIVE_ENTRIES
-            if e.environment==environment and e.object_id==object_id]
+        entries=[]
+        matched_key=None
+        # Multi-instance scenes (bread_a) share the type-keyed recipe (bread).
+        for key in _recipe_keys_for_target(object_id, environment):
+            entries=[e for e in candidates
+                if e.environment==environment and e.object_id==key]
+            if entries:
+                matched_key=key
+                break
         if not entries:
             continue
         before=list(subgoal.feasible_ee)
@@ -33,13 +41,13 @@ def constrain_task_request(request, environment):
         if not allowed:
             raise ValueError(
                 f'SCRIPTED_GRASP_EE_INFEASIBLE: {subgoal.subgoal_id}: '
-                f'{object_id} supports {supported}, grounded feasible EEs={before}'
+                f'{matched_key} supports {supported}, grounded feasible EEs={before}'
             )
         subgoal.feasible_ee=allowed
         contract={
             'source':'scripted_grasp_registry',
             'environment':environment,
-            'object_id':object_id,
+            'object_id':matched_key,
             'supported_ee':supported,
             'selected_feasible_ee':allowed,
         }
@@ -49,7 +57,7 @@ def constrain_task_request(request, environment):
         }
         changes.append({
             'subgoal_id':subgoal.subgoal_id,
-            'object_id':object_id,
+            'object_id':matched_key,
             'grounded_feasible_ee':before,
             'scripted_feasible_ee':allowed,
             'source':'scripted_grasp_registry',

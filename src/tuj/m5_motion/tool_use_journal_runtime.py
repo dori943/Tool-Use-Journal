@@ -21,7 +21,7 @@ import math
 import time
 from bisect import bisect_right
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Protocol
@@ -165,6 +165,9 @@ class _RuntimeState:
     qvel_by_joint: Mapping[str, tuple[float, ...]]
     ctrl_by_actuator: Mapping[str, float]
     simulation_time_s: float
+    # Legacy serialized checkpoints omit calibration history. The in-memory
+    # EE transition captures it explicitly; never invent it for old checkpoints.
+    scene_geom_solref: Mapping[str, Any] = field(default_factory=dict)
 
 
 def _active_contact_snapshot(
@@ -207,6 +210,7 @@ def _active_contact_snapshot(
 
 
 def _capture_runtime_state(env: object) -> _RuntimeState:
+    from .scene_contact_state import capture_scene_solref
     model, data = _raw_model_data(env)
     qpos: dict[str, tuple[float, ...]] = {}
     qvel: dict[str, tuple[float, ...]] = {}
@@ -239,11 +243,14 @@ def _capture_runtime_state(env: object) -> _RuntimeState:
         qvel_by_joint=qvel,
         ctrl_by_actuator=controls,
         simulation_time_s=float(data.time),
+        scene_geom_solref=capture_scene_solref(env, model),
     )
 
 
 def _restore_runtime_state(env: object, state: _RuntimeState) -> None:
+    from .scene_contact_state import restore_scene_solref
     model, data = _raw_model_data(env)
+    restore_scene_solref(env, model, state.scene_geom_solref)
     for joint_id in range(model.njnt):
         name = _name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
         if not name:
@@ -319,6 +326,26 @@ class EERuntimeTransition:
 class AttachmentMode(str, Enum):
     KINEMATIC = "KINEMATIC"
     BREAKABLE_WELD = "BREAKABLE_WELD"
+
+
+def scripted_retention_held_object_id(retention: Any) -> str | None:
+    """Scene instance id for a scripted grasp retention, else recipe type id.
+
+    C3_2 multi-instance holds use ``held_tool_id`` / plan attached ids like
+    ``fruit_b`` / ``spoon_b`` / ``fork_b`` / ``mug_b``, while
+    ``GraspEntry.object_id`` stays the recipe type (``fruit``, …). Contact-
+    friction proxy checks and DETACH must match the scene instance.
+    """
+
+    entry = getattr(retention, "entry", None)
+    if entry is None:
+        return None
+    scene_id = getattr(entry, "scene_object_id", None)
+    if isinstance(scene_id, str) and scene_id:
+        return scene_id
+    object_id = getattr(entry, "object_id", None)
+    return object_id if isinstance(object_id, str) and object_id else None
+
 
 
 @dataclass(frozen=True, slots=True)
@@ -570,7 +597,24 @@ class ToolUseJournalEERuntime:
         self._contact_friction_retention: Any | None = None
         self._breakable_runtime: _BreakableAttachmentRuntime | None = None
         self._last_attachment_break: AttachmentBreakObservation | None = None
+        self._vac_attach_diag_logged: set[tuple[str, str]] = set()
         self._render_callback: Callable[[object], None] | None = None
+        # Prior collision state for temporarily enabled held-tool fill geoms.
+        # Values: (contype, conaffinity, size_xyz, pos_xyz).
+        self._held_tool_fill_geom_backup: dict[
+            int, tuple[int, int, np.ndarray, np.ndarray]
+        ] = {}
+        # Prior contype/conaffinity for hollow-tool rim meshes disabled while
+        # the underside fill paddle is active.
+        self._held_tool_rim_collision_backup: dict[int, tuple[int, int]] = {}
+        # Free-object ids that inherit held-tool XY motion during tabletop push.
+        self._held_tool_push_partner_ids: frozenset[str] = frozenset()
+        # Optional goal region for clamping pushed partners fully inside.
+        self._held_tool_push_region_id: str | None = None
+        # Prior contype/conaffinity for vac cup geoms disabled while a tool is held.
+        self._vac_cup_collision_backup: dict[int, tuple[int, int]] = {}
+        # Last synchronized attached-object pose for finite-difference qvel.
+        self._attached_sync_state: tuple[np.ndarray, np.ndarray, float] | None = None
         self._set_declared_active_ee(env, self._active_ee)
         self._hidden_rack_ee = self._apply_rack_visibility(
             env, self._active_ee
@@ -692,6 +736,147 @@ class ToolUseJournalEERuntime:
     @property
     def attached_object_id(self) -> str | None:
         return self._attachment.object_id if self._attachment is not None else None
+
+    @property
+    def native_adhesion_suppressed(self) -> bool:
+        """True when vac holds an attached body via weld/kinematic lock.
+
+        Native MuJoCo adhesion pulls *every* geom contacting the vacuum body.
+        After the intended target is attached, adhesion must stay off so nearby
+        free bodies (e.g. sweep targets under a thin plate) are not sucked onto
+        the cup; retention is the attachment, not the adhesion actuator.
+        """
+
+        return self._active_ee == "vac" and self._attachment is not None
+
+    def vac_gripper_action_for_command(self, command: float) -> float:
+        """Map a logical suction command to the robosuite vac gripper action.
+
+        Logical ``gripper_command`` / ``grasp_engaged`` may remain suction-on
+        while the native adhesion actuator action is forced to ``-1`` (off)
+        once an attachment lock is active.
+        """
+
+        if self.native_adhesion_suppressed:
+            return -1.0
+        return float(command)
+
+    def suppress_native_adhesion_actuators(self) -> None:
+        """Zero vac adhesion actuator ctrl while an attachment lock is active."""
+
+        if not self.native_adhesion_suppressed:
+            return
+        model, data = _raw_model_data(self.env)
+        for actuator_id in range(int(model.nu)):
+            if int(model.actuator_trntype[actuator_id]) != int(
+                mujoco.mjtTrn.mjTRN_BODY
+            ):
+                continue
+            data.ctrl[actuator_id] = 0.0
+
+    def diagnose_vac_cup_contacts(self) -> list[dict[str, Any]]:
+        """Return vac-cup contacts against free bodies (diagnostic)."""
+
+        if self._active_ee != "vac":
+            return []
+        model, data = _raw_model_data(self.env)
+        cup_geoms: set[int] = set()
+        for geom_id in range(int(model.ngeom)):
+            name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+            if name is None:
+                continue
+            lowered = str(name).lower()
+            if "vac_cup" in lowered or "cup_collision" in lowered:
+                cup_geoms.add(int(geom_id))
+        if not cup_geoms:
+            return []
+        attached_body = None
+        if self._attachment is not None:
+            try:
+                attached_body, _, _ = self._object_free_joint(
+                    self.env, self._attachment.object_id
+                )
+            except ToolUseJournalRuntimeError:
+                attached_body = None
+        rows: list[dict[str, Any]] = []
+        for contact_index in range(int(data.ncon)):
+            contact = data.contact[contact_index]
+            geom1 = int(contact.geom1)
+            geom2 = int(contact.geom2)
+            if geom1 in cup_geoms:
+                other_geom = geom2
+            elif geom2 in cup_geoms:
+                other_geom = geom1
+            else:
+                continue
+            other_body = int(model.geom_bodyid[other_geom])
+            other_name = mujoco.mj_id2name(
+                model, mujoco.mjtObj.mjOBJ_GEOM, other_geom
+            )
+            body_name = mujoco.mj_id2name(
+                model, mujoco.mjtObj.mjOBJ_BODY, other_body
+            )
+            rows.append(
+                {
+                    "candidate_geom": str(other_name or other_geom),
+                    "candidate_body": str(body_name or other_body),
+                    "candidate_body_id": other_body,
+                    "penetration_m": float(-contact.dist)
+                    if float(contact.dist) < 0.0
+                    else 0.0,
+                    "is_attached_target": (
+                        attached_body is not None and other_body == attached_body
+                    ),
+                }
+            )
+        return rows
+
+    def log_vac_attach_diagnostic(
+        self,
+        *,
+        action: str,
+        intended_target: str | None = None,
+        candidate_body: str | None = None,
+        candidate_geom: str | None = None,
+        reason: str = "",
+    ) -> None:
+        """Emit a compact suction-attachment diagnostic line."""
+
+        attached = self.attached_object_id
+        intended = intended_target if intended_target is not None else attached
+        key = (action, str(candidate_body or ""), str(reason))
+        if action == "REJECT" and key in self._vac_attach_diag_logged:
+            return
+        if action == "REJECT":
+            self._vac_attach_diag_logged.add(key)
+        print(
+            "[M5][VAC_ATTACH]"
+            f" intended_target={intended!r}"
+            f" current_attached_body={attached!r}"
+            f" candidate_body={candidate_body!r}"
+            f" candidate_geom={candidate_geom!r}"
+            f" action={action}"
+            f" reason={reason}"
+        )
+
+    def log_vac_non_target_cup_contacts(self) -> None:
+        """Log cup contacts that are not the locked attachment target."""
+
+        if not self.native_adhesion_suppressed:
+            return
+        for row in self.diagnose_vac_cup_contacts():
+            if row.get("is_attached_target"):
+                continue
+            self.log_vac_attach_diagnostic(
+                action="REJECT",
+                intended_target=self.attached_object_id,
+                candidate_body=str(row.get("candidate_body")),
+                candidate_geom=str(row.get("candidate_geom")),
+                reason=(
+                    "attachment_locked_native_adhesion_suppressed;"
+                    f"penetration_m={float(row.get('penetration_m', 0.0)):.6f}"
+                ),
+            )
 
     @property
     def captured_gripper_action(self) -> tuple[float, ...] | None:
@@ -1812,6 +1997,15 @@ class ToolUseJournalEERuntime:
                 "cannot attach an object to a bare flange"
             )
         if self._attachment is not None:
+            self.log_vac_attach_diagnostic(
+                action="REJECT",
+                intended_target=object_id,
+                candidate_body=object_id,
+                reason=(
+                    "attachment_locked;"
+                    f"current_attached_body={self._attachment.object_id!r}"
+                ),
+            )
             raise ToolUseJournalRuntimeError(
                 f"object {self._attachment.object_id!r} is already attached"
             )
@@ -1856,17 +2050,33 @@ class ToolUseJournalEERuntime:
             self.env, object_id
         )
         distance = self._minimum_ee_object_distance(body_id)
+        self.last_attachment_geometry_audit = None
         if distance > max_attach_distance_m:
             raise ToolUseJournalRuntimeError(
                 f"object {object_id!r} is {distance:.4f} m from the EE; "
                 f"attach limit is {max_attach_distance_m:.4f} m"
             )
         if distance < -max_attach_penetration_m:
-            raise ToolUseJournalRuntimeError(
-                f"object {object_id!r} penetrates EE geometry by "
-                f"{-distance:.4f} m; limit is "
-                f"{max_attach_penetration_m:.4f} m"
+            from tuj.m5_motion.attachment_geometry import certify_attachment_penetration
+            adapter = ToolUseJournalEnvironmentAdapter(self.env)
+            mounted_id = model.body(adapter.mounted_root_body).id
+            enabled = lambda root: tuple(
+                gid for gid in self._subtree_geom_ids(model, root)
+                if model.geom_contype[gid] or model.geom_conaffinity[gid]
             )
+            audit = certify_attachment_penetration(
+                model, data, enabled(mounted_id), enabled(body_id),
+                max_attach_penetration_m,
+            )
+            self.last_attachment_geometry_audit = audit
+            if not audit['certified']:
+                raise ToolUseJournalRuntimeError(
+                    f"object {object_id!r} penetrates EE geometry by "
+                    f"{-distance:.4f} m; limit is "
+                    f"{max_attach_penetration_m:.4f} m"
+                    f"{self._closest_ee_object_pair_detail()}"
+                    f"{self._ee_object_pair_report()}"
+                )
         kind, name, reference_position, reference_rotation = (
             self._grasp_reference(self.env)
         )
@@ -1894,6 +2104,15 @@ class ToolUseJournalEERuntime:
         )
         self._attachment = attachment
         self._last_attachment_break = None
+        self._vac_attach_diag_logged.clear()
+        self._attached_sync_state = None
+        self.log_vac_attach_diagnostic(
+            action="ATTACH",
+            intended_target=object_id,
+            candidate_body=object_id,
+            candidate_geom=None,
+            reason=f"mode={mode.value};attach_distance_m={distance:.6f}",
+        )
         if mode is AttachmentMode.BREAKABLE_WELD:
             contact = self._attachment_contact_metrics(attachment)
             if breakable_weld is None:  # pragma: no cover - guarded above
@@ -1918,6 +2137,15 @@ class ToolUseJournalEERuntime:
         else:
             self._breakable_runtime = None
             self.synchronize_attached_object()
+        # Intended-target lock: keep logical suction engaged, but kill native
+        # adhesion so non-target cup contacts cannot be pulled in.
+        self.suppress_native_adhesion_actuators()
+        self.log_vac_attach_diagnostic(
+            action="KEEP_EXISTING",
+            intended_target=object_id,
+            candidate_body=object_id,
+            reason="native_adhesion_suppressed_after_attach",
+        )
         return attachment
 
     def restore_logical_state(
@@ -2089,6 +2317,9 @@ class ToolUseJournalEERuntime:
             raise ToolUseJournalRuntimeError(
                 f"attached free joint {attachment.free_joint_name!r} is absent"
             )
+        # Integration updates qpos before refreshing site/body transforms.
+        # Project from the current hand pose, not the preceding physics step.
+        mujoco.mj_kinematics(model, data)
         reference_position, reference_rotation = self._reference_pose(
             self.env,
             attachment.reference_kind,
@@ -2109,16 +2340,591 @@ class ToolUseJournalEERuntime:
             quaternion_wxyz,
             np.ascontiguousarray(object_rotation.reshape(9)),
         )
+        # A moving attachment must carry velocity as well as pose. Zeroing it
+        # makes the contact solver see a stationary object against moving fingers.
+        # Evaluate the reference body's twist at the projected object origin;
+        # MuJoCo free joints use world linear and body-local angular velocity.
+        mujoco.mj_comPos(model, data)
+        reference_body = self._attachment_reference_body_id(model, attachment)
+        jacp = np.zeros((3, model.nv))
+        jacr = np.zeros((3, model.nv))
+        mujoco.mj_jac(model, data, jacp, jacr,
+                      np.ascontiguousarray(object_position), reference_body)
+        linear_velocity = jacp @ data.qvel
+        angular_velocity = object_rotation.T @ (jacr @ data.qvel)
         qpos_start = int(model.jnt_qposadr[joint_id])
         qvel_start = int(model.jnt_dofadr[joint_id])
+        previous = self._attached_sync_state
+        now = float(data.time)
         data.qpos[qpos_start : qpos_start + 3] = object_position
         data.qpos[qpos_start + 3 : qpos_start + 7] = quaternion_wxyz
-        data.qvel[qvel_start : qvel_start + 6] = 0.0
+        previous_qvel = np.asarray(
+            data.qvel[qvel_start : qvel_start + 6], dtype=float
+        ).copy()
+        # Mainline's Jacobian velocity is the physically consistent baseline,
+        # including the first projection where no finite-difference sample
+        # exists yet. Teleport-style synchronization below replaces it with
+        # finite differences when those better describe the projected motion.
+        data.qvel[qvel_start : qvel_start + 3] = linear_velocity
+        data.qvel[qvel_start + 3 : qvel_start + 6] = angular_velocity
+        # Finite-difference velocity so soft contacts see tool motion. Zeroing
+        # qvel every substep makes a kinematic plate slide over blocks with
+        # only vertical penetration and no lateral friction/push.
+        #
+        # Controller loop syncs twice per physics substep (pre + post). The
+        # pre-step call shares ``data.time`` with the previous post-step sync
+        # (dt≈0). Clearing qvel there kills contact drag for the upcoming
+        # step — keep the last FD velocity instead.
+        #
+        # When kinematic push assist is active, do NOT feed planar FD velocity:
+        # residual contacts + assist both move partners and overshoot (~1.4x).
+        delta_xy = None
+        kinematic_assist_owns_push = bool(self._held_tool_push_partner_ids)
+        if previous is not None:
+            prev_pos, prev_quat, prev_time = previous
+            delta_xy = np.asarray(object_position[:2], dtype=float) - np.asarray(
+                prev_pos[:2], dtype=float
+            )
+            real_dt = now - float(prev_time)
+            dt = real_dt
+            if (not math.isfinite(dt) or dt <= 1e-6) and float(
+                np.linalg.norm(object_position - prev_pos)
+            ) > 1e-9:
+                # Pose moved without a sim-time advance; fall back to the
+                # model timestep so contacts still see a tangential velocity.
+                dt = float(model.opt.timestep)
+            if kinematic_assist_owns_push:
+                # Assist teleports partners by the EEF XY delta; integrating
+                # the tool free-joint with FD qvel double-drives any leftover
+                # contacts and reads as bounce / overshoot.
+                data.qvel[qvel_start : qvel_start + 2] = 0.0
+                data.qvel[qvel_start + 2] = 0.0
+                data.qvel[qvel_start + 3 : qvel_start + 6] = 0.0
+            elif math.isfinite(dt) and dt > 1e-6:
+                linear = (object_position - prev_pos) / dt
+                quat_conj = np.array(
+                    [
+                        float(prev_quat[0]),
+                        -float(prev_quat[1]),
+                        -float(prev_quat[2]),
+                        -float(prev_quat[3]),
+                    ],
+                    dtype=float,
+                )
+                quat_delta = np.empty(4, dtype=float)
+                mujoco.mju_mulQuat(quat_delta, quaternion_wxyz, quat_conj)
+                if float(quat_delta[0]) < 0.0:
+                    quat_delta *= -1.0
+                angular = np.asarray(quat_delta[1:4], dtype=float) * (2.0 / dt)
+                data.qvel[qvel_start : qvel_start + 3] = linear
+                data.qvel[qvel_start + 3 : qvel_start + 6] = angular
+            else:
+                # Same-time re-projection: preserve the preceding FD velocity
+                # so the upcoming contact step still sees tangential motion.
+                data.qvel[qvel_start : qvel_start + 6] = previous_qvel
+        self._attached_sync_state = (
+            np.asarray(object_position, dtype=float).copy(),
+            np.asarray(quaternion_wxyz, dtype=float).copy(),
+            now,
+        )
         mujoco.mj_forward(model, data)
+        # Drag partners on planar teleports (incl. dt≈0 vac goal snaps). When a
+        # fill paddle is armed, also re-run with a zero delta so vertical
+        # anti-penetration still fires while the tool is stationary over
+        # partners (end settle). Partner set alone without fill only assists
+        # on nonzero XY motion.
+        if self._held_tool_push_partner_ids:
+            assist_delta = (
+                np.asarray(delta_xy, dtype=float).reshape(2)
+                if delta_xy is not None
+                else np.zeros(2, dtype=float)
+            )
+            has_xy = float(np.linalg.norm(assist_delta)) >= 1e-9
+            if has_xy or self._held_tool_fill_geom_backup:
+                self._apply_held_tool_kinematic_push_assist(
+                    delta_xy=assist_delta,
+                    tool_position=object_position,
+                    tool_rotation=object_rotation,
+                )
+        self.suppress_native_adhesion_actuators()
+        self.log_vac_non_target_cup_contacts()
+
+    def _held_tool_inactive_fill_geom_ids(self, body_id: int) -> list[int]:
+        """Collision-disabled AABB/region geoms under a body (e.g. ``reg_bbox``)."""
+
+        model, _ = _raw_model_data(self.env)
+        geom_ids: list[int] = []
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) != int(body_id):
+                continue
+            name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+            if not isinstance(name, str):
+                continue
+            lowered = name.lower()
+            if not (
+                lowered.endswith("reg_bbox")
+                or lowered.endswith("tool_act_collision_slab")
+            ):
+                continue
+            if int(model.geom_contype[geom_id]) or int(model.geom_conaffinity[geom_id]):
+                continue
+            geom_ids.append(int(geom_id))
+        return geom_ids
+
+    def _body_collision_underside_is_hollow(self, body_id: int) -> bool:
+        """True when active collision geoms leave an empty central disk."""
+
+        model, data = _raw_model_data(self.env)
+        mujoco.mj_forward(model, data)
+        body_pos = np.asarray(data.xpos[body_id], dtype=float)
+        body_rot = np.asarray(data.xmat[body_id], dtype=float).reshape(3, 3)
+        radii: list[float] = []
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) != int(body_id):
+                continue
+            if not (
+                int(model.geom_contype[geom_id])
+                or int(model.geom_conaffinity[geom_id])
+            ):
+                continue
+            geom_pos = np.asarray(data.geom_xpos[geom_id], dtype=float)
+            local = body_rot.T @ (geom_pos - body_pos)
+            radii.append(float(np.linalg.norm(local[:2])))
+        if len(radii) < 4:
+            return False
+        r_max = max(radii)
+        if not math.isfinite(r_max) or r_max < 1e-3:
+            return False
+        inner = 0.45 * r_max
+        inner_count = sum(1 for radius in radii if radius <= inner + 1e-9)
+        return inner_count <= max(1, int(0.05 * len(radii)))
+
+    def _vac_cup_geom_ids(self) -> list[int]:
+        if self._active_ee != "vac":
+            return []
+        model, _ = _raw_model_data(self.env)
+        geom_ids: list[int] = []
+        for geom_id in range(int(model.ngeom)):
+            name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id)
+            if name is None:
+                continue
+            lowered = str(name).lower()
+            if "vac_cup" in lowered or "cup_collision" in lowered:
+                geom_ids.append(int(geom_id))
+        return geom_ids
+
+    def suppress_vac_cup_free_body_collisions(self) -> list[int]:
+        """Disable vac-cup collision while a non-cup body is attached.
+
+        Mid-sweep soft contacts can still kiss the cup through a thin dish even
+        with adhesion suppressed; turning the cup geom off keeps free bodies
+        interacting with the held tool fill instead of clipping into the cup.
+        """
+
+        self.restore_vac_cup_free_body_collisions()
+        if self._attachment is None:
+            return []
+        model, data = _raw_model_data(self.env)
+        disabled: list[int] = []
+        for geom_id in self._vac_cup_geom_ids():
+            self._vac_cup_collision_backup[geom_id] = (
+                int(model.geom_contype[geom_id]),
+                int(model.geom_conaffinity[geom_id]),
+            )
+            model.geom_contype[geom_id] = 0
+            model.geom_conaffinity[geom_id] = 0
+            disabled.append(geom_id)
+        if disabled:
+            mujoco.mj_forward(model, data)
+            print(
+                f"[M5][VAC_CUP] disabled cup collision while holding "
+                f"{self._attachment.object_id!r} geoms={disabled}"
+            )
+        return disabled
+
+    def restore_vac_cup_free_body_collisions(self) -> None:
+        if not self._vac_cup_collision_backup:
+            return
+        model, data = _raw_model_data(self.env)
+        for geom_id, (contype, conaffinity) in list(
+            self._vac_cup_collision_backup.items()
+        ):
+            if 0 <= int(geom_id) < int(model.ngeom):
+                model.geom_contype[geom_id] = int(contype)
+                model.geom_conaffinity[geom_id] = int(conaffinity)
+        self._vac_cup_collision_backup.clear()
+        mujoco.mj_forward(model, data)
+
+    def enable_held_tool_collision_fill(
+        self,
+        *,
+        push_partner_ids: Sequence[str] | None = None,
+        push_region_id: str | None = None,
+    ) -> list[int]:
+        """Enable a thin underside paddle for held-tool tabletop pushes.
+
+        Hollow dishes leave an empty center. Enabling the full ``reg_bbox``
+        solidifies the dish cavity so free bodies look like they tunnel through
+        the plate. Instead:
+
+        1. morph the inactive AABB into a thin bottom paddle,
+        2. keep hollow rim mesh collisions (so the visual rim cannot pass
+           through partners),
+        3. disable vac-cup collisions,
+        4. remember free-object partners for kinematic XY push assist (soft
+           contacts alone do not drag when the tool free-joint is teleported).
+        """
+
+        self.disable_held_tool_collision_fill()
+        tool_id = self._held_tool_id or (
+            self._attachment.object_id if self._attachment is not None else None
+        )
+        if tool_id is None:
+            return []
+        try:
+            body_id, _, _ = self._object_free_joint(self.env, tool_id)
+        except ToolUseJournalRuntimeError:
+            return []
+        fill_ids = self._held_tool_inactive_fill_geom_ids(body_id)
+        if not fill_ids:
+            return []
+        model, data = _raw_model_data(self.env)
+        # Prefer a dedicated thin slab geom when present; otherwise morph
+        # ``reg_bbox`` into a bottom paddle (~5 mm thick) so shallow top-press
+        # still gets a few mm of solid overlap without filling the dish cavity.
+        slab_half_z = 0.0025
+        preferred = [
+            geom_id
+            for geom_id in fill_ids
+            if str(
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id) or ""
+            )
+            .lower()
+            .endswith("tool_act_collision_slab")
+        ]
+        active_ids = preferred or fill_ids
+        # Keep rim mesh collisions enabled. Disabling them lets the visual
+        # dish rim teleport through blocks at engagement press / settle.
+        enabled: list[int] = []
+        for geom_id in active_ids:
+            size = np.asarray(model.geom_size[geom_id], dtype=float).copy()
+            pos = np.asarray(model.geom_pos[geom_id], dtype=float).copy()
+            self._held_tool_fill_geom_backup[geom_id] = (
+                int(model.geom_contype[geom_id]),
+                int(model.geom_conaffinity[geom_id]),
+                size,
+                pos,
+            )
+            # Bottom-align a thin slab inside the original AABB footprint.
+            if not preferred:
+                bottom_z = float(pos[2] - size[2])
+                size = size.copy()
+                size[2] = float(slab_half_z)
+                pos = pos.copy()
+                pos[2] = bottom_z + float(slab_half_z)
+                model.geom_size[geom_id] = size
+                model.geom_pos[geom_id] = pos
+            # Solid thin floor: blocks must not tunnel through the hollow dish.
+            # Planar drag still comes from kinematic assist (tool XY qvel is
+            # zeroed while partners are armed), so soft contacts only block
+            # vertical penetration instead of double-driving travel.
+            model.geom_contype[geom_id] = 1
+            model.geom_conaffinity[geom_id] = 1
+            model.geom_friction[geom_id] = np.asarray(
+                (1.5, 0.5, 0.1), dtype=float
+            )
+            model.geom_solref[geom_id] = np.asarray((0.002, 1.0), dtype=float)
+            model.geom_solimp[geom_id] = np.asarray(
+                (0.99, 0.99, 0.001, 0.5, 2.0), dtype=float
+            )
+            enabled.append(geom_id)
+        partners = {
+            str(object_id).strip()
+            for object_id in (push_partner_ids or ())
+            if str(object_id).strip()
+        }
+        self._held_tool_push_partner_ids = frozenset(partners)
+        region = str(push_region_id).strip() if push_region_id else ""
+        self._held_tool_push_region_id = region or None
+        mujoco.mj_forward(model, data)
+        self.suppress_vac_cup_free_body_collisions()
+        if enabled:
+            print(
+                f"[M5][TOOL_FILL] enabled solid underside push paddle for "
+                f"held tool {tool_id!r} geoms={enabled} "
+                f"rim_kept=1 "
+                f"push_partners={sorted(partners)} "
+                f"push_region={self._held_tool_push_region_id!r}"
+            )
+        return enabled
+
+    def disable_held_tool_collision_fill(self) -> None:
+        """Restore fill paddle, rim meshes, and vac-cup collision state."""
+
+        self.restore_vac_cup_free_body_collisions()
+        self._held_tool_push_partner_ids = frozenset()
+        self._held_tool_push_region_id = None
+        if not (
+            self._held_tool_fill_geom_backup or self._held_tool_rim_collision_backup
+        ):
+            return
+        model, data = _raw_model_data(self.env)
+        for geom_id, backup in list(self._held_tool_fill_geom_backup.items()):
+            if not (0 <= int(geom_id) < int(model.ngeom)):
+                continue
+            contype, conaffinity, size, pos = backup
+            model.geom_contype[geom_id] = int(contype)
+            model.geom_conaffinity[geom_id] = int(conaffinity)
+            model.geom_size[geom_id] = np.asarray(size, dtype=float)
+            model.geom_pos[geom_id] = np.asarray(pos, dtype=float)
+        self._held_tool_fill_geom_backup.clear()
+        for geom_id, (contype, conaffinity) in list(
+            self._held_tool_rim_collision_backup.items()
+        ):
+            if 0 <= int(geom_id) < int(model.ngeom):
+                model.geom_contype[geom_id] = int(contype)
+                model.geom_conaffinity[geom_id] = int(conaffinity)
+        self._held_tool_rim_collision_backup.clear()
+        mujoco.mj_forward(model, data)
+
+    def _apply_held_tool_kinematic_push_assist(
+        self,
+        *,
+        delta_xy: np.ndarray,
+        tool_position: np.ndarray,
+        tool_rotation: np.ndarray,
+    ) -> None:
+        """Drag / vertically separate partners under the held-tool paddle.
+
+        Soft contacts cannot reliably push when a kinematic attached tool is
+        teleported each substep. Partners listed at fill-enable time that lie
+        under the paddle footprint:
+
+        1. are always pushed down out of the paddle volume (even with a zero
+           XY delta, so settle / end-of-sweep does not leave embeds), and
+        2. when near underside contact and ``delta_xy`` is nonzero, inherit
+           the same planar displacement (optional goal-region AABB pack).
+        """
+
+        if not self._held_tool_fill_geom_backup:
+            return
+        if not self._held_tool_push_partner_ids:
+            return
+        delta = np.asarray(delta_xy, dtype=float).reshape(2)
+        has_xy = float(np.linalg.norm(delta)) >= 1e-9
+        model, data = _raw_model_data(self.env)
+        half_xy = np.zeros(2, dtype=float)
+        center_xy = np.asarray(tool_position[:2], dtype=float)
+        paddle_bottom_z = float(tool_position[2])
+        rot = np.asarray(tool_rotation, dtype=float)
+        for geom_id in self._held_tool_fill_geom_backup:
+            if int(model.geom_type[geom_id]) != int(mujoco.mjtGeom.mjGEOM_BOX):
+                continue
+            size = np.asarray(model.geom_size[geom_id], dtype=float)
+            local_pos = np.asarray(model.geom_pos[geom_id], dtype=float)
+            world_offset = rot @ local_pos
+            center_xy = np.asarray(tool_position[:2], dtype=float) + world_offset[:2]
+            half_xy = np.maximum(
+                half_xy,
+                np.array(
+                    [
+                        abs(rot[0, 0]) * size[0] + abs(rot[0, 1]) * size[1],
+                        abs(rot[1, 0]) * size[0] + abs(rot[1, 1]) * size[1],
+                    ],
+                    dtype=float,
+                ),
+            )
+            paddle_bottom_z = min(
+                paddle_bottom_z,
+                float(tool_position[2] + world_offset[2] - size[2]),
+            )
+        if float(np.max(half_xy)) < 1e-4:
+            return
+        # Capture under the paddle plus a small halo so a rigid herd still
+        # grabs slightly offset cluster members (plate center ≠ cluster center).
+        half_xy = half_xy + 0.025
+        region_center, region_half = self._held_tool_push_region_xy_m()
+        moved = False
+        for object_id in self._held_tool_push_partner_ids:
+            try:
+                body_id, joint_id, _ = self._object_free_joint(self.env, object_id)
+            except ToolUseJournalRuntimeError:
+                continue
+            qpos_start = int(model.jnt_qposadr[joint_id])
+            partner_xy = np.asarray(
+                data.qpos[qpos_start : qpos_start + 2], dtype=float
+            )
+            partner_z = float(data.qpos[qpos_start + 2])
+            support_z = self._table_support_surface_z_m()
+            in_table_band = (
+                support_z - 0.10 <= partner_z <= support_z + 0.06
+            )
+            # Also admit partners near the live paddle (unit fixtures may place
+            # ``table_collision`` far below the workcell objects).
+            near_paddle = abs(partner_z - float(paddle_bottom_z)) <= 0.20
+            if not (in_table_band or near_paddle):
+                continue
+            if float(np.max(np.abs(partner_xy - center_xy) - half_xy)) > 0.0:
+                continue
+            half_height = self._body_collision_half_height_m(model, body_id)
+            half_xy_partner = self._body_collision_half_xy_m(model, body_id)
+            # Always push partners down out of the paddle volume, even when the
+            # tool is stationary (zero XY delta at settle / end of sweep).
+            max_center_z = float(paddle_bottom_z - half_height - 0.0005)
+            table_floor = support_z - 0.10
+            if max_center_z >= table_floor and partner_z > max_center_z:
+                data.qpos[qpos_start + 2] = max_center_z
+                partner_z = max_center_z
+                moved = True
+            if not has_xy:
+                continue
+            partner_top_z = partner_z + half_height
+            # gap > 0: paddle above partner top (separation)
+            # gap < 0: paddle pressed into / through the partner top
+            gap = float(paddle_bottom_z - partner_top_z)
+            if gap > 0.010:
+                # Not near contact — do not telekinetically drag.
+                continue
+            if gap < -0.015:
+                continue
+            new_xy = partner_xy + delta
+            if region_center is not None and region_half is not None:
+                # Pack footprints into the goal AABB once the tool is over (or
+                # the partner is already inside) the region. Do not teleport
+                # far-away outsiders in during the approach.
+                inset = (
+                    region_half
+                    - half_xy_partner * 1.41421356237
+                    - 0.002
+                )
+                if float(np.min(inset)) > 1e-4:
+                    lo = region_center - inset
+                    hi = region_center + inset
+                    inside_before = bool(
+                        np.all(partner_xy >= lo - 1e-6)
+                        and np.all(partner_xy <= hi + 1e-6)
+                    )
+                    tool_over_region = bool(
+                        np.all(
+                            np.abs(center_xy - region_center)
+                            <= region_half + 0.03
+                        )
+                    )
+                    if inside_before or tool_over_region:
+                        new_xy = np.clip(new_xy, lo, hi)
+            data.qpos[qpos_start : qpos_start + 2] = new_xy
+            qvel_start = int(model.jnt_dofadr[joint_id])
+            data.qvel[qvel_start : qvel_start + 2] = 0.0
+            data.qvel[qvel_start + 2] = min(float(data.qvel[qvel_start + 2]), 0.0)
+            # Kill residual spin that soft contacts inject after a teleport;
+            # spinning footprints fail containment even when the center is in.
+            data.qvel[qvel_start + 3 : qvel_start + 6] = 0.0
+            moved = True
+        if moved:
+            mujoco.mj_forward(model, data)
+
+    def _table_support_surface_z_m(self) -> float:
+        """World-z of the workcell support top (table), else a C1-compatible fallback."""
+
+        model, data = _raw_model_data(self.env)
+        for name in ("table_collision", "table"):
+            geom_id = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, name)
+            if geom_id < 0:
+                continue
+            pos = np.asarray(data.geom_xpos[geom_id], dtype=float)
+            size = np.asarray(model.geom_size[geom_id], dtype=float)
+            gtype = int(model.geom_type[geom_id])
+            if gtype == int(mujoco.mjtGeom.mjGEOM_BOX):
+                return float(pos[2] + size[2])
+            if gtype == int(mujoco.mjtGeom.mjGEOM_PLANE):
+                return float(pos[2])
+            # Sphere / cylinder / mesh: use geom AABB top when available.
+            if hasattr(model, "geom_rbound"):
+                return float(pos[2] + float(model.geom_rbound[geom_id]))
+            return float(pos[2])
+        return 0.8
+
+    def _body_collision_half_height_m(
+        self, model: mujoco.MjModel, body_id: int
+    ) -> float:
+        half_height = 0.0
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) != int(body_id):
+                continue
+            if not (
+                int(model.geom_contype[geom_id])
+                or int(model.geom_conaffinity[geom_id])
+            ):
+                continue
+            size = np.asarray(model.geom_size[geom_id], dtype=float)
+            gtype = int(model.geom_type[geom_id])
+            if gtype == int(mujoco.mjtGeom.mjGEOM_BOX):
+                half_height = max(half_height, float(size[2]))
+            elif gtype == int(mujoco.mjtGeom.mjGEOM_SPHERE):
+                half_height = max(half_height, float(size[0]))
+            elif gtype == int(mujoco.mjtGeom.mjGEOM_CYLINDER):
+                half_height = max(half_height, float(size[1]))
+        return half_height if half_height > 0.0 else 0.02
+
+    def _body_collision_half_xy_m(
+        self, model: mujoco.MjModel, body_id: int
+    ) -> np.ndarray:
+        half = np.zeros(2, dtype=float)
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) != int(body_id):
+                continue
+            if not (
+                int(model.geom_contype[geom_id])
+                or int(model.geom_conaffinity[geom_id])
+            ):
+                continue
+            size = np.asarray(model.geom_size[geom_id], dtype=float)
+            gtype = int(model.geom_type[geom_id])
+            if gtype == int(mujoco.mjtGeom.mjGEOM_BOX):
+                half = np.maximum(half, size[:2])
+            elif gtype == int(mujoco.mjtGeom.mjGEOM_SPHERE):
+                half = np.maximum(half, np.array([size[0], size[0]]))
+            elif gtype == int(mujoco.mjtGeom.mjGEOM_CYLINDER):
+                half = np.maximum(half, np.array([size[0], size[0]]))
+        if float(np.min(half)) <= 0.0:
+            return np.asarray((0.02, 0.02), dtype=float)
+        return half
+
+    def _held_tool_push_region_xy_m(
+        self,
+    ) -> tuple[np.ndarray, np.ndarray] | tuple[None, None]:
+        region_id = self._held_tool_push_region_id
+        if not region_id:
+            return None, None
+        try:
+            body_id, _, _ = self._object_free_joint(self.env, region_id)
+        except ToolUseJournalRuntimeError:
+            # Visual / static regions may not have a free joint — resolve body.
+            adapter = ToolUseJournalEnvironmentAdapter(self.env)
+            try:
+                body_id = int(adapter.object_body_ids[region_id])
+            except (KeyError, TypeError, ValueError):
+                return None, None
+        model, data = _raw_model_data(self.env)
+        mujoco.mj_forward(model, data)
+        center = np.asarray(data.xpos[body_id][:2], dtype=float)
+        half = np.zeros(2, dtype=float)
+        for geom_id in range(int(model.ngeom)):
+            if int(model.geom_bodyid[geom_id]) != int(body_id):
+                continue
+            if int(model.geom_type[geom_id]) != int(mujoco.mjtGeom.mjGEOM_BOX):
+                continue
+            size = np.asarray(model.geom_size[geom_id], dtype=float)
+            half = np.maximum(half, size[:2])
+        if float(np.min(half)) < 1e-4:
+            return None, None
+        return center, half
 
     def detach_object(self, object_id: str | None = None) -> AttachedObjectState:
         """Release the attached object while preserving its current world pose."""
 
+        self.disable_held_tool_collision_fill()
+        self._attached_sync_state = None
         attachment = self._attachment
         if attachment is None:
             raise ToolUseJournalRuntimeError("no object is attached")
@@ -2140,6 +2946,7 @@ class ToolUseJournalEERuntime:
             data.qvel[qvel_start : qvel_start + 6] = 0.0
         self._attachment = None
         self._captured_gripper_action = None
+        self._vac_attach_diag_logged.clear()
         if self._held_tool_id == attachment.object_id:
             self._held_tool_id = None
         self._breakable_runtime = None
@@ -2179,11 +2986,32 @@ class ToolUseJournalEERuntime:
         if self._held_tool_id is not None:
             raise ToolUseJournalRuntimeError("release the contact-held object before EE exchange")
         old_env = self._env
+        previous = self._active_ee
         state = _capture_runtime_state(old_env)
+        # Release the previous MjModel before allocating the next one. Holding
+        # both bare and vac (plus collision caches) routinely OOMs on C1_1 TOOL_LOCK.
+        # On failure, rebuild the previous variant from the captured state.
+        released_old = False
+        old_offscreen_released = False
+        if self._close_replaced:
+            close = getattr(old_env, "close", None)
+            if callable(close):
+                close()
+            self._env = None
+            del close, old_env
+            old_env = None
+            released_old = True
+            gc.collect()
+        else:
+            # Keep the previous env; free its offscreen buffer before allocating
+            # the next variant (origin/main), then restore it if the swap fails.
+            if old_env is not None:
+                old_offscreen_released = bool(
+                    _release_offscreen_render_context(old_env)
+                )
+            gc.collect()
+
         new_env: object | None = None
-        old_offscreen_released = bool(
-            self._close_replaced and _release_offscreen_render_context(old_env)
-        )
         try:
             new_env = self._factory(to_ee)
             new_env.reset()  # type: ignore[attr-defined]
@@ -2206,6 +3034,10 @@ class ToolUseJournalEERuntime:
             # Verify every common named joint survived bit-for-bit within
             # floating-point transfer tolerance before committing the swap.
             restored = _capture_runtime_state(new_env)
+            common_contacts = state.scene_geom_solref.keys() & restored.scene_geom_solref.keys()
+            if any(state.scene_geom_solref[name] != restored.scene_geom_solref[name]
+                   for name in common_contacts):
+                raise ToolUseJournalRuntimeError('EE transfer changed common scene contact calibration')
             common = sorted(
                 set(state.qpos_by_joint) & set(restored.qpos_by_joint)
             )
@@ -2228,7 +3060,25 @@ class ToolUseJournalEERuntime:
                 close = getattr(new_env, "close", None)
                 if callable(close):
                     close()
-            if old_offscreen_released:
+                del close, new_env
+                new_env = None
+                gc.collect()
+            if released_old:
+                try:
+                    rebuilt = self._factory(previous)
+                    rebuilt.reset()  # type: ignore[attr-defined]
+                    _restore_runtime_state(rebuilt, state)
+                    self._set_declared_active_ee(rebuilt, previous)
+                    self._apply_rack_visibility(rebuilt, previous)
+                    self._env = rebuilt
+                except Exception as restore_error:
+                    self._closed = True
+                    raise ToolUseJournalRuntimeError(
+                        f"failed to build EE runtime state {to_ee!r}: {error}; "
+                        f"also failed to restore prior EE {previous!r}: "
+                        f"{restore_error}"
+                    ) from error
+            elif old_offscreen_released and old_env is not None:
                 try:
                     _initialize_offscreen_render_context(old_env)
                 except Exception as restore_error:
@@ -2245,7 +3095,6 @@ class ToolUseJournalEERuntime:
             ) from error
 
         self._env = new_env
-        previous = self._active_ee
         self._active_ee = to_ee
         self._gripper_command = -1.0
         self._grasp_engaged = False
@@ -2259,10 +3108,12 @@ class ToolUseJournalEERuntime:
             hidden_rack_ee=hidden,
         )
         self._transitions.append(transition)
-        if self._close_replaced:
+        if not released_old and self._close_replaced and old_env is not None:
             close = getattr(old_env, "close", None)
             if callable(close):
                 close()
+            del close, old_env
+            gc.collect()
         return transition
 
     def unlock(self, ee: str) -> EERuntimeTransition:
@@ -2323,6 +3174,109 @@ class _PlaybackFailure:
     waypoint_index: int | None = None
     event_id: str | None = None
     observed: Mapping[str, Any] | None = None
+
+
+def _tabletop_held_tool_push_partners(plan: MotionPlan) -> list[str]:
+    """Free tabletop object ids allowed to contact the held tool in ``plan``.
+
+    Used to enable a temporary solid collision fill for hollow dishes during
+    sweep / push tool_act, without arming fill for cargo resting on a raised
+    plate during transport.
+    """
+
+    if not plan.segments:
+        return []
+    held_ids: set[str] = set()
+    for segment in plan.segments:
+        for context in (
+            segment.collision_context_before,
+            segment.collision_context_after,
+        ):
+            if context is None:
+                continue
+            held_ids.update(str(object_id) for object_id in context.attached_object_ids)
+    if not held_ids:
+        return []
+    partners: set[str] = set()
+    free_z_by_id: dict[str, float] = {}
+    for segment in plan.segments:
+        for context in (
+            segment.collision_context_before,
+            segment.collision_context_after,
+        ):
+            if context is None:
+                continue
+            for object_id, other_id in context.allowed_collision_pairs:
+                left = str(object_id)
+                right = str(other_id)
+                if left in held_ids and right not in held_ids:
+                    partners.add(right)
+                elif right in held_ids and left not in held_ids:
+                    partners.add(left)
+            for free_pose in context.free_object_poses:
+                free_z_by_id[str(free_pose.object_id)] = float(
+                    free_pose.pose.position_m[2]
+                )
+    # Ignore EE / rack names that may appear in exemption pairs.
+    skip = {"vac", "2f", "3f", "bare", "table", "table_collision"}
+    partners = {
+        name
+        for name in partners
+        if name.lower() not in skip and not name.lower().startswith("robot0")
+    }
+    if not partners:
+        return []
+    # Tabletop push targets sit near the support. Cargo on a raised attached
+    # plate sits well above the lowest collision-pair partners and must not
+    # trigger fill. Band matches prior 0.70–0.86 at a 0.80 m table.
+    partner_zs = [
+        float(free_z_by_id[name])
+        for name in partners
+        if name in free_z_by_id and math.isfinite(float(free_z_by_id[name]))
+    ]
+    if not partner_zs:
+        return []
+    support_anchor = float(min(partner_zs))
+    tabletop = {
+        name
+        for name in partners
+        if name in free_z_by_id
+        and float(free_z_by_id[name]) <= support_anchor + 0.06
+    }
+    # Prefer the task's declared target_ids so nontarget distractors are not
+    # kinematically herded into (or out of) the goal region.
+    raw_targets = plan.metadata.get("target_ids")
+    if isinstance(raw_targets, (list, tuple, set)):
+        wanted = {
+            str(object_id).strip()
+            for object_id in raw_targets
+            if str(object_id).strip()
+        }
+        if wanted:
+            tabletop &= wanted
+    return sorted(tabletop)
+
+
+def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
+    """True when the plan allows the held tool to touch free tabletop objects."""
+
+    return bool(_tabletop_held_tool_push_partners(plan))
+
+
+def _maybe_enable_held_tool_fill_for_plan(
+    runtime: ToolUseJournalEERuntime, plan: MotionPlan
+) -> bool:
+    partners = _tabletop_held_tool_push_partners(plan)
+    if not partners:
+        return False
+    region_id = plan.metadata.get("target_region_id")
+    if not isinstance(region_id, str) or not region_id.strip():
+        region_id = None
+    enabled = runtime.enable_held_tool_collision_fill(
+        push_partner_ids=partners,
+        push_region_id=region_id,
+    )
+    return bool(enabled)
 
 
 class ToolUseJournalKinematicTrajectoryPlayer:
@@ -2540,8 +3494,9 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             return message
         if event.event_type is EventType.DETACH_OBJECT:
             retention = getattr(self.runtime, "scripted_grasp_retention", None)
+            retention_object_id = scripted_retention_held_object_id(retention)
             if (retention is not None and self.runtime.attachment is None
-                    and target == self.runtime.held_tool_id == retention.entry.object_id):
+                    and target == self.runtime.held_tool_id == retention_object_id):
                 self.runtime.command_gripper(engaged=False, suction=False)
                 return f"opened gripper to release contact-held {target}"
             attachment = self.runtime.detach_object(target)
@@ -2775,8 +3730,8 @@ class ToolUseJournalKinematicTrajectoryPlayer:
             scripted_retention = getattr(
                 self.runtime, "scripted_grasp_retention", None
             )
-            scripted_object_id = getattr(
-                getattr(scripted_retention, "entry", None), "object_id", None
+            scripted_object_id = scripted_retention_held_object_id(
+                scripted_retention
             )
             contact_retention = getattr(
                 self.runtime, "_contact_friction_retention", None
@@ -2803,6 +3758,26 @@ class ToolUseJournalKinematicTrajectoryPlayer:
         """Replay a MotionPlan and return a schema-valid execution artifact."""
 
         report_name = report_id or f"{run.run_id}:execution-report"
+        fill_enabled = _maybe_enable_held_tool_fill_for_plan(self.runtime, run.plan)
+
+        try:
+            return self._execute_plan_body(
+                run,
+                report_id=report_name,
+            )
+        finally:
+            if fill_enabled:
+                self.runtime.disable_held_tool_collision_fill()
+
+    def _execute_plan_body(
+        self,
+        run: SimulationRun,
+        *,
+        report_id: str,
+    ) -> ExecutionReport:
+        """Replay body shared by kinematic / controller players' fill wrapper."""
+
+        report_name = report_id
         plan = run.plan
         executed_events: list[ExecutedEvent] = []
         executed_event_ids: set[str] = set()
@@ -3013,6 +3988,13 @@ class ToolUseJournalControllerTrajectoryPlayer(
     _PLAYER_ID = "TOOL_USE_JOURNAL_CONTROLLER_V1"
     _PLAYBACK_MODE = "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER"
     _CONTROLLER_TRACKING = True
+    _ACQUIRE_CONTACT_EVENT_TYPES = frozenset(
+        {
+            EventType.ATTACH_OBJECT,
+            EventType.SUCTION_ON,
+            EventType.GRIPPER_CLOSE,
+        }
+    )
 
     def __init__(
         self,
@@ -3031,6 +4013,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
         self._collision_check_stride = collision_check_stride
         self._gripper_rate_credit = 0.0
         self._active_segment: TrajectorySegment | None = None
+        self._playback_plan: MotionPlan | None = None
 
     def _custom_settle_evaluation(
         self,
@@ -3039,17 +4022,197 @@ class ToolUseJournalControllerTrajectoryPlayer(
         settle_config: Mapping[str, float | int],
         joint_error_rad: float,
         eef_position_error_m: float | None,
+        eef_orientation_error_rad: float | None = None,
     ) -> Mapping[str, Any] | None:
         """Optionally replace rigid EEF settling with task-relevant physics.
 
-        The default controller remains joint / EEF based.  A subclass carrying
-        a frictionally held free tool can instead return a mapping containing a
-        boolean ``succeeded`` and its observed task-space evidence.  Keeping
-        this hook in the generic player avoids teaching the runtime about any
-        particular tool geometry.
+        Acquire contact keyframes (ATTACH / suction-on / gripper-close) may
+        nominate a penetrating TCP that physics cannot reach after first
+        contact.  For those endpoints only, intended EE-target contact plus
+        orientation convergence is sufficient.  Non-contact motion keeps the
+        default joint / EEF gate by returning ``None``.  Subclasses may still
+        override this hook for tool-specific settle contracts.
         """
 
-        return None
+        del joint_error_rad
+        return self._acquire_contact_settle_evaluation(
+            segment=segment,
+            settle_config=settle_config,
+            eef_position_error_m=eef_position_error_m,
+            eef_orientation_error_rad=eef_orientation_error_rad,
+        )
+
+    @classmethod
+    def _acquire_contact_target_id(
+        cls,
+        plan: MotionPlan,
+        segment: TrajectorySegment,
+    ) -> str | None:
+        """Return the acquire target for a contact-sensitive settle segment."""
+
+        motion_end_time = float(
+            segment.metadata.get("motion_end_time_s", segment.end_time_s)
+        )
+        attach_target: str | None = None
+        grasp_target: str | None = None
+        for event in plan.events:
+            if event.event_type not in cls._ACQUIRE_CONTACT_EVENT_TYPES:
+                continue
+            if not (
+                motion_end_time - cls._TIME_TOLERANCE_S
+                <= event.time_from_start_s
+                <= segment.end_time_s + cls._TIME_TOLERANCE_S
+            ):
+                continue
+            target = event.target_id
+            if not isinstance(target, str) or not target:
+                continue
+            if event.event_type is EventType.ATTACH_OBJECT:
+                attach_target = target
+            else:
+                grasp_target = target
+        return attach_target or grasp_target
+
+    def _ee_contact_partners(
+        self,
+        *,
+        allowed_object_ids: set[str],
+    ) -> dict[str, Any]:
+        """Classify live EE contacts into target / foreign-object / environment."""
+
+        model, data = _raw_model_data(self.runtime.env)
+        adapter = ToolUseJournalEnvironmentAdapter(self.runtime.env)
+        mounted_id = mujoco.mj_name2id(
+            model, mujoco.mjtObj.mjOBJ_BODY, adapter.mounted_root_body
+        )
+        if mounted_id < 0:
+            raise ToolUseJournalRuntimeError("mounted EE body is absent")
+        ee_geoms = set(self.runtime._subtree_geom_ids(model, mounted_id))
+        robot_root_name = str(adapter.robot.robot_model.root_body)
+        robot_root_id = mujoco.mj_name2id(
+            model, mujoco.mjtObj.mjOBJ_BODY, robot_root_name
+        )
+        robot_bodies = (
+            set(_descendant_body_ids(model, robot_root_id))
+            if robot_root_id >= 0
+            else set()
+        )
+        body_to_object: dict[int, str] = {}
+        raw_bodies = getattr(self.runtime.env, "obj_body_id", {})
+        if isinstance(raw_bodies, Mapping):
+            for object_id, body_id in raw_bodies.items():
+                try:
+                    body_to_object[int(body_id)] = str(object_id)
+                except (TypeError, ValueError):
+                    continue
+
+        target_pairs: list[tuple[str, str]] = []
+        foreign_object_pairs: list[tuple[str, str]] = []
+        environment_pairs: list[tuple[str, str]] = []
+        ee_contact_geoms: set[str] = set()
+
+        for contact_id in range(int(data.ncon)):
+            contact = data.contact[contact_id]
+            geom_a = int(contact.geom1)
+            geom_b = int(contact.geom2)
+            if geom_a in ee_geoms and geom_b in ee_geoms:
+                continue
+            if geom_a not in ee_geoms and geom_b not in ee_geoms:
+                continue
+            ee_geom = geom_a if geom_a in ee_geoms else geom_b
+            other_geom = geom_b if geom_a in ee_geoms else geom_a
+            other_body = int(model.geom_bodyid[other_geom])
+            if other_body in robot_bodies:
+                continue
+            ee_name = (
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, ee_geom) or ""
+            )
+            other_name = (
+                mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_GEOM, other_geom)
+                or ""
+            )
+            ee_contact_geoms.add(ee_name)
+            object_id = body_to_object.get(other_body)
+            pair = (ee_name, other_name if object_id is None else object_id)
+            if object_id is None:
+                environment_pairs.append(pair)
+            elif object_id in allowed_object_ids:
+                target_pairs.append(pair)
+            else:
+                foreign_object_pairs.append(pair)
+
+        return {
+            "target_contact_pairs": target_pairs,
+            "foreign_object_contact_pairs": foreign_object_pairs,
+            "environment_contact_pairs": environment_pairs,
+            "ee_contact_geoms": sorted(ee_contact_geoms),
+            "intended_target_contact": bool(target_pairs),
+        }
+
+    def _acquire_contact_settle_evaluation(
+        self,
+        *,
+        segment: TrajectorySegment,
+        settle_config: Mapping[str, float | int],
+        eef_position_error_m: float | None,
+        eef_orientation_error_rad: float | None,
+    ) -> Mapping[str, Any] | None:
+        plan = self._playback_plan
+        if plan is None or "tracking_settle" not in segment.metadata:
+            return None
+        target_id = self._acquire_contact_target_id(plan, segment)
+        if target_id is None:
+            return None
+        # Preserve joint-only / already-converged pose settles.  Contact-aware
+        # success is an escape hatch only when the nominal TCP residual remains
+        # outside the configured EEF position tolerance.
+        if "eef_tolerance_m" not in settle_config:
+            return None
+        if (
+            eef_position_error_m is None
+            or eef_position_error_m <= float(settle_config["eef_tolerance_m"])
+        ):
+            return None
+
+        partners = self._ee_contact_partners(allowed_object_ids={target_id})
+        metrics = self.runtime.object_contact_metrics(target_id)
+        intended_contact = bool(partners["intended_target_contact"]) and (
+            int(metrics.contact_count) > 0
+        )
+        orientation_ok = (
+            "eef_orientation_tolerance_rad" not in settle_config
+            or (
+                eef_orientation_error_rad is not None
+                and eef_orientation_error_rad
+                <= float(settle_config["eef_orientation_tolerance_rad"])
+            )
+        )
+        foreign_ok = not partners["foreign_object_contact_pairs"]
+        environment_ok = not partners["environment_contact_pairs"]
+        succeeded = bool(
+            intended_contact and orientation_ok and foreign_ok and environment_ok
+        )
+        return {
+            "mode": "ACQUIRE_CONTACT_SETTLE",
+            "succeeded": succeeded,
+            "target_object_id": target_id,
+            "intended_target_contact": intended_contact,
+            "orientation_ok": orientation_ok,
+            "foreign_object_ok": foreign_ok,
+            "environment_ok": environment_ok,
+            "target_contact_count": int(metrics.contact_count),
+            "target_contact_groups": list(metrics.contact_groups),
+            "target_contact_pairs": list(partners["target_contact_pairs"]),
+            "foreign_object_contact_pairs": list(
+                partners["foreign_object_contact_pairs"]
+            ),
+            "environment_contact_pairs": list(
+                partners["environment_contact_pairs"]
+            ),
+            "ee_contact_geoms": list(partners["ee_contact_geoms"]),
+            "eef_position_error_m": eef_position_error_m,
+            "eef_orientation_error_rad": eef_orientation_error_rad,
+        }
 
     def _plan_time_step_s(
         self,
@@ -3294,6 +4457,10 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 action[gripper_start:gripper_end] = 0.0
                 return action
             command = float(self.runtime.gripper_command)
+            if hasattr(self.runtime, "vac_gripper_action_for_command"):
+                command = float(
+                    self.runtime.vac_gripper_action_for_command(command)
+                )
             if getattr(robot.gripper["right"], "action_is_absolute", False):
                 self._gripper_rate_credit = 0.0
                 gripper_action = command
@@ -3311,6 +4478,16 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 else:
                     gripper_action = 0.0
             action[gripper_start:gripper_end] = gripper_action
+            suppress = getattr(
+                self.runtime, "suppress_native_adhesion_actuators", None
+            )
+            if callable(suppress):
+                suppress()
+            log_contacts = getattr(
+                self.runtime, "log_vac_non_target_cup_contacts", None
+            )
+            if callable(log_contacts):
+                log_contacts()
         return action
 
     def preshape_finger_gripper(
@@ -3599,8 +4776,24 @@ class ToolUseJournalControllerTrajectoryPlayer(
     ) -> ExecutionReport:
         """Execute a MotionPlan through controller torques and physics."""
 
+        fill_enabled = _maybe_enable_held_tool_fill_for_plan(self.runtime, run.plan)
+        try:
+            return self._execute_controller_plan_body(run, report_id=report_id)
+        finally:
+            if fill_enabled:
+                self.runtime.disable_held_tool_collision_fill()
+
+    def _execute_controller_plan_body(
+        self,
+        run: SimulationRun,
+        *,
+        report_id: str | None = None,
+    ) -> ExecutionReport:
+        """Controller playback body (held-tool fill enabled by ``execute``)."""
+
         report_name = report_id or f"{run.run_id}:execution-report"
         plan = run.plan
+        self._playback_plan = plan
         executed_events: list[ExecutedEvent] = []
         executed_event_ids: set[str] = set()
         max_tracking_error = 0.0
@@ -3631,6 +4824,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
                 0.0, executed_time - plan_time
             )
             report.metadata["segment_tracking"] = segment_tracking
+            self._playback_plan = None
             report.metadata["gripper_release_waits"] = release_waits
             if release_wait is not None:
                 report.metadata['gripper_release_pending'] = release_wait.observation
@@ -4078,12 +5272,22 @@ class ToolUseJournalControllerTrajectoryPlayer(
                         settle_config=settle_config,
                         joint_error_rad=step_joint_error,
                         eef_position_error_m=target_eef_error,
+                        eef_orientation_error_rad=target_eef_orientation_error,
                     )
                     settle_ok = (
                         joint_ok and eef_ok and eef_orientation_ok
                         if custom_settle is None
                         else bool(custom_settle.get("succeeded", False))
                     )
+                    if segment.metadata.get('container_settle') is not None:
+                        from .container_settle import measured_container_settle
+                        container_result = measured_container_settle(
+                            self.runtime, segment.metadata['container_settle'], settle_state)
+                        settle_ok = (settle_ok and joint_ok and eef_ok
+                                     and eef_orientation_ok and container_result['succeeded'])
+                        custom_settle = {**(custom_settle or {}),
+                                         'container_settle': container_result,
+                                         'succeeded': settle_ok}
                     settle_state["last_joint_error_rad"] = step_joint_error
                     settle_state["last_eef_error_m"] = target_eef_error
                     settle_state["last_eef_orientation_error_rad"] = (

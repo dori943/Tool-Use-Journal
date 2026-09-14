@@ -8,7 +8,16 @@ from tuj.m5_motion.schema import (
     KeyframeType,
     MotionPlanRequest,
 )
-from tuj.m5_motion.task_semantics import is_release_task, task_operation
+from tuj.m5_motion.task_semantics import (
+    is_acquire_task,
+    is_release_task,
+    task_operation,
+)
+from tuj.m5_motion.contact_keyframe_validation import (
+    ContactKeyframeGeometryError,
+    is_tool_act_contact_geometry_scope,
+    validate_sweep_keyframe_strategy,
+)
 
 
 class KeyframePhaseContractError(ValueError):
@@ -31,6 +40,25 @@ def validate_keyframe_phase_contract(
     operation = task_operation(request.task)
     for strategy in artifact.candidates:
         keyframes = strategy.keyframes
+        if is_acquire_task(request.task) and operation != "PICK_TOOL":
+            grasp_indices = [
+                index
+                for index, keyframe in enumerate(keyframes)
+                if keyframe.keyframe_type is KeyframeType.GRASP
+            ]
+            if len(grasp_indices) != 1:
+                raise KeyframePhaseContractError(
+                    f"acquire strategy {strategy.strategy_id!r} requires exactly one GRASP"
+                )
+            grasp_index = grasp_indices[0]
+            if not any(
+                keyframe.keyframe_type is KeyframeType.PRE_GRASP
+                for keyframe in keyframes[:grasp_index]
+            ):
+                raise KeyframePhaseContractError(
+                    f"acquire strategy {strategy.strategy_id!r} requires "
+                    "PRE_GRASP before GRASP"
+                )
         if operation == "TRANSPORT":
             forbidden = [
                 keyframe.keyframe_id
@@ -43,6 +71,13 @@ def validate_keyframe_phase_contract(
                     f"TRANSPORT strategy {strategy.strategy_id!r} contains PLACE or "
                     f"release effects at {', '.join(forbidden)}"
                 )
+        if is_tool_act_contact_geometry_scope(request):
+            try:
+                validate_sweep_keyframe_strategy(request, keyframes)
+            except ContactKeyframeGeometryError as error:
+                raise KeyframePhaseContractError(
+                    f"sweep strategy {strategy.strategy_id!r}: {error}"
+                ) from error
         if not is_release_task(request.task):
             continue
         place_indices = [
