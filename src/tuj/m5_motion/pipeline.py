@@ -3,16 +3,20 @@
 from __future__ import annotations
 
 import hashlib
+import json
 import math
 import re
 from dataclasses import dataclass, replace
+from pathlib import Path
 from typing import Callable, Mapping, Protocol
 
+from tuj.m5_motion.attachment_retarget import retarget_resolved_pose
 from tuj.m5_motion.compiler import (
     FirstFeasibleStrategyCompiler,
     StrategyAttempt,
     StrategyCompilationResult,
 )
+from tuj.m5_motion.geometry import RelativePoseResolver
 from tuj.m5_motion.kinematics import UR5eKinematics
 from tuj.m5_motion.plan_builder import (
     FinalSegmentValidator,
@@ -32,10 +36,13 @@ from tuj.m5_motion.safety import KinematicSafetyValidator
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
     CollisionContext,
+    KeyframeEventType,
     KeyframePlanArtifact,
     ModuleName,
     MotionPlan,
     MotionPlanRequest,
+    Pose,
+    RelativeKeyframeSpec,
 )
 from tuj.m5_motion.strategy import (
     EdgePlanner,
@@ -48,6 +55,97 @@ from tuj.m5_motion.trajectory_processing import TrajectoryProcessingError
 
 class KeyframeStrategyProvider(Protocol):
     def generate(self, request: MotionPlanRequest) -> KeyframePlanArtifact: ...
+
+
+EdgeContextMaterializer = Callable[[RelativeKeyframeSpec, Pose], None]
+
+
+def _debug_name(request: MotionPlanRequest) -> str:
+    label = re.sub(r"[^A-Za-z0-9._-]+", "_", request.task.subgoal_id).strip("._")
+    digest = hashlib.sha256(request.request_id.encode("utf-8")).hexdigest()[:12]
+    return f"{label or 'request'}-{digest}"
+
+
+def _resolved_debug_keyframes(
+    request: MotionPlanRequest,
+    artifact: KeyframePlanArtifact,
+    *,
+    retarget: bool,
+) -> list[dict[str, object]]:
+    resolver = RelativePoseResolver(request.world)
+    strategies: list[dict[str, object]] = []
+    for strategy in artifact.candidates:
+        keyframes: list[dict[str, object]] = []
+        for index, keyframe in enumerate(strategy.keyframes):
+            entry: dict[str, object] = {
+                "index": index,
+                "keyframe_id": keyframe.keyframe_id,
+                "phase": keyframe.keyframe_type.value,
+                "frame_ref": keyframe.frame_ref,
+                "anchor": keyframe.anchor,
+                "raw_offset_m": keyframe.offset_along_approach_m,
+                "approach_axis_xyz": list(keyframe.approach_axis_xyz),
+                "tool_axis_to_align": keyframe.tool_axis_to_align,
+                "roll_rad": keyframe.roll_rad,
+                "planner": keyframe.planner.value,
+                "metadata": keyframe.metadata,
+            }
+            try:
+                pose = resolver.resolve(keyframe)
+                entry["resolver_world_pose"] = pose.model_dump(mode="json")
+                entry["raw_position_world_m"] = list(pose.position_m)
+                if retarget:
+                    final_pose = retarget_resolved_pose(request.world, keyframe, pose)
+                    entry["final_tcp_world_pose"] = final_pose.model_dump(mode="json")
+            except Exception as error:  # diagnostics must not affect planning
+                entry["resolution_error"] = f"{type(error).__name__}: {error}"
+            keyframes.append(entry)
+        strategies.append({"strategy_id": strategy.strategy_id, "keyframes": keyframes})
+    return strategies
+
+
+def _write_debug_json(path: Path, payload: object) -> None:
+    """Best-effort atomic diagnostics; failures never change planning behavior."""
+
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        temporary = path.with_suffix(path.suffix + ".tmp")
+        temporary.write_text(
+            json.dumps(payload, ensure_ascii=False, indent=2, default=str) + "\n",
+            encoding="utf-8",
+        )
+        temporary.replace(path)
+    except OSError:
+        pass
+
+
+class DebugKeyframeStrategyProvider:
+    """Persist the generated artifact before physical/collision binders mutate it."""
+
+    def __init__(self, provider: KeyframeStrategyProvider, directory: str | Path) -> None:
+        self._provider = provider
+        self._directory = Path(directory)
+        self.supports_collision_feedback = bool(
+            getattr(provider, "supports_collision_feedback", False)
+        )
+
+    def generate(self, request: MotionPlanRequest) -> KeyframePlanArtifact:
+        artifact = self._provider.generate(request)
+        _write_debug_json(
+            self._directory / f"{_debug_name(request)}-generated.json",
+            {
+                "stage": "VLM_GENERATED",
+                "request_id": request.request_id,
+                "subgoal_id": request.task.subgoal_id,
+                "artifact": artifact.model_dump(mode="json"),
+                "strategies": _resolved_debug_keyframes(request, artifact, retarget=False),
+                "raw_position_note": (
+                    "VLM emits frame/anchor/offset, not absolute XYZ; "
+                    "raw_position_world_m is the first resolver result."
+                ),
+            },
+        )
+        return artifact
 
 
 @dataclass(frozen=True, slots=True)
@@ -65,6 +163,43 @@ class CollisionPlanningSetup:
     collision_contexts: Mapping[str, CollisionContext]
     initial_collision_context_id: str
     final_segment_validator: FinalSegmentValidator
+    edge_context_materializer: EdgeContextMaterializer | None = None
+
+
+@dataclass(slots=True)
+class _EdgeContextMaterializingPlanner:
+    """Refresh branch-dependent collision state before an outgoing edge."""
+
+    delegate: EdgePlanner
+    kinematics: UR5eKinematics
+    materialize: EdgeContextMaterializer
+
+    def plan(
+        self,
+        source: tuple[float, ...],
+        target: tuple[float, ...],
+        source_keyframe: RelativeKeyframeSpec | None,
+        target_keyframe: RelativeKeyframeSpec,
+    ):
+        if (
+            source_keyframe is not None
+            and KeyframeEventType.ATTACH_OBJECT in source_keyframe.events_after
+        ):
+            position, orientation = self.kinematics.forward_pose_world(source)
+            self.materialize(
+                source_keyframe,
+                Pose(
+                    frame_id="world",
+                    position_m=position,
+                    orientation_xyzw=orientation,
+                ),
+            )
+        return self.delegate.plan(
+            source,
+            target,
+            source_keyframe,
+            target_keyframe,
+        )
 
 
 class CollisionContextFactory(Protocol):
@@ -379,12 +514,100 @@ class MotionPlanningPipeline:
         kinematics: UR5eKinematics,
         *,
         plan_builder: MotionPlanBuilder | None = None,
+        debug_dir: str | Path | None = None,
     ) -> None:
         self._provider = provider
         self._kinematics = kinematics
         forward_pose = getattr(kinematics, "forward_pose_world", None)
         self._builder = plan_builder or MotionPlanBuilder(
             forward_pose=forward_pose if callable(forward_pose) else None
+        )
+        self._debug_dir = Path(debug_dir) if debug_dir is not None else None
+
+    def _dump_planning_debug(
+        self,
+        request: MotionPlanRequest,
+        binder_artifact: KeyframePlanArtifact,
+        final_artifact: KeyframePlanArtifact,
+        compilation: StrategyCompilationResult,
+    ) -> None:
+        if self._debug_dir is None:
+            return
+        final_by_id = {
+            keyframe.keyframe_id: keyframe
+            for strategy in final_artifact.candidates
+            for keyframe in strategy.keyframes
+        }
+        final_location_by_id = {
+            keyframe.keyframe_id: (index, keyframe.keyframe_type.value)
+            for strategy in final_artifact.candidates
+            for index, keyframe in enumerate(strategy.keyframes)
+        }
+        attempts: list[dict[str, object]] = []
+        for attempt in compilation.attempts:
+            failed_keyframe_id = (
+                attempt.ik_diagnostics[-1].keyframe_id
+                if attempt.failure_code and attempt.ik_diagnostics
+                else None
+            )
+            attempts.append(
+                {
+                    "strategy_id": attempt.strategy_id,
+                    "failure_code": attempt.failure_code,
+                    "failure_detail": attempt.detail,
+                    "failed_keyframe_id": failed_keyframe_id,
+                    "failed_keyframe_index": (
+                        final_location_by_id[failed_keyframe_id][0]
+                        if failed_keyframe_id in final_location_by_id
+                        else None
+                    ),
+                    "failed_keyframe_phase": (
+                        final_location_by_id[failed_keyframe_id][1]
+                        if failed_keyframe_id in final_location_by_id
+                        else None
+                    ),
+                    "failed_keyframe": (
+                        final_by_id[failed_keyframe_id].model_dump(mode="json")
+                        if failed_keyframe_id in final_by_id
+                        else None
+                    ),
+                    "resolved_final_tcp_keyframes": [
+                        {
+                            "keyframe_id": resolved.keyframe_id,
+                            "final_tcp_world_pose": resolved.pose.model_dump(mode="json"),
+                        }
+                        for resolved in attempt.resolved_keyframes
+                    ],
+                    "ik_diagnostics": [
+                        {
+                            "keyframe_id": diagnostic.keyframe_id,
+                            "raw_ik_count": diagnostic.raw_ik_count,
+                            "valid_ik_count": diagnostic.valid_ik_count,
+                            "attempted_seeds": diagnostic.attempted_seeds,
+                            "solver_failure_code": diagnostic.solver_failure_code,
+                            "solver_detail": diagnostic.solver_detail,
+                            "validity_detail": diagnostic.validity_detail,
+                        }
+                        for diagnostic in attempt.ik_diagnostics
+                    ],
+                }
+            )
+        _write_debug_json(
+            self._debug_dir / f"{_debug_name(request)}-planning.json",
+            {
+                "stage": "BINDER_AND_COMPILER",
+                "request_id": request.request_id,
+                "subgoal_id": request.task.subgoal_id,
+                "binder_artifact_id": binder_artifact.artifact_id,
+                "binder_strategies": _resolved_debug_keyframes(
+                    request, binder_artifact, retarget=True
+                ),
+                "final_artifact_id": final_artifact.artifact_id,
+                "final_strategies": _resolved_debug_keyframes(
+                    request, final_artifact, retarget=True
+                ),
+                "compilation_attempts": attempts,
+            },
         )
 
     @staticmethod
@@ -448,6 +671,8 @@ class MotionPlanningPipeline:
             update_reference(request.world.robot_state.joint_positions_rad)
         artifact = self._provider.generate(request)
         self._validate_artifact(request, artifact)
+        binder_artifact = artifact
+        edge_context_materializer: EdgeContextMaterializer | None = None
         explicit_collision_arguments = (
             state_validator,
             collision_contexts,
@@ -466,6 +691,7 @@ class MotionPlanningPipeline:
             collision_contexts = setup.collision_contexts
             initial_collision_context_id = setup.initial_collision_context_id
             final_segment_validator = setup.final_segment_validator
+            edge_context_materializer = setup.edge_context_materializer
             self._validate_artifact(request, artifact)
         else:
             missing = [
@@ -580,6 +806,12 @@ class MotionPlanningPipeline:
                 wrap_joints=False,
             ),
         )
+        if edge_context_materializer is not None:
+            selected_edge_planner = _EdgeContextMaterializingPlanner(
+                selected_edge_planner,
+                self._kinematics,
+                edge_context_materializer,
+            )
         plan_id, provenance = self._plan_identity(request, artifact)
 
         def final_validator(
@@ -635,6 +867,7 @@ class MotionPlanningPipeline:
                 start_joint_config=request.world.robot_state.joint_positions_rad,
                 state_validator=effective_state_validator,
                 edge_planner=selected_edge_planner,
+                request=request,
             )
             attempts.extend(current.attempts)
             compilation = StrategyCompilationResult(
@@ -687,6 +920,9 @@ class MotionPlanningPipeline:
                 connected=current.connected,
                 attempts=tuple(attempts),
             )
+            self._dump_planning_debug(
+                request, binder_artifact, artifact, compilation
+            )
             return MotionPlanningResult(
                 keyframe_artifact=artifact,
                 compilation=compilation,
@@ -696,6 +932,9 @@ class MotionPlanningPipeline:
         compilation = StrategyCompilationResult(
             connected=None,
             attempts=tuple(attempts),
+        )
+        self._dump_planning_debug(
+            request, binder_artifact, artifact, compilation
         )
         failures = "; ".join(
             (
@@ -717,13 +956,33 @@ class MotionPlanningPipeline:
             and _collision_repair_eligible(compilation)
         ):
             retry_request = request.model_copy(deep=True)
+            repair_feedback = _collision_repair_feedback(
+                request,
+                compilation,
+            )
+            # Carry prior rejected place seats across repair batches so the
+            # deterministic reground cannot republish the same XY.
+            previous_feedback = request.task.metadata.get(
+                _COLLISION_REPAIR_FEEDBACK_KEY
+            )
+            if isinstance(previous_feedback, Mapping):
+                prior_rejected = previous_feedback.get("rejected_place_xy_m")
+                if isinstance(prior_rejected, list) and prior_rejected:
+                    repair_feedback["rejected_place_xy_m"] = [
+                        item for item in prior_rejected
+                        if isinstance(item, (list, tuple)) and len(item) >= 2
+                    ]
             retry_request.task.metadata = {
                 **retry_request.task.metadata,
-                _COLLISION_REPAIR_FEEDBACK_KEY: _collision_repair_feedback(
-                    request,
-                    compilation,
-                ),
+                _COLLISION_REPAIR_FEEDBACK_KEY: repair_feedback,
             }
+            from tuj.m5_motion.scripted_grasps.transport import (
+                reground_held_place_from_collision_feedback,
+            )
+            reground_held_place_from_collision_feedback(
+                retry_request,
+                repair_feedback,
+            )
             retry_arguments = {
                 "edge_planner": edge_planner,
                 "final_plan_validator": final_plan_validator,

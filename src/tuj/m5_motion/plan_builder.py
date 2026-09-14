@@ -75,6 +75,10 @@ def _segment_type(keyframe_type: KeyframeType) -> SegmentType:
         KeyframeType.PRE_PLACE: SegmentType.PLACE,
         KeyframeType.PLACE: SegmentType.PLACE,
         KeyframeType.RETREAT: SegmentType.RETREAT,
+        KeyframeType.PRE_CONTACT: SegmentType.APPROACH,
+        KeyframeType.CONTACT_START: SegmentType.TRANSFER,
+        KeyframeType.CONTACT_SWEEP: SegmentType.TRANSFER,
+        KeyframeType.CONTACT_END: SegmentType.TRANSFER,
         KeyframeType.EE_UNDOCK_STAGING: SegmentType.EE_UNDOCK,
         KeyframeType.EE_PRE_UNDOCK: SegmentType.EE_UNDOCK,
         KeyframeType.EE_UNDOCK: SegmentType.EE_UNDOCK,
@@ -83,7 +87,12 @@ def _segment_type(keyframe_type: KeyframeType) -> SegmentType:
         KeyframeType.EE_DOCK: SegmentType.EE_DOCK,
         KeyframeType.CUSTOM: SegmentType.CUSTOM,
     }
-    return mapping[keyframe_type]
+    try:
+        return mapping[keyframe_type]
+    except KeyError as error:
+        raise MotionPlanBuildError(
+            f"unsupported keyframe type for segment mapping: {keyframe_type!r}"
+        ) from error
 
 
 def _scene_signature(context: CollisionContext) -> tuple[object, ...]:
@@ -958,6 +967,22 @@ class MotionPlanBuilder:
                 "strategy_id": connected.strategy_id,
                 "ik_branch_ids": [node.solution.branch_id for node in connected.nodes],
                 "edge_evaluations": connected.edge_evaluations,
+                **(
+                    {"target_region_id": request.task.goal.target_region_id}
+                    if request.task.goal.target_region_id
+                    else {}
+                ),
+                **(
+                    {
+                        "target_ids": [
+                            str(object_id).strip()
+                            for object_id in request.task.target_ids
+                            if str(object_id).strip()
+                        ]
+                    }
+                    if request.task.target_ids
+                    else {}
+                ),
                 **(
                     {
                         "grasp_execution_mode": "CONTACT_FRICTION",

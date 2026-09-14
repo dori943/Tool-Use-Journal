@@ -15,6 +15,7 @@ from tuj.m5_motion.execution import (
     GroundedMotionGoalEvaluator,
 )
 from tuj.m5_motion.push_to_region import (
+    PLACE_SETTLE_FOOTPRINT_TOLERANCE_M,
     target_above_region,
     target_fully_inside_region,
     target_resting_on_region,
@@ -53,12 +54,16 @@ class RegionContainmentEvaluator:
         inset_margin_m: float = 0.0,
         include_vertical: bool = False,
         require_interior_geometry: bool = False,
+        contact_tolerance_m: float | None = None,
     ) -> None:
         if inset_margin_m < 0.0:
             raise ValueError("inset margin must be non-negative")
+        if contact_tolerance_m is not None and contact_tolerance_m < 0.0:
+            raise ValueError("contact tolerance must be non-negative")
         self._inset = inset_margin_m
         self._include_vertical = include_vertical
         self._require_interior_geometry = require_interior_geometry
+        self._contact_tolerance_m = contact_tolerance_m
 
     def evaluate(
         self,
@@ -124,6 +129,7 @@ class RegionContainmentEvaluator:
                     region_id=region_id,
                     inset_margin_m=self._inset,
                     include_vertical=self._include_vertical,
+                    contact_tolerance_m=self._contact_tolerance_m,
                 ):
                     inside.append(target_id)
                 else:
@@ -150,6 +156,7 @@ class RegionContainmentEvaluator:
                 "geometry_errors": errors,
                 "inset_margin_m": self._inset,
                 "include_vertical": self._include_vertical,
+                "contact_tolerance_m": self._contact_tolerance_m,
             },
         )
 
@@ -613,6 +620,10 @@ class TaskAwareGoalEvaluator:
             joint_tolerance_rad=joint_tolerance_rad
         )
         self._region = RegionContainmentEvaluator()
+        # Open-plate place/release: tolerate post-release settle rim graze.
+        self._place_region = RegionContainmentEvaluator(
+            contact_tolerance_m=PLACE_SETTLE_FOOTPRINT_TOLERANCE_M,
+        )
         self._container_region = RegionContainmentEvaluator(
             include_vertical=True,
             require_interior_geometry=True,
@@ -665,7 +676,11 @@ class TaskAwareGoalEvaluator:
             self._container_region
             if isinstance(packing_metadata, Mapping)
             and str(packing_metadata.get("kind", "")).upper() == "CONTAINER"
-            else self._region
+            else (
+                self._place_region
+                if is_release_task(task)
+                else self._region
+            )
         )
         evaluation_world = observed_world
         if (
@@ -719,6 +734,18 @@ class TaskAwareGoalEvaluator:
                     f"placed object {target!r} is still attached",
                     observed={"attached_object_id": state.attached_object_id},
                 )
+            from .container_surface import is_container_surface_task, surface_report_result
+            if is_container_surface_task(task, request.world.objects):
+                if evaluation_world is None:
+                    return _result(request, GoalEvaluationStatus.UNKNOWN, 'observed cover state unavailable')
+                try:
+                    evidence = surface_report_result(request, report, evaluation_world)
+                except (ValueError, KeyError, TypeError) as error:
+                    return _result(request, GoalEvaluationStatus.UNKNOWN,
+                                   'container cover evidence unavailable', observed={'error_type': type(error).__name__})
+                return _result(request,
+                    GoalEvaluationStatus.SATISFIED if evidence['succeeded'] else GoalEvaluationStatus.FAILED,
+                    'container opening coverage, physical support and packed contents', observed=evidence)
             if operation == "PLACE_ON" and region_evaluator is self._region:
                 # place_on names a base object to stack onto, so support is the
                 # success condition rather than containment.  Containers keep

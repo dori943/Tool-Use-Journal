@@ -30,6 +30,10 @@ def task_operation(task: Any) -> str:
     return normalize_action(operation or getattr(task, "action_type", ""))
 
 
+def is_move_to_workspace_task(task: Any) -> bool:
+    return task_operation(task) == "MOVE_TO_WORKSPACE"
+
+
 def is_ee_exchange_task(task: Any) -> bool:
     return task_operation(task) in {
         "EE_ATTACH",
@@ -105,6 +109,7 @@ __all__ = [
     "is_acquire_action",
     "is_acquire_task",
     "is_ee_exchange_task",
+    "is_move_to_workspace_task",
     "is_release_action",
     "is_release_task",
     "normalize_action",

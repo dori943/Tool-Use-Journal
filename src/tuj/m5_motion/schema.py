@@ -157,6 +157,10 @@ class KeyframeType(str, enum.Enum):
     PRE_PLACE = "PRE_PLACE"
     PLACE = "PLACE"
     RETREAT = "RETREAT"
+    PRE_CONTACT = "PRE_CONTACT"
+    CONTACT_START = "CONTACT_START"
+    CONTACT_SWEEP = "CONTACT_SWEEP"
+    CONTACT_END = "CONTACT_END"
     EE_UNDOCK_STAGING = "EE_UNDOCK_STAGING"
     EE_PRE_UNDOCK = "EE_PRE_UNDOCK"
     EE_UNDOCK = "EE_UNDOCK"
@@ -413,7 +417,10 @@ class MotionTask(_ContractModel):
 
     @model_validator(mode="after")
     def _validate_pick_grasp(self) -> "MotionTask":
-        from tuj.m5_motion.task_semantics import is_ee_exchange_task
+        from tuj.m5_motion.task_semantics import (
+            is_ee_exchange_task,
+            is_move_to_workspace_task,
+        )
 
         if self.metadata.get("require_structured_grasp") and self.grasp is None:
             raise ValueError("task explicitly requires a structured grasp")
@@ -423,6 +430,7 @@ class MotionTask(_ContractModel):
             and self.goal.target_object_id is None
             and self.goal.target_region_id is None
             and not is_ee_exchange_task(self)
+            and not is_move_to_workspace_task(self)
         ):
             raise ValueError(
                 "POSE goal requires target_pose, target_object_id, or target_region_id"

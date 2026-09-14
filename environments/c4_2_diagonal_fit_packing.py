@@ -67,7 +67,7 @@ ROBOT_SPEC_PATH = (
 
 BOX_INNER_W = 0.240
 BOX_INNER_D = 0.180
-BOX_INNER_H = 0.200
+BOX_INNER_H = 0.230
 
 BOX_WALL_THICKNESS = 0.010
 BOX_FLOOR_THICKNESS = 0.010
@@ -975,6 +975,16 @@ class C4_2_DiagonalFitPacking(KitchenBase):
         BOX_INNER_W / D / H describe the clear interior.
         """
 
+        # Author boundary compliance explicitly: MuJoCo averages each wall's
+        # defaults with the contacting object, otherwise softening thin bodies'
+        # calibrated support when later objects load the packed contents.
+        contact_profile = json.loads(
+            (
+                Path(__file__).parent
+                / "assets/contact_profiles/rigid_container.json"
+            ).read_text(encoding="utf-8")
+        )
+
         body = new_body(
             name=_BOX_BODY_NAME,
             pos=[
@@ -1013,6 +1023,8 @@ class C4_2_DiagonalFitPacking(KitchenBase):
                     friction=(
                         "0.95 0.3 0.1"
                     ),
+                    solref=contact_profile["solref"],
+                    solimp=contact_profile["solimp"],
                 )
             )
 
@@ -1535,10 +1547,16 @@ class C4_2_DiagonalFitPacking(KitchenBase):
                     BOX_FLOOR_THICKNESS + 0.5 * BOX_INNER_H,
                 ),
                 "opening_top_z_m": BOX_FLOOR_THICKNESS + BOX_INNER_H,
+                # Prefer nearby free volume when an occupied drop site would
+                # depend on incidental tipping; retain all physical gates.
+                "position_policy": "NEAREST_CLEAR_VOLUME",
             }
         candidates = _PACKING_ORIENTATION_CANDIDATES.get(object_id)
         if candidates is None:
-            metadata = {}
+            # The packable cartons have stable rectangular faces. Establish a
+            # low base layer before the diagonal objects need the upper volume.
+            metadata = ({"kind": "PACKABLE_OBJECT", "stable_face_policy": "MINIMUM_HEIGHT"}
+                        if object_id in _PACKING_OBJECTS else {})
         else:
             metadata = {
                 "kind": "PACKABLE_OBJECT",

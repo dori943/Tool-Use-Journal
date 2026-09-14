@@ -15,10 +15,13 @@ from tuj.m4_taskplanner.serialization import (
 )
 
 from tuj.m5_motion.generic_runner import (
+    apply_selected_plan_window,
     default_constraints,
     load_selected_plan,
     load_world,
     main,
+    resolve_object_subgoal,
+    slice_subgoal_range,
     truncate_after_first_acquire,
     truncate_after_subgoal,
     validate_selected_plan,
@@ -330,6 +333,46 @@ def test_stop_after_named_subgoal_keeps_prefix_only() -> None:
         step.subgoal_id in {"pick-tool", "sweep-blocks"}
         for step in result.steps
     )
+
+
+def test_slice_subgoal_range_keeps_inclusive_window() -> None:
+    selected = _m4_tool_contract_selected()
+
+    result = slice_subgoal_range(selected, "sweep-blocks", "return-tool")
+
+    assert result.subgoal_order == ["sweep-blocks", "return-tool"]
+    assert [item.subgoal_id for item in result.candidate_assignments] == [
+        "sweep-blocks",
+        "return-tool",
+    ]
+    assert all(
+        step.subgoal_id in {"sweep-blocks", "return-tool"} for step in result.steps
+    )
+
+
+def test_apply_selected_plan_window_resolves_object_span() -> None:
+    selected = _m4_tool_contract_selected()
+
+    result = apply_selected_plan_window(
+        selected,
+        start_object_id="block_0",
+        stop_object_id="light_plate",
+    )
+
+    # block_0 appears on sweep-blocks; last light_plate target is return-tool.
+    assert result.subgoal_order == ["sweep-blocks", "return-tool"]
+    assert resolve_object_subgoal(selected, "light_plate", which="first") == "pick-tool"
+    assert resolve_object_subgoal(selected, "light_plate", which="last") == "return-tool"
+
+
+def test_apply_selected_plan_window_rejects_conflicting_filters() -> None:
+    selected = _m4_tool_contract_selected()
+    with pytest.raises(generic_runner.GenericMotionRunnerError, match="only one of"):
+        apply_selected_plan_window(
+            selected,
+            start_subgoal_id="sweep-blocks",
+            start_object_id="block_0",
+        )
 
 
 def test_generic_cli_validates_explicit_task_and_world_files(tmp_path) -> None:

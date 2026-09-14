@@ -10,12 +10,12 @@ space keeps both the scripted live runtime (``retention``) and the generic
 ``run.py`` pipeline (attachment metadata on the WorldSnapshot) on one contract.
 
 Transport ends above the region with rim clearance; place ends with the object
-bbox a release clearance above whatever it will rest on.  Both pick the same
-XY spot -- the slot M2 assigned inside the region when the plan divided it
-among several objects, else the region centre -- and move off it to the nearest
-clear spot when it is taken, so objects share one tray without stacking.  When
-the region has no room left they stack squarely on the largest support rather
-than being driven into it.
+bbox a release clearance above the region floor.  Both pick the same XY spot --
+the slot M2 assigned inside the region when the plan divided it among several
+objects, else the region centre -- and move off it when occupied footprints
+block the seat.  Nested platforms already in the region (e.g. a plate on a
+tray) are stacking-forbidden supports: a small contact tolerance is allowed,
+but seats that rest on them are not preferred.
 """
 import math
 import numpy as np
@@ -41,9 +41,57 @@ REGION_FLOOR_FALLBACK_M = 0.005
 # narrow enough to exclude the wall above it.
 _FLOOR_BAND_M = 0.004
 FREE_SPOT_GRID_M = 0.01
+# Body-frame XY aspect for nested platforms vs thin utensil strips.  Broad
+# occupants inside a destination (plate/mug on a tray) are stacking-forbidden
+# supports: seat search may graze them within OCCUPANT_CONTACT_TOLERANCE_M but
+# must not rank a seat that rests fully on them.  Thin strips stay hard blockers.
+THIN_STRIP_MAX_SHORT_M = 0.06
+THIN_STRIP_MAX_ASPECT = 0.4
+OCCUPANT_CONTACT_TOLERANCE_M = 0.005
 # Occupants whose tops agree to within this share the load of what is put
 # on them; below it only the higher one is touched.
 SUPPORT_LEVEL_TOLERANCE_M = 0.002
+# Rejected place seats must move at least this far in XY before reuse.
+REJECTED_PLACE_EPS_M = 0.005
+# Geom-label tokens that identify moving robot / EE collision bodies (not scene
+# objects). Matched case-insensitively as substrings of validator geom names.
+_ROBOT_MOTION_LABEL_MARKERS = (
+    "hand",
+    "gripper",
+    "finger",
+    "palm",
+    "wrist",
+    "flange",
+    "robot0_",
+    "ur5e",
+    "forearm",
+    "wrist_3",
+)
+# VacuumGripper ``vac_cup`` cylinder half-height from
+# ``scripts/assets/vacuum_gripper.xml`` (``size="0.03 0.012"``).  The seal
+# face coincides with the grip TCP; held-place still reserves this axial
+# cup size above the support so vac EE collision clears the floor the same
+# way multi-finger place reserves ``finger_below`` — not only the object bbox.
+VACUUM_CUP_HALF_HEIGHT_M = 0.012
+# Radial extent of the same ``vac_cup`` collision cylinder.  Held-object slot
+# clipping reserves this footprint too, because during PLACE the cup remains
+# attached to an off-centre plate grasp and must clear the container rim itself.
+VACUUM_CUP_RADIUS_M = 0.030
+
+
+def _is_soft_contact_occupant(dimensions_m):
+    """True for broad nested platforms; false for thin utensil strips.
+
+    Soft-contact occupants forbid stacking but allow a small XY graze.  Thin
+    strips remain hard blockers (no intentional contact budget).
+    """
+    xy = np.sort(np.asarray(dimensions_m[:2], dtype=float))
+    short, long = float(xy[0]), float(xy[1])
+    if short < THIN_STRIP_MAX_SHORT_M and short / max(long, 1e-9) < THIN_STRIP_MAX_ASPECT:
+        return False
+    return True
+
+
 CONCEPTUAL_TOOL_REST_ID = 'tool_rest'
 CONCEPTUAL_TOOL_HOME_GOAL = 'conceptual_tool_home_goal'
 
@@ -65,7 +113,8 @@ def _materialize_conceptual_tool_home(request, retention):
     existing = request.world.objects.get(region_id)
     if isinstance(existing, dict) and {'pose', 'dimensions_m'} <= set(existing):
         return
-    object_id = getattr(getattr(retention, 'entry', None), 'object_id', None)
+    entry = getattr(retention, 'entry', None)
+    object_id = getattr(entry, 'scene_object_id', None) or getattr(entry, 'object_id', None)
     if object_id is None or task.target_ids != [object_id]:
         return
     if held_pose_subject(request) != object_id:
@@ -162,6 +211,72 @@ def _action(task):
     return normalize_action(task.metadata.get('operation') or task.action_type)
 
 
+def _request_uses_vacuum(request):
+    ee = str(request.task.ee or '').strip().lower()
+    return ee in {'vac', 'vacuum'}
+
+
+def _vacuum_cup_half_height_m():
+    """Axial vac-cup collision half-size used for held-place EE clearance."""
+
+    return float(VACUUM_CUP_HALF_HEIGHT_M)
+
+
+def _vacuum_place_release_clearance_m(g, collision_margin_m, base_clearance):
+    """Object↔support gap for vac place while the payload is still attached.
+
+    Thin plates seat with planner margin alone. Thicker/irregular vac payloads
+    (live bread_b on plate_b) still intersect the support during the attached
+    PLACE settle keyframe, so absolute-joint tracking never reaches KF1_2
+    (~0.036 m / 0.083 rad vs 0.005 m / 0.05 rad gates). Pad with the held
+    object's vertical half-extent plus a small tilt term from the lateral
+    footprint — geometry-driven, not object-id specific.
+    """
+
+    margin = float(collision_margin_m)
+    vertical = float(np.asarray(g.half, dtype=float)[2])
+    lateral = float(np.linalg.norm(np.asarray(g.half, dtype=float)[:2]))
+    geometry_pad = vertical + 0.15 * lateral
+    return max(float(base_clearance), margin, geometry_pad)
+
+
+def _retargeted_tcp_world_z(grip_pose, body_pose, destination_body):
+    """World-z of the grip TCP that realizes ``destination_body`` under T_GB."""
+
+    t_gb = inverse(grip_pose) @ body_pose
+    t_we = destination_body @ inverse(t_gb)
+    return float(t_we[2, 3])
+
+
+def _raise_place_for_vacuum_ee_clearance(
+        g, destination, *, support_z, release_clearance, collision_margin_m):
+    """Raise an object-space place pose until the vac TCP clears the support.
+
+    Object seating (bbox above support by ``release_clearance``) is the floor;
+    vacuum EE clearance is applied only as an additional lift when the
+    measured grasp transform would put the cup/TCP inside the planner margin.
+    """
+
+    margin = float(collision_margin_m)
+    tcp_z = _retargeted_tcp_world_z(g.T_WE, g.T_WB, destination)
+    required_tcp_z = (
+        float(support_z) + _vacuum_cup_half_height_m() + max(0., margin)
+    )
+    lift = required_tcp_z - tcp_z
+    if lift <= 1e-12:
+        return destination, float(release_clearance), 0.
+    raised = destination.copy()
+    raised[2, 3] = float(destination[2, 3]) + lift
+    anchors = g.record.setdefault('anchors', {})
+    anchors[HELD_PLACE_GOAL_ANCHOR] = (inverse(g.T_WR) @ raised)[:3, 3].tolist()
+    hint = g.task.metadata.get(HELD_PLACE_GOAL_ANCHOR)
+    if isinstance(hint, dict):
+        hint['release_clearance_m'] = float(release_clearance) + lift
+        hint['vacuum_ee_clearance_lift_m'] = float(lift)
+        hint['vacuum_ee_cup_half_height_m'] = _vacuum_cup_half_height_m()
+    return raised, float(release_clearance) + lift, float(lift)
+
+
 def _is_transport(task):
     return _action(task) in {'TRANSPORT', 'MOVE'}
 
@@ -217,6 +332,7 @@ class _Grounding:
         if pose.get('frame_id', 'world') != 'world':
             raise ValueError('TRANSPORT_REGION_WORLD_FRAME_REQUIRED')
         self.request, self.task, self.record, self.object_id = request, task, record, object_id
+        self.retention = retention
         self.T_WR = transform(pose['position_m'], rotation=Rotation.from_quat(pose['orientation_xyzw']).as_matrix())
         self.region_dims = np.asarray(record['dimensions_m'], dtype=float)
         self.region_center_local = np.asarray(record.get('anchors', {}).get('center', [0., 0., 0.]), dtype=float)
@@ -246,6 +362,8 @@ class _Grounding:
         )
         self.preserve_destination_rotation = home_orientation is not None
         self.half = np.abs(self.destination_rotation) @ self.local_size / 2.
+        from .container_orientation import configure_packing_orientation
+        configure_packing_orientation(self)
 
     def bottom_below_origin(self):
         """Depth of the object's lowest point under its body origin (world z).
@@ -351,7 +469,13 @@ class _Grounding:
         return np.maximum(self.interior_half_xy() - REGION_WALL_ALLOWANCE_M, 0.)
 
     def _occupants(self):
-        """World XY footprints (and tops) of scene objects already in the region."""
+        """World XY footprints (and tops) of scene objects already in the region.
+
+        Each entry is ``(center_xy, half_xy, top_z, soft_contact)``.
+        ``soft_contact`` marks broad nested platforms (plate/mug on a tray):
+        stacking onto them is forbidden, but seat search may graze within
+        ``OCCUPANT_CONTACT_TOLERANCE_M``.  Thin strips are hard blockers.
+        """
         cached = getattr(self, '_occupant_cache', None)
         if cached is not None:
             return cached
@@ -369,12 +493,20 @@ class _Grounding:
             R = Rotation.from_quat(pose['orientation_xyzw']).as_matrix()
             c = np.asarray(other.get('anchors', {}).get('center', [0., 0., 0.]), dtype=float)
             center = p + R @ c
-            half = np.abs(R[:2, :]) @ np.asarray(other['dimensions_m'], dtype=float) / 2.
+            dims = np.asarray(other['dimensions_m'], dtype=float)
+            half = np.abs(R[:2, :]) @ dims / 2.
+            # Destination regions often sit inside a larger container (plate on
+            # tray).  The container center can fall inside the region AABB while
+            # its footprint dwarfs the region, so treating it as a packed item
+            # makes every interior seat look blocked and free-spot search then
+            # stacks the held object onto utensils already on the plate
+            # (live bread_a → plate_a with tray_a counted as an occupant).
+            if np.any(half > self.region_half[:2] + 1e-9):
+                continue
             inside = np.all(np.abs(center[:2] - self.region_world[:2]) <= self.region_half[:2])
             if inside and center[2] >= region_bottom - 1e-6:
-                top = float(center[2] + (np.abs(R[2, :]) @ np.asarray(
-                    other['dimensions_m'], dtype=float)) / 2.)
-                out.append((center[:2], half, top))
+                top = float(center[2] + (np.abs(R[2, :]) @ dims) / 2.)
+                out.append((center[:2], half, top, _is_soft_contact_occupant(dims)))
         self._occupant_cache = out
         return out
 
@@ -394,24 +526,91 @@ class _Grounding:
         uv = slot.get('uv')
         if not (isinstance(uv, (list, tuple)) and len(uv) >= 2):
             return None
-        inner = self.usable_half_xy()
-        offset = np.clip(np.asarray(uv[:2], dtype=float), -1., 1.) * inner
-        limit = np.maximum(inner - self.half[:2], 0.)
-        return self.region_world[:2] + np.clip(offset, -limit, limit)
+        # ``uv`` is expressed in the region frame.  Using the world-axis AABB
+        # (``region_half``) here inflates a rotated region and then applies the
+        # local offset along the wrong axes.  That placed a bread slot on the
+        # rim of a rotated C3_2 plate even though the planned slot was interior.
+        inner = np.maximum(
+            self.region_dims[:2] * .5 - REGION_WALL_ALLOWANCE_M, 0.)
+        object_in_region = self.T_WR[:3, :3].T @ self.destination_rotation
+        placed_object_in_region = object_in_region
+        object_half = (
+            np.abs(object_in_region[:2, :]) @ self.local_size * .5)
+        # ``publish`` may rotate the held body by 90 degrees to fit the
+        # region's short axis.  Slot clipping happens before publish, so reserve
+        # the footprint of that orientation as well; otherwise the later yaw
+        # can turn a valid center into a rim overhang.
+        short_axis = int(np.argmin(self.region_dims[:2]))
+        long_axis = 1 - short_axis
+        extent_along_short = float(
+            np.abs(object_in_region[short_axis, :]) @ self.local_size)
+        extent_if_rotated = float(
+            np.abs(object_in_region[long_axis, :]) @ self.local_size)
+        if (
+            not self.preserve_destination_rotation
+            and extent_if_rotated + 1e-6 < extent_along_short
+        ):
+            yaw_about_region_z = np.array(
+                [[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]
+            )
+            rotated = yaw_about_region_z @ object_in_region
+            placed_object_in_region = rotated
+            object_half = np.maximum(
+                object_half,
+                np.abs(rotated[:2, :]) @ self.local_size * .5,
+            )
+        limit = np.maximum(inner - object_half, 0.)
+        lower, upper = -limit, limit
+        if _request_uses_vacuum(self.request):
+            # T_BE is the measured body→TCP transform.  Preserve the actual
+            # off-centre suction station when determining whether the cup, not
+            # only the payload bbox, fits inside the destination region.
+            t_be = inverse(self.T_WB) @ self.T_WE
+            # Slot / free-spot XY is the object bbox center, while T_BE is
+            # expressed from the body origin.  Convert the cup into the center
+            # frame before clipping or an off-centre vac grasp undershoots the
+            # rim pad by ``center_in_body``.
+            cup_from_center = (
+                np.asarray(t_be[:3, 3], dtype=float)
+                - np.asarray(self.center_in_body, dtype=float)
+            )
+            cup_offset = (placed_object_in_region @ cup_from_center)[:2]
+            # Tray collision meshes (e.g. rim geoms) sit inset from the AABB that
+            # backs ``region_dims``. wall_allowance alone can leave vac_cup
+            # inside the planner margin of those meshes (live plate_a: ~0.08 mm
+            # short of 5 mm). Reserve 2x collision margin beyond the cup disk.
+            mesh_pad = max(
+                2.0 * float(self.request.constraints.collision_margin_m), 0.01)
+            # Extra millimetre covers publish yaw / center-vs-origin numerics so
+            # the final TCP disk stays inside the padded limit, not on it.
+            cup_limit = np.maximum(
+                inner - VACUUM_CUP_RADIUS_M - mesh_pad - 0.001, 0.)
+            lower = np.maximum(lower, -cup_limit - cup_offset)
+            upper = np.minimum(upper, cup_limit - cup_offset)
+        requested = np.clip(
+            np.asarray(uv[:2], dtype=float), -1., 1.) * inner
+        if np.any(lower > upper):
+            # The region cannot contain both footprints; retain the object-safe
+            # interval and let ordinary collision validation report infeasibility.
+            lower, upper = -limit, limit
+        local_xy = self.region_center_local[:2] + np.clip(
+            requested, lower, upper)
+        local = self.region_center_local.copy()
+        local[:2] = local_xy
+        return (self.T_WR @ np.r_[local, 1.])[:2]
 
     def free_destination_xy(self):
-        """The plan's slot when it is clear, else the nearest interior spot that is.
+        """The plan's slot when it is clear enough, else the least-overlapping seat.
 
-        The search is anchored on the assigned slot (region centre when the plan
-        assigned none) and, when the region cannot hold one more footprint
-        without contact, returns the spot with the most clearance instead of
-        falling back to the anchor.  Returning the anchor put every object at
-        the same place, so each release drove the held object into the one
-        already there (c3_1: mug into the plate, all place strategies filtered).
+        Nested platforms already inside the region are stacking-forbidden: a
+        small contact tolerance is allowed, but the search never prefers resting
+        fully on them.  Thin occupants remain hard blockers.  Returning the
+        anchor whenever it was taken put every object at the same place
+        (c3_1: mug into the plate).
         """
-        margin = max(.01, float(self.request.constraints.collision_margin_m) * 2.)
         occupants = self._occupants()
         mine = self.half[:2]
+        margin = max(.01, float(self.request.constraints.collision_margin_m) * 2.)
         # 0912: 여기에 "점유자가 없으면 영역 중심을 돌려준다" 는 이른 리턴이
         # 있었다. 영역이 비어 있는 때가 바로 첫 물체를 놓는 순간이라, 계획이
         # 배정한 칸이 가장 필요한 그 배치에서 _slot_xy() 를 아예 보지 못하고
@@ -425,12 +624,23 @@ class _Grounding:
             if not occupants:
                 return float('inf')
             return min(float(np.max(np.abs(xy - c) - (h + mine + margin)))
-                       for c, h, _t in occupants)
+                       for c, h, _t, _soft in occupants)
+
+        def acceptable(xy):
+            """Clear enough: hard blockers need gap>=0; soft platforms allow a graze."""
+            if not occupants:
+                return True
+            for c, h, _t, soft in occupants:
+                gap = float(np.max(np.abs(xy - c) - (h + mine + margin)))
+                limit = -OCCUPANT_CONTACT_TOLERANCE_M if soft else 0.
+                if gap < limit:
+                    return False
+            return True
 
         anchor = self._slot_xy()
         if anchor is None:
             anchor = self.region_world[:2]
-        if clearance(anchor) >= 0.:
+        if acceptable(anchor):
             return anchor
         limit = self.usable_half_xy() - mine
         if np.any(limit <= 0.):
@@ -443,41 +653,148 @@ class _Grounding:
                              key=lambda v: (v[0] - (anchor - center_xy)[0]) ** 2
                              + (v[1] - (anchor - center_xy)[1]) ** 2):
             xy = center_xy + np.array([dx, dy])
-            gap = clearance(xy)
-            if gap >= 0.:
+            if acceptable(xy):
                 return xy
-            # No room left: stack, and stack squarely.  Ranking by clearance
-            # alone picks the spot hanging furthest off the rim of what is
-            # already there, which then topples; the footprint that sits fully
-            # on one occupant is the one that holds.
-            key = (self._supported_fraction(xy), gap,
-                   -float(np.sum((xy - anchor) ** 2)))
+            # No seat within contact policy: minimize penetration (max gap).
+            # Do not rank by resting on a stacking-forbidden platform.
+            key = (clearance(xy), -float(np.sum((xy - anchor) ** 2)))
             if best_key is None or key > best_key:
                 best, best_key = xy, key
         return best
 
-    def _supported_fraction(self, xy):
-        """Share of the footprint carried by the occupant it will actually rest on.
+    def place_xy_away_from(
+        self,
+        partner_xy,
+        *,
+        rejected_xys=(),
+        min_shift_m=0.0,
+        current_xy=None,
+        toward_partner=False,
+    ):
+        """Next in-region place XY farther from ``partner_xy`` than rejected seats.
 
-        Only the highest overlapped occupant ever touches the object; anything
-        lower never takes load, so scoring by the best supporter of any height
-        rewards a spot that is squarely on a flat item while straddling the rim
-        of something taller standing on it.  That is what put the bread on the
-        mug in c3_1 -- fully on the plate by area, resting on the mug in fact.
+        Used by collision-feedback repair when an EE/hand margin violation is
+        measured against a region occupant: keep the object AABB clear, stay
+        inside the interior, and do not reuse prior place seats.
+
+        When ``toward_partner`` is set (destination region itself is the
+        collision partner), move toward the region center instead of away from
+        it — fleeing the center drives the cup further into the rim.
         """
+        partner = np.asarray(partner_xy, dtype=float).reshape(2)
+        rejected = [
+            np.asarray(item, dtype=float).reshape(2)
+            for item in rejected_xys
+            if item is not None
+        ]
+        margin = max(.01, float(self.request.constraints.collision_margin_m) * 2.)
         mine = self.half[:2]
-        area = float(4. * mine[0] * mine[1]) or 1.
-        carried = []
-        for c, h, top in self._occupants():
-            overlap = np.minimum(xy + mine, c + h) - np.maximum(xy - mine, c - h)
-            if np.all(overlap > 0.):
-                carried.append((top, float(overlap[0] * overlap[1]) / area))
-        if not carried:
-            return 0.
-        resting_top = max(top for top, _f in carried)
-        # Occupants level with the highest one share the load; lower ones do not.
-        return round(max(f for top, f in carried
-                         if top >= resting_top - SUPPORT_LEVEL_TOLERANCE_M), 3)
+        min_shift = max(0.0, float(min_shift_m))
+        anchor = (
+            np.asarray(current_xy, dtype=float).reshape(2)
+            if current_xy is not None
+            else self.free_destination_xy()
+        )
+
+        def occupants_acceptable(xy):
+            occupants = self._occupants()
+            if not occupants:
+                return True
+            for c, h, _t, soft in occupants:
+                gap = float(np.max(np.abs(xy - c) - (h + mine + margin)))
+                limit = -OCCUPANT_CONTACT_TOLERANCE_M if soft else 0.
+                if gap < limit:
+                    return False
+            return True
+
+        def usable(xy):
+            limit = self.region_half[:2] - REGION_WALL_ALLOWANCE_M - mine
+            if np.any(limit <= 0.):
+                return False
+            if np.any(np.abs(xy - self.region_world[:2]) > limit + 1e-9):
+                return False
+            if not occupants_acceptable(xy):
+                return False
+            for prior in rejected:
+                if float(np.linalg.norm(xy - prior)) < REJECTED_PLACE_EPS_M:
+                    return False
+            anchor_dist = float(np.linalg.norm(anchor - partner))
+            cand_dist = float(np.linalg.norm(xy - partner))
+            if toward_partner:
+                # Must move at least min_shift closer to the region center.
+                if anchor_dist - cand_dist + 1e-9 < min_shift:
+                    return False
+            elif cand_dist + 1e-9 < anchor_dist + min_shift:
+                return False
+            return True
+
+        if toward_partner:
+            away = partner - anchor
+        else:
+            away = anchor - partner
+        away_norm = float(np.linalg.norm(away))
+        if away_norm < 1e-9:
+            away = self.region_world[:2] - partner
+            away_norm = float(np.linalg.norm(away))
+        if away_norm < 1e-9:
+            away = np.array([1.0, 0.0])
+            away_norm = 1.0
+        away = away / away_norm
+        # Prefer flee rays first so a small margin deficit yields a distinct seat.
+        radii = []
+        step = max(FREE_SPOT_GRID_M, min_shift if min_shift > 0 else FREE_SPOT_GRID_M)
+        reach = float(np.linalg.norm(self.region_half[:2])) + step
+        r = max(step, min_shift)
+        while r <= reach + 1e-9:
+            radii.append(r)
+            r += step
+        angles = (0.0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.57, -1.57)
+        for radius in radii:
+            for angle in angles:
+                c, s = math.cos(angle), math.sin(angle)
+                direction = np.array(
+                    [away[0] * c - away[1] * s, away[0] * s + away[1] * c]
+                )
+                xy = anchor + direction * radius
+                if usable(xy):
+                    return xy
+        # Fall back to a full interior grid ranked by distance from the partner.
+        limit = self.region_half[:2] - REGION_WALL_ALLOWANCE_M - mine
+        if np.any(limit <= 0.):
+            return None
+        center_xy = self.region_world[:2]
+        xs = np.arange(-limit[0], limit[0] + 1e-9, FREE_SPOT_GRID_M)
+        ys = np.arange(-limit[1], limit[1] + 1e-9, FREE_SPOT_GRID_M)
+        if toward_partner:
+            ranked = sorted(
+                (center_xy + np.array([dx, dy]) for dx in xs for dy in ys),
+                key=lambda xy: (
+                    float(np.linalg.norm(xy - partner)),
+                    float(np.linalg.norm(xy - anchor)),
+                ),
+            )
+        else:
+            ranked = sorted(
+                (center_xy + np.array([dx, dy]) for dx in xs for dy in ys),
+                key=lambda xy: (
+                    -float(np.linalg.norm(xy - partner)),
+                    float(np.linalg.norm(xy - anchor)),
+                ),
+            )
+        for xy in ranked:
+            if usable(xy):
+                return xy
+        return None
+
+    def _supported_fraction(self, xy):
+        """Deprecated stacking score; region occupants are never stacking supports.
+
+        Kept for call sites/tests that probe overlap geometry.  Always returns
+        0 because nested platforms are stacking-forbidden (tray seat search may
+        graze them, but must not rest on them).
+        """
+        del xy
+        return 0.
 
     def interior_top_world_z(self):
         """Highest point of anything already inside the region (rim if empty).
@@ -487,21 +804,26 @@ class _Grounding:
         mug standing on the plate (c3_1).
         """
         rim = self.region_world[2] + self.region_half[2]
-        return max([rim, *(t for _c, _h, t in self._occupants())])
+        return max([rim, *(t for _c, _h, t, _soft in self._occupants())])
 
     def support_top_world_z(self, xy):
-        """Top of whatever the object will rest on at ``xy``, and whether it stacks.
+        """Region-floor support height; occupants are never stacking surfaces.
 
-        The region floor when the spot is clear, otherwise the highest occupant
-        the footprint overlaps.  A full region has to stack, and releasing at
-        floor height then drives the object through what is already there.
+        Nested platforms inside the destination remain XY exclusion (with a
+        soft-contact budget).  Releasing on their tops would stack the held
+        object onto a plate that already occupies a tray seat.
         """
         floor = self.floor_top_world_z()
-        mine = self.half[:2]
-        tops = [t for c, h, t in self._occupants()
-                if np.all(np.abs(np.asarray(xy, dtype=float) - c) < h + mine)]
-        top = max([floor, *tops])
-        return top, bool(tops and top > floor)
+        container = self.record.get('packing_metadata', {})
+        if _action(self.task) == 'PLACE_ON' and container.get('kind') == 'CONTAINER':
+            # Rest on the container's opening plane, not its interior contents.
+            # Use the same explicit rim metadata as PackingBinding.
+            rim = float(container['opening_top_z_m'])
+            if not math.isfinite(rim) or not np.allclose(self.T_WR[:3, 2], [0., 0., 1.], atol=1e-6):
+                raise ValueError('PLACE_ON_UPRIGHT_CONTAINER_RIM_REQUIRED')
+            floor = max(floor, float(self.T_WR[2, 3] + rim))
+        del xy
+        return floor, False
 
     # -- publication ---------------------------------------------------------
     def publish(self, goal_key, start_key, desired_center, extra):
@@ -560,15 +882,23 @@ class _Grounding:
             'offset_along_approach_m': 0., 'preserve_grasp_orientation': True,
             'pose_subject': ATTACHED_OBJECT_POSE_SUBJECT,
             'object_orientation_xyzw': Rotation.from_matrix(destination[:3, :3]).as_quat().tolist(),
+            'start_object_orientation_xyzw': Rotation.from_matrix(self.T_WB[:3, :3]).as_quat().tolist(),
             'eef_orientation_xyzw': Rotation.from_matrix(self.T_WE[:3, :3]).as_quat().tolist(),
             'object_id': self.object_id, 'source': self.source, **extra}
+        if goal_key == HELD_PLACE_GOAL_ANCHOR:
+            # Withdrawal targets the empty hand, not the held object's origin.
+            # This measured entry is a candidate; post-release collision checks
+            # must still validate the open hand and the entire return path.
+            entry_eef_anchor = goal_key + '_entry_eef'
+            anchors[entry_eef_anchor] = (inverse(self.T_WR) @ self.T_WE)[:3, 3].tolist()
+            self.task.metadata[goal_key]['entry_eef_anchor'] = entry_eef_anchor
         return destination
 
 
 def _grounding_for(request, retention, predicate):
     task = request.task
     if retention is not None:
-        object_id = retention.entry.object_id
+        object_id = retention.entry.scene_object_id
         implicit = task.metadata.get('scripted_m4_implicit_object_pose', False)
     else:
         object_id = held_pose_subject(request)
@@ -576,6 +906,19 @@ def _grounding_for(request, retention, predicate):
     if not implicit or not predicate(task) or not _implicit_region_goal(task, object_id):
         return None
     return _Grounding(request, retention, object_id)
+
+
+def transport_destination_center(g):
+    """Shared exact center for transport grounding and orientation IK probes."""
+    desired_center = g.region_world.copy()
+    desired_center[:2] = g.free_destination_xy()
+    # Keep the measured object bbox clear of the rim without an arbitrary 5 cm
+    # standoff that can place a reachable kitchen destination outside UR5e reach.
+    clearance = max(.02, g.request.constraints.collision_margin_m * 2.)
+    desired_center[2] = max(g.center[2],
+                            g.interior_top_world_z() + g.half[2] + clearance)
+    from .container_orientation import packing_destination_center
+    return packing_destination_center(g, desired_center, place=False)
 
 
 def ground_held_transport(request, retention=None):
@@ -586,15 +929,14 @@ def ground_held_transport(request, retention=None):
     g = _grounding_for(request, retention, _is_transport)
     if g is None:
         return
-    desired_center = g.region_world.copy()
-    desired_center[:2] = g.free_destination_xy()
-    # Keep the measured object bbox clear of the rim without an arbitrary 5 cm
-    # standoff that can place a reachable kitchen destination outside UR5e reach.
-    clearance = max(.02, request.constraints.collision_margin_m * 2.)
-    desired_center[2] = max(g.center[2],
-                            g.interior_top_world_z() + g.half[2] + clearance)
+    desired_center = transport_destination_center(g)
     g.task.goal.target_pose = None
-    g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, {})
+    destination = g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, {})
+    from .container_release import clear_container_rim
+    raised, evidence = clear_container_rim(g, destination, retention)
+    if evidence:
+        desired_center[2] += raised[2, 3] - destination[2, 3]
+        g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, evidence)
 
 
 def ground_held_place(request, retention=None):
@@ -611,7 +953,29 @@ def ground_held_place(request, retention=None):
     g = _grounding_for(request, retention, _is_region_place)
     if g is None:
         return
+    _seat_held_place_at(g, g.free_destination_xy())
+
+
+def _seat_held_place_at(g, desired_xy):
+    """Publish held_place_goal / target_pose for bbox center ``desired_xy``."""
+    request = g.request
     release_clearance = max(REGION_FLOOR_FALLBACK_M, float(request.constraints.collision_margin_m))
+    # Multi-finger fingertips reach below the grip TCP into the region floor.
+    # Seat the held object high enough that the retargeted TCP clears that
+    # immersion plus the planner margin (same constant as acquire enclosure).
+    from tuj.m5_motion.grasp_geometry import (
+        _request_uses_multi_finger,
+        multi_finger_finger_below_tcp_m,
+    )
+    if _request_uses_multi_finger(request):
+        release_clearance = max(
+            release_clearance,
+            float(multi_finger_finger_below_tcp_m())
+            + float(request.constraints.collision_margin_m),
+        )
+    if _request_uses_vacuum(request):
+        release_clearance = _vacuum_place_release_clearance_m(
+            g, request.constraints.collision_margin_m, release_clearance)
     if g.task.metadata.get(CONCEPTUAL_TOOL_HOME_GOAL) is True:
         # A nominal pose exactly on the collision boundary can discard the
         # continuous IK branch for sub-millimetre solver error. Reserve the
@@ -622,7 +986,7 @@ def ground_held_place(request, retention=None):
             + float(request.constraints.position_tolerance_m),
         )
     desired_center = g.region_world.copy()
-    desired_center[:2] = g.free_destination_xy()
+    desired_center[:2] = np.asarray(desired_xy, dtype=float).reshape(2)
     support_z, stacked = g.support_top_world_z(desired_center[:2])
     if stacked:
         # Releasing exactly at the required margin above another object leaves
@@ -631,14 +995,224 @@ def ground_held_place(request, retention=None):
         release_clearance = max(release_clearance,
                                 float(request.constraints.collision_margin_m) * 2.)
     origin_z = support_z + release_clearance + g.bottom_below_origin()
-    desired_center[2] = g.center[2] + (origin_z - g.T_WB[2, 3])
+    desired_center[2] = origin_z + float(g.destination_rotation[2, :] @ g.center_in_body)
+    from .container_orientation import packing_destination_center
+    desired_center = packing_destination_center(g, desired_center, place=True)
+    place_extra = {
+        'release_clearance_m': release_clearance,
+        'destination_center_xy_m': [
+            float(desired_center[0]),
+            float(desired_center[1]),
+        ],
+    }
     destination = g.publish(
         HELD_PLACE_GOAL_ANCHOR, HELD_PLACE_START_ANCHOR, desired_center,
-        {'release_clearance_m': release_clearance})
+        place_extra)
+    if _request_uses_vacuum(request):
+        destination, release_clearance, lift = _raise_place_for_vacuum_ee_clearance(
+            g, destination,
+            support_z=support_z,
+            release_clearance=release_clearance,
+            collision_margin_m=request.constraints.collision_margin_m,
+        )
+        desired_center[2] += lift
+        place_extra['release_clearance_m'] = float(release_clearance)
+        if lift > 0.:
+            place_extra.update({
+                'vacuum_ee_clearance_lift_m': float(lift),
+                'vacuum_ee_cup_half_height_m': _vacuum_cup_half_height_m(),
+            })
+    from .container_release import clear_container_rim
+    raised, evidence = clear_container_rim(g, destination, g.retention)
+    if evidence:
+        desired_center[2] += raised[2, 3] - destination[2, 3]
+        destination = g.publish(HELD_PLACE_GOAL_ANCHOR, HELD_PLACE_START_ANCHOR,
+            desired_center, {**place_extra, **evidence})
     g.task.goal.target_pose = Pose(
         frame_id='world',
         position_m=tuple(float(v) for v in destination[:3, 3]),
         orientation_xyzw=tuple(float(v) for v in Rotation.from_matrix(destination[:3, :3]).as_quat()))
+    return desired_center[:2]
+
+
+def _label_matches_object_id(label: str, object_id: str) -> bool:
+    return bool(
+        label == object_id
+        or label.startswith(f"{object_id}_")
+        or label.startswith(f"{object_id}.")
+    )
+
+
+def _is_robot_motion_collision_label(label: str, request) -> bool:
+    lower = str(label).lower()
+    if any(marker in lower for marker in _ROBOT_MOTION_LABEL_MARKERS):
+        return True
+    ee = request.task.ee or request.world.metadata.get("physical_active_ee")
+    if isinstance(ee, str) and ee:
+        return label == ee or label.startswith(f"{ee}_") or label.startswith(f"{ee}.")
+    return False
+
+
+def _object_id_for_collision_label(label: str, request) -> str | None:
+    best = None
+    for object_id in request.world.objects:
+        if not _label_matches_object_id(label, object_id):
+            continue
+        if best is None or len(object_id) > len(best):
+            best = object_id
+    return best
+
+
+def _held_place_center_xy(request) -> np.ndarray | None:
+    hint = request.task.metadata.get(HELD_PLACE_GOAL_ANCHOR)
+    if isinstance(hint, dict):
+        raw = hint.get("destination_center_xy_m")
+        if isinstance(raw, (list, tuple)) and len(raw) >= 2:
+            return np.asarray(raw[:2], dtype=float)
+    pose = request.task.goal.target_pose
+    if pose is not None and pose.frame_id == "world":
+        return np.asarray(pose.position_m[:2], dtype=float)
+    return None
+
+
+def _clear_held_place_grounding(request) -> None:
+    request.task.metadata.pop(HELD_PLACE_GOAL_ANCHOR, None)
+    request.task.metadata.pop(HELD_PLACE_START_ANCHOR, None)
+    region_id = request.task.goal.target_region_id
+    record = request.world.objects.get(region_id) if region_id else None
+    if isinstance(record, dict):
+        anchors = record.get("anchors")
+        if isinstance(anchors, dict):
+            anchors.pop(HELD_PLACE_GOAL_ANCHOR, None)
+            anchors.pop(HELD_PLACE_START_ANCHOR, None)
+
+
+def _place_margin_partner_from_feedback(request, feedback):
+    """Pick the scene partner of an EE/hand margin violation, if any."""
+    if not isinstance(feedback, dict):
+        return None
+    strategies = feedback.get("failed_strategies")
+    if not isinstance(strategies, list):
+        return None
+    held_id = held_pose_subject(request)
+    region_id = request.task.goal.target_region_id
+    best = None
+    for strategy in strategies:
+        if not isinstance(strategy, dict):
+            continue
+        observations = strategy.get("collision_observations")
+        if not isinstance(observations, list):
+            continue
+        for observation in observations:
+            if not isinstance(observation, dict):
+                continue
+            try:
+                measured = float(observation.get("measured_clearance_m"))
+                required = float(observation.get("required_clearance_m"))
+            except (TypeError, ValueError):
+                continue
+            if (
+                not math.isfinite(measured)
+                or not math.isfinite(required)
+                or required < 0.0
+                or measured >= required
+            ):
+                continue
+            labels = (
+                str(observation.get("geometry_a", "")),
+                str(observation.get("geometry_b", "")),
+            )
+            robot_labels = [
+                label for label in labels
+                if _is_robot_motion_collision_label(label, request)
+            ]
+            if not robot_labels:
+                continue
+            scene_labels = [label for label in labels if label not in robot_labels]
+            partner_id = None
+            for label in scene_labels:
+                partner_id = _object_id_for_collision_label(label, request)
+                if partner_id is not None:
+                    break
+            if partner_id is None or partner_id == held_id:
+                continue
+            record = request.world.objects.get(partner_id)
+            if not isinstance(record, dict) or "pose" not in record:
+                continue
+            pose = record["pose"]
+            if pose.get("frame_id", "world") != "world":
+                continue
+            center = np.asarray(pose["position_m"], dtype=float)[:2].copy()
+            anchor = record.get("anchors", {}).get("center") if isinstance(
+                record.get("anchors"), dict
+            ) else None
+            if anchor is not None:
+                rotation = Rotation.from_quat(pose["orientation_xyzw"]).as_matrix()
+                center = center + (rotation @ np.asarray(anchor, dtype=float))[:2]
+            deficit = max(0.0, required - measured)
+            # Prefer the worst deficit; break ties toward region occupants.
+            rank = (deficit, 1.0 if partner_id == region_id else 0.0)
+            if best is None or rank > best[0]:
+                best = (rank, center, deficit, partner_id)
+    if best is None:
+        return None
+    _rank, partner_xy, deficit, partner_id = best
+    return {
+        "partner_xy": partner_xy,
+        "deficit_m": float(deficit),
+        "partner_id": partner_id,
+    }
+
+
+def reground_held_place_from_collision_feedback(request, feedback) -> bool:
+    """Rewrite ``held_place_goal`` away from a colliding partner for repair.
+
+    Returns True when a distinct in-region place seat was published. Real
+    penetration still fails later validation; this only diversifies the PLACE
+    XY that collision-feedback retries would otherwise freeze.
+    """
+    if not _is_region_place(request.task):
+        return False
+    partner = _place_margin_partner_from_feedback(request, feedback)
+    if partner is None:
+        return False
+    g = _grounding_for(request, None, _is_region_place)
+    if g is None:
+        return False
+    rejected = []
+    raw_rejected = feedback.get("rejected_place_xy_m") if isinstance(feedback, dict) else None
+    if isinstance(raw_rejected, list):
+        for item in raw_rejected:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                rejected.append([float(item[0]), float(item[1])])
+    current = _held_place_center_xy(request)
+    if current is not None:
+        rejected.append([float(current[0]), float(current[1])])
+    min_shift = float(partner["deficit_m"]) + float(
+        request.constraints.collision_margin_m
+    )
+    # Destination-region partners are rim/floor geoms: move toward the region
+    # center. Fleeing the region center pushes an off-centre vac cup deeper
+    # into the wall that already failed margin.
+    toward_region = (
+        partner["partner_id"] == request.task.goal.target_region_id
+    )
+    next_xy = g.place_xy_away_from(
+        partner["partner_xy"],
+        rejected_xys=rejected,
+        min_shift_m=min_shift,
+        current_xy=current,
+        toward_partner=toward_region,
+    )
+    if next_xy is None:
+        return False
+    _clear_held_place_grounding(request)
+    seated = _seat_held_place_at(g, next_xy)
+    if isinstance(feedback, dict):
+        feedback["rejected_place_xy_m"] = rejected
+        feedback["reground_place_partner_id"] = partner["partner_id"]
+        feedback["reground_place_xy_m"] = [float(seated[0]), float(seated[1])]
+    return True
 
 
 def ground_held_region_goal(request, retention=None):

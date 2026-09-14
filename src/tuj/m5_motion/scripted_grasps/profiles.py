@@ -60,7 +60,8 @@ def configure_environment(env, environment, ee):
         # kitchen home. A bare start fetches its EE from the rack, and every
         # commissioned rack path begins at TOOL_USE_JOURNAL_BARE_HOME_QPOS --
         # overriding it here put the arm 1.99 rad from that seam and no cached
-        # path could start (c3_1: START_STATE_MISMATCH on bare->vac).
+        # path could start (c3_1: START_STATE_MISMATCH on bare->vac). Tabletop
+        # and kitchen rack caches both expect that bare home when ee is None.
         env.robot_configs[0]["initial_qpos"] = [0., -1.8, 1.2, -.97, -1.57, 0.]
     corrected = not (environment == "C1_2_DoughFlatten" and ee == "3F")
     env._load_model()

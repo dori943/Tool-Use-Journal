@@ -154,7 +154,37 @@ def truncate_after_subgoal(selected: SelectedPlan, subgoal_id: str) -> SelectedP
         raise GenericMotionRunnerError(
             f"--stop-after-subgoal {subgoal_id!r} is not in SelectedPlan"
         ) from error
-    kept_order = list(selected.subgoal_order[: stop_index + 1])
+    return slice_subgoal_range(
+        selected, selected.subgoal_order[0], selected.subgoal_order[stop_index]
+    )
+
+
+def slice_subgoal_range(
+    selected: SelectedPlan,
+    start_subgoal_id: str,
+    stop_subgoal_id: str,
+) -> SelectedPlan:
+    """Keep an inclusive contiguous subgoal window for diagnostic live runs."""
+
+    order = list(selected.subgoal_order)
+    try:
+        start_index = order.index(start_subgoal_id)
+    except ValueError as error:
+        raise GenericMotionRunnerError(
+            f"--start-from-subgoal {start_subgoal_id!r} is not in SelectedPlan"
+        ) from error
+    try:
+        stop_index = order.index(stop_subgoal_id)
+    except ValueError as error:
+        raise GenericMotionRunnerError(
+            f"--stop-after-subgoal {stop_subgoal_id!r} is not in SelectedPlan"
+        ) from error
+    if start_index > stop_index:
+        raise GenericMotionRunnerError(
+            f"subgoal range is empty: start {start_subgoal_id!r} is after "
+            f"stop {stop_subgoal_id!r}"
+        )
+    kept_order = order[start_index : stop_index + 1]
     kept = set(kept_order)
     payload = selected.model_dump(mode="python")
     payload["subgoal_order"] = kept_order
@@ -167,6 +197,68 @@ def truncate_after_subgoal(selected: SelectedPlan, subgoal_id: str) -> SelectedP
         step for step in selected.steps if step.subgoal_id in kept
     ]
     return SelectedPlan.model_validate(payload)
+
+
+def resolve_object_subgoal(
+    selected: SelectedPlan,
+    object_id: str,
+    *,
+    which: str,
+) -> str:
+    """Map a scene object id to the first/last SelectedPlan subgoal that targets it."""
+
+    if which not in {"first", "last"}:
+        raise ValueError(f"which must be 'first' or 'last', got {which!r}")
+    by_id = {
+        assignment.subgoal_id: assignment
+        for assignment in selected.candidate_assignments
+    }
+    matches = [
+        subgoal_id
+        for subgoal_id in selected.subgoal_order
+        if object_id in list(getattr(by_id.get(subgoal_id), "target_ids", ()) or ())
+    ]
+    if not matches:
+        raise GenericMotionRunnerError(
+            f"object {object_id!r} is not targeted by any SelectedPlan subgoal"
+        )
+    return matches[0] if which == "first" else matches[-1]
+
+
+def apply_selected_plan_window(
+    selected: SelectedPlan,
+    *,
+    start_subgoal_id: str | None = None,
+    stop_subgoal_id: str | None = None,
+    start_object_id: str | None = None,
+    stop_object_id: str | None = None,
+) -> SelectedPlan:
+    """Apply start/stop filters from subgoal ids and/or target object ids."""
+
+    if start_subgoal_id and start_object_id:
+        raise GenericMotionRunnerError(
+            "use only one of --start-from-subgoal / --start-from-object"
+        )
+    if stop_subgoal_id and stop_object_id:
+        raise GenericMotionRunnerError(
+            "use only one of --stop-after-subgoal / --stop-after-object"
+        )
+    start = start_subgoal_id
+    stop = stop_subgoal_id
+    if start_object_id:
+        start = resolve_object_subgoal(selected, start_object_id, which="first")
+    if stop_object_id:
+        stop = resolve_object_subgoal(selected, stop_object_id, which="last")
+    if start is None and stop is None:
+        return selected
+    order = list(selected.subgoal_order)
+    if not order:
+        raise GenericMotionRunnerError("SelectedPlan has no subgoals to slice")
+    return slice_subgoal_range(
+        selected,
+        start if start is not None else order[0],
+        stop if stop is not None else order[-1],
+    )
 
 
 def default_constraints(world: WorldSnapshot) -> MotionConstraints:
@@ -384,11 +476,13 @@ class ToolUseJournalPlannerPool:
         ee_attach_policy: EEAttachPolicy | str = EEAttachPolicy.PRECOMPUTED_REQUIRED,
         ee_attach_start_tolerance_rad: float = 0.01,
         provider: Any | None = None,
+        debug_dir: Path | None = None,
         final_plan_validator: Any | None = None,
     ) -> None:
         self.repository = repository
         self.seed = seed
         self.provider = provider
+        self.debug_dir = debug_dir
         self.final_plan_validator = final_plan_validator
         self.ee_attach_registry_root = ee_attach_registry_root
         self.ee_attach_trajectory_paths = tuple(ee_attach_trajectory_paths)
@@ -434,6 +528,7 @@ class ToolUseJournalPlannerPool:
                     self.ee_attach_start_tolerance_rad
                 ),
                 provider=self.provider,
+                debug_dir=self.debug_dir,
             )
             self._planners[key] = planner
         if self.final_plan_validator is not None:
@@ -1012,8 +1107,26 @@ def _parser(repository: Path) -> argparse.ArgumentParser:
         ),
     )
     parser.add_argument(
+        "--start-from-subgoal",
+        help="plan and execute starting at this subgoal (inclusive)",
+    )
+    parser.add_argument(
         "--stop-after-subgoal",
         help="plan and execute through this subgoal, then stop",
+    )
+    parser.add_argument(
+        "--start-from-object",
+        help=(
+            "start at the first SelectedPlan subgoal targeting this scene object "
+            "id (e.g. fork_b); mounts that subgoal's EE when --initial-ee is bare"
+        ),
+    )
+    parser.add_argument(
+        "--stop-after-object",
+        help=(
+            "stop after the last SelectedPlan subgoal targeting this scene object "
+            "id (e.g. mug_a)"
+        ),
     )
     parser.add_argument(
         "--headless",
@@ -1164,9 +1277,43 @@ def main(
             acquire_task_metadata["grasp_profile"] = dict(raw_grasp_profile)
         selected, envelope = load_selected_plan(task_planner)
         if args.stop_after_pick:
+            if (
+                args.start_from_subgoal
+                or args.stop_after_subgoal
+                or args.start_from_object
+                or args.stop_after_object
+            ):
+                parser.error(
+                    "--stop-after-pick cannot be combined with subgoal/object "
+                    "range filters"
+                )
             selected = truncate_after_first_acquire(selected)
-        if args.stop_after_subgoal:
-            selected = truncate_after_subgoal(selected, args.stop_after_subgoal)
+        else:
+            selected = apply_selected_plan_window(
+                selected,
+                start_subgoal_id=args.start_from_subgoal,
+                stop_subgoal_id=args.stop_after_subgoal,
+                start_object_id=args.start_from_object,
+                stop_object_id=args.stop_after_object,
+            )
+            # Mid-plan windows usually begin after an earlier EE attach. When
+            # the caller left the flange bare, mount the sliced plan's EE so
+            # KEEP_EE / scripted grasps see the expected gripper.
+            if (
+                (args.start_from_subgoal or args.start_from_object)
+                and _parse_initial_ee(args.initial_ee) is None
+                and selected.candidate_assignments
+            ):
+                start_assignment = next(
+                    (
+                        assignment
+                        for assignment in selected.candidate_assignments
+                        if assignment.subgoal_id == selected.subgoal_order[0]
+                    ),
+                    selected.candidate_assignments[0],
+                )
+                if start_assignment.ee:
+                    args.initial_ee = str(start_assignment.ee)
         if args.initial_world is not None:
             world = load_world(args.initial_world.expanduser().resolve())
             world_environment = world.metadata.get("environment_name")
@@ -1216,6 +1363,15 @@ def main(
             from tuj.m5_motion.geometry_evidence import integrate_m1_geometry
 
             scene_geometry = _read_json(args.scene_geometry.expanduser().resolve())
+            if (
+                not isinstance(scene_geometry, Mapping)
+                or not isinstance(scene_geometry.get("geometry_metadata"), Mapping)
+            ):
+                raise GeometryEvidenceError(
+                    "M1 geometry_metadata is required; implicit coordinate frames "
+                    "are unsafe. Re-run M1 to emit M1_GEOMETRY_V2 metadata, or omit "
+                    "--scene-geometry to plan against the MuJoCo world alone."
+                )
             raw_aliases = (
                 _read_json(args.id_aliases.expanduser().resolve())
                 if args.id_aliases is not None
@@ -1369,7 +1525,10 @@ def main(
         envelope.get("artifact_id")
         or f"task-planner:selected-plan:{selected_hash[:24]}"
     )
-    planner_pool_options: dict[str, Any] = {"seed": args.seed}
+    planner_pool_options: dict[str, Any] = {
+        "seed": args.seed,
+        "debug_dir": output_dir / "debug",
+    }
     if args.provider == "gemini":
         from tuj.m5_motion.gemini_provider import GeminiKeyframeProvider, GeminiKeyframeProviderConfig
         config = GeminiKeyframeProviderConfig.from_environment(
@@ -1437,6 +1596,7 @@ def main(
         if args.realtime_factor is not None
         else (1.0 if show_viewer else 0.0)
     )
+
     planners = None
     live_session = None
     try:
@@ -1480,14 +1640,7 @@ def main(
             options=options,
             selected_plan_artifact_id=artifact_id,
         )
-        if live_session is not None:
-            live_session.complete(
-                video_hold_seconds=args.video_hold_seconds,
-                viewer_hold_seconds=args.hold_seconds,
-            )
     except Exception as error:
-        if live_session is not None:
-            live_session.mark_failure(error)
         execution_failed = (
             live_session is not None and live_session.records
             and live_session.records[-1].get("status") == "FAILED"
@@ -1518,8 +1671,6 @@ def main(
     finally:
         if planners is not None:
             planners.close()
-        if live_session is not None:
-            live_session.close()
 
     summary = {
         **report,
@@ -1555,6 +1706,7 @@ __all__ = [
     "GenericMotionRunnerError",
     "GenericSimulationVideoRecorder",
     "ToolUseJournalPlannerPool",
+    "apply_selected_plan_window",
     "capture_initial_world",
     "default_constraints",
     "execute_planning_result",
@@ -1562,6 +1714,8 @@ __all__ = [
     "load_keyframe_artifact",
     "load_world",
     "main",
+    "resolve_object_subgoal",
+    "slice_subgoal_range",
     "truncate_after_first_acquire",
     "truncate_after_subgoal",
     "validate_selected_plan",

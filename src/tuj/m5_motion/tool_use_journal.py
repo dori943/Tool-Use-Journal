@@ -400,6 +400,15 @@ def _object_record(
         }
     if collision_points is not None:
         record["collision_points_m"] = collision_points.tolist()
+    if len(collision_ids) == 1 and model.geom_type[collision_ids[0]] == mujoco.mjtGeom.mjGEOM_BOX:
+        gid = collision_ids[0]
+        body_rotation = data.xmat[body_id].reshape(3, 3)
+        record["solid_box_geometry"] = {
+            "source": "MUJOCO_BOX",
+            "half_size_m": model.geom_size[gid].tolist(),
+            "center_in_body_m": (body_rotation.T @ (data.geom_xpos[gid] - data.xpos[body_id])).tolist(),
+            "rotation_in_body": (body_rotation.T @ data.geom_xmat[gid].reshape(3, 3)).tolist(),
+        }
     free_joints = [
         _name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
         for joint_id in range(model.njnt)
@@ -1278,6 +1287,12 @@ class ToolUseJournalCollisionModelCompiler:
             ee: f"tool-use-journal-{environment_tag}-{ee}-attached-{revision_tag}-v1"
             for ee in sorted(_EXPECTED_EES)
         }
+        # Instance-local only.  with_reference_environment() constructs a new
+        # compiler, so refreshed reference joint state never reuses stale
+        # compiled baselines.  MjData is not cached here.
+        self._compiled_models: dict[
+            str | None, CompiledToolUseJournalCollisionModel
+        ] = {}
 
     @classmethod
     def from_environments(
@@ -1465,6 +1480,9 @@ class ToolUseJournalCollisionModelCompiler:
     def compile(
         self, active_ee: str | None
     ) -> CompiledToolUseJournalCollisionModel:
+        cached = self._compiled_models.get(active_ee)
+        if cached is not None:
+            return cached
         version = self.model_version_for(active_ee)
         capture = self._captures[active_ee]
         root = ET.fromstring(capture.source_mjcf)
@@ -1524,7 +1542,7 @@ class ToolUseJournalCollisionModelCompiler:
                 f"compiled model {version!r} lost collision entities "
                 f"{sorted(missing_required)}"
             )
-        return CompiledToolUseJournalCollisionModel(
+        compiled = CompiledToolUseJournalCollisionModel(
             model=model,
             collision_model_version=version,
             active_ee=active_ee,
@@ -1535,6 +1553,8 @@ class ToolUseJournalCollisionModelCompiler:
             promoted_rack_geom_names=promoted,
             mjcf_sha256=hashlib.sha256(compiled_xml.encode("utf-8")).hexdigest(),
         )
+        self._compiled_models[active_ee] = compiled
+        return compiled
 
     def build_collision_registry(
         self,

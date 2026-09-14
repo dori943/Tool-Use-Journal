@@ -1,5 +1,5 @@
 """Explicit, scene-scoped dispatch. Importing this module creates no simulator."""
-from dataclasses import dataclass
+from dataclasses import dataclass, replace
 from importlib import import_module
 from inspect import signature
 
@@ -13,6 +13,14 @@ class GraspEntry:
     ee: str
     driver: str
     module_name: str | None = None
+    # When set, MuJoCo body / attachment id for multi-instance scenes
+    # (``plate_b``). Recipe modules still key off ``object_id`` (``plate``).
+    body_object_id: str | None = None
+    recipe_name: str | None = None
+
+    @property
+    def scene_object_id(self) -> str:
+        return self.body_object_id or self.object_id
 
     def recipe(self):
         name = self.module_name or self.object_id
@@ -23,7 +31,7 @@ class GraspEntry:
             # 팩토리가 받는 인자만 골라 넘긴다. 인자를 안 받는 기존 레시피는
             # 그대로 호출되고, environment/object_id 를 선언한 레시피는 자기
             # 환경을 알게 되어 실행 기록의 task_id 가 실제 태스크와 맞는다.
-            factory = getattr(module, name + "_recipe")
+            factory = getattr(module, self.recipe_name or name + "_recipe")
             accepted = signature(factory).parameters
             arguments = {key: value for key, value in
                          (("environment", self.environment),
@@ -34,8 +42,10 @@ class GraspEntry:
             # Spoon has independently calibrated 2F and 3F recipes.  The EE
             # chosen by M4 is part of the dispatch key, so recipe selection
             # must preserve that choice instead of falling back to the 2F
-            # dataclass default.
-            return module.spoon_recipe(self.ee,self.environment)
+            # dataclass default. C3_2 also selects the thin-handle asset.
+            asset = "c3_2" if self.environment.startswith("C3_2") else "default"
+            return module.spoon_recipe(
+                self.ee, self.environment, asset=asset)
         return getattr(module, self.object_id.title() + "Recipe")()
 
     def function(self):
@@ -51,10 +61,10 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # 있으면 M4 의 constrain_task_request 가 SCRIPTED_GRASP_EE_INFEASIBLE 로 멈춘다.
     # C2_1 에서 검증된 흡착 레시피를 그대로 쓴다 (같은 접시 자산). resolve() 가
     # EE 로 매칭하므로 위 2F 항목과 공존한다.
-    # 주의: plate_vac_recipe() 의 task_id 가 'c2_1' 로 고정돼 있어 실행 기록에는
-    # C1_1 작업도 c2_1 로 남는다. 동작에는 영향이 없다 (catalog_types 는 task_id 를
-    # 화이트리스트로만 검사하고 dispatch_grasp 는 object_id 만 대조한다).
-    ("plate", "C1_1_LegoSweep", "vac", "catalog", "plate_vac"),
+    # 주의: C1_1 vac 는 plate_vac_c1_1_recipe (flat, zero seating immersion) 를
+    # 쓴다. C2_1 의 -0.5 mm 좌석은 table_collision 위에서 접시를 눌러 LIFT 시
+    # early-support 면제 한도(~2 mm)를 넘긴다. 기본 plate_vac_recipe() 는 C3_2 rim.
+    ("plate", "C1_1_LegoSweep", "vac", "catalog", "plate_vac", None, "plate_vac_c1_1_recipe"),
     ("bottle", "C1_2_DoughFlatten", "3F", "bottle"),
     ("spatula", "C1_2_DoughFlatten", "3F", "spatula"),
     ("spoon", "C1_2_DoughFlatten", "2F", "spoon"),
@@ -77,24 +87,19 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     # the 2F ``plate`` driver used at C1_1 (objects/plate.py / grasp_plate).
     ("spoon", "C2_1_ObjectSorting", "2F", "spoon"),
     ("spoon", "C2_1_ObjectSorting", "3F", "spoon"),
-    ("spoon", "C3_1_ObjectSorting", "3F", "spoon"),
-    ("plate", "C2_1_ObjectSorting", "vac", "catalog", "plate_vac"),
+    ("plate", "C2_1_ObjectSorting", "vac", "catalog", "plate_vac", None, "plate_vac_c2_1_recipe"),
     # 0912: C3_1 도 정렬 태스크라 M4 가 접시에 vac EE 를 물리는데, C3_1 용 plate
     # 항목이 없어 resolve() 가 매칭 실패(matches 빈 리스트) → generic M5 파지로
     # 폴백했고, 그 진공 파지가 접시 표면을 못 짚어 CONTACT_COUNT=0, normal_force=0
     # 으로 BREAKABLE_WELD 접촉 계약이 깨졌다 (C1_1/C2_1 주석의 그 실패 모드).
-    # 같은 접시 자산이므로 C2_1 에서 검증된 흡착 레시피(objects/plate_vac.py)를
-    # 그대로 재사용한다. plate_vac_recipe().task_id 는 'c2_1' 고정이라 실행 기록에
-    # C3_1 작업도 c2_1 로 남지만 동작에는 영향 없다 (C1_1 항목과 동일).
+    # environment-aware plate_vac_recipe() 가 C3_1 flat seating 을 고른다.
     ("plate", "C3_1_ObjectSorting", "vac", "catalog", "plate_vac"),
-    # 0912: 아래 네 줄은 main 에서 사라져 있었다. 테스트는 그대로 남아 있어
-    # (test_excluded_unknown_and_wrong_hand 의 스푼 6개 경로,
-    # test_plate_vac_routes_are_task_and_instance_scoped 의 plate_a/plate_b)
-    # main 단독으로도 빨간 상태였다. PR #71 이 스푼 4줄을 날린 것과 같은 사고다.
+    # 0909/0912: C3_1 spoon routes (kept once; merge had duplicated the pair).
     ("spoon", "C3_1_ObjectSorting", "2F", "spoon"),
     ("spoon", "C3_1_ObjectSorting", "3F", "spoon"),
-    ("plate_a", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac"),
-    ("plate_b", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac"),
+    # Exact C3_2 instance ids (main) plus type-keyed plate entry below.
+    ("plate_a", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac", None, "plate_vac_c3_2_recipe"),
+    ("plate_b", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac", None, "plate_vac_c3_2_recipe"),
     ("apple", "C2_1_ObjectSorting", "3F", "catalog"),
     ("bread", "C2_1_ObjectSorting", "3F", "catalog"),
     ("mug", "C2_1_ObjectSorting", "3F", "catalog"),
@@ -139,24 +144,32 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     ("cereal", "C4_2_DiagonalFitPacking", "2F", "catalog"),
     ("milk", "C4_2_DiagonalFitPacking", "3F", "catalog"),
     ("lid", "C4_2_DiagonalFitPacking", "vac", "catalog"),
-    # 0912: C4_1 (IntervalFitExtraction, RoboCasa kitchen) picks a thin spatula
-    # off the island to reach a card in the appliance gap. The tool lies flush
-    # on the counter, so the generic M5 pick drove the 2F fingertips into the
-    # island top and every generated grasp was collision-filtered. This scripted
-    # 2F recipe routes the pick through the catalog path, which treats the island
-    # top as the support surface (handles fingertip proximity like a tabletop
-    # pick). M4 may select any tool that clears the horizontal gap_accessible
-    # check (knife / spatula_a / spatula_b — all reach ~66 mm horizontally and fit
-    # the 52 mm gap), so all three carry a C4_1 2F pick recipe (each keyed to its
-    # own bbox; a catalog recipe validates the record dims against expected_size).
-    ("tool_1_knife", "C4_1_IntervalFitExtraction", "2F", "catalog", "knife_c4_1"),
-    ("tool_2_spatula_a", "C4_1_IntervalFitExtraction", "2F", "catalog", "spatula_c4_1"),
-    ("tool_3_spatula_b", "C4_1_IntervalFitExtraction", "2F", "catalog", "spatula_b_c4_1"),
+    # C3_2 breakfast tray: type-keyed recipes; *_a/*_b resolve via instance
+    # suffix → type, with body_object_id = request target.
+    ("plate", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "plate_vac", None, "plate_vac_c3_2_recipe"),
+    ("fork", "C3_2_BreakfastTrayPreparation", "3F", "catalog"),
+    # Breakfast bread: M4 may mount 3F or vac. Both keep a scripted path —
+    # 3F enclosure (C2_1 pattern + C3_2 AABB) and vac top-face attach.
+    ("bread", "C3_2_BreakfastTrayPreparation", "3F", "catalog", "bread", None, "bread_3f_c3_2_recipe"),
+    ("bread", "C3_2_BreakfastTrayPreparation", "vac", "catalog", "bread_vac"),
+    ("fruit", "C3_2_BreakfastTrayPreparation", "3F", "catalog"),
+    ("spoon", "C3_2_BreakfastTrayPreparation", "3F", "spoon"),
+    ("mug", "C3_2_BreakfastTrayPreparation", "3F", "catalog", "mug_c3_2"),
 ))
 
-# Optional alternatives remain an explicit extension point. The repository does
-# not select object- or scene-specific alternatives in the generic M5 path.
+# C1_1 plate+vac is a primary ENTRIES row (flat zero-immersion seating) so M4's
+# EE feasibility check can select it alongside the validated 2F plate entry.
 ALTERNATIVE_ENTRIES: tuple[GraspEntry, ...] = ()
+
+# Explicit validator-only feasibility probes. They do not alter M4 choices or
+# the normal M5 registry surface.
+VALIDATOR_EXPERIMENTAL_ENTRIES: tuple[GraspEntry, ...] = (
+    GraspEntry("bread", "C3_2_BreakfastTrayPreparation", "2F", "catalog",
+               "bread", recipe_name="bread_2f_c3_2_recipe"),
+    GraspEntry("spoon", "C3_2_BreakfastTrayPreparation", "2F", "spoon"),
+    GraspEntry("fork", "C3_2_BreakfastTrayPreparation", "2F", "catalog",
+               "fork", recipe_name="fork_2f_c3_2_recipe"),
+)
 
 # Exact M1 identifiers only; no substring or fuzzy matching of object names.
 ALIASES = {f"obj_{e.object_id}_{e.object_id}": e.object_id for e in ENTRIES}
@@ -165,9 +178,17 @@ ALIASES = {f"obj_{e.object_id}_{e.object_id}": e.object_id for e in ENTRIES}
 # visibly distinct from validated entries in every execution artifact. A failed
 # experimental grasp still stops the task; it is never replaced by an LLM grasp.
 EXPERIMENTAL_INTEGRATION = {
-    "plate": "2F recipe is connected for C1_1 and the C2_1 vacuum recipe is reused "
-             "there for the sweep tool; physical validation of a suction-held sweep "
-             "is pending",
+    "plate": "vacuum routes are task-scoped for C1_1, C2_1, C3_1 and C3_2; the "
+             "C1_1 2F grasp and suction-held sweep still require physical validation",
+    "fork": "C3_2 3F fork recipe connected; physical validation is pending",
+    "fruit": "C3_2 3F fruit recipe connected; physical validation is pending",
+}
+# Object ids that already have validated non-C3_2 recipes stay out of
+# EXPERIMENTAL_INTEGRATION; only the C3_2 registrations are experimental.
+EXPERIMENTAL_ENTRY_KEYS = {
+    ("bread", "C3_2_BreakfastTrayPreparation"),
+    ("spoon", "C3_2_BreakfastTrayPreparation"),
+    ("mug", "C3_2_BreakfastTrayPreparation"),
 }
 PENDING_INTEGRATION = {}
 ENABLED_ENTRIES = tuple(entry for entry in ENTRIES if entry.object_id not in PENDING_INTEGRATION)
@@ -178,6 +199,10 @@ def integration_status(entry):
         return "BLOCKED"
     if entry in ALTERNATIVE_ENTRIES:
         return "VALIDATED"
+    if entry in VALIDATOR_EXPERIMENTAL_ENTRIES:
+        return "EXPERIMENTAL"
+    if (entry.object_id, entry.environment) in EXPERIMENTAL_ENTRY_KEYS:
+        return "EXPERIMENTAL"
     if entry.object_id in EXPERIMENTAL_INTEGRATION:
         return "EXPERIMENTAL"
     return "VALIDATED"
@@ -185,6 +210,20 @@ def integration_status(entry):
 
 class ScriptedGraspUnavailable(RuntimeError):
     pass
+
+
+def _recipe_keys_for_target(target: str, environment: str) -> tuple[str, ...]:
+    """Exact id first; optional ``type_a`` / ``type_b`` → ``type`` for that env."""
+
+    keys = [target]
+    if len(target) > 2 and target[-2:] in {"_a", "_b"}:
+        base = target[:-2]
+        if any(
+            entry.object_id == base and entry.environment == environment
+            for entry in ENTRIES + ALTERNATIVE_ENTRIES + VALIDATOR_EXPERIMENTAL_ENTRIES
+        ):
+            keys.append(base)
+    return tuple(keys)
 
 
 def resolve(request):
@@ -197,6 +236,9 @@ def resolve(request):
     disagreement never hard-stops the task.  The scripted recipe is used only
     when the mounted EE matches; otherwise M5 plans the grasp with the mounted
     EE and the controller preview still physically validates it.
+
+    Multi-instance scenes (``plate_b``) may resolve a type-keyed entry
+    (``plate``) while preserving the request target as ``body_object_id``.
     """
     if not is_acquire_task(request.task):
         return None
@@ -208,12 +250,29 @@ def resolve(request):
         target = task.tool
     target = ALIASES.get(target, target)
     environment = request.world.metadata.get("environment_name")
-    matches = [e for e in ENTRIES + ALTERNATIVE_ENTRIES
-               if (e.object_id, e.environment) == (target, environment)]
+    candidates = ENTRIES + ALTERNATIVE_ENTRIES
+    if task.metadata.get("scripted_grasp_validator_experimental", False):
+        candidates += VALIDATOR_EXPERIMENTAL_ENTRIES
+    matched_key = None
+    matches: list[GraspEntry] = []
+    for key in _recipe_keys_for_target(target, environment):
+        matches = [
+            e
+            for e in candidates
+            if (e.object_id, e.environment) == (key, environment)
+        ]
+        if matches:
+            matched_key = key
+            break
     for entry in matches:
         if task.ee == entry.ee:
-            if target in PENDING_INTEGRATION:
-                raise ScriptedGraspUnavailable(f"SCRIPTED_GRASP_NOT_VALIDATED: {target}: {PENDING_INTEGRATION[target]}")
+            if entry.object_id in PENDING_INTEGRATION:
+                raise ScriptedGraspUnavailable(
+                    f"SCRIPTED_GRASP_NOT_VALIDATED: {entry.object_id}: "
+                    f"{PENDING_INTEGRATION[entry.object_id]}"
+                )
+            if matched_key != target:
+                return replace(entry, body_object_id=target)
             return entry
     if matches:
         supported = '/'.join(e.ee for e in matches)
