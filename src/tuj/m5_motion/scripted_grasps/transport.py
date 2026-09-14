@@ -36,6 +36,10 @@ HELD_PLACE_START_ANCHOR = 'held_place_start'
 # fallback floor thickness when the region has no usable collision points.
 REGION_WALL_ALLOWANCE_M = 0.02
 REGION_FLOOR_FALLBACK_M = 0.005
+# Thickness of the band at the floor top whose vertices define the interior
+# footprint.  Wide enough to catch a slab meshed a few millimetres apart,
+# narrow enough to exclude the wall above it.
+_FLOOR_BAND_M = 0.004
 FREE_SPOT_GRID_M = 0.01
 # Body-frame XY aspect for nested platforms vs thin utensil strips.  Broad
 # occupants inside a destination (plate/mug on a tray) are stacking-forbidden
@@ -328,6 +332,7 @@ class _Grounding:
         if pose.get('frame_id', 'world') != 'world':
             raise ValueError('TRANSPORT_REGION_WORLD_FRAME_REQUIRED')
         self.request, self.task, self.record, self.object_id = request, task, record, object_id
+        self.retention = retention
         self.T_WR = transform(pose['position_m'], rotation=Rotation.from_quat(pose['orientation_xyzw']).as_matrix())
         self.region_dims = np.asarray(record['dimensions_m'], dtype=float)
         self.region_center_local = np.asarray(record.get('anchors', {}).get('center', [0., 0., 0.]), dtype=float)
@@ -357,6 +362,8 @@ class _Grounding:
         )
         self.preserve_destination_rotation = home_orientation is not None
         self.half = np.abs(self.destination_rotation) @ self.local_size / 2.
+        from .container_orientation import configure_packing_orientation
+        configure_packing_orientation(self)
 
     def bottom_below_origin(self):
         """Depth of the object's lowest point under its body origin (world z).
@@ -384,6 +391,14 @@ class _Grounding:
         walls, and its highest point at or below the body center is the floor
         top.  Falls back to bottom + a nominal slab thickness.
         """
+        floor_local = self.floor_top_local()
+        return float((self.T_WR @ np.r_[self.region_center_local[0], self.region_center_local[1], floor_local, 1.])[2])
+
+    def floor_top_local(self):
+        """Floor top in region-local z; shared with interior_half_xy()."""
+        cached = getattr(self, '_floor_local_cache', None)
+        if cached is not None:
+            return cached
         bottom_local = self.region_center_local[2] - self.region_dims[2] / 2.
         floor_local = bottom_local + REGION_FLOOR_FALLBACK_M
         points = self.record.get('collision_points_m')
@@ -394,11 +409,64 @@ class _Grounding:
                 mask = (np.abs(rel[:, 0]) <= self.region_dims[0] * fraction) & \
                        (np.abs(rel[:, 1]) <= self.region_dims[1] * fraction)
                 if mask.sum() >= 4:
-                    lower = P[mask, 2][P[mask, 2] <= self.region_center_local[2] + 1e-9]
-                    if lower.size:
-                        floor_local = max(floor_local, float(lower.max()))
+                    # 0912: 중심 이하만 보는 이 필터는 용기의 벽을 걸러내려는
+                    # 것인데, 속이 찬 물체 위에 얹는 place_on 에서는 물체의
+                    # 한가운데를 지지면으로 돌려준다. c2_2 가 터키를 빵 위에
+                    # 올리는 단계에서 EEF 를 z=0.945646 (빵 중심 0.94602, 윗면
+                    # 0.95748) 에 두어 흡착컵이 빵을 7.8~9.6mm 파고들었고 전략
+                    # 11개가 전부 기각됐다.
+                    #
+                    # 둘은 같은 점군으로 갈린다. 용기는 테두리가 중앙 발자국
+                    # 바깥에 있어 중앙 점들이 중심 이하에서 끝나고, 속이 찬
+                    # 물체는 중앙 점들이 꼭대기까지 올라간다. 중앙 최고점이
+                    # 중심보다 위면 그 점이 곧 얹는 면이다.
+                    central = P[mask, 2]
+                    highest = float(central.max())
+                    if highest > self.region_center_local[2] + 1e-9:
+                        floor_local = highest
+                    else:
+                        lower = central[central <= self.region_center_local[2] + 1e-9]
+                        if lower.size:
+                            floor_local = max(floor_local, float(lower.max()))
                     break
-        return float((self.T_WR @ np.r_[self.region_center_local[0], self.region_center_local[1], floor_local, 1.])[2])
+        self._floor_local_cache = float(floor_local)
+        return self._floor_local_cache
+
+    def interior_half_xy(self):
+        """Region interior half extent (XY), measured rather than assumed.
+
+        ``dimensions_m`` is the region's bounding box, and a tray whose rim
+        flares outward sets that box by the rim alone: blue_tray measures
+        0.1966 m in y at the top band and about 0.172 m at every band below it.
+        Subtracting a fixed wall allowance from the box therefore reports
+        interior that does not exist (0.1766 m in y against a floor that ends
+        at 0.1672 m), and a place aimed there rests the object on the wall --
+        13.6 mm above its commanded pose, pushed sideways until one finger pad
+        unloads and the grasp monitor stops the task (c3_1 apple).
+
+        The floor slab is the honest interior: take the collision vertices at
+        the floor top and use their extent.  Falls back to the bounding box
+        when a region carries no collision geometry, so regions without points
+        behave exactly as before.
+        """
+        cached = getattr(self, '_interior_half_cache', None)
+        if cached is not None:
+            return cached
+        half = self.region_half[:2].copy()
+        points = self.record.get('collision_points_m')
+        if points is not None and len(points) >= 8:
+            P = np.asarray(points, dtype=float)
+            floor_local = self.floor_top_local()
+            band = P[np.abs(P[:, 2] - floor_local) <= _FLOOR_BAND_M]
+            if len(band) >= 4:
+                measured = np.abs(band[:, :2] - self.region_center_local[:2]).max(axis=0)
+                half = np.minimum(half, measured)
+        self._interior_half_cache = half
+        return half
+
+    def usable_half_xy(self):
+        """Interior minus the wall allowance: where a footprint may be centred."""
+        return np.maximum(self.interior_half_xy() - REGION_WALL_ALLOWANCE_M, 0.)
 
     def _occupants(self):
         """World XY footprints (and tops) of scene objects already in the region.
@@ -543,6 +611,13 @@ class _Grounding:
         occupants = self._occupants()
         mine = self.half[:2]
         margin = max(.01, float(self.request.constraints.collision_margin_m) * 2.)
+        # 0912: 여기에 "점유자가 없으면 영역 중심을 돌려준다" 는 이른 리턴이
+        # 있었다. 영역이 비어 있는 때가 바로 첫 물체를 놓는 순간이라, 계획이
+        # 배정한 칸이 가장 필요한 그 배치에서 _slot_xy() 를 아예 보지 못하고
+        # 모두가 중심을 겨눴다. 빈 영역은 아래 clearance(anchor) 가 무한대를
+        # 돌려주어 슬롯을 그대로 쓰므로 따로 처리할 필요가 없다.
+        # (같은 자리에 clearance 가 두 번 정의돼 있었다. 첫 정의는 두 번째에
+        # 가려진 죽은 코드인데 occupants 를 2개씩 풀어 실행되면 터진다. 지운다.)
 
         def clearance(xy):
             """Smallest per-object AABB separation; >= 0 means no contact."""
@@ -567,7 +642,7 @@ class _Grounding:
             anchor = self.region_world[:2]
         if acceptable(anchor):
             return anchor
-        limit = self.region_half[:2] - REGION_WALL_ALLOWANCE_M - mine
+        limit = self.usable_half_xy() - mine
         if np.any(limit <= 0.):
             return anchor
         center_xy = self.region_world[:2]
@@ -738,8 +813,17 @@ class _Grounding:
         soft-contact budget).  Releasing on their tops would stack the held
         object onto a plate that already occupies a tray seat.
         """
+        floor = self.floor_top_world_z()
+        container = self.record.get('packing_metadata', {})
+        if _action(self.task) == 'PLACE_ON' and container.get('kind') == 'CONTAINER':
+            # Rest on the container's opening plane, not its interior contents.
+            # Use the same explicit rim metadata as PackingBinding.
+            rim = float(container['opening_top_z_m'])
+            if not math.isfinite(rim) or not np.allclose(self.T_WR[:3, 2], [0., 0., 1.], atol=1e-6):
+                raise ValueError('PLACE_ON_UPRIGHT_CONTAINER_RIM_REQUIRED')
+            floor = max(floor, float(self.T_WR[2, 3] + rim))
         del xy
-        return self.floor_top_world_z(), False
+        return floor, False
 
     # -- publication ---------------------------------------------------------
     def publish(self, goal_key, start_key, desired_center, extra):
@@ -798,8 +882,16 @@ class _Grounding:
             'offset_along_approach_m': 0., 'preserve_grasp_orientation': True,
             'pose_subject': ATTACHED_OBJECT_POSE_SUBJECT,
             'object_orientation_xyzw': Rotation.from_matrix(destination[:3, :3]).as_quat().tolist(),
+            'start_object_orientation_xyzw': Rotation.from_matrix(self.T_WB[:3, :3]).as_quat().tolist(),
             'eef_orientation_xyzw': Rotation.from_matrix(self.T_WE[:3, :3]).as_quat().tolist(),
             'object_id': self.object_id, 'source': self.source, **extra}
+        if goal_key == HELD_PLACE_GOAL_ANCHOR:
+            # Withdrawal targets the empty hand, not the held object's origin.
+            # This measured entry is a candidate; post-release collision checks
+            # must still validate the open hand and the entire return path.
+            entry_eef_anchor = goal_key + '_entry_eef'
+            anchors[entry_eef_anchor] = (inverse(self.T_WR) @ self.T_WE)[:3, 3].tolist()
+            self.task.metadata[goal_key]['entry_eef_anchor'] = entry_eef_anchor
         return destination
 
 
@@ -816,6 +908,19 @@ def _grounding_for(request, retention, predicate):
     return _Grounding(request, retention, object_id)
 
 
+def transport_destination_center(g):
+    """Shared exact center for transport grounding and orientation IK probes."""
+    desired_center = g.region_world.copy()
+    desired_center[:2] = g.free_destination_xy()
+    # Keep the measured object bbox clear of the rim without an arbitrary 5 cm
+    # standoff that can place a reachable kitchen destination outside UR5e reach.
+    clearance = max(.02, g.request.constraints.collision_margin_m * 2.)
+    desired_center[2] = max(g.center[2],
+                            g.interior_top_world_z() + g.half[2] + clearance)
+    from .container_orientation import packing_destination_center
+    return packing_destination_center(g, desired_center, place=False)
+
+
 def ground_held_transport(request, retention=None):
     """Carry the held object to a free spot above the region with rim clearance."""
     _materialize_conceptual_tool_home(request, retention)
@@ -824,15 +929,14 @@ def ground_held_transport(request, retention=None):
     g = _grounding_for(request, retention, _is_transport)
     if g is None:
         return
-    desired_center = g.region_world.copy()
-    desired_center[:2] = g.free_destination_xy()
-    # Keep the measured object bbox clear of the rim without an arbitrary 5 cm
-    # standoff that can place a reachable kitchen destination outside UR5e reach.
-    clearance = max(.02, request.constraints.collision_margin_m * 2.)
-    desired_center[2] = max(g.center[2],
-                            g.interior_top_world_z() + g.half[2] + clearance)
+    desired_center = transport_destination_center(g)
     g.task.goal.target_pose = None
-    g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, {})
+    destination = g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, {})
+    from .container_release import clear_container_rim
+    raised, evidence = clear_container_rim(g, destination, retention)
+    if evidence:
+        desired_center[2] += raised[2, 3] - destination[2, 3]
+        g.publish(HELD_TRANSPORT_GOAL_ANCHOR, HELD_TRANSPORT_START_ANCHOR, desired_center, evidence)
 
 
 def ground_held_place(request, retention=None):
@@ -891,30 +995,39 @@ def _seat_held_place_at(g, desired_xy):
         release_clearance = max(release_clearance,
                                 float(request.constraints.collision_margin_m) * 2.)
     origin_z = support_z + release_clearance + g.bottom_below_origin()
-    desired_center[2] = g.center[2] + (origin_z - g.T_WB[2, 3])
+    desired_center[2] = origin_z + float(g.destination_rotation[2, :] @ g.center_in_body)
+    from .container_orientation import packing_destination_center
+    desired_center = packing_destination_center(g, desired_center, place=True)
+    place_extra = {
+        'release_clearance_m': release_clearance,
+        'destination_center_xy_m': [
+            float(desired_center[0]),
+            float(desired_center[1]),
+        ],
+    }
     destination = g.publish(
         HELD_PLACE_GOAL_ANCHOR, HELD_PLACE_START_ANCHOR, desired_center,
-        {
-            'release_clearance_m': release_clearance,
-            'destination_center_xy_m': [
-                float(desired_center[0]),
-                float(desired_center[1]),
-            ],
-        })
+        place_extra)
     if _request_uses_vacuum(request):
-        destination, release_clearance, _lift = _raise_place_for_vacuum_ee_clearance(
+        destination, release_clearance, lift = _raise_place_for_vacuum_ee_clearance(
             g, destination,
             support_z=support_z,
             release_clearance=release_clearance,
             collision_margin_m=request.constraints.collision_margin_m,
         )
-        hint = g.task.metadata.get(HELD_PLACE_GOAL_ANCHOR)
-        if isinstance(hint, dict):
-            hint['destination_center_xy_m'] = [
-                float(desired_center[0]),
-                float(desired_center[1]),
-            ]
-            hint['release_clearance_m'] = float(release_clearance)
+        desired_center[2] += lift
+        place_extra['release_clearance_m'] = float(release_clearance)
+        if lift > 0.:
+            place_extra.update({
+                'vacuum_ee_clearance_lift_m': float(lift),
+                'vacuum_ee_cup_half_height_m': _vacuum_cup_half_height_m(),
+            })
+    from .container_release import clear_container_rim
+    raised, evidence = clear_container_rim(g, destination, g.retention)
+    if evidence:
+        desired_center[2] += raised[2, 3] - destination[2, 3]
+        destination = g.publish(HELD_PLACE_GOAL_ANCHOR, HELD_PLACE_START_ANCHOR,
+            desired_center, {**place_extra, **evidence})
     g.task.goal.target_pose = Pose(
         frame_id='world',
         position_m=tuple(float(v) for v in destination[:3, 3]),

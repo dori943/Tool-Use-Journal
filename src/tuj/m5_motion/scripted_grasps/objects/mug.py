@@ -1,9 +1,31 @@
 """C2_1 mug: validated 3F enclosure around the body, away from the handle."""
 from tuj.m5_motion.scripted_grasps.catalog_types import CatalogRecipe,build_catalog_targets,dispatch_grasp
 
-def mug_recipe():
-    return CatalogRecipe('mug','c2_1','3F',(.070630,.101936,.080475),
-        offset_fraction=(0.,.1,.1),offset_m=(0.,0.,0.),two_finger_parallel_linkage=False,
+# 0912: 같은 자산이 C2_1 과 C3_1 (환경 파일이 클래스명과 render_camera 두 줄만
+# 다른 같은 씬) 양쪽에 등록된다. task_id 를 'c2_1' 로 고정해 두면 C3_1 실행이
+# 전부 c2_1 로 기록돼 채점 때 섞인다. 레지스트리가 환경을 넘겨 주므로 매핑한다.
+_TASK_IDS = {'C2_1_ObjectSorting': 'c2_1', 'C3_1_ObjectSorting': 'c3_1'}
+
+
+def _task(environment):
+    try:
+        return _TASK_IDS[environment]
+    except KeyError as error:
+        raise ValueError(f'UNSUPPORTED_ENVIRONMENT: {environment}') from error
+
+
+def mug_recipe(environment='C2_1_ObjectSorting'):
+    # The grasp target is already centered on the cup body: build_catalog_targets
+    # places T_WC at center_in_body, which the M5 record puts at the body wall
+    # centroid (center_in_body_y=-0.0069, pulled off-origin BY the handle on +y).
+    # An extra offset_fraction_y=+0.1 (=+0.0102 m) then shoved the whole grip back
+    # toward the handle: thumb+index closed on the body across x (5.1 N / 4 N), but
+    # the lone +y finger (pinky) reached past the wall into the handle gap and stayed
+    # at ~0 N the entire CLOSE, so ready() (all three fingers) never armed
+    # (GRASP_CONTACT_NOT_STABLE).  Drop the y offset so the enclosure sits on the
+    # body center and all three fingers land on the cylindrical wall.
+    return CatalogRecipe('mug',_task(environment),'3F',(.070630,.101936,.080475),
+        offset_fraction=(0.,0.,.1),offset_m=(0.,0.,0.),two_finger_parallel_linkage=False,
         contact_region_min=(-.6,-.25,-.45),contact_region_max=(.6,.45,.5),
         preshape_aperture_m=.081,preshape_closure_command=-.82,two_finger_force_target_n=8.,
         lift_distance_m=.14)

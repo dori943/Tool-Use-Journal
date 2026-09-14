@@ -21,7 +21,7 @@ import math
 import time
 from bisect import bisect_right
 from collections.abc import Callable, Mapping, Sequence
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from enum import Enum
 from pathlib import Path
 from typing import Any, Protocol
@@ -165,6 +165,9 @@ class _RuntimeState:
     qvel_by_joint: Mapping[str, tuple[float, ...]]
     ctrl_by_actuator: Mapping[str, float]
     simulation_time_s: float
+    # Legacy serialized checkpoints omit calibration history. The in-memory
+    # EE transition captures it explicitly; never invent it for old checkpoints.
+    scene_geom_solref: Mapping[str, Any] = field(default_factory=dict)
 
 
 def _active_contact_snapshot(
@@ -207,6 +210,7 @@ def _active_contact_snapshot(
 
 
 def _capture_runtime_state(env: object) -> _RuntimeState:
+    from .scene_contact_state import capture_scene_solref
     model, data = _raw_model_data(env)
     qpos: dict[str, tuple[float, ...]] = {}
     qvel: dict[str, tuple[float, ...]] = {}
@@ -239,11 +243,14 @@ def _capture_runtime_state(env: object) -> _RuntimeState:
         qvel_by_joint=qvel,
         ctrl_by_actuator=controls,
         simulation_time_s=float(data.time),
+        scene_geom_solref=capture_scene_solref(env, model),
     )
 
 
 def _restore_runtime_state(env: object, state: _RuntimeState) -> None:
+    from .scene_contact_state import restore_scene_solref
     model, data = _raw_model_data(env)
+    restore_scene_solref(env, model, state.scene_geom_solref)
     for joint_id in range(model.njnt):
         name = _name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
         if not name:
@@ -1363,27 +1370,125 @@ class ToolUseJournalEERuntime:
             if int(model.geom_contype[geom_id])
             or int(model.geom_conaffinity[geom_id])
         )
-        distances: list[float] = []
+        # Prefer the contact set the solver itself built.  mj_geomDistance runs
+        # GJK/EPA per convex hull, and on a flat cup resting on a decomposed
+        # mesh that penetration depth is unreliable: bread_b reported -0.0280 m
+        # against hull g24 while its neighbours g17 and g4 reported -0.0000 m at
+        # the same pose, and the figure moved between runs (0.0279, 0.0280,
+        # 0.0342) although the loaf never moved.  It cannot be real either, as
+        # the cup bottom (0.9576) and the bread top (0.9577) overlap by 0.1 mm
+        # and no penetration depth can exceed that overlap.  mjContact.dist is
+        # what the physics actually integrates, and the runtime already reports
+        # it as penetration elsewhere, so a genuine deep grab still registers.
+        ee_set = set(ee_geoms)
+        object_set = set(object_geoms)
+        contacts: list[tuple[float, int, int]] = []
+        for index in range(int(data.ncon)):
+            contact = data.contact[index]
+            first, second = int(contact.geom1), int(contact.geom2)
+            if first in ee_set and second in object_set:
+                contacts.append((float(contact.dist), first, second))
+            elif second in ee_set and first in object_set:
+                contacts.append((float(contact.dist), second, first))
+        if contacts:
+            contacts.sort(key=lambda item: item[0])
+            self._ee_object_pairs = contacts
+            self._ee_distance_source = "SIMULATOR_CONTACT"
+            distance, ee_id, object_id = contacts[0]
+            self._last_ee_object_pair = (
+                distance,
+                str(model.geom(ee_id).name),
+                str(model.geom(object_id).name),
+            )
+            return distance
+        self._ee_distance_source = "GEOM_QUERY"
+        closest: tuple[float, str, str] | None = None
+        measured: list[tuple[float, int, int]] = []
         for ee_geom in ee_geoms:
             for object_geom in object_geoms:
                 from_to = np.empty(6, dtype=float)
-                distances.append(
-                    float(
-                        mujoco.mj_geomDistance(
-                            model,
-                            data,
-                            ee_geom,
-                            object_geom,
-                            10.0,
-                            from_to,
-                        )
+                distance = float(
+                    mujoco.mj_geomDistance(
+                        model,
+                        data,
+                        ee_geom,
+                        object_geom,
+                        10.0,
+                        from_to,
                     )
                 )
-        if distances:
-            return min(distances)
+                measured.append((distance, int(ee_geom), int(object_geom)))
+                if closest is None or distance < closest[0]:
+                    closest = (
+                        distance,
+                        str(model.geom(ee_geom).name),
+                        str(model.geom(object_geom).name),
+                    )
+        measured.sort(key=lambda item: item[0])
+        self._ee_object_pairs = measured
+        if closest is not None:
+            self._last_ee_object_pair = closest
+            return closest[0]
         _, _, reference_position, _ = self._grasp_reference(self.env)
+        self._last_ee_object_pair = None
         return float(
             np.linalg.norm(data.xpos[object_body_id] - reference_position)
+        )
+
+    def _ee_object_pair_report(self, limit: int = 3) -> str:
+        """Describe the closest EE/object geom pairs with their geometry.
+
+        bread_b reported a 34 mm penetration while the trace showed the cup
+        seated exactly on the top face (T_GB z equal to the half thickness) and
+        the loaf motionless, which a 22.9 mm slab cannot produce.  When the
+        number cannot come from the pose, the next thing to measure is the
+        geometry the query actually ran against: type, size and world height of
+        both geoms in the offending pair.
+        """
+
+        pairs = getattr(self, "_ee_object_pairs", None)
+        if not pairs:
+            return ""
+        model, data = _raw_model_data(self.env)
+        types = {
+            int(getattr(mujoco.mjtGeom, name)): name.replace("mjGEOM_", "").lower()
+            for name in dir(mujoco.mjtGeom)
+            if name.startswith("mjGEOM_")
+        }
+
+        def describe(geom_id: int) -> str:
+            geom = model.geom(geom_id)
+            kind = types.get(int(model.geom_type[geom_id]), "?")
+            size = ", ".join(f"{value:.4f}" for value in model.geom_size[geom_id])
+            return (
+                f"{geom.name!r} type={kind} size=({size}) "
+                f"z={float(data.geom_xpos[geom_id][2]):.4f}"
+            )
+
+        lines = [
+            f"{distance:+.4f} m  {describe(ee_id)}  <->  {describe(object_id)}"
+            for distance, ee_id, object_id in pairs[:limit]
+        ]
+        return "; closest pairs: " + " | ".join(lines)
+
+    def _closest_ee_object_pair_detail(self) -> str:
+        """Name the geom pair behind the last measured EE/object distance.
+
+        A bare penetration number cannot say whether the cup sealed too deep on
+        the target face or some other part of the EE met some other part of the
+        object, and those need opposite fixes.  0912 showed the same thing for
+        rejected keyframes: the measurement had to name the pose before the
+        cause was readable at all.
+        """
+
+        pair = getattr(self, "_last_ee_object_pair", None)
+        if pair is None:
+            return ""
+        _, ee_name, object_name = pair
+        source = getattr(self, "_ee_distance_source", "GEOM_QUERY")
+        return (
+            f"; closest geom pair {ee_name!r} <-> {object_name!r}"
+            f" measured by {source}"
         )
 
     @staticmethod
@@ -2023,17 +2128,34 @@ class ToolUseJournalEERuntime:
             self.env, object_id
         )
         distance = self._minimum_ee_object_distance(body_id)
+        self.last_attachment_geometry_audit = None
         if distance > max_attach_distance_m:
             raise ToolUseJournalRuntimeError(
                 f"object {object_id!r} is {distance:.4f} m from the EE; "
                 f"attach limit is {max_attach_distance_m:.4f} m"
+                f"{self._closest_ee_object_pair_detail()}"
             )
         if distance < -max_attach_penetration_m:
-            raise ToolUseJournalRuntimeError(
-                f"object {object_id!r} penetrates EE geometry by "
-                f"{-distance:.4f} m; limit is "
-                f"{max_attach_penetration_m:.4f} m"
+            from tuj.m5_motion.attachment_geometry import certify_attachment_penetration
+            adapter = ToolUseJournalEnvironmentAdapter(self.env)
+            mounted_id = model.body(adapter.mounted_root_body).id
+            enabled = lambda root: tuple(
+                gid for gid in self._subtree_geom_ids(model, root)
+                if model.geom_contype[gid] or model.geom_conaffinity[gid]
             )
+            audit = certify_attachment_penetration(
+                model, data, enabled(mounted_id), enabled(body_id),
+                max_attach_penetration_m,
+            )
+            self.last_attachment_geometry_audit = audit
+            if not audit['certified']:
+                raise ToolUseJournalRuntimeError(
+                    f"object {object_id!r} penetrates EE geometry by "
+                    f"{-distance:.4f} m; limit is "
+                    f"{max_attach_penetration_m:.4f} m"
+                    f"{self._closest_ee_object_pair_detail()}"
+                    f"{self._ee_object_pair_report()}"
+                )
         kind, name, reference_position, reference_rotation = (
             self._grasp_reference(self.env)
         )
@@ -2274,6 +2396,9 @@ class ToolUseJournalEERuntime:
             raise ToolUseJournalRuntimeError(
                 f"attached free joint {attachment.free_joint_name!r} is absent"
             )
+        # Integration updates qpos before refreshing site/body transforms.
+        # Project from the current hand pose, not the preceding physics step.
+        mujoco.mj_kinematics(model, data)
         reference_position, reference_rotation = self._reference_pose(
             self.env,
             attachment.reference_kind,
@@ -2294,12 +2419,33 @@ class ToolUseJournalEERuntime:
             quaternion_wxyz,
             np.ascontiguousarray(object_rotation.reshape(9)),
         )
+        # A moving attachment must carry velocity as well as pose. Zeroing it
+        # makes the contact solver see a stationary object against moving fingers.
+        # Evaluate the reference body's twist at the projected object origin;
+        # MuJoCo free joints use world linear and body-local angular velocity.
+        mujoco.mj_comPos(model, data)
+        reference_body = self._attachment_reference_body_id(model, attachment)
+        jacp = np.zeros((3, model.nv))
+        jacr = np.zeros((3, model.nv))
+        mujoco.mj_jac(model, data, jacp, jacr,
+                      np.ascontiguousarray(object_position), reference_body)
+        linear_velocity = jacp @ data.qvel
+        angular_velocity = object_rotation.T @ (jacr @ data.qvel)
         qpos_start = int(model.jnt_qposadr[joint_id])
         qvel_start = int(model.jnt_dofadr[joint_id])
         previous = self._attached_sync_state
         now = float(data.time)
         data.qpos[qpos_start : qpos_start + 3] = object_position
         data.qpos[qpos_start + 3 : qpos_start + 7] = quaternion_wxyz
+        previous_qvel = np.asarray(
+            data.qvel[qvel_start : qvel_start + 6], dtype=float
+        ).copy()
+        # Mainline's Jacobian velocity is the physically consistent baseline,
+        # including the first projection where no finite-difference sample
+        # exists yet. Teleport-style synchronization below replaces it with
+        # finite differences when those better describe the projected motion.
+        data.qvel[qvel_start : qvel_start + 3] = linear_velocity
+        data.qvel[qvel_start + 3 : qvel_start + 6] = angular_velocity
         # Finite-difference velocity so soft contacts see tool motion. Zeroing
         # qvel every substep makes a kinematic plate slide over blocks with
         # only vertical penetration and no lateral friction/push.
@@ -2351,9 +2497,10 @@ class ToolUseJournalEERuntime:
                 angular = np.asarray(quat_delta[1:4], dtype=float) * (2.0 / dt)
                 data.qvel[qvel_start : qvel_start + 3] = linear
                 data.qvel[qvel_start + 3 : qvel_start + 6] = angular
-            # else: same-time re-projection — leave existing qvel untouched
-        else:
-            data.qvel[qvel_start : qvel_start + 6] = 0.0
+            else:
+                # Same-time re-projection: preserve the preceding FD velocity
+                # so the upcoming contact step still sees tangential motion.
+                data.qvel[qvel_start : qvel_start + 6] = previous_qvel
         self._attached_sync_state = (
             np.asarray(object_position, dtype=float).copy(),
             np.asarray(quaternion_wxyz, dtype=float).copy(),
@@ -2966,6 +3113,10 @@ class ToolUseJournalEERuntime:
             # Verify every common named joint survived bit-for-bit within
             # floating-point transfer tolerance before committing the swap.
             restored = _capture_runtime_state(new_env)
+            common_contacts = state.scene_geom_solref.keys() & restored.scene_geom_solref.keys()
+            if any(state.scene_geom_solref[name] != restored.scene_geom_solref[name]
+                   for name in common_contacts):
+                raise ToolUseJournalRuntimeError('EE transfer changed common scene contact calibration')
             common = sorted(
                 set(state.qpos_by_joint) & set(restored.qpos_by_joint)
             )
@@ -3211,6 +3362,13 @@ class ToolUseJournalKinematicTrajectoryPlayer:
     """Replay timed joint samples and execute runtime EE exchange events."""
 
     _TIME_TOLERANCE_S = 1e-9
+    # A settle wait is abandoned once the tracking error has failed to improve
+    # by this much for this many consecutive control ticks.  0.5 mm is a tenth
+    # of the default 5 mm EEF tolerance, so an arm still closing on its goal
+    # keeps resetting the counter; 50 ticks is one second at the 50 Hz control
+    # rate, which a blocked pose never escapes.
+    _SETTLE_IMPROVEMENT_M = 0.0005
+    _SETTLE_STALL_TICKS = 50
     _PLAYER_ID = "TOOL_USE_JOURNAL_KINEMATIC_V2"
     _PLAYBACK_MODE = "DIRECT_QPOS_MJ_FORWARD"
     _CONTROLLER_TRACKING = False
@@ -5207,6 +5365,15 @@ class ToolUseJournalControllerTrajectoryPlayer(
                         if custom_settle is None
                         else bool(custom_settle.get("succeeded", False))
                     )
+                    if segment.metadata.get('container_settle') is not None:
+                        from .container_settle import measured_container_settle
+                        container_result = measured_container_settle(
+                            self.runtime, segment.metadata['container_settle'], settle_state)
+                        settle_ok = (settle_ok and joint_ok and eef_ok
+                                     and eef_orientation_ok and container_result['succeeded'])
+                        custom_settle = {**(custom_settle or {}),
+                                         'container_settle': container_result,
+                                         'succeeded': settle_ok}
                     settle_state["last_joint_error_rad"] = step_joint_error
                     settle_state["last_eef_error_m"] = target_eef_error
                     settle_state["last_eef_orientation_error_rad"] = (
@@ -5223,12 +5390,47 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     wait_duration = executed_time - float(
                         settle_state["started_at_execution_s"]
                     )
+                    # max_wait_s means "wait until it converges", but an arm
+                    # whose commanded pose is unreachable never converges and
+                    # spends the whole budget pressing.  Carrying an object,
+                    # that press is what breaks the grasp: the c3_1 apple came
+                    # to rest 13.6 mm above its commanded pose and was squeezed
+                    # for five seconds until a finger pad unloaded, so the task
+                    # failed as SCRIPTED_GRASP_CONTACT_LOST and named the grasp
+                    # instead of the unreachable goal.  Stop once the error has
+                    # stopped improving: a genuinely slow convergence keeps
+                    # gaining (the loaded arm climbs millimetres per second, far
+                    # above this threshold) and is untouched, while a blocked
+                    # pose is reported for what it is, sooner.
+                    best_error = settle_state.get("best_error_m")
+                    step_error = (
+                        target_eef_error
+                        if target_eef_error is not None
+                        else step_joint_error
+                    )
+                    if (
+                        best_error is None
+                        or step_error
+                        <= float(best_error) - self._SETTLE_IMPROVEMENT_M
+                    ):
+                        settle_state["best_error_m"] = float(step_error)
+                        settle_state["stalled_ticks"] = 0
+                    else:
+                        settle_state["stalled_ticks"] = (
+                            int(settle_state.get("stalled_ticks", 0)) + 1
+                        )
+                    stalled = int(
+                        settle_state.get("stalled_ticks", 0)
+                    ) >= self._SETTLE_STALL_TICKS
                     if int(settle_state["consecutive_ticks"]) >= int(
                         settle_config["required_consecutive_ticks"]
                     ):
                         settle_state["settled"] = True
                         settle_state["wait_duration_s"] = wait_duration
-                    elif wait_duration >= float(settle_config["max_wait_s"]):
+                    elif stalled or wait_duration >= float(
+                        settle_config["max_wait_s"]
+                    ):
+                        settle_state["stalled"] = stalled
                         settle_state["wait_duration_s"] = wait_duration
                         segment_tracking.append(
                             {
@@ -5250,6 +5452,9 @@ class ToolUseJournalControllerTrajectoryPlayer(
                                 "adaptive_settle_requested": True,
                                 "adaptive_settle_succeeded": False,
                                 "adaptive_settle_wait_s": wait_duration,
+                                "settle_stalled": bool(
+                                    settle_state.get("stalled", False)
+                                ),
                             }
                         )
                         failure = _PlaybackFailure(
@@ -5267,6 +5472,12 @@ class ToolUseJournalControllerTrajectoryPlayer(
                                 ),
                                 "settle_config": dict(settle_config),
                                 "wait_duration_s": wait_duration,
+                                "settle_stalled": bool(
+                                    settle_state.get("stalled", False)
+                                ),
+                                "best_eef_error_m": settle_state.get(
+                                    "best_error_m"
+                                ),
                                 "custom_settle": settle_state.get(
                                     "custom_settle"
                                 ),

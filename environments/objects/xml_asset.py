@@ -88,12 +88,28 @@ def _apply_absolute_scale(root: ET.Element, scale: float) -> None:
         for mesh in asset.findall("mesh"):
             mesh.set("scale", scale_str)
 
-    bbox = root.find(".//geom[@name='reg_bbox']")
-    if bbox is not None and ratio != 1.0:
-        if bbox.get("size") is not None:
-            bbox.set("size", _fmt_floats(v * ratio for v in _as_floats(bbox.get("size"))))
-        if bbox.get("pos") is not None:
-            bbox.set("pos", _fmt_floats(v * ratio for v in _as_floats(bbox.get("pos"))))
+    # 0912: 예전에는 reg_bbox 하나만 같이 줄였다. 그런데 cutting_board 의 충돌은
+    # 이름 없는 box geom 이고(model.xml 19행, size 0.0736 x 0.1227 x 0.0073),
+    # 그 geom 은 mesh scale 을 따르지 않는다. 그래서 scale 을 주면 보이는 것만
+    # 줄고 충돌 기하는 원래 크기로 남았다. c2_2 는 재료 도마를 0.19 로 줄여
+    # 놓고도 충돌이 245mm 라 자리 간격 220mm 안에서 이웃과 25mm 씩 겹쳤고,
+    # 겹친 도마가 서로 밀어내며 치즈가 조리대 바닥까지 떨어졌다.
+    # 명시적 size 를 가진 geom 과 site 를 전부 같은 비율로 맞춘다. 메시 geom 은
+    # size 가 없으므로 영향을 받지 않는다.
+    if ratio != 1.0:
+        body = root.find("./worldbody/body")
+        if body is not None:
+            for element in body.iter():
+                if element.tag not in {"geom", "site"}:
+                    continue
+                for attribute in ("size", "pos"):
+                    value = element.get(attribute)
+                    if value is None:
+                        continue
+                    element.set(
+                        attribute,
+                        _fmt_floats(v * ratio for v in _as_floats(value)),
+                    )
 
 
 def _ensure_placement_sites(root: ET.Element) -> None:
@@ -137,10 +153,27 @@ def _ensure_placement_sites(root: ET.Element) -> None:
     _add_site("horizontal_radius_site", horiz)
 
 
+def _apply_density(root: ET.Element, density: float) -> None:
+    """본체 geom 의 density 를 덮어쓴다.
+
+    자산이 선언한 값이 실물과 크게 다를 때 쓴다. cutting_board 는 100 kg/m3
+    으로 나무(600~800)의 1/7 이고, scale 로 부피를 줄이면 질량이 세제곱으로
+    줄어 흡착을 뗄 때 생기는 힘에 그대로 날아간다 (c2_2 에서 재료 도마가
+    터키와 함께 12cm 튀어 올랐다).
+    """
+    body = root.find("./worldbody/body")
+    if body is None:
+        return
+    for geom in body.iter("geom"):
+        if geom.get("density") is not None:
+            geom.set("density", _fmt_floats([density]))
+
+
 def make_resolved_object_xml(
     asset_dir: Path,
     xml_name: str = "model.xml",
     scale: float | None = None,
+    density: float | None = None,
 ) -> str:
     """로컬 model.xml을 읽어 절대경로·스케일·배치 사이트를 반영한 임시 XML 경로를 반환한다."""
     xml_path = asset_dir / xml_name
@@ -169,6 +202,8 @@ def make_resolved_object_xml(
 
     if scale is not None:
         _apply_absolute_scale(root, scale)
+    if density is not None:
+        _apply_density(root, density)
 
     _ensure_placement_sites(root)
 

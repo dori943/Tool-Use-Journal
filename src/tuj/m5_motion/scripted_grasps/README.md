@@ -6,12 +6,12 @@
 
 | 상태 | 객체와 EE |
 |---|---|
-| 검증됨: 파지·유지와 후속 이동·release 통과 | bottle(3F), spatula(3F), spoon(2F/3F), apple(3F), bread(3F), mug(3F), knife(2F), rolling_pin(2F), baguette(2F), whisk(2F), cereal(2F), milk(3F), lid(vac attach) |
-| 실험 연결: 함수는 호출하지만 성공 미검증 | plate(2F): 현재 runtime에서 lift 전 접촉 안정성 실패 |
+| 검증됨: 파지·유지 통과 | bottle(3F), spatula(3F), spoon(2F/3F), apple(3F), bread(3F), mug(3F), knife(2F), rolling_pin(2F), baguette(2F), whisk(2F), cereal(2F), milk(3F), lid(vac attach), plate(vac), plate_a(vac), plate_b(vac) |
+| 실험 연결 | plate(2F), C1_1 suction-held sweep와 일반 M5 후속 이동 |
 | 이식·등록 제외 | tongs, ladle |
 
 
-자동 분기는 plate를 포함한 14개 객체에 연결되어 있다. 검증 완료는 13개이고 plate는 `EXPERIMENTAL`로 manifest에 기록된다. 2026-09-04의 8개 후속 통과 기록에 09-05 보정으로 bottle, spatula, bread, mug, lid가 추가됐다. 후속 검사는 일반 M5 계획기를 통한 2cm 이동·2초 유지 및 실제 release이며, 전체 task PLACE나 모든 배치의 성공률을 뜻하지 않는다. plate 파지가 실패하면 해당 단계에서 중단하며 일반 LLM 파지로 바꾸지 않는다.
+자동 분기는 registry의 환경·객체·EE 조합에만 정확히 연결된다. plate vacuum은 C1_1, C2_1, C3_1과 C3_2의 두 접시에서 파지·attach·lift·5초 hold를 통과했다. C2_1, C3_1과 C3_2의 두 접시는 일반 M5 2cm 이동과 release도 통과했으며, C1_1은 파지 이후 일반 M5의 EEF grounded tolerance 보정이 남아 있다. 전체 task PLACE나 모든 배치의 성공률을 뜻하지 않는다. plate 파지가 실패하면 해당 단계에서 중단하며 일반 LLM 파지로 바꾸지 않는다.
 
 파지·5초 유지·2cm 후속 이동·2초 유지·release 기준으로 13개 객체를 검증했다. 사과는 실제 전체 task에서 파지·유지·운반, 뒤집개는 파지·5초 유지를 통과했다. 전체 task 4개는 이후 계획 단계에서 중단되었고 완료 판정은 아직 없다. plate 연결 변경을 포함한 회귀검사는 273 passed, 2 skipped이다. `SOURCE.json`의 원본 lab 소스·보정값 31개 SHA-256은 작업 전과 일치한다.
 
@@ -35,7 +35,7 @@
 6. 그다음 요청은 기존 M5 계획기로 전달한다. LLM이 생성한 키프레임을 기존 IK, 경로 계획, 충돌 검사, 컨트롤러로 실행한다.
 7. 실패하면 해당 단계에서 멈추고 실제 실패 상태와 원인을 저장한다. plate는 연결 상태와 검증 상태를 구분하기 위해 `EXPERIMENTAL`로 기록한다. 실패한 파지를 성공으로 처리하거나 다른 파지 방식으로 자동 재시도하지 않는다.
 
-지원하지 않는 객체와 일반 동작은 기존 M5로 전달한다. 알려진 보정 보류 항목은 registry의 명시적 상태를 따른다. EE가 다른 경우 임의로 바꾸지 않고 입력 오류를 반환한다. 스푼은 `C1_2_DoughFlatten`, `C2_1_ObjectSorting`, `C3_1_ObjectSorting`에서 2F와 3F를 모두 등록하며, M4가 선택한 EE와 정확히 일치하는 레시피로 분기한다.
+지원하지 않는 객체와 일반 동작은 기존 M5로 전달한다. 알려진 보정 보류 항목은 registry의 명시적 상태를 따른다. 등록된 객체라도 M4가 다른 EE를 선택하면 임의 교체하지 않고 해당 EE의 기존 M5 경로로 전달한다. 스푼은 `C1_2_DoughFlatten`, `C2_1_ObjectSorting`, `C3_1_ObjectSorting`에서 2F와 3F를 모두 등록하며, M4가 선택한 EE와 정확히 일치하는 레시피로 분기한다. 접시 vacuum은 `C1_1_LegoSweep`, `C2_1_ObjectSorting`, `C3_1_ObjectSorting`의 `plate`와 `C3_2_BreakfastTrayPreparation`의 작은 접시 `plate_a`, `plate_b`에 각각 등록한다. `C3_2`는 다른 크기 검증값을 사용하며 등록되지 않은 task나 접시 ID에는 레시피를 재사용하지 않는다.
 
 전체 동작을 먼저 계획한 뒤 재생하는 기존 모드와 달리, 이 모드는 **계획 → 실행 → 실제 상태 읽기**를 요청마다 반복한다. 따라서 파지 결과와 다른 예측 상태에서 다음 경로를 시작하지 않는다.
 

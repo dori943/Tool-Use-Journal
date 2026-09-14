@@ -168,6 +168,8 @@ class OpenAIKeyframeProviderConfig:
         cache = os.environ.get("MOTION_PLANNER_KEYFRAME_CACHE")
         if cache:
             values["cache_dir"] = Path(cache)
+        if output_budget := os.environ.get("OPENAI_KEYFRAME_MAX_OUTPUT_TOKENS"):
+            values["max_output_tokens"] = int(output_budget)
         values.update(overrides)
         return cls(**values)
 
@@ -430,6 +432,9 @@ class _HeldGoalSubject:
     object_keyframe_types: frozenset[KeyframeType]
     object_orientation_xyzw: _Quaternion | None
     eef_orientation_xyzw: _Quaternion | None
+    start_object_orientation_xyzw: _Quaternion | None
+    start_frame_ref: str | None
+    start_anchor: str | None
 
 
 def _quaternion(goal: Any, key: str) -> _Quaternion | None:
@@ -482,6 +487,9 @@ def _held_goal_subject(request: MotionPlanRequest) -> _HeldGoalSubject | None:
         object_keyframe_types=kinds,
         object_orientation_xyzw=_quaternion(goal, "object_orientation_xyzw"),
         eef_orientation_xyzw=_quaternion(goal, "eef_orientation_xyzw"),
+        start_object_orientation_xyzw=_quaternion(goal, "start_object_orientation_xyzw"),
+        start_frame_ref=goal.get("frame_ref") if isinstance(goal, dict) else None,
+        start_anchor=goal.get("start_anchor") if isinstance(goal, dict) else None,
     )
 
 
@@ -700,12 +708,20 @@ Hard rules:
 - When held_place_goal is supplied for a PLACE into target_region_id, its
   anchor is the object's resting destination on the region's interior floor
   (release clearance included): put the PLACE keyframe exactly at that
-  frame_ref/anchor with zero offset and the supplied orientation, put
+  frame_ref/anchor with zero offset and the supplied orientation. Normally put
   PRE_PLACE at the same anchor with a positive offset_along_approach_m, and
   RETREAT at the same anchor with a larger positive offset. TRANSFER /
   PRE_PLACE / PLACE keyframes describe the HELD OBJECT's pose; only RETREAT
-  is a gripper motion. Never lower the object below that anchor and never
-  target the region's center or bottom.
+  is a gripper motion.
+  When entry_eef_anchor is supplied, also include one compact exception with
+  PRE_PLACE at start_anchor, PLACE at anchor, and RETREAT at entry_eef_anchor,
+  all in the supplied frame_ref with zero offset. start_anchor is the measured
+  OBJECT entry; entry_eef_anchor is the measured HAND entry and RETREAT uses
+  eef_orientation_xyzw. Do not substitute the object start for the hand entry.
+  Other candidates may use additional clearance, but a larger vertical offset
+  is not inherently reachable. The measured return is only a candidate: normal
+  post-release collision and IK checks still apply. Never lower the object below
+  the destination anchor and never target the region's center or bottom.
 - PICK_TOOL strategies use GRASP then LIFT/RETREAT; RETURN_TOOL strategies use
   PLACE then RETREAT.
 - When task.operation is TOOL_ACT with contact.primitive "sweep": the tool is
@@ -1052,6 +1068,17 @@ class OpenAIKeyframeProvider:
                             if held_goal.object_orientation_xyzw is not None:
                                 metadata["packing_orientation_xyzw"] = list(
                                     held_goal.object_orientation_xyzw
+                                )
+                            if (
+                                held_goal.start_object_orientation_xyzw is not None
+                                and item.frame_ref == held_goal.start_frame_ref
+                                and item.anchor == held_goal.start_anchor
+                                and abs(item.offset_along_approach_m) <= 1e-12
+                            ):
+                                # This anchor is the measured start body pose,
+                                # not a request to rotate at the starting point.
+                                metadata["packing_orientation_xyzw"] = list(
+                                    held_goal.start_object_orientation_xyzw
                                 )
                         elif (
                             item.keyframe_type is KeyframeType.RETREAT

@@ -82,12 +82,16 @@ def test_c3_2_plate_vac_and_fork_resolve_multi_instance():
     assert fork.ee == "3F"
     for instance in ("plate_a", "plate_b"):
         resolved = resolve(request_for(plate, object_id=instance))
-        assert resolved.object_id == "plate"
+        # Main registers plate instances explicitly; exact instance routes take
+        # precedence over the legacy type-keyed fallback.
+        assert resolved.object_id == instance
         assert resolved.module_name == "plate_vac"
         assert resolved.ee == "vac"
         assert resolved.scene_object_id == instance
-        assert resolved.body_object_id == instance
-        assert resolved.recipe().recipe_id.startswith("plate_vac_")
+        assert resolved.body_object_id is None
+        recipe = resolved.recipe()
+        assert (recipe.object_id, recipe.task_id, recipe.ee_id) == (
+            instance, "c3_2", "vac")
     for instance in ("fork_a", "fork_b"):
         resolved = resolve(request_for(fork, object_id=instance))
         assert resolved.object_id == "fork"
@@ -984,6 +988,46 @@ def test_plate_is_routable_but_explicitly_experimental():
     assert plate.object_id not in PENDING_INTEGRATION
     assert integration_status(plate) == "EXPERIMENTAL"
     assert resolve(request_for(plate)) == plate
+
+
+@pytest.mark.parametrize(('object_id','environment','task_id','expected_size'),(
+    ('plate','C1_1_LegoSweep','c1_1',(0.182334163,0.181833528,0.011091216)),
+    ('plate','C2_1_ObjectSorting','c2_1',(0.182334163,0.181833528,0.011091216)),
+    ('plate','C3_1_ObjectSorting','c3_1',(0.182334163,0.181833528,0.011091216)),
+    # C3_2 uses the compiled PLATE_SCALE=0.17 AABB with rim-annulus seating
+    # (not the older flat-face breakfast AABB from main).
+    ('plate_a','C3_2_BreakfastTrayPreparation','c3_2',(0.167550312,0.167090268,0.010191929)),
+    ('plate_b','C3_2_BreakfastTrayPreparation','c3_2',(0.167550312,0.167090268,0.010191929)),
+))
+def test_plate_vac_routes_are_task_and_instance_scoped(
+        object_id,environment,task_id,expected_size):
+    entry=next(e for e in ENTRIES if (e.object_id,e.environment,e.ee)==(
+        object_id,environment,'vac'))
+    assert resolve(request_for(entry))==entry
+    assert entry.function().__name__=='grasp_plate_vac'
+    recipe=entry.recipe()
+    assert (recipe.object_id,recipe.task_id,recipe.ee_id)==(object_id,task_id,'vac')
+    np.testing.assert_allclose(recipe.expected_size_m,expected_size,atol=1e-12)
+    assert recipe.minimum_vacuum_contact_count==1
+    assert recipe.contact_ticks==(3 if task_id=='c1_1' else 5)
+    assert recipe.maximum_vacuum_attach_penetration_m==(
+        .0035 if task_id=='c1_1' else .002)
+    assert recipe.maximum_support_separation_penetration_m==(
+        .0045 if task_id=='c1_1' else .002)
+    if task_id=='c3_2':
+        # Rim annulus, not plate center.
+        assert recipe.offset_fraction[0] > 0.
+        assert recipe.offset_m[2] == 0.
+    else:
+        assert recipe.offset_fraction == (0., 0., .5)
+
+
+def test_plate_vac_recipe_rejects_unregistered_task_and_instance():
+    from tuj.m5_motion.scripted_grasps.objects.plate_vac import plate_vac_recipe
+    with pytest.raises(ValueError,match='UNSUPPORTED_PLATE_VAC_ENVIRONMENT'):
+        plate_vac_recipe('C4_2_DiagonalFitPacking')
+    with pytest.raises(ValueError,match='UNSUPPORTED_PLATE_VAC_OBJECT'):
+        plate_vac_recipe('C3_2_BreakfastTrayPreparation','plate')
 
 
 @pytest.mark.parametrize(

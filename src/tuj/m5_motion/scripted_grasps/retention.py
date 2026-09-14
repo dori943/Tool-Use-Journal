@@ -6,6 +6,8 @@ from .frames import inverse
 from .runtime import GraspFailure
 from .spoon_hand_model import bound_spoon_3f_commands
 
+MIN_CONTACT_FORCE_N = .01
+
 
 class GraspRetention:
     def __init__(self, context, entry):
@@ -116,8 +118,18 @@ class GraspRetention:
         if c.three_finger_force_hold:
             measured = np.array([self.forces[n] for n in ("thumb", "index", "pinky")])
             from .spatula_runtime import update_three_finger_commands
+            attachment = c.runtime.attachment
+            constrained = (attachment is not None
+                and attachment.object_id == self.entry.object_id
+                and attachment.mode == "KINEMATIC")
+            # A kinematically carried body cannot respond to force redistribution.
+            # Freeze valid contacts, but recover a missing finger within the
+            # unchanged loss timer. Never open another finger to redistribute load.
             if not getattr(recipe, 'hold_finger_positions', False):
-                self.commands = update_three_finger_commands(self.commands, measured, recipe)
+                proposed = update_three_finger_commands(self.commands, measured, recipe)
+                self.commands = (np.where(measured <= MIN_CONTACT_FORCE_N,
+                    np.minimum(self.commands, proposed), self.commands)
+                    if constrained else proposed)
                 command_min=getattr(c,'three_finger_hold_command_min',None)
                 if command_min is not None:
                     self.commands=np.clip(self.commands,command_min,
@@ -162,7 +174,7 @@ class GraspRetention:
             # false-triggers SCRIPTED_GRASP_CONTACT_LOST (c3_2 fruit_a transport).
             contact = True
         else:
-            contact = all(force > .01 for force in self.forces.values())
+            contact = all(force > MIN_CONTACT_FORCE_N for force in self.forces.values())
         self.loss_started = None if contact else (time_s if self.loss_started is None else self.loss_started)
         self.samples.append({
             "time_s": time_s,
@@ -176,7 +188,17 @@ class GraspRetention:
             c.original_monitor_sample(time_s)
         if self.loss_started is not None and time_s - self.loss_started > .10:
             raise GraspFailure("SCRIPTED_GRASP_CONTACT_LOST")
-        if slip > .005 or angle > 5.:
+        # Use the recipe's own slip tolerances so a per-object allowance set for
+        # the grasp HOLD validation (catalog_runtime) carries through transport
+        # and place.  Defaults reproduce the historical hard-coded 5 mm / 5 deg,
+        # so every recipe that does not override them is unchanged; an
+        # orientation-invariant object (e.g. a sphere pinched by the 2F jaw,
+        # which spins freely about the grip axis) can widen only its rotational
+        # bound while position slip and contact loss stay tight.
+        recipe = c.recipe
+        max_slip_m = float(getattr(recipe, "maximum_slip_m", .005))
+        max_slip_deg = float(getattr(recipe, "maximum_slip_deg", 5.))
+        if slip > max_slip_m or angle > max_slip_deg:
             raise GraspFailure(f"SCRIPTED_GRASP_SLIPPED: {slip:.6f} m, {angle:.3f} deg")
 
     def transform(self):

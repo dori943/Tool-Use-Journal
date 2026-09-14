@@ -21,7 +21,8 @@ DEFAULT_CUTTING_BOARD_SCALE = xml_default_scale(CUTTING_BOARD_ASSET_DIR)
 class CuttingBoardObject(MujocoXMLObject):
     """로컬 cutting board. 충돌은 box geom."""
 
-    def __init__(self, name: str = "cutting_board", scale: float | None = None):
+    def __init__(self, name: str = "cutting_board", scale: float | None = None,
+                 density: float | None = None):
         applied_scale = (
             DEFAULT_CUTTING_BOARD_SCALE if scale is None else float(scale)
         )
@@ -35,7 +36,9 @@ class CuttingBoardObject(MujocoXMLObject):
         self.bbox_full_size_m = tuple(v * scale_ratio for v in bbox)
 
         super().__init__(
-            fname=make_resolved_object_xml(CUTTING_BOARD_ASSET_DIR, scale=scale),
+            fname=make_resolved_object_xml(
+                CUTTING_BOARD_ASSET_DIR, scale=scale, density=density
+            ),
             name=name,
             joints="default",
             obj_type="all",

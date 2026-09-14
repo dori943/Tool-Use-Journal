@@ -21,6 +21,7 @@ class CatalogRecipe:
     preshape_closure_command: float = .16
     approach_distance_m: float = .12
     lift_distance_m: float = .18
+    linear_lift_start: bool = False
     arm_kp: float = 150.
     post_grasp_arm_kp: float | None = None
     close_duration_s: float = 4.
@@ -28,12 +29,26 @@ class CatalogRecipe:
     physics_timestep_s: float = .001
     physics_integrator: str = 'implicitfast'
     thin_contact_timeconstant_s: float = .004
+    # 충돌 geom 의 solimp. 자산이 선언한 solimp 는 contype=0 인 visual geom 에만
+    # 붙어 있어서 실제로 충돌하는 geom 은 MuJoCo 기본값(.9 .95 .001)으로 떨어진다.
+    # 그 물렁한 접촉 때문에 가벼운 슬라이스가 흡착(gain 80 N)에 컵 안으로 끌려
+    # 들어간다. cheese 자산만 충돌 geom 에 .998 을 제대로 달고 있다.
+    # None 이면 기존 동작 그대로다.
+    thin_contact_solimp: tuple | None = None
+    # 흡착컵 geom 의 margin/gap. 자산 기본값은 10 mm 인데, MuJoCo 흡착은 margin
+    # 안의 모든 접촉에 작용하므로 얇은 슬라이스를 집으면 그 아래 받침까지 같이
+    # 빨아올린다 (토마토 4.74 mm 를 .5 mm 눌러 앉으면 도마 윗면이 4.2 mm,
+    # 터키 2.52 mm 면 2.0 mm 거리다). None 이면 자산 값 그대로다.
+    vacuum_cup_margin_m: float | None = None
     two_finger_parallel_linkage: bool = True
     two_finger_force_target_n: float = 5.
     two_finger_force_gain: float = .002
     three_finger_force_targets_n: tuple = (6.,3.,3.)
     three_finger_force_gain: float = .002
-    # SpoonContext.step force servo (CatalogContext inherits it).
+    # Force-integrator deadband (N) shared by the 3F force hold
+    # (update_three_finger_commands).  Upstream added this to the spoon recipe
+    # but not to CatalogRecipe, so a catalog 3F grasp (e.g. bread) raised
+    # AttributeError at CLOSE.  Same default as the spoon recipe.
     three_finger_force_deadband_n: float = .5
     prelift_stabilization_s: float = .5
     settle_s: float = 1.
@@ -44,6 +59,9 @@ class CatalogRecipe:
     maximum_slip_m: float = .005
     maximum_slip_deg: float = 5.
     contact_ticks: int = 5
+    minimum_vacuum_contact_count: int = 3
+    maximum_vacuum_attach_penetration_m: float = .002
+    maximum_support_separation_penetration_m: float = .002
     maximum_joint_limit_error_rad: float = .01
     suction_command: float = 1.
     # Thin utensil handles: accept thumb+index/pinky pinch instead of full 3F.
@@ -52,6 +70,17 @@ class CatalogRecipe:
     # After a failed thin-handle CLOSE, retry GRASP+CLOSE at offset_m.x ± k*step.
     thin_handle_close_retries: int = 0
     thin_handle_lateral_retry_m: float = 0.002
+    # Minimum simultaneous cup-object contacts for the vacuum contact gate.
+    # A multi-finger grasp naturally makes several contacts, but a single
+    # suction cup pressed flat on a flat surface makes only ONE MuJoCo contact
+    # point, so the historical hard-coded >=3 could never arm for a flat disc
+    # (plate: contact_count=1 with suction_alignment=0.999 and 40 N of force).
+    # Default stays 3 so existing recipes are unchanged; a flat single-cup
+    # target sets this to 1.
+    vacuum_min_contacts: int = 3
+    finger_attachment_policy: str = 'FREE_HOLD_THEN_ATTACH'
+    open_hand_clearance_axis: tuple | None = None
+    contact_region_endpoint_policy: str | None = None
 
     @property
     def model_class(self):
@@ -60,11 +89,25 @@ class CatalogRecipe:
     @property
     def recipe_id(self):
         version='v2_attach' if self.ee_id=='vac' else 'v1'
+        if self.finger_attachment_policy == 'STABLE_CONTACT':version='v2_contact_attach'
         return f'{self.object_id}_{self.ee_id.lower()}_center_{version}'
 
     def __post_init__(self):
+        if self.contact_region_endpoint_policy not in {None, 'MIN_LONG_AXIS', 'MAX_LONG_AXIS'}:
+            raise ValueError('Invalid contact region endpoint policy')
+        if self.contact_region_endpoint_policy is not None and self.open_hand_clearance_axis is not None:
+            raise ValueError('Choose one grasp clearance proposal policy')
+        if self.open_hand_clearance_axis is not None:
+            axis = np.asarray(self.open_hand_clearance_axis, dtype=float)
+            if (self.ee_id == 'vac' or axis.shape != (3,) or not np.isfinite(axis).all()
+                    or not np.isclose(np.linalg.norm(axis), 1., atol=1e-9, rtol=0.)):
+                raise ValueError('Open hand clearance requires a unit body axis and finger EE')
+        if self.finger_attachment_policy not in {'FREE_HOLD_THEN_ATTACH', 'STABLE_CONTACT'}:
+            raise ValueError('Invalid finger attachment policy')
+        if self.finger_attachment_policy == 'STABLE_CONTACT' and self.ee_id != '2F':
+            raise ValueError('Stable bilateral contact attachment requires 2F')
         if self.ee_id not in {'2F','3F','vac'}: raise ValueError('UNSUPPORTED_EE')
-        if self.task_id not in {'c1_1','c1_2','c2_1','c2_2','c3_2','c4_2'}: raise ValueError('UNSUPPORTED_TASK')
+        if self.task_id not in {'c1_1','c1_2','c2_1','c2_2','c3_1','c3_2','c4_2'}: raise ValueError('UNSUPPORTED_TASK')
         for name in ('expected_size_m','offset_fraction','offset_m','rotation_xyz_deg','contact_region_min','contact_region_max'):
             value=np.asarray(getattr(self,name),dtype=float)
             if value.shape!=(3,) or not np.isfinite(value).all(): raise ValueError(f'Invalid {name}')
@@ -103,6 +146,23 @@ class CatalogRecipe:
             raise ValueError('Invalid thin_handle_lateral_retry_m')
         if self.thin_handle_lateral_retry_m>.01:
             raise ValueError('thin_handle_lateral_retry_m out of range')
+        if self.vacuum_cup_margin_m is not None:
+            if self.ee_id!='vac': raise ValueError('Cup margin requires the vacuum EE')
+            if not 0<self.vacuum_cup_margin_m<.01: raise ValueError('Invalid cup margin')
+        if self.thin_contact_solimp is not None:
+            if len(self.thin_contact_solimp)!=3: raise ValueError('Invalid contact solimp')
+            if not all(0<v<1 for v in self.thin_contact_solimp[:2]): raise ValueError('Invalid contact solimp')
+            if self.thin_contact_solimp[2]<=0: raise ValueError('Invalid contact solimp')
+        if not isinstance(self.linear_lift_start,bool): raise ValueError('Invalid lift easing policy')
+        if self.physics_timestep_s not in (.0005,.001,.002): raise ValueError('Invalid timestep')
+        if self.physics_integrator!='implicitfast': raise ValueError('Invalid integrator')
+        if not isinstance(self.contact_ticks,int) or self.contact_ticks<1: raise ValueError('Invalid contact ticks')
+        if not isinstance(self.minimum_vacuum_contact_count,int) or self.minimum_vacuum_contact_count<1:
+            raise ValueError('Invalid vacuum contact count')
+        if not 0 < self.maximum_vacuum_attach_penetration_m <= .004:
+            raise ValueError('Invalid vacuum attachment penetration')
+        if not 0 < self.maximum_support_separation_penetration_m <= .006:
+            raise ValueError('Invalid support separation penetration')
 
     def to_dict(self):
         result={**asdict(self),'model_class':self.model_class,'recipe_id':self.recipe_id}
@@ -122,6 +182,13 @@ def build_catalog_targets(T_WB,center_in_body_m,local_size_m,recipe):
     T_WC=body@T_BC
     rotation=Rotation.from_euler('xyz',recipe.rotation_xyz_deg,degrees=True).as_matrix()@np.diag([1.,-1.,-1.])
     T_CG=transform(size*np.asarray(recipe.offset_fraction)+np.asarray(recipe.offset_m),rotation=rotation)
+    if recipe.contact_region_endpoint_policy is not None:
+        if not np.isfinite(size).all() or np.any(size <= 0):
+            raise ValueError('Invalid endpoint grasp geometry')
+        axis = int(np.argmax(size))
+        region = (recipe.contact_region_min if recipe.contact_region_endpoint_policy == 'MIN_LONG_AXIS'
+                  else recipe.contact_region_max)
+        T_CG[axis, 3] = size[axis] * region[axis]
     grasp=T_WC@T_CG
     pre=grasp.copy();pre[:3,3]-=grasp[:3,2]*recipe.approach_distance_m
     lift=grasp.copy();lift[2,3]+=recipe.lift_distance_m

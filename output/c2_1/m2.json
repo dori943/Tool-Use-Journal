@@ -15,34 +15,33 @@
         "obj_spoon_spoon",
         "obj_tray_blue_tray"
       ],
-      "selection_reason": "왼쪽부터 순서대로 옮겨야 하므로 이동 대상 물체들과 목적지인 파란 트레이를 선택했다.",
+      "selection_reason": "왼쪽부터 옮길 대상 물체들과 목적지인 파란 트레이가 모두 필요하며, 트레이를 제외한 나머지 장면 물체들은 도구 후보로 함께 고려한다.",
       "confidence": {
         "before": {
           "decomposition": 0.78,
-          "object_selection": 0.96,
+          "object_selection": 0.93,
           "uncertain_about": [
-            "장면에 실제 좌우 배치 정보가 명시되지 않아 대상 순서의 정확한 기하 관계",
-            "각 물체의 정확한 접촉/적재 가능 상태"
+            "각 물체의 실제 크기와 무게에 따라 도구로 쓸지 여부가 달라질 수 있음",
+            "장면에 테이블이 직접 노드로 없어서 물체들의 정확한 기준 배치 해석이 제한됨"
           ]
         },
         "after": {
           "decomposition": 0.86,
-          "object_selection": 0.98,
+          "object_selection": 0.97,
           "uncertain_about": [
-            "테이블 위 물체들의 정확한 좌우 순서가 아직 실측으로 직접 확인되지는 않음",
-            "각 물체의 정확한 접촉/적재 상태는 일부 조건만 확인되었고 전체 배치 관계는 남아 있음"
+            "테이블이 직접 노드로 없어서 물체들의 정확한 기준 배치 해석이 제한됨"
           ],
-          "reason": "측정으로 대상 물체들의 접근성·파지 가능성·트레이 적재 가능성이 확인되어 실행 가능성은 높아졌지만, 왼쪽부터의 정확한 순서 자체는 직접 실측되지 않아 분해 신뢰도는 약간만 올렸다.",
+          "reason": "대상 물체들이 모두 도달 가능하고 상단 노출 및 그립 가능하며 파란 트레이도 비어 있어 서브골 분해는 더 확실해졌고, 선택한 파란 트레이가 실제로 적절한 목표 객체임도 확인되었지만 테이블 기준 배치 해석의 불확실성은 아직 남아 있다.",
           "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
         },
         "delta": {
           "decomposition": 0.08,
-          "object_selection": 0.02
+          "object_selection": 0.04
         }
       },
       "target_order": {
         "source": "vlm",
-        "reason": "이미지에서 물체가 왼쪽에서 오른쪽으로 놓인 순서대로 정렬했다."
+        "reason": "이미지에서 물체의 왼쪽부터 오른쪽 순서대로 정렬했다."
       },
       "measurements": [
         {
@@ -582,7 +581,23 @@
               "eval_by": "m2"
             }
           ],
-          "destroy": []
+          "destroy": [],
+          "action_parameters": {
+            "placement_slot": {
+              "region": "obj_tray_blue_tray",
+              "target": "obj_spoon_spoon",
+              "uv": [
+                0.5592,
+                0.4475
+              ],
+              "offset_mm": [
+                83.8,
+                95.6
+              ],
+              "row": 1,
+              "source": "m2_container_layout"
+            }
+          }
         },
         {
           "detail_id": "SG1_s1_d3",
@@ -664,7 +679,23 @@
               "head": "above",
               "eval_by": "m2"
             }
-          ]
+          ],
+          "action_parameters": {
+            "placement_slot": {
+              "region": "obj_tray_blue_tray",
+              "target": "obj_spoon_spoon",
+              "uv": [
+                0.5592,
+                0.4475
+              ],
+              "offset_mm": [
+                83.8,
+                95.6
+              ],
+              "row": 1,
+              "source": "m2_container_layout"
+            }
+          }
         }
       ],
       "ignore_ids": [
@@ -672,7 +703,15 @@
         "obj_bread_bread",
         "obj_mug_mug",
         "obj_plate_plate"
-      ]
+      ],
+      "placement_slot": {
+        "region": "obj_tray_blue_tray",
+        "uv": [
+          0.5592,
+          0.4475
+        ],
+        "row": 1
+      }
     },
     {
       "subgoal_id": "SG1_s2",
@@ -688,34 +727,33 @@
         "obj_plate_plate",
         "obj_tray_blue_tray"
       ],
-      "selection_reason": "왼쪽부터 순서대로 옮겨야 하므로 이동 대상 물체들과 목적지인 파란 트레이를 선택했다.",
+      "selection_reason": "왼쪽부터 옮길 대상 물체들과 목적지인 파란 트레이가 모두 필요하며, 트레이를 제외한 나머지 장면 물체들은 도구 후보로 함께 고려한다.",
       "confidence": {
         "before": {
           "decomposition": 0.78,
-          "object_selection": 0.96,
+          "object_selection": 0.93,
           "uncertain_about": [
-            "장면에 실제 좌우 배치 정보가 명시되지 않아 대상 순서의 정확한 기하 관계",
-            "각 물체의 정확한 접촉/적재 가능 상태"
+            "각 물체의 실제 크기와 무게에 따라 도구로 쓸지 여부가 달라질 수 있음",
+            "장면에 테이블이 직접 노드로 없어서 물체들의 정확한 기준 배치 해석이 제한됨"
           ]
         },
         "after": {
           "decomposition": 0.86,
-          "object_selection": 0.98,
+          "object_selection": 0.97,
           "uncertain_about": [
-            "테이블 위 물체들의 정확한 좌우 순서가 아직 실측으로 직접 확인되지는 않음",
-            "각 물체의 정확한 접촉/적재 상태는 일부 조건만 확인되었고 전체 배치 관계는 남아 있음"
+            "테이블이 직접 노드로 없어서 물체들의 정확한 기준 배치 해석이 제한됨"
           ],
-          "reason": "측정으로 대상 물체들의 접근성·파지 가능성·트레이 적재 가능성이 확인되어 실행 가능성은 높아졌지만, 왼쪽부터의 정확한 순서 자체는 직접 실측되지 않아 분해 신뢰도는 약간만 올렸다.",
+          "reason": "대상 물체들이 모두 도달 가능하고 상단 노출 및 그립 가능하며 파란 트레이도 비어 있어 서브골 분해는 더 확실해졌고, 선택한 파란 트레이가 실제로 적절한 목표 객체임도 확인되었지만 테이블 기준 배치 해석의 불확실성은 아직 남아 있다.",
           "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
         },
         "delta": {
           "decomposition": 0.08,
-          "object_selection": 0.02
+          "object_selection": 0.04
         }
       },
       "target_order": {
         "source": "vlm",
-        "reason": "이미지에서 물체가 왼쪽에서 오른쪽으로 놓인 순서대로 정렬했다."
+        "reason": "이미지에서 물체의 왼쪽부터 오른쪽 순서대로 정렬했다."
       },
       "measurements": [
         {
@@ -1261,7 +1299,23 @@
               "eval_by": "m2"
             }
           ],
-          "destroy": []
+          "destroy": [],
+          "action_parameters": {
+            "placement_slot": {
+              "region": "obj_tray_blue_tray",
+              "target": "obj_plate_plate",
+              "uv": [
+                -0.311,
+                -0.2574
+              ],
+              "offset_mm": [
+                -46.6,
+                -55.0
+              ],
+              "row": 0,
+              "source": "m2_container_layout"
+            }
+          }
         },
         {
           "detail_id": "SG1_s2_d3",
@@ -1343,7 +1397,23 @@
               "head": "above",
               "eval_by": "m2"
             }
-          ]
+          ],
+          "action_parameters": {
+            "placement_slot": {
+              "region": "obj_tray_blue_tray",
+              "target": "obj_plate_plate",
+              "uv": [
+                -0.311,
+                -0.2574
+              ],
+              "offset_mm": [
+                -46.6,
+                -55.0
+              ],
+              "row": 0,
+              "source": "m2_container_layout"
+            }
+          }
         }
       ],
       "ignore_ids": [
@@ -1351,7 +1421,15 @@
         "obj_bread_bread",
         "obj_mug_mug",
         "obj_spoon_spoon"
-      ]
+      ],
+      "placement_slot": {
+        "region": "obj_tray_blue_tray",
+        "uv": [
+          -0.311,
+          -0.2574
+        ],
+        "row": 0
+      }
     },
     {
       "subgoal_id": "SG1_s3",
@@ -1367,34 +1445,33 @@
         "obj_bread_bread",
         "obj_tray_blue_tray"
       ],
-      "selection_reason": "왼쪽부터 순서대로 옮겨야 하므로 이동 대상 물체들과 목적지인 파란 트레이를 선택했다.",
+      "selection_reason": "왼쪽부터 옮길 대상 물체들과 목적지인 파란 트레이가 모두 필요하며, 트레이를 제외한 나머지 장면 물체들은 도구 후보로 함께 고려한다.",
       "confidence": {
         "before": {
           "decomposition": 0.78,
-          "object_selection": 0.96,
+          "object_selection": 0.93,
           "uncertain_about": [
-            "장면에 실제 좌우 배치 정보가 명시되지 않아 대상 순서의 정확한 기하 관계",
-            "각 물체의 정확한 접촉/적재 가능 상태"
+            "각 물체의 실제 크기와 무게에 따라 도구로 쓸지 여부가 달라질 수 있음",
+            "장면에 테이블이 직접 노드로 없어서 물체들의 정확한 기준 배치 해석이 제한됨"
           ]
         },
         "after": {
           "decomposition": 0.86,
-          "object_selection": 0.98,
+          "object_selection": 0.97,
           "uncertain_about": [
-            "테이블 위 물체들의 정확한 좌우 순서가 아직 실측으로 직접 확인되지는 않음",
-            "각 물체의 정확한 접촉/적재 상태는 일부 조건만 확인되었고 전체 배치 관계는 남아 있음"
+            "테이블이 직접 노드로 없어서 물체들의 정확한 기준 배치 해석이 제한됨"
           ],
-          "reason": "측정으로 대상 물체들의 접근성·파지 가능성·트레이 적재 가능성이 확인되어 실행 가능성은 높아졌지만, 왼쪽부터의 정확한 순서 자체는 직접 실측되지 않아 분해 신뢰도는 약간만 올렸다.",
+          "reason": "대상 물체들이 모두 도달 가능하고 상단 노출 및 그립 가능하며 파란 트레이도 비어 있어 서브골 분해는 더 확실해졌고, 선택한 파란 트레이가 실제로 적절한 목표 객체임도 확인되었지만 테이블 기준 배치 해석의 불확실성은 아직 남아 있다.",
           "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
         },
         "delta": {
           "decomposition": 0.08,
-          "object_selection": 0.02
+          "object_selection": 0.04
         }
       },
       "target_order": {
         "source": "vlm",
-        "reason": "이미지에서 물체가 왼쪽에서 오른쪽으로 놓인 순서대로 정렬했다."
+        "reason": "이미지에서 물체의 왼쪽부터 오른쪽 순서대로 정렬했다."
       },
       "measurements": [
         {
@@ -1942,7 +2019,23 @@
               "eval_by": "m2"
             }
           ],
-          "destroy": []
+          "destroy": [],
+          "action_parameters": {
+            "placement_slot": {
+              "region": "obj_tray_blue_tray",
+              "target": "obj_bread_bread",
+              "uv": [
+                0.638,
+                -0.2574
+              ],
+              "offset_mm": [
+                95.6,
+                -55.0
+              ],
+              "row": 0,
+              "source": "m2_container_layout"
+            }
+          }
         },
         {
           "detail_id": "SG1_s3_d3",
@@ -2024,7 +2117,23 @@
               "head": "above",
               "eval_by": "m2"
             }
-          ]
+          ],
+          "action_parameters": {
+            "placement_slot": {
+              "region": "obj_tray_blue_tray",
+              "target": "obj_bread_bread",
+              "uv": [
+                0.638,
+                -0.2574
+              ],
+              "offset_mm": [
+                95.6,
+                -55.0
+              ],
+              "row": 0,
+              "source": "m2_container_layout"
+            }
+          }
         }
       ],
       "ignore_ids": [
@@ -2032,7 +2141,15 @@
         "obj_mug_mug",
         "obj_plate_plate",
         "obj_spoon_spoon"
-      ]
+      ],
+      "placement_slot": {
+        "region": "obj_tray_blue_tray",
+        "uv": [
+          0.638,
+          -0.2574
+        ],
+        "row": 0
+      }
     },
     {
       "subgoal_id": "SG1_s4",
@@ -2048,34 +2165,33 @@
         "obj_apple_apple",
         "obj_tray_blue_tray"
       ],
-      "selection_reason": "왼쪽부터 순서대로 옮겨야 하므로 이동 대상 물체들과 목적지인 파란 트레이를 선택했다.",
+      "selection_reason": "왼쪽부터 옮길 대상 물체들과 목적지인 파란 트레이가 모두 필요하며, 트레이를 제외한 나머지 장면 물체들은 도구 후보로 함께 고려한다.",
       "confidence": {
         "before": {
           "decomposition": 0.78,
-          "object_selection": 0.96,
+          "object_selection": 0.93,
           "uncertain_about": [
-            "장면에 실제 좌우 배치 정보가 명시되지 않아 대상 순서의 정확한 기하 관계",
-            "각 물체의 정확한 접촉/적재 가능 상태"
+            "각 물체의 실제 크기와 무게에 따라 도구로 쓸지 여부가 달라질 수 있음",
+            "장면에 테이블이 직접 노드로 없어서 물체들의 정확한 기준 배치 해석이 제한됨"
           ]
         },
         "after": {
           "decomposition": 0.86,
-          "object_selection": 0.98,
+          "object_selection": 0.97,
           "uncertain_about": [
-            "테이블 위 물체들의 정확한 좌우 순서가 아직 실측으로 직접 확인되지는 않음",
-            "각 물체의 정확한 접촉/적재 상태는 일부 조건만 확인되었고 전체 배치 관계는 남아 있음"
+            "테이블이 직접 노드로 없어서 물체들의 정확한 기준 배치 해석이 제한됨"
           ],
-          "reason": "측정으로 대상 물체들의 접근성·파지 가능성·트레이 적재 가능성이 확인되어 실행 가능성은 높아졌지만, 왼쪽부터의 정확한 순서 자체는 직접 실측되지 않아 분해 신뢰도는 약간만 올렸다.",
+          "reason": "대상 물체들이 모두 도달 가능하고 상단 노출 및 그립 가능하며 파란 트레이도 비어 있어 서브골 분해는 더 확실해졌고, 선택한 파란 트레이가 실제로 적절한 목표 객체임도 확인되었지만 테이블 기준 배치 해석의 불확실성은 아직 남아 있다.",
           "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
         },
         "delta": {
           "decomposition": 0.08,
-          "object_selection": 0.02
+          "object_selection": 0.04
         }
       },
       "target_order": {
         "source": "vlm",
-        "reason": "이미지에서 물체가 왼쪽에서 오른쪽으로 놓인 순서대로 정렬했다."
+        "reason": "이미지에서 물체의 왼쪽부터 오른쪽 순서대로 정렬했다."
       },
       "measurements": [
         {
@@ -2118,7 +2234,7 @@
             "mu": 0.45,
             "stage": 0,
             "material": "natural organic material",
-            "rms_mm": null
+            "rms_mm": NaN
           },
           "confidence": 0.625,
           "caption": "Red apple with stem.",
@@ -2264,7 +2380,7 @@
             "mu": 0.45,
             "stage": 0,
             "material": "natural organic material",
-            "rms_mm": null
+            "rms_mm": NaN
           },
           "confidence": 0.625,
           "caption": "Red apple with stem.",
@@ -2622,7 +2738,23 @@
               "eval_by": "m2"
             }
           ],
-          "destroy": []
+          "destroy": [],
+          "action_parameters": {
+            "placement_slot": {
+              "region": "obj_tray_blue_tray",
+              "target": "obj_apple_apple",
+              "uv": [
+                -0.1008,
+                0.4475
+              ],
+              "offset_mm": [
+                -15.1,
+                95.6
+              ],
+              "row": 1,
+              "source": "m2_container_layout"
+            }
+          }
         },
         {
           "detail_id": "SG1_s4_d3",
@@ -2704,7 +2836,23 @@
               "head": "above",
               "eval_by": "m2"
             }
-          ]
+          ],
+          "action_parameters": {
+            "placement_slot": {
+              "region": "obj_tray_blue_tray",
+              "target": "obj_apple_apple",
+              "uv": [
+                -0.1008,
+                0.4475
+              ],
+              "offset_mm": [
+                -15.1,
+                95.6
+              ],
+              "row": 1,
+              "source": "m2_container_layout"
+            }
+          }
         }
       ],
       "ignore_ids": [
@@ -2712,7 +2860,15 @@
         "obj_mug_mug",
         "obj_plate_plate",
         "obj_spoon_spoon"
-      ]
+      ],
+      "placement_slot": {
+        "region": "obj_tray_blue_tray",
+        "uv": [
+          -0.1008,
+          0.4475
+        ],
+        "row": 1
+      }
     },
     {
       "subgoal_id": "SG1_s5",
@@ -2728,34 +2884,33 @@
         "obj_mug_mug",
         "obj_tray_blue_tray"
       ],
-      "selection_reason": "왼쪽부터 순서대로 옮겨야 하므로 이동 대상 물체들과 목적지인 파란 트레이를 선택했다.",
+      "selection_reason": "왼쪽부터 옮길 대상 물체들과 목적지인 파란 트레이가 모두 필요하며, 트레이를 제외한 나머지 장면 물체들은 도구 후보로 함께 고려한다.",
       "confidence": {
         "before": {
           "decomposition": 0.78,
-          "object_selection": 0.96,
+          "object_selection": 0.93,
           "uncertain_about": [
-            "장면에 실제 좌우 배치 정보가 명시되지 않아 대상 순서의 정확한 기하 관계",
-            "각 물체의 정확한 접촉/적재 가능 상태"
+            "각 물체의 실제 크기와 무게에 따라 도구로 쓸지 여부가 달라질 수 있음",
+            "장면에 테이블이 직접 노드로 없어서 물체들의 정확한 기준 배치 해석이 제한됨"
           ]
         },
         "after": {
           "decomposition": 0.86,
-          "object_selection": 0.98,
+          "object_selection": 0.97,
           "uncertain_about": [
-            "테이블 위 물체들의 정확한 좌우 순서가 아직 실측으로 직접 확인되지는 않음",
-            "각 물체의 정확한 접촉/적재 상태는 일부 조건만 확인되었고 전체 배치 관계는 남아 있음"
+            "테이블이 직접 노드로 없어서 물체들의 정확한 기준 배치 해석이 제한됨"
           ],
-          "reason": "측정으로 대상 물체들의 접근성·파지 가능성·트레이 적재 가능성이 확인되어 실행 가능성은 높아졌지만, 왼쪽부터의 정확한 순서 자체는 직접 실측되지 않아 분해 신뢰도는 약간만 올렸다.",
+          "reason": "대상 물체들이 모두 도달 가능하고 상단 노출 및 그립 가능하며 파란 트레이도 비어 있어 서브골 분해는 더 확실해졌고, 선택한 파란 트레이가 실제로 적절한 목표 객체임도 확인되었지만 테이블 기준 배치 해석의 불확실성은 아직 남아 있다.",
           "post_split_note": "batch_feasible 불충족은 그룹 분할로 해소됨"
         },
         "delta": {
           "decomposition": 0.08,
-          "object_selection": 0.02
+          "object_selection": 0.04
         }
       },
       "target_order": {
         "source": "vlm",
-        "reason": "이미지에서 물체가 왼쪽에서 오른쪽으로 놓인 순서대로 정렬했다."
+        "reason": "이미지에서 물체의 왼쪽부터 오른쪽 순서대로 정렬했다."
       },
       "measurements": [
         {
@@ -3302,7 +3457,23 @@
               "eval_by": "m2"
             }
           ],
-          "destroy": []
+          "destroy": [],
+          "action_parameters": {
+            "placement_slot": {
+              "region": "obj_tray_blue_tray",
+              "target": "obj_mug_mug",
+              "uv": [
+                -0.66,
+                0.4475
+              ],
+              "offset_mm": [
+                -98.9,
+                95.6
+              ],
+              "row": 1,
+              "source": "m2_container_layout"
+            }
+          }
         },
         {
           "detail_id": "SG1_s5_d3",
@@ -3384,7 +3555,23 @@
               "head": "above",
               "eval_by": "m2"
             }
-          ]
+          ],
+          "action_parameters": {
+            "placement_slot": {
+              "region": "obj_tray_blue_tray",
+              "target": "obj_mug_mug",
+              "uv": [
+                -0.66,
+                0.4475
+              ],
+              "offset_mm": [
+                -98.9,
+                95.6
+              ],
+              "row": 1,
+              "source": "m2_container_layout"
+            }
+          }
         }
       ],
       "ignore_ids": [
@@ -3392,7 +3579,15 @@
         "obj_bread_bread",
         "obj_plate_plate",
         "obj_spoon_spoon"
-      ]
+      ],
+      "placement_slot": {
+        "region": "obj_tray_blue_tray",
+        "uv": [
+          -0.66,
+          0.4475
+        ],
+        "row": 1
+      }
     }
   ],
   "m2_partial_order": [
@@ -3609,31 +3804,31 @@
     "llm_usage": {
       "서브골 분해": {
         "calls": 1,
-        "prompt_tokens": 978,
-        "completion_tokens": 94,
-        "tokens": 1072,
-        "seconds": 2.3
+        "prompt_tokens": 1142,
+        "completion_tokens": 100,
+        "tokens": 1242,
+        "seconds": 1.78
       },
       "객체 선택": {
         "calls": 1,
-        "prompt_tokens": 714,
-        "completion_tokens": 136,
-        "tokens": 850,
-        "seconds": 1.91
+        "prompt_tokens": 834,
+        "completion_tokens": 193,
+        "tokens": 1027,
+        "seconds": 2.36
       },
       "순서(VLM)": {
         "calls": 1,
         "prompt_tokens": 526,
-        "completion_tokens": 60,
-        "tokens": 586,
-        "seconds": 1.53
+        "completion_tokens": 57,
+        "tokens": 583,
+        "seconds": 1.19
       },
       "confidence_update": {
         "calls": 1,
-        "prompt_tokens": 908,
-        "completion_tokens": 145,
-        "tokens": 1053,
-        "seconds": 1.31
+        "prompt_tokens": 889,
+        "completion_tokens": 127,
+        "tokens": 1016,
+        "seconds": 1.56
       }
     },
     "n_evaluations": 35,

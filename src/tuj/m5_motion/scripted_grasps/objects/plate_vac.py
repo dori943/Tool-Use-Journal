@@ -1,9 +1,9 @@
-"""Vacuum plate recipes: C2_1 flat-top seating and C3_2 rim-annulus seating.
+"""Task-scoped vacuum plate recipes.
 
-C2_1 / C1_1 vac alternatives use the flat disc top face (lid-style catalog vac
-path). C3_2 breakfast plates are shallow dishes: lateral contact is derived from
-the plate bbox and an explicit cup-clearance so the TCP is not aimed at the
-recessed center.
+C1_1, C2_1 and C3_1 use the full-size plate. C3_2 uses the smaller
+``plate_a`` / ``plate_b`` instances and seats the cup on the solid rim annulus
+instead of the recessed center. Routes descend along tool -z, engage suction,
+and lift with task-scoped contact calibration.
 """
 from dataclasses import replace
 import numpy as np
@@ -22,6 +22,14 @@ SEATING_OFFSET_Z_M = 0.0
 
 # C2_1 sorting plate (same flat asset family as C1_1 plate).
 C2_1_PLATE_EXPECTED_SIZE_M = (0.182334163, 0.181833528, 0.011091216)
+_TASK_IDS = {
+    'C1_1_LegoSweep': 'c1_1',
+    'C2_1_ObjectSorting': 'c2_1',
+    'C3_1_ObjectSorting': 'c3_1',
+    'C3_2_BreakfastTrayPreparation': 'c3_2',
+}
+_FULL_SIZE_M = (0.182334163, 0.181833528, 0.011091216)
+_BREAKFAST_SIZE_M = (0.157261405, 0.157261434, 0.009592403)
 
 
 def _rim_offset_fraction(size_m=PLATE_EXPECTED_SIZE_M):
@@ -33,36 +41,63 @@ def _rim_offset_fraction(size_m=PLATE_EXPECTED_SIZE_M):
     return (radial_m / sx, 0.0, 0.5)
 
 
-def tune_recipe_to_measured_size(recipe, local_size_m):
-    """Recompute C3_2 rim fraction from the live AABB (PLATE_SCALE-safe).
-
-    ``offset_fraction`` is size-relative. If ``expected_size_m`` drifts from the
-    measured plate while ``local_size`` is used for ``size * fraction``, the cup
-    seats too far inward on the dish and CLOSE loses suction alignment.
-    """
-    if recipe.object_id != 'plate' or recipe.task_id != 'c3_2' or recipe.ee_id != 'vac':
-        return recipe
-    size = tuple(float(x) for x in np.asarray(local_size_m, dtype=float).reshape(3))
-    if len(size) != 3 or not np.isfinite(size).all() or min(size) <= 0:
-        raise ValueError('Invalid measured plate size')
-    fx, fy, fz = _rim_offset_fraction(size)
-    return replace(
-        recipe,
-        expected_size_m=size,
-        offset_fraction=(fx, fy, fz),
-        offset_m=(0.0, 0.0, SEATING_OFFSET_Z_M),
+def _task_recipe(task_id, object_id, expected_size_m):
+    is_breakfast = task_id == 'c3_2'
+    offset_fraction = (
+        _rim_offset_fraction(expected_size_m)
+        if is_breakfast else (0., 0., .5)
+    )
+    extra = ({
+        'contact_region_min': (-0.95, -0.95, 0.0),
+        'contact_region_max': (0.95, 0.95, 0.6),
+    } if is_breakfast else {})
+    return CatalogRecipe(
+        object_id, task_id, 'vac',
+        expected_size_m,
+        offset_fraction=offset_fraction,
+        # C1_1 rests on table_collision: negative immersion pushes the plate
+        # through its support during CLOSE / early LIFT.
+        offset_m=(0., 0., 0. if task_id in {'c1_1', 'c3_2'} else -.0005),
+        linear_lift_start=task_id == 'c1_1',
+        arm_kp=300. if task_id == 'c1_1' else 150.,
+        two_finger_parallel_linkage=False,
+        post_grasp_arm_kp=300.,
+        # Reach the suction command before the thin plate is pushed or tilted
+        # by a slow four-second command ramp.
+        close_duration_s=.04 if task_id == 'c1_1' else .2,
+        # The plate collision mesh yields one aligned cup contact. Requiring
+        # three contacts is appropriate for the lid mesh but rejects this
+        # sustained, centered contact before attachment.
+        minimum_vacuum_contact_count=1,
+        contact_ticks=3 if task_id == 'c1_1' else 5,
+        prelift_stabilization_s=.02 if task_id == 'c1_1' else .5,
+        # C1_1's concave plate mesh reports deeper cup and initial table overlap
+        # at an otherwise aligned top-face contact. Keep both exceptions scoped
+        # to that environment and below their catalog safety caps.
+        maximum_vacuum_attach_penetration_m=(
+            .0035 if task_id == 'c1_1' else .002),
+        maximum_support_separation_penetration_m=(
+            .0045 if task_id == 'c1_1' else .002),
+        **extra,
     )
 
 
-def plate_vac_c2_1_recipe():
-    """Flat top-face vac contact for C2_1 sorting plates."""
-    return CatalogRecipe(
-        'plate', 'c2_1', 'vac',
-        C2_1_PLATE_EXPECTED_SIZE_M,
-        offset_fraction=(0., 0., .5),
-        offset_m=(0., 0., -.0005),
-        two_finger_parallel_linkage=False,
-        post_grasp_arm_kp=300.,
+def tune_recipe_to_measured_size(recipe, local_size_m):
+    """Recompute C3_2 rim fraction from the live AABB (PLATE_SCALE-safe)."""
+    if (
+        recipe.object_id not in {'plate', 'plate_a', 'plate_b'}
+        or recipe.task_id != 'c3_2'
+        or recipe.ee_id != 'vac'
+    ):
+        return recipe
+    size = tuple(float(x) for x in np.asarray(local_size_m, dtype=float).reshape(3))
+    if not np.isfinite(size).all() or min(size) <= 0:
+        raise ValueError('Invalid measured plate size')
+    return replace(
+        recipe,
+        expected_size_m=size,
+        offset_fraction=_rim_offset_fraction(size),
+        offset_m=(0.0, 0.0, SEATING_OFFSET_Z_M),
     )
 
 
@@ -73,39 +108,38 @@ def plate_vac_c1_1_recipe():
     and immersing the cup presses the free plate into the table. CLOSE then
     reports ~1 cm depression and early-LIFT fails on residual table penetration.
     """
-    return CatalogRecipe(
-        'plate', 'c1_1', 'vac',
-        C2_1_PLATE_EXPECTED_SIZE_M,
-        offset_fraction=(0., 0., .5),
-        offset_m=(0., 0., 0.),
-        two_finger_parallel_linkage=False,
-        post_grasp_arm_kp=300.,
-    )
+    return _task_recipe('c1_1', 'plate', C2_1_PLATE_EXPECTED_SIZE_M)
 
 
-def plate_vac_c3_2_recipe():
+def plate_vac_c2_1_recipe():
+    """Flat top-face vac contact for C2_1 sorting plates."""
+    return _task_recipe('c2_1', 'plate', C2_1_PLATE_EXPECTED_SIZE_M)
+
+
+def plate_vac_c3_2_recipe(object_id='plate'):
     """Rim-annulus vac contact for C3_2 breakfast plates."""
-    fx, fy, fz = _rim_offset_fraction()
-    return CatalogRecipe(
-        'plate', 'c3_2', 'vac', PLATE_EXPECTED_SIZE_M,
-        offset_fraction=(fx, fy, fz),
-        offset_m=(0.0, 0.0, SEATING_OFFSET_Z_M),
-        two_finger_parallel_linkage=False,
-        post_grasp_arm_kp=300.0,
-        contact_region_min=(-0.95, -0.95, 0.0),
-        contact_region_max=(0.95, 0.95, 0.6),
-    )
+    if object_id not in {'plate', 'plate_a', 'plate_b'}:
+        raise ValueError(f'UNSUPPORTED_PLATE_VAC_OBJECT: {object_id}')
+    return _task_recipe('c3_2', object_id, PLATE_EXPECTED_SIZE_M)
 
 
-def plate_vac_recipe(task_id=None):
-    """Dispatch by task id; default remains the C3_2 rim recipe used by local tests."""
-    if task_id in (None, 'c3_2'):
+def plate_vac_recipe(environment=None, object_id='plate'):
+    """Build an environment-scoped recipe; no-arg calls retain C3_2 defaults."""
+    if environment is None:
+        if object_id != 'plate':
+            raise ValueError(f'UNSUPPORTED_PLATE_VAC_OBJECT: {object_id}')
         return plate_vac_c3_2_recipe()
-    if task_id == 'c1_1':
-        return plate_vac_c1_1_recipe()
-    if task_id == 'c2_1':
-        return plate_vac_c2_1_recipe()
-    raise ValueError(f'UNSUPPORTED_PLATE_VAC_TASK: {task_id!r}')
+    try:
+        task_id = _TASK_IDS[environment]
+    except KeyError as error:
+        raise ValueError(
+            f'UNSUPPORTED_PLATE_VAC_ENVIRONMENT: {environment}'
+        ) from error
+    allowed_ids = {'plate_a', 'plate_b'} if task_id == 'c3_2' else {'plate'}
+    if object_id not in allowed_ids:
+        raise ValueError(f'UNSUPPORTED_PLATE_VAC_OBJECT: {object_id}')
+    expected = PLATE_EXPECTED_SIZE_M if task_id == 'c3_2' else _FULL_SIZE_M
+    return _task_recipe(task_id, object_id, expected)
 
 
 def build_plate_vac_targets(T_WB, center_in_body_m, local_size_m, recipe=None):
@@ -114,9 +148,9 @@ def build_plate_vac_targets(T_WB, center_in_body_m, local_size_m, recipe=None):
 
 
 def grasp_plate_vac(context, object_id=None, recipe=None):
-    object_id = object_id or getattr(context, 'object_id', 'plate')
+    target = object_id or getattr(context, 'object_id', 'plate')
     # Prefer the recipe bind_context already installed (C1_1/C2_1 flat vs C3_2
     # rim). Falling back to plate_vac_recipe() defaults to C3_2 and trips
     # "Context must be initialized with the same recipe" on C1_1 vac.
     active = recipe or getattr(context, 'recipe', None) or plate_vac_recipe()
-    return dispatch_grasp(context, object_id, active, expected_id='plate')
+    return dispatch_grasp(context, target, active, expected_id=active.object_id)

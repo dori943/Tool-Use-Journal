@@ -585,7 +585,6 @@ def attach_vacuum(context):
 
     command = 2. * context.recipe.suction_command - 1.
     context.runtime.command_gripper(engaged=True, suction=True, command=command)
-
     pose_before_attach = np.asarray(context.body_pose(), dtype=float).copy()
     grip_before_attach = np.asarray(context.grip_pose(), dtype=float).copy()
     # Attach on the live contact pair (distance gate). Continuity rebind to the
@@ -594,7 +593,9 @@ def attach_vacuum(context):
         context.object_id,
         attachment_mode='KINEMATIC',
         max_attach_distance_m=.002,
-        max_attach_penetration_m=.002,
+        max_attach_penetration_m=(
+            context.recipe.maximum_vacuum_attach_penetration_m
+        ),
     )
     # Lock intended target: kinematic weld holds the object; zero adhesion so
     # the cup cannot suction additional free bodies during later tool-use.

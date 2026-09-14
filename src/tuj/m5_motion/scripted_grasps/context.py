@@ -30,6 +30,7 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     c = cls()
     scene_object_id = entry.scene_object_id
     c.runtime, c.env, c.recipe, c.object_id = runtime, env, recipe, scene_object_id
+    c.request_collision_margin_m = float(request.constraints.collision_margin_m) if request is not None else 0.
     c.output = Path(output).resolve()
     # Re-runs reuse the same step hash; allow an existing empty/partial grasp
     # tree instead of failing closed with FileExistsError / missing parents.
@@ -88,15 +89,35 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     c.fixed_mount_pairs = {tuple(sorted((int(con.geom1), int(con.geom2)))) for con in c.data.contact[:c.data.ncon]
         if con.dist < 0 and (int(con.geom1) in c.robot_geoms or int(con.geom2) in c.robot_geoms)
         and int(con.geom1) not in c.gripper_geoms and int(con.geom2) not in c.gripper_geoms}
-    c.support_gid = CatalogContext.find_support_geom(c)
-    c.support_top_z = CatalogContext.geom_top_height(c, c.support_gid)
+    c.support_gids = CatalogContext.find_support_geoms(c)
+    c.support_gid = min(c.support_gids)
+    c.support_top_z = max(CatalogContext.geom_top_height(c, gid)
+        for gid in c.support_gids)
     c.thin_contact_profile = None
     if hasattr(recipe, "thin_contact_timeconstant_s"):
-        relevant = c.gripper_geoms | c.object_geoms | {c.support_gid}
+        relevant = c.gripper_geoms | c.object_geoms | c.support_gids
         original = {c.model.geom(i).name: c.model.geom_solref[i].tolist() for i in relevant}
+        solimp = getattr(recipe, "thin_contact_solimp", None)
+        original_solimp = (
+            {c.model.geom(i).name: c.model.geom_solimp[i].tolist() for i in relevant}
+            if solimp is not None else None)
         for i in relevant:
             c.model.geom_solref[i] = [recipe.thin_contact_timeconstant_s, 1.]
-        c.thin_contact_profile = {"timeconstant_s": recipe.thin_contact_timeconstant_s, "original_solref": original}
+            if solimp is not None:
+                c.model.geom_solimp[i][:3] = list(solimp)
+        c.thin_contact_profile = {"timeconstant_s": recipe.thin_contact_timeconstant_s, "original_solref": original,
+            "solimp": list(solimp) if solimp is not None else None, "original_solimp": original_solimp}
+    c.vacuum_cup_margin_profile = None
+    cup_margin = getattr(recipe, "vacuum_cup_margin_m", None)
+    if cup_margin is not None and entry.ee == "vac":
+        # 흡착이 받침을 통해 딸려 올라가지 않도록 컵의 접촉 탐지 범위를 좁힌다.
+        # gap 을 margin 과 같게 유지해야 접촉력 발생 시점(dist<0)이 안 바뀐다.
+        cup_ids = sorted(c.finger_groups["suction"])
+        c.vacuum_cup_margin_profile = {"margin_m": float(cup_margin),
+            "original": {c.model.geom(i).name: [float(c.model.geom_margin[i]), float(c.model.geom_gap[i])] for i in cup_ids}}
+        for i in cup_ids:
+            c.model.geom_margin[i] = float(cup_margin)
+            c.model.geom_gap[i] = float(cup_margin)
     c.ee_spec = next(s for s in env.robot_spec["ee_pool"] if s["ee_id"] == entry.ee)
     c.gripper_actuator_ids = np.array([i for i in range(c.model.nu) if c.model.actuator(i).name.startswith(c.gripper.naming_prefix)])
     if entry.driver == "plate":
@@ -115,8 +136,11 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     c.grasp_T_GB = c.grasp_object_pose = c.grasp_grip_pose = None
     c.three_finger_force_hold, c.two_finger_force_hold = False, False
     c.three_finger_commands, c.two_finger_command = None, 0.
-    c.three_finger_hold_command_min = None
-    c.three_finger_hold_command_max = None
+    # Shared 3F force-hold clamp bounds. The runtime step reads these, but only
+    # the spoon path (execute_spoon) initialised them; a catalog 3F grasp (bread
+    # /apple/mug) hit AttributeError. Initialise here for every context; the
+    # step leaves the clamp inactive while they stay None.
+    c.three_finger_hold_command_min = c.three_finger_hold_command_max = None
     c.physics_steps_audited, c.maximum_physics_joint_error = 0, 0.
     c.max_runtime_s = c.execution_started = None
     c.timing = {"physics_timestep_s": float(c.model.opt.timestep), "control_timestep_s": float(env.control_timestep), "clock_source": "MUJOCO_DATA_TIME"}
@@ -136,6 +160,13 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
 def execute_grasp(runtime, entry, output, *, seed=0, request=None):
     """Call one object function and retain real state only after validation."""
     c = bind_context(runtime, entry, output, seed=seed, request=request)
+    arm_controller = getattr(getattr(c, 'robot', None), 'part_controllers', {}).get('right')
+    original_arm_gains = None
+    if arm_controller is not None and hasattr(c.recipe, 'arm_kp'):
+        original_arm_gains = (arm_controller.kp.copy(), arm_controller.kd.copy())
+        damping_ratio = arm_controller.kd / (2. * np.sqrt(arm_controller.kp))
+        runtime.set_joint_position_controller_gains(
+            kp=c.recipe.arm_kp, damping_ratio=float(np.asarray(damping_ratio).mean()))
     finish = runtime.finish_attachment_step
     audit = getattr(c, "audit_hand_range", None)
     if audit is not None:
@@ -147,6 +178,8 @@ def execute_grasp(runtime, entry, output, *, seed=0, request=None):
         result = entry.function()(c)
     finally:
         runtime.finish_attachment_step = finish
+        if original_arm_gains is not None:
+            arm_controller.kp, arm_controller.kd = original_arm_gains
     if result["status"] != "SUCCESS":
         raise GraspFailure(f"{entry.scene_object_id}: {result.get('failure_stage')}: {result.get('failure_reason')}")
     result["acquisition_status"] = result["status"]
@@ -168,16 +201,19 @@ def execute_grasp(runtime, entry, output, *, seed=0, request=None):
                 attachment_used=False,
                 attachment_phase="CONTACT_FRICTION",
                 post_grasp_attachment_error=str(error),
+                attachment_geometry_audit=getattr(runtime, 'last_attachment_geometry_audit', None),
             )
         else:
             result.update(status="FAILED", failure_stage="POST_GRASP_ATTACHMENT",
                           failure_reason=str(error), error_type=type(error).__name__,
-                          attachment_used=runtime.attachment is not None)
+                          attachment_used=runtime.attachment is not None,
+                          attachment_geometry_audit=getattr(runtime, 'last_attachment_geometry_audit', None))
             save_json(c.output / "result.json", result)
             raise
     else:
         result.update(attachment_used=True, attachment_mode=runtime.attachment.mode.value,
-                      attachment_phase="POST_VALIDATED_GRASP" if not result["acquisition_attachment_used"] else "ACQUISITION")
+                      attachment_phase="POST_VALIDATED_GRASP" if not result["acquisition_attachment_used"] else "ACQUISITION",
+                      attachment_geometry_audit=getattr(runtime, 'last_attachment_geometry_audit', None))
     from .retention import GraspRetention
     runtime.scripted_grasp_retention = GraspRetention(c, entry)
     result.update(final_robot_q=c.data.qpos[c.arm_ids].tolist(), object_pose_in_gripper=pose_dict(inverse(c.grip_pose()) @ c.body_pose()))

@@ -400,6 +400,15 @@ def _object_record(
         }
     if collision_points is not None:
         record["collision_points_m"] = collision_points.tolist()
+    if len(collision_ids) == 1 and model.geom_type[collision_ids[0]] == mujoco.mjtGeom.mjGEOM_BOX:
+        gid = collision_ids[0]
+        body_rotation = data.xmat[body_id].reshape(3, 3)
+        record["solid_box_geometry"] = {
+            "source": "MUJOCO_BOX",
+            "half_size_m": model.geom_size[gid].tolist(),
+            "center_in_body_m": (body_rotation.T @ (data.geom_xpos[gid] - data.xpos[body_id])).tolist(),
+            "rotation_in_body": (body_rotation.T @ data.geom_xmat[gid].reshape(3, 3)).tolist(),
+        }
     free_joints = [
         _name(model, mujoco.mjtObj.mjOBJ_JOINT, joint_id)
         for joint_id in range(model.njnt)

@@ -59,8 +59,22 @@ def repair_spoon_parallel_2f_xml(root,prefix):
     for j in root.findall('.//worldbody//joint'):
         if j.get('name','').startswith(prefix):
             j.set('solreflimit','.002 1');j.set('solimplimit','.9999 .9999 .001');j.set('armature','.0001')
+    damped_actuators=[]
+    for actuator in root.findall('./actuator/position'):
+        if not actuator.get('name','').startswith(prefix):
+            continue
+        if float(actuator.get('kv','0')) > 0 or float(actuator.get('dampratio','0')) > 0:
+            continue
+        # The corrected linkage otherwise has position stiffness but no
+        # velocity damping: even a constant input oscillates through preshape.
+        # Let MuJoCo derive kv from kp and reference inertia (incl. armature),
+        # rather than choosing an object-specific gain or widening tolerances.
+        actuator.attrib.pop('kv',None)
+        actuator.set('dampratio','1')
+        damped_actuators.append(actuator.get('name'))
     return {'policy':'CALIBRATED_PARALLEL_2F_LINKAGE','removed_spring_tendons':removed,
         'added_joint_couplings':added,'joint_armature_kg_m2':.0001,
+        'critical_damping_actuators':damped_actuators,
         'joint_ranges_changed':False,'mass_or_friction_changed':False,'source_assets_changed':False,
         'object_attachment':False,'scene_collision_masks_changed':False}
 

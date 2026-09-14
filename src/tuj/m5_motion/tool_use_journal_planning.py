@@ -1299,12 +1299,31 @@ class ToolUseJournalCollisionContextFactory:
             contact_id = f"grasp-contact:{target}:{token}"
             attached_id = f"object-attached:{target}:{token}"
             release_id = f"object-attached-release:{target}:{token}"
+            # 0911: 파지 중 문맥은 [EE, 대상] 만 면제하고 받침에는 5mm 마진을
+            # 그대로 요구했다. 얇은 물체를 집을 때 이 요구는 원리상 만족이
+            # 불가능하다 -- 대상 윗면에 EE 를 대면 받침은 대상 두께만큼 아래에
+            # 있기 때문이다. c2_2 의 turkey_3(두께 2.5mm)은 바로 아래 turkey_2
+            # 와의 여유가 -0.001847 / -0.000082 / +0.000633 m 로 나와 생성된
+            # 전략이 전부 COLLISION_FILTERED_ALL 로 기각됐고, 접시 위 단독
+            # 슬라이스도 같은 벽에 부딪힌다. 파지 후 문맥은 이미 [대상, 받침]
+            # 을 1mm 관통까지 허용하므로 같은 장치를 파지 중에도 건다.
+            # 무제한 면제가 아니라 EE 가 받침을 뚫고 들어가는 것은 계속 막는다.
+            contact_metadata: dict[str, Any] = {}
+            if support_selectors:
+                contact_metadata[_BOUNDED_COLLISION_ALLOWANCES_KEY] = [
+                    {
+                        "selectors": [active_ee, selector],
+                        "minimum_distance_m": -support_penetration_tolerance_m,
+                    }
+                    for selector in support_selectors
+                ]
             contact = base.model_copy(
                 update={
                     "context_id": contact_id,
                     "allowed_collision_pairs": self._contact_pairs(
-                        active_ee, touch_selectors
+                        active_ee, [*touch_selectors, *support_selectors]
                     ),
+                    "metadata": contact_metadata,
                 }
             )
             transform = _relative_attachment(
@@ -1329,27 +1348,36 @@ class ToolUseJournalCollisionContextFactory:
             contexts[contact_id] = contact
             contexts[attached_id] = attached
             if support_selectors:
+                # 0912: 이 문맥은 [대상, 받침] 만 면제하고 [EE, 받침] 에는 5mm
+                # 마진을 그대로 요구했다. 얇은 물체를 받침에서 떼는 동안 EE 는
+                # 물체 두께만큼만 받침에서 떨어져 있으므로 원리상 만족이
+                # 불가능하다. c2_2 의 turkey_1(두께 2.5mm)을 흡착으로 들어올릴
+                # 때 흡착컵과 접시 여유가 0.000439 / 0.000737 / 0.001557 /
+                # 0.001993 m 로 나와 생성된 전략이 전부 기각됐다. 파지 중 문맥이
+                # 0911 에 같은 이유로 이미 하는 처리를 파지 후에도 건다. 무제한
+                # 면제가 아니라 EE 가 받침을 뚫는 것은 계속 막는다.
+                support_allowances = [
+                    {
+                        "selectors": [selector_a, selector],
+                        "minimum_distance_m": -support_penetration_tolerance_m,
+                    }
+                    for selector_a in (target, active_ee)
+                    for selector in support_selectors
+                ]
                 release = attached.model_copy(
                     update={
                         "context_id": release_id,
-                        "allowed_collision_pairs": self._contact_pairs(
-                            target, support_selectors
-                        ),
+                        "allowed_collision_pairs": [
+                            *self._contact_pairs(target, support_selectors),
+                            *self._contact_pairs(active_ee, support_selectors),
+                        ],
                         "metadata": {
                             "support_separation": {
                                 **support_evidence,
                                 "target_selector": target,
                                 "support_selectors": list(support_selectors),
                             },
-                            _BOUNDED_COLLISION_ALLOWANCES_KEY: [
-                                {
-                                    "selectors": [target, selector],
-                                    "minimum_distance_m": (
-                                        -support_penetration_tolerance_m
-                                    ),
-                                }
-                                for selector in support_selectors
-                            ],
+                            _BOUNDED_COLLISION_ALLOWANCES_KEY: support_allowances,
                             _POST_SEGMENT_VALIDATION_CONTEXT_KEY: attached_id,
                         },
                     }
@@ -1577,6 +1605,50 @@ class ToolUseJournalCollisionContextFactory:
         from tuj.m5_motion.release_separation import bind_release_separation
 
         bind_release_separation(self.compiler, request, bound, contexts, target)
+        # Withdrawal from a crowded region.  After the held object is released,
+        # the empty gripper retreats past objects already packed into the same
+        # region.  The descent already tolerates the HELD object contacting
+        # those occupants (the task packs everything into one region and permits
+        # overlap); extend the identical tolerance to the withdrawing GRIPPER so
+        # a post-release retreat that grazes a neighbour -- e.g. an open 2F
+        # finger passing 2.5 mm from an already-placed spoon while lifting away
+        # -- is not collision-filtered.  Scoped to the release/retreat contexts
+        # of this place only (every keyframe after the PLACE); approach,
+        # transport and free-space margins are unchanged, and a single-object
+        # region has no occupants so those tasks are untouched.
+        occupants = self._region_occupant_ids(request, target)
+        occupant_pairs = self._contact_pairs(active_ee, occupants) if occupants else []
+        if occupant_pairs:
+            for candidate in bound.candidates:
+                place_kf = next(
+                    (
+                        keyframe
+                        for keyframe in candidate.keyframes
+                        if keyframe.keyframe_type is KeyframeType.PLACE
+                    ),
+                    None,
+                )
+                if place_kf is None:
+                    continue
+                start = candidate.keyframes.index(place_kf) + 1
+                retreat_context_ids = {
+                    context_id
+                    for keyframe in candidate.keyframes[start:]
+                    for context_id in (
+                        keyframe.collision_context_id,
+                        keyframe.collision_context_after_events_id,
+                    )
+                    if context_id in contexts
+                }
+                for context_id in retreat_context_ids:
+                    ctx = contexts[context_id]
+                    merged = list(ctx.allowed_collision_pairs)
+                    for pair in occupant_pairs:
+                        if pair not in merged:
+                            merged.append(pair)
+                    contexts[context_id] = ctx.model_copy(
+                        update={"allowed_collision_pairs": merged}
+                    )
         return _stamp_bound_artifact(request, source, bound), contexts
 
     def _bind_ee_exchange(
