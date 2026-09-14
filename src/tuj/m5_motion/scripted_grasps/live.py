@@ -40,8 +40,15 @@ def snapshot(runtime, previous=None):
     retention = getattr(runtime, "scripted_grasp_retention", None)
     if retention is not None and attachment is None:
         world.metadata["contact_friction_held_objects"] = {
-            retention.entry.object_id: retention.transform().model_dump(mode="json")}
+            retention.entry.scene_object_id: retention.transform().model_dump(mode="json")}
     world.metadata["scripted_grasps"] = True
+    if retention is not None and retention.entry.ee in {"2F", "3F"}:
+        from .open_geometry import open_joint_positions
+        world.metadata["released_gripper_configuration"] = {
+            "ee": retention.entry.ee,
+            "source": "PUBLIC_OPEN_ENDPOINT_AND_LINKAGE",
+            "joint_positions": open_joint_positions(retention.context),
+        }
     return world
 
 
@@ -51,7 +58,7 @@ class ScriptedGraspSession:
     """
     def __init__(self, runtime, repository, output, *, seed=0, provider=None,
                  planner_factory=None, executor_factory=None, **planner_options):
-        self.runtime, self.repository, self.output = runtime, Path(repository), Path(output)
+        self.runtime, self.repository, self.output = runtime, Path(repository), Path(output).resolve()
         self.seed, self.provider, self.planner_options = seed, provider, planner_options
         self.planner_factory, self.executor_factory = planner_factory, executor_factory
         self.world = snapshot(runtime)
@@ -70,17 +77,32 @@ class ScriptedGraspSession:
         # recorder has already opened here (Windows raises WinError 32 if we try
         # to delete a file another handle holds open, which aborted the run when
         # ``--video`` pointed inside the session output directory).
+        # Do not clear while another run shares this folder: parallel run_m5
+        # processes both targeting ``.../m5/live`` will delete each other's
+        # in-flight step dirs and surface as missing ``grasp/result.json``.
         import shutil
         self.output.mkdir(parents=True, exist_ok=True)
         for child in self.output.iterdir():
             if child.is_dir():
                 shutil.rmtree(child, ignore_errors=True)
 
+    def _get_planner(self):
+        from tuj.m5_motion.tool_use_journal_planning import ToolUseJournalMotionRequestPlanner
+        factory = self.planner_factory or ToolUseJournalMotionRequestPlanner.from_environment
+        key = (id(self.runtime.env), id(self.provider))
+        if self._planner is None or key != self._planner_key:
+            self._planner = factory(self.runtime.env, self.repository, provider=self.provider,
+                seed=self.seed, **self.planner_options)
+            self._planner_key = key
+        else:
+            collision_factory = self._planner.collision_context_factory
+            collision_factory.compiler = collision_factory.compiler.with_reference_environment(self.runtime.env)
+        return self._planner
+
     def execute_request(self, request, *, completed_subgoal=None):
         from .context import execute_grasp
         from tuj.m5_motion.execution import SimulationArtifactStore
         from tuj.m5_motion.tool_use_journal_execution import ToolUseJournalExecutionAdapter
-        from tuj.m5_motion.tool_use_journal_planning import ToolUseJournalMotionRequestPlanner
 
         request = request.model_copy(deep=True)
         request.world = self.world.model_copy(deep=True)
@@ -117,8 +139,11 @@ class ScriptedGraspSession:
             contact_speed = ContactExecutionProfile().contact_penetration_m / env.control_timestep
             request.constraints.max_cartesian_speed_m_s = min(request.constraints.max_cartesian_speed_m_s or contact_speed, contact_speed)
         if retention is not None:
-            from .transport import ground_held_transport
-            ground_held_transport(request, retention)
+            from .packing_validity import needs_packing_transport_filter, bind_packing_transport_filter
+            if needs_packing_transport_filter(request, retention):
+                bind_packing_transport_filter(request, retention, self._get_planner())
+            from .transport import ground_held_region_goal
+            ground_held_region_goal(request, retention)
         token = hashlib.sha256(request.model_dump_json().encode()).hexdigest()[:20]
         request.request_id = f"motion-request:live:{token}"
         request.provenance = request.provenance.model_copy(update={
@@ -126,6 +151,12 @@ class ScriptedGraspSession:
             "metadata": {**request.provenance.metadata, "state_source": "LIVE_RUNTIME"}})
         index = len(self.records)
         directory = self.output / f"{index:04d}-{token}"
+        # Replace a stale same-hash step tree from a previous attempt so grasp/
+        # mkdir and plan artifacts do not collide mid-run.
+        if directory.exists():
+            import shutil
+            shutil.rmtree(directory, ignore_errors=True)
+        directory.mkdir(parents=True, exist_ok=True)
         store = MotionPlanStore(directory)
         request_path = store.save_request(request, index=0)
         record = {"request_id": request.request_id, "request": str(request_path), "status": "RUNNING"}
@@ -141,17 +172,10 @@ class ScriptedGraspSession:
                     metrics=result.get("metrics"))
             else:
                 record["route"] = "M5_MOTION_PLAN"
-                factory = self.planner_factory or ToolUseJournalMotionRequestPlanner.from_environment
-                key = (id(self.runtime.env), id(self.provider))
-                if self._planner is None or key != self._planner_key:
-                    self._planner = factory(self.runtime.env, self.repository, provider=self.provider,
-                        seed=self.seed, **self.planner_options)
-                    self._planner_key = key
-                else:
-                    collision_factory = self._planner.collision_context_factory
-                    collision_factory.compiler = collision_factory.compiler.with_reference_environment(self.runtime.env)
-                planner = self._planner
+                planner = self._get_planner()
                 plan = _unwrap_plan(planner(request), request)
+                from tuj.m5_motion.container_settle import configure_container_settle
+                configure_container_settle(request, plan)
                 store.save_request(request, index=0)
                 record["plan"] = str(store.save_plan(plan, index=0))
                 execution_factory = self.executor_factory or ToolUseJournalExecutionAdapter

@@ -124,11 +124,25 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
                 runtime.env.sim.forward()
             recorder = GenericSimulationVideoRecorder(runtime, args.video.resolve(), camera=camera,
                 width=args.width, height=args.height, fps=args.video_fps)
-        session = ScriptedGraspSession(runtime, repository, output / "live", **planner_options)
+        # Isolate each live run under its own directory. Clearing ``live/`` on
+        # session start previously deleted in-flight step trees when two run_m5
+        # processes shared the same output folder (seen as missing grasp/result.json).
+        import uuid
+        from datetime import datetime
+        live_root = (output / "live").resolve()
+        live_root.mkdir(parents=True, exist_ok=True)
+        run_dir = live_root / (
+            f"run-{datetime.now().strftime('%Y%m%d-%H%M%S')}-{uuid.uuid4().hex[:8]}"
+        )
+        session = ScriptedGraspSession(runtime, repository, run_dir, **planner_options)
         session.world = snapshot(runtime, initial_world)
         manifest = session.execute_selected_plan(selected, constraints=constraints,
             options=options, selected_plan_artifact_id=artifact_id)
+        # Stable pointer for tools that still look at live/live-execution-manifest.json.
+        latest = live_root / "live-execution-manifest.json"
+        latest.write_text(manifest.read_text(encoding="utf-8"), encoding="utf-8")
         summary.update(status="SUCCESS", manifest=str(manifest.resolve()),
+            live_run_dir=str(run_dir.resolve()),
             scripted_grasp_count=sum(r["route"] == "SCRIPTED_GRASP" for r in session.records),
             motion_plan_count=sum(r["route"] == "M5_MOTION_PLAN" for r in session.records))
         if recorder:
@@ -152,7 +166,11 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
             summary["failure_detail"] = str(path.resolve())
         if session:
             session.failure = summary["detail"]
-            summary["manifest"] = str(session.save_manifest().resolve())
+            manifest = session.save_manifest()
+            summary["manifest"] = str(manifest.resolve())
+            summary["live_run_dir"] = str(session.output.resolve())
+            latest = session.output.parent / "live-execution-manifest.json"
+            latest.write_text(manifest.read_text(encoding="utf-8"), encoding="utf-8")
     finally:
         if recorder:
             recorder.close()

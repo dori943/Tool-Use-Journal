@@ -37,6 +37,7 @@ from tuj.m5_motion.schema import (
 from tuj.m5_motion.tool_use_journal_runtime import (
     AttachmentContactMetrics,
     AttachmentMode,
+    AttachedObjectState,
     BreakableWeldConfig,
     ToolUseJournalAttachmentBroken,
     ToolUseJournalControllerTrajectoryPlayer,
@@ -407,6 +408,79 @@ def test_compiler_reuses_variants_with_current_reference_state() -> None:
     assert refreshed.attached_model_versions == compiler.attached_model_versions
 
 
+def test_compiler_compile_reuses_model_for_same_active_ee(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    variants = {
+        active_ee: _fake_env(active_ee)
+        for active_ee in (None, "2F", "3F", "vac")
+    }
+    compiler = ToolUseJournalCollisionModelCompiler.from_environments(
+        variants["2F"], variants, source_revision="fixture"
+    )
+    real_from_xml = mujoco.MjModel.from_xml_string
+    calls = {"count": 0}
+
+    def counting_from_xml(xml: str, *args: object, **kwargs: object):
+        calls["count"] += 1
+        return real_from_xml(xml, *args, **kwargs)
+
+    monkeypatch.setattr(mujoco.MjModel, "from_xml_string", counting_from_xml)
+    first = compiler.compile("3F")
+    second = compiler.compile("3F")
+    assert first is second
+    assert first.model is second.model
+    assert calls["count"] == 1
+
+
+def test_compiler_compile_caches_distinct_active_ee_entries() -> None:
+    variants = {
+        active_ee: _fake_env(active_ee)
+        for active_ee in (None, "2F", "3F", "vac")
+    }
+    compiler = ToolUseJournalCollisionModelCompiler.from_environments(
+        variants["2F"], variants, source_revision="fixture"
+    )
+    bare = compiler.compile(None)
+    three_f = compiler.compile("3F")
+    assert bare is not three_f
+    assert bare.model is not three_f.model
+    assert None in compiler._compiled_models
+    assert "3F" in compiler._compiled_models
+
+
+def test_with_reference_environment_starts_with_empty_compile_cache() -> None:
+    variants = {
+        active_ee: _fake_env(active_ee)
+        for active_ee in (None, "2F", "3F", "vac")
+    }
+    compiler = ToolUseJournalCollisionModelCompiler.from_environments(
+        variants["2F"], variants, source_revision="fixture"
+    )
+    original = compiler.compile("vac")
+    refreshed = compiler.with_reference_environment(variants["2F"])
+    assert refreshed._compiled_models == {}
+    rebuilt = refreshed.compile("vac")
+    assert rebuilt is not original
+    assert rebuilt.model is not original.model
+
+
+def test_make_validator_creates_fresh_mjdata_for_cached_model() -> None:
+    variants = {
+        active_ee: _fake_env(active_ee)
+        for active_ee in (None, "2F", "3F", "vac")
+    }
+    compiler = ToolUseJournalCollisionModelCompiler.from_environments(
+        variants["2F"], variants, source_revision="fixture"
+    )
+    compiled = compiler.compile("2F")
+    first = compiled.make_validator(collision_margin_m=0.005)
+    second = compiled.make_validator(collision_margin_m=0.005)
+    assert first.model is compiled.model
+    assert second.model is compiled.model
+    assert first.data is not second.data
+
+
 def test_exchange_contexts_route_to_target_scene_models() -> None:
     variants = {
         active_ee: _fake_env(active_ee)
@@ -576,6 +650,384 @@ def test_runtime_grasp_attach_tracks_hand_and_blocks_tool_exchange() -> None:
     runtime.command_gripper(engaged=False, suction=False)
     assert runtime.attached_object_id is None
     assert runtime.held_tool_id is None
+    runtime.close()
+
+
+def test_attached_object_same_time_resync_preserves_finite_diff_qvel() -> None:
+    """Controller pre-step sync shares sim time with the prior post-step sync.
+
+    Zeroing qvel on that dt≈0 call removes tangential velocity before physics
+    and makes held tools slide over tabletop targets without lateral push.
+    """
+
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    hand_id = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_BODY, "robot0_right_hand"
+    )
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    apple_qvel = int(model.jnt_dofadr[apple_joint])
+    data.qpos[apple_qpos : apple_qpos + 3] = data.xpos[hand_id]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+    runtime.command_gripper(engaged=True, suction=False)
+    runtime.attach_object(
+        "apple",
+        max_attach_distance_m=0.05,
+        max_attach_penetration_m=0.05,
+    )
+    assert runtime._attachment is not None
+
+    data.time = 1.0
+    runtime.synchronize_attached_object()
+    # Shift the locked relative pose so FD qvel is well-defined without
+    # relying on the tiny fake arm's joint kinematics.
+    runtime._attachment = AttachedObjectState(
+        object_id=runtime._attachment.object_id,
+        free_joint_name=runtime._attachment.free_joint_name,
+        reference_kind=runtime._attachment.reference_kind,
+        reference_name=runtime._attachment.reference_name,
+        position_in_reference_m=(0.04, 0.0, 0.0),
+        rotation_in_reference=runtime._attachment.rotation_in_reference,
+        attach_distance_m=runtime._attachment.attach_distance_m,
+        mode=runtime._attachment.mode,
+        breakable_weld=runtime._attachment.breakable_weld,
+    )
+    data.time = 1.02
+    runtime.synchronize_attached_object()
+    moving = np.asarray(
+        data.qvel[apple_qvel : apple_qvel + 3], dtype=float
+    ).copy()
+    assert float(np.linalg.norm(moving)) > 1e-3
+
+    # Same-sim-time re-sync must keep the FD velocity for the next physics step.
+    runtime.synchronize_attached_object()
+    preserved = np.asarray(
+        data.qvel[apple_qvel : apple_qvel + 3], dtype=float
+    )
+    assert preserved == pytest.approx(moving, abs=1e-9)
+    runtime.close()
+
+
+def test_held_tool_kinematic_push_assist_moves_tabletop_partner() -> None:
+    """Underside-contact partners inherit XY delta; raised tools do not drag."""
+
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    # Place a tabletop partner under the tool footprint.
+    data.qpos[apple_qpos : apple_qpos + 3] = [0.0, 0.0, 0.80]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+
+    # Fabricate an active fill box geom entry (no need to mutate model sizes).
+    box_geom = next(
+        geom_id
+        for geom_id in range(int(model.ngeom))
+        if int(model.geom_type[geom_id]) == int(mujoco.mjtGeom.mjGEOM_BOX)
+    )
+    runtime._held_tool_fill_geom_backup[box_geom] = (
+        0,
+        0,
+        np.asarray(model.geom_size[box_geom], dtype=float).copy(),
+        np.asarray(model.geom_pos[box_geom], dtype=float).copy(),
+    )
+    model.geom_size[box_geom] = np.asarray([0.10, 0.10, 0.0025], dtype=float)
+    model.geom_pos[box_geom] = np.asarray([0.0, 0.0, 0.0], dtype=float)
+    runtime._held_tool_push_partner_ids = frozenset({"apple"})
+
+    before = data.qpos[apple_qpos : apple_qpos + 2].copy()
+    # Paddle underside near the partner top (contact band).
+    runtime._apply_held_tool_kinematic_push_assist(
+        delta_xy=np.asarray([-0.05, 0.01], dtype=float),
+        tool_position=np.asarray([0.0, 0.0, 0.822], dtype=float),
+        tool_rotation=np.eye(3, dtype=float),
+    )
+    after = data.qpos[apple_qpos : apple_qpos + 2]
+    assert after == pytest.approx(before + np.asarray([-0.05, 0.01]), abs=1e-9)
+    apple_qvel = int(model.jnt_dofadr[apple_joint])
+    assert data.qvel[apple_qvel : apple_qvel + 2] == pytest.approx(
+        np.zeros(2), abs=1e-9
+    )
+
+    # Raised tool must not drag partners (no underside contact).
+    data.qpos[apple_qpos : apple_qpos + 2] = before
+    runtime._apply_held_tool_kinematic_push_assist(
+        delta_xy=np.asarray([-0.05, 0.01], dtype=float),
+        tool_position=np.asarray([0.0, 0.0, 0.99], dtype=float),
+        tool_rotation=np.eye(3, dtype=float),
+    )
+    assert data.qpos[apple_qpos : apple_qpos + 2] == pytest.approx(before, abs=1e-9)
+    runtime.close()
+
+
+def test_kinematic_push_assist_separates_z_with_zero_xy_delta() -> None:
+    """Stationary paddle still pushes partners down out of its volume."""
+
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    data.qpos[apple_qpos : apple_qpos + 3] = [0.0, 0.0, 0.80]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+
+    box_geom = next(
+        geom_id
+        for geom_id in range(int(model.ngeom))
+        if int(model.geom_type[geom_id]) == int(mujoco.mjtGeom.mjGEOM_BOX)
+    )
+    runtime._held_tool_fill_geom_backup[box_geom] = (
+        0,
+        0,
+        np.asarray(model.geom_size[box_geom], dtype=float).copy(),
+        np.asarray(model.geom_pos[box_geom], dtype=float).copy(),
+    )
+    model.geom_size[box_geom] = np.asarray([0.10, 0.10, 0.0025], dtype=float)
+    model.geom_pos[box_geom] = np.asarray([0.0, 0.0, 0.0], dtype=float)
+    runtime._held_tool_push_partner_ids = frozenset({"apple"})
+
+    before_xy = data.qpos[apple_qpos : apple_qpos + 2].copy()
+    before_z = float(data.qpos[apple_qpos + 2])
+    runtime._apply_held_tool_kinematic_push_assist(
+        delta_xy=np.zeros(2, dtype=float),
+        tool_position=np.asarray([0.0, 0.0, 0.822], dtype=float),
+        tool_rotation=np.eye(3, dtype=float),
+    )
+    assert data.qpos[apple_qpos : apple_qpos + 2] == pytest.approx(before_xy, abs=1e-9)
+    assert float(data.qpos[apple_qpos + 2]) < before_z - 1e-4
+    # Sphere r=0.03 → center must sit below paddle_bottom - r - 0.5mm.
+    assert float(data.qpos[apple_qpos + 2]) == pytest.approx(
+        0.822 - 0.0025 - 0.03 - 0.0005, abs=1e-6
+    )
+    runtime.close()
+
+
+def test_kinematic_push_assist_packs_partner_when_tool_over_region() -> None:
+    """When the paddle is over the goal region, pack footprints into the AABB."""
+
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    # Partner near the region edge (would fail footprint containment by ~mm).
+    data.qpos[apple_qpos : apple_qpos + 3] = [-0.09, 0.082, 0.80]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+
+    box_geom = next(
+        geom_id
+        for geom_id in range(int(model.ngeom))
+        if int(model.geom_type[geom_id]) == int(mujoco.mjtGeom.mjGEOM_BOX)
+    )
+    runtime._held_tool_fill_geom_backup[box_geom] = (
+        0,
+        0,
+        np.asarray(model.geom_size[box_geom], dtype=float).copy(),
+        np.asarray(model.geom_pos[box_geom], dtype=float).copy(),
+    )
+    model.geom_size[box_geom] = np.asarray([0.10, 0.10, 0.0025], dtype=float)
+    model.geom_pos[box_geom] = np.asarray([0.0, 0.0, 0.0], dtype=float)
+    runtime._held_tool_push_partner_ids = frozenset({"apple"})
+    runtime._held_tool_push_region_id = "collection_zone_visual"
+    runtime._held_tool_push_region_xy_m = lambda: (  # type: ignore[method-assign]
+        np.asarray([-0.15, 0.0], dtype=float),
+        np.asarray([0.125, 0.09], dtype=float),
+    )
+
+    runtime._apply_held_tool_kinematic_push_assist(
+        delta_xy=np.asarray([-0.001, 0.0], dtype=float),
+        tool_position=np.asarray([-0.15, 0.0, 0.822], dtype=float),
+        tool_rotation=np.eye(3, dtype=float),
+    )
+    after = data.qpos[apple_qpos : apple_qpos + 2]
+    # Y must be pulled inside the yaw-inflated footprint inset (~0.061).
+    assert float(after[1]) <= 0.07 + 1e-6
+    runtime.close()
+
+
+def test_tabletop_push_partners_intersect_plan_target_ids() -> None:
+    from tuj.m5_motion.tool_use_journal_runtime import (
+        _tabletop_held_tool_push_partners,
+    )
+    from tuj.m5_motion.schema import (
+        CollisionContext,
+        FreeObjectPose,
+        MotionPlan,
+        Pose,
+        RobotState,
+        SegmentType,
+        TrajectorySegment,
+        TrajectoryWaypoint,
+        ArtifactProvenance,
+        ModuleName,
+    )
+
+    pose = Pose(
+        frame_id="world",
+        position_m=(0.1, 0.0, 0.8),
+        orientation_xyzw=(0.0, 0.0, 0.0, 1.0),
+    )
+    context = CollisionContext(
+        context_id="c0",
+        scene_state_id="s0",
+        active_ee="vac",
+        attached_object_ids=["plate"],
+        attached_object_transforms=[],
+        free_object_poses=[
+            FreeObjectPose(
+                object_id="block_a", free_joint_name="block_a_joint", pose=pose
+            ),
+            FreeObjectPose(
+                object_id="block_b", free_joint_name="block_b_joint", pose=pose
+            ),
+            FreeObjectPose(
+                object_id="block_c", free_joint_name="block_c_joint", pose=pose
+            ),
+        ],
+        touch_links=[],
+        kinematic_joint_positions={},
+        allowed_collision_pairs=[
+            ("block_a", "plate"),
+            ("block_b", "plate"),
+            ("block_c", "plate"),
+        ],
+        collision_model_version="v0",
+        metadata={},
+    )
+    waypoint = TrajectoryWaypoint(
+        time_from_start_s=0.0,
+        joint_positions_rad=[0.0] * 6,
+    )
+    segment = TrajectorySegment(
+        segment_id="seg0",
+        segment_type=SegmentType.TRANSFER,
+        start_time_s=0.0,
+        end_time_s=1.0,
+        interpolation="LINEAR",
+        waypoints=[
+            waypoint,
+            waypoint.model_copy(update={"time_from_start_s": 1.0}),
+        ],
+        collision_checked=True,
+        min_clearance_m=0.0,
+        collision_context_before=context,
+        collision_context_after=context,
+        processing_steps=[],
+        metadata={},
+    )
+    plan = MotionPlan(
+        plan_id="plan0",
+        request_id="req0",
+        provenance=ArtifactProvenance(
+            artifact_id="a0",
+            artifact_type="motion-plan",
+            produced_by=ModuleName.MOTION_PLANNER,
+            invocation_id="inv0",
+        ),
+        scene_signature="sig",
+        robot_id="ur5e_0",
+        joint_names=[f"j{i}" for i in range(6)],
+        duration_s=1.0,
+        segments=[segment],
+        events=[],
+        expected_final_state=RobotState(
+            robot_id="ur5e_0",
+            joint_names=[f"j{i}" for i in range(6)],
+            joint_positions_rad=[0.0] * 6,
+        ),
+        metadata={"target_ids": ["block_a", "block_c"]},
+    )
+    assert _tabletop_held_tool_push_partners(plan) == ["block_a", "block_c"]
+
+
+def test_kinematic_push_assist_applies_same_time_pose_jump_and_zeros_tool_qvel() -> None:
+    """Vac goal-snap (dt≈0) must still assist; assist mode zeros tool FD qvel."""
+
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    hand_id = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_BODY, "robot0_right_hand"
+    )
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    apple_qvel = int(model.jnt_dofadr[apple_joint])
+    data.qpos[apple_qpos : apple_qpos + 3] = data.xpos[hand_id]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+    runtime.command_gripper(engaged=True, suction=False)
+    runtime.attach_object(
+        "apple",
+        max_attach_distance_m=0.05,
+        max_attach_penetration_m=0.05,
+    )
+    runtime.mark_attached_object_as_tool("apple")
+    # Non-empty partner set engages kinematic-assist mode (qvel zeroing).
+    runtime._held_tool_push_partner_ids = frozenset({"block_partner"})
+    assist_calls: list[np.ndarray] = []
+
+    def _capture_assist(*, delta_xy, tool_position, tool_rotation):
+        assist_calls.append(np.asarray(delta_xy, dtype=float).copy())
+
+    runtime._apply_held_tool_kinematic_push_assist = _capture_assist  # type: ignore[method-assign]
+
+    data.time = 2.0
+    runtime.synchronize_attached_object()
+    assert runtime._attachment is not None
+    runtime._attachment = AttachedObjectState(
+        object_id=runtime._attachment.object_id,
+        free_joint_name=runtime._attachment.free_joint_name,
+        reference_kind=runtime._attachment.reference_kind,
+        reference_name=runtime._attachment.reference_name,
+        position_in_reference_m=(0.03, 0.01, 0.0),
+        rotation_in_reference=runtime._attachment.rotation_in_reference,
+        attach_distance_m=runtime._attachment.attach_distance_m,
+        mode=runtime._attachment.mode,
+        breakable_weld=runtime._attachment.breakable_weld,
+    )
+    # Same-time re-sync with pose change (vac goal snap): must assist once.
+    runtime.synchronize_attached_object()
+    assert len(assist_calls) == 1
+    assert float(np.linalg.norm(assist_calls[0])) > 1e-3
+    assert data.qvel[apple_qvel : apple_qvel + 3] == pytest.approx(
+        np.zeros(3), abs=1e-9
+    )
+
+    # Real time advance with another planar shift: assist again.
+    runtime._attachment = AttachedObjectState(
+        object_id=runtime._attachment.object_id,
+        free_joint_name=runtime._attachment.free_joint_name,
+        reference_kind=runtime._attachment.reference_kind,
+        reference_name=runtime._attachment.reference_name,
+        position_in_reference_m=(0.06, 0.02, 0.0),
+        rotation_in_reference=runtime._attachment.rotation_in_reference,
+        attach_distance_m=runtime._attachment.attach_distance_m,
+        mode=runtime._attachment.mode,
+        breakable_weld=runtime._attachment.breakable_weld,
+    )
+    data.time = 2.02
+    runtime.synchronize_attached_object()
+    assert len(assist_calls) == 2
+    assert data.qvel[apple_qvel : apple_qvel + 3] == pytest.approx(
+        np.zeros(3), abs=1e-9
+    )
     runtime.close()
 
 
@@ -1380,3 +1832,261 @@ def test_player_replays_plan_and_executes_ee_exchange_events() -> None:
     )
     assert report.metadata["controller_tracking_simulated"] is False
     runtime.close()
+
+
+def _acquire_contact_settle_fixtures() -> tuple[
+    ToolUseJournalControllerTrajectoryPlayer,
+    TrajectorySegment,
+    MotionPlan,
+]:
+    runtime = SimpleNamespace(
+        object_contact_metrics=lambda object_id: AttachmentContactMetrics(
+            contact_count=0
+        )
+    )
+    player = ToolUseJournalControllerTrajectoryPlayer(runtime)
+    segment = TrajectorySegment(
+        segment_id="acquire-contact",
+        segment_type=SegmentType.GRASP,
+        start_time_s=0.0,
+        end_time_s=1.0,
+        collision_checked=False,
+        waypoints=[
+            TrajectoryWaypoint(
+                time_from_start_s=0.0,
+                joint_positions_rad=[0.0] * len(ARM_JOINTS),
+            ),
+            TrajectoryWaypoint(
+                time_from_start_s=1.0,
+                joint_positions_rad=[0.1] * len(ARM_JOINTS),
+            ),
+        ],
+        metadata={
+            "motion_end_time_s": 1.0,
+            "tracking_settle": {
+                "eef_tolerance_m": 0.005,
+                "eef_orientation_tolerance_rad": 0.05,
+                "max_wait_s": 5.0,
+                "required_consecutive_ticks": 3,
+            },
+        },
+    )
+    plan = MotionPlan(
+        plan_id="acquire-contact-plan",
+        request_id="acquire-contact-request",
+        provenance=_provenance(
+            "acquire-contact-plan-artifact",
+            "MotionPlan",
+            ModuleName.MOTION_PLANNER,
+        ),
+        scene_signature="acquire-contact-scene",
+        robot_id="ur5e_0",
+        joint_names=list(ARM_JOINTS),
+        segments=[segment],
+        duration_s=1.0,
+        events=[
+            TrajectoryEvent(
+                event_id="suction-on",
+                time_from_start_s=1.0,
+                event_type=EventType.SUCTION_ON,
+                target_id="target_object",
+            ),
+            TrajectoryEvent(
+                event_id="attach",
+                time_from_start_s=1.0,
+                event_type=EventType.ATTACH_OBJECT,
+                target_id="target_object",
+            ),
+        ],
+        expected_final_state=RobotState(
+            robot_id="ur5e_0",
+            joint_names=list(ARM_JOINTS),
+            joint_positions_rad=[0.1] * len(ARM_JOINTS),
+            joint_velocities_rad_s=[0.0] * len(ARM_JOINTS),
+        ),
+    )
+    player._playback_plan = plan
+    return player, segment, plan
+
+
+def test_acquire_contact_settle_passes_with_target_contact_despite_tcp_residual() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+    player.runtime.object_contact_metrics = lambda object_id: AttachmentContactMetrics(
+        contact_count=2, contact_groups=("suction",)
+    )
+    player._ee_contact_partners = lambda *, allowed_object_ids: {
+        "target_contact_pairs": [("ee_cup", "target_object")],
+        "foreign_object_contact_pairs": [],
+        "environment_contact_pairs": [],
+        "ee_contact_geoms": ["ee_cup"],
+        "intended_target_contact": True,
+    }
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.02,
+        eef_position_error_m=0.016,
+        eef_orientation_error_rad=0.02,
+    )
+
+    assert result is not None
+    assert result["mode"] == "ACQUIRE_CONTACT_SETTLE"
+    assert result["succeeded"] is True
+    assert result["intended_target_contact"] is True
+    assert result["eef_position_error_m"] == pytest.approx(0.016)
+
+
+def test_acquire_contact_settle_fails_without_intended_contact() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+    player.runtime.object_contact_metrics = lambda object_id: AttachmentContactMetrics(
+        contact_count=0
+    )
+    player._ee_contact_partners = lambda *, allowed_object_ids: {
+        "target_contact_pairs": [],
+        "foreign_object_contact_pairs": [],
+        "environment_contact_pairs": [],
+        "ee_contact_geoms": [],
+        "intended_target_contact": False,
+    }
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.02,
+        eef_position_error_m=0.016,
+        eef_orientation_error_rad=0.01,
+    )
+
+    assert result is not None
+    assert result["succeeded"] is False
+    assert result["intended_target_contact"] is False
+
+
+def test_acquire_contact_settle_rejects_wrong_object_contact() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+    player.runtime.object_contact_metrics = lambda object_id: AttachmentContactMetrics(
+        contact_count=1, contact_groups=("suction",)
+    )
+    player._ee_contact_partners = lambda *, allowed_object_ids: {
+        "target_contact_pairs": [("ee_cup", "target_object")],
+        "foreign_object_contact_pairs": [("ee_cup", "other_object")],
+        "environment_contact_pairs": [],
+        "ee_contact_geoms": ["ee_cup"],
+        "intended_target_contact": True,
+    }
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.01,
+        eef_position_error_m=0.016,
+        eef_orientation_error_rad=0.01,
+    )
+
+    assert result is not None
+    assert result["succeeded"] is False
+    assert result["foreign_object_ok"] is False
+
+
+def test_acquire_contact_settle_rejects_environment_collision() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+    player.runtime.object_contact_metrics = lambda object_id: AttachmentContactMetrics(
+        contact_count=1, contact_groups=("suction",)
+    )
+    player._ee_contact_partners = lambda *, allowed_object_ids: {
+        "target_contact_pairs": [("ee_cup", "target_object")],
+        "foreign_object_contact_pairs": [],
+        "environment_contact_pairs": [("ee_cup", "table_top")],
+        "ee_contact_geoms": ["ee_cup"],
+        "intended_target_contact": True,
+    }
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.01,
+        eef_position_error_m=0.016,
+        eef_orientation_error_rad=0.01,
+    )
+
+    assert result is not None
+    assert result["succeeded"] is False
+    assert result["environment_ok"] is False
+
+
+def test_non_contact_motion_keeps_default_pose_settle() -> None:
+    player, segment, plan = _acquire_contact_settle_fixtures()
+    plan.events.clear()
+    plan.events.append(
+        TrajectoryEvent(
+            event_id="wait-only",
+            time_from_start_s=1.0,
+            event_type=EventType.WAIT,
+        )
+    )
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.0,
+        eef_position_error_m=0.001,
+        eef_orientation_error_rad=0.0,
+    )
+
+    assert result is None
+
+
+def test_acquire_contact_settle_defers_when_tcp_already_within_tolerance() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.0,
+        eef_position_error_m=0.001,
+        eef_orientation_error_rad=0.0,
+    )
+
+    assert result is None
+
+
+def test_acquire_contact_settle_fails_when_orientation_out_of_tolerance() -> None:
+    player, segment, _plan = _acquire_contact_settle_fixtures()
+    player.runtime.object_contact_metrics = lambda object_id: AttachmentContactMetrics(
+        contact_count=2, contact_groups=("suction",)
+    )
+    player._ee_contact_partners = lambda *, allowed_object_ids: {
+        "target_contact_pairs": [("ee_cup", "target_object")],
+        "foreign_object_contact_pairs": [],
+        "environment_contact_pairs": [],
+        "ee_contact_geoms": ["ee_cup"],
+        "intended_target_contact": True,
+    }
+
+    result = player._custom_settle_evaluation(
+        segment=segment,
+        settle_config=ToolUseJournalControllerTrajectoryPlayer._tracking_settle_config(
+            segment
+        ),
+        joint_error_rad=0.01,
+        eef_position_error_m=0.016,
+        eef_orientation_error_rad=0.08,
+    )
+
+    assert result is not None
+    assert result["succeeded"] is False
+    assert result["orientation_ok"] is False
+    assert result["intended_target_contact"] is True

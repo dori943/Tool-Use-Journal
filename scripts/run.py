@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """통합 실행기 — 한 번의 실행으로 M1 → M2 → G_k → M4 → M5를 순서대로 돌린다.
 
 현재 M1은 기존 Scene Abstraction과 Metric & Physical Grounding 기능을 통합한다.
@@ -46,7 +45,6 @@ import random
 import sys
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 
@@ -63,8 +61,7 @@ STAGES = ("m1", "m2", "m4", "m5")
 
 
 # 태스크 id <-> 환경 이름 단일 출처
-from task_registry import TASK_ENVS as TASK_ENV  # noqa: E402
-
+from task_registry import TASK_ENVS as TASK_ENV
 
 # ══════════════════════════════════════════════════════════════════════
 # 공통 유틸
@@ -661,7 +658,7 @@ def run_m5_runner(
             label,
         )
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         if (
             type(exc).__name__
             != "MotionPlanningPipelineError"
@@ -848,6 +845,20 @@ def build_parser():
         ),
     )
 
+    p.add_argument(
+        "--grounding-mode",
+        choices=("full", "without_grounding"),
+        default="full",
+        help="Separate upper-level grounding ablation; default keeps the full pipeline",
+    )
+    p.add_argument(
+        "--planner-mode",
+        choices=("full", "without-planner"),
+        default="full",
+        help="Independent per-subgoal EE/tool assignment without M4 joint search",
+    )
+    p.add_argument("--scene-frame", type=Path,
+                   help="Matching scene image for without_grounding when reusing M1")
     p.add_argument(
         "task",
         nargs="?",
@@ -1295,6 +1306,14 @@ def main():
 
     _resolve_llm(args)
 
+    if args.planner_mode == "without-planner":
+        from run_without_planner import run
+        return run(args, sys.modules[__name__])
+
+    if args.grounding_mode == "without_grounding":
+        from run_without_grounding import run
+        return run(args, sys.modules[__name__])
+
     task = args.task
 
     out = (
@@ -1309,6 +1328,12 @@ def main():
         parents=True,
         exist_ok=True,
     )
+
+    if (out / "ablation_manifest.json").exists():
+        sys.exit(
+            "[err] This output directory belongs to an ablation; "
+            "choose a separate full output."
+        )
 
     start = (
         STAGES.index(args.start_from)

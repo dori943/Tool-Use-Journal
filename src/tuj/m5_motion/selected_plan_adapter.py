@@ -272,32 +272,39 @@ def _inferred_support_collision_metadata(
     record = world.objects.get(target_id)
     if record is None:
         return {}
-    from tuj.m5_motion.grasp_geometry import support_clearance_context_from_world
+    from tuj.m5_motion.grasp_geometry import support_clearance_contexts_from_world
 
-    support = support_clearance_context_from_world(
+    supports = support_clearance_contexts_from_world(
         record,
         world,
         target_id,
         tolerance_m=tolerance_m,
         minimum_horizontal_overlap_ratio=minimum_overlap_ratio,
     )
-    if (
-        support is None
-        or support.support_id == target_id
-        or abs(support.under_clearance_m) > tolerance_m + 1e-9
-        or (
-            support.source in {"world.obstacles.aabb", "world.objects.obb"}
-            and support.horizontal_overlap_ratio + 1e-9
-            < minimum_overlap_ratio
-        )
-    ):
+    if not supports:
         return {}
+    supports = tuple(item for item in supports if item.support_id != target_id)
+    if not supports:
+        return {}
+    primary = next(
+        (
+            item
+            for item in supports
+            if item.horizontal_overlap_ratio + 1e-9 >= minimum_overlap_ratio
+        ),
+        supports[0],
+    )
     return {
-        "support_collision_selectors": [support.support_id],
+        "support_collision_selectors": [
+            item.support_id
+            for item in sorted(supports, key=lambda item: item.support_id)
+        ],
         "support_collision_policy": "AUTO_INITIAL_SUPPORT_V1",
-        "support_collision_detection_source": support.source,
-        "support_initial_clearance_m": support.under_clearance_m,
-        "support_horizontal_overlap_ratio": support.horizontal_overlap_ratio,
+        "support_collision_detection_source": primary.source,
+        "support_initial_clearance_m": min(
+            item.under_clearance_m for item in supports
+        ),
+        "support_horizontal_overlap_ratio": primary.horizontal_overlap_ratio,
         "support_min_horizontal_overlap_ratio": minimum_overlap_ratio,
     }
 
@@ -441,12 +448,9 @@ def _contact_spec(
     action = _action_type(assignment, execution)
     mode = str(assignment.mode or "").strip()
     normalized = f"{action}:{mode}".lower()
-    if not any(token in normalized for token in ("push", "pull", "sweep", "extract")):
+    if not any(token in normalized for token in ("push", "pull", "sweep", "flatten")):
         return None
     surface = parameters.get("contact_surface", ContactSurfaceType.AUTO.value)
-    # Carry any grounded extraction geometry the planner attached (e.g. the M2
-    # gap descriptor) through to the motion provider; harmless when absent.
-    spec_metadata = parameters.get("contact_metadata")
     return ContactManipulationSpec(
         primitive=mode or action,
         contact_surface=surface,
@@ -455,7 +459,6 @@ def _contact_spec(
         target_grouping=str(parameters.get("target_grouping", "SINGLE")),
         maintain_contact=bool(parameters.get("maintain_contact", False)),
         max_contact_force_n=parameters.get("max_contact_force_n"),
-        metadata=dict(spec_metadata) if isinstance(spec_metadata, Mapping) else {},
     )
 def _source_value(
     source: Any,

@@ -122,25 +122,18 @@ def opening_pass(passer: dict, opening_height_mm: float, pass_height_mm: float) 
 
 
 def gap_access(tool: dict, target: dict, gap_width_mm: float | None = None,
-               insertion_depth_mm: float | None = None, tip_ratio: float = None) -> dict:
+               tip_ratio: float = None) -> dict:
     """gap_accessible(?tool, ?target) 접지(0901 어휘 확장): 도구가 틈에 진입해
     대상에 닿을 수 있는가. 3조건을 bbox 산술로 — 전부 도구/대상 치수 비교, VLM 0회.
       · thickness_lt_gap : 도구 최소 두께 < 틈 폭
       · contact_le_target: 도구 접촉폭(중간 치수) ≤ 대상 최대 폭 (물거나 긁을 수 있음)
-      · reach_ge_depth   : 도구 최대 길이 ≥ 진입(삽입) 깊이
-    gap_width_mm 미지정 시 대상 최소변으로 근사(틈에 낀 대상 자신의 폭).
-
-    insertion_depth_mm: 도구가 틈 입구에서 대상까지 실제로 진입해야 하는 거리.
-    M2 가 접근 전략에 맞춰 산출해 넘긴다 — 예컨대 양끝이 열린 채널에 도구를
-    수평으로 밀어넣는 전략이면 '가장 가까운 열린 끝→대상' 거리(짧다)를 넘긴다.
-    미지정 시 대상 자신의 높이(bbox z)로 폴백하는데, 얇은 대상(카드≈0)에서는
-    reach 검사가 무의미해지므로(c4_1: 어떤 도구도 못 걸러 짧은 도구 선택) 접근
-    전략을 아는 M2 가 실제 삽입 깊이를 넘기는 것이 맞다."""
+      · reach_ge_depth   : 도구 최대 길이 ≥ 진입 깊이(대상 높이 근사)
+    gap_width_mm 미지정 시 대상 최소변으로 근사(틈에 낀 대상 자신의 폭)."""
     t = sorted(tool["bbox_mm"])
     tool_thick, tool_contact, tool_len = t[0], t[1], t[2]
     gap_w = gap_width_mm if gap_width_mm is not None else min(target["bbox_mm"])
     target_w = max(target["bbox_mm"][0], target["bbox_mm"][1])
-    depth = insertion_depth_mm if insertion_depth_mm is not None else target["bbox_mm"][2]
+    depth = target["bbox_mm"][2]
     checks = [
         {"rule": "thickness_lt_gap", "value_mm": round(tool_thick, 1),
          "limit_mm": round(gap_w, 1), "pass": bool(tool_thick < gap_w)},

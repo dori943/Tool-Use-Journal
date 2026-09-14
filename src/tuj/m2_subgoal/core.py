@@ -546,83 +546,6 @@ def gap_width_mm(m1: dict | None, target_id: str, exclude: set[str] | None = Non
     return round(best, 1) if best is not None else None
 
 
-def gap_extraction_geometry(m1: dict | None, target_id: str,
-                            exclude: set[str] | None = None) -> dict:
-    """틈에 낀 대상을 도구로 빼낼 때의 접근 기하 — M2 의 '수평 접근 전략' 산출.
-
-    대상을 양쪽에서 끼는 두 물체(예: 두 가전)가 이루는 틈은 보통 한 축(gap axis)으로
-    좁고 직교 축(channel axis)으로 길며 양끝이 열려 있다. 도구를 위→아래로 수직 삽입
-    하면 진입 깊이가 크지만(예: c4_1 219mm — 어떤 도구도 못 닿음), '열린 끝'에서 채널
-    장축을 따라 수평으로 밀어넣으면 진입 거리가 훨씬 짧다(예: 카드가 열린 끝에서 67mm).
-    반환:
-      gap_width_mm       : 두 물체의 마주보는 면 사이 거리(좁은 폭).
-      insertion_depth_mm : 가장 가까운 열린 끝→대상 수평 거리(수평 슬라이드 진입 깊이).
-      approach           : 채택한 접근 전략 라벨.
-      gap_axis/channel_axis, flank_ids : 하류(M5)가 기하를 grounding 할 때 참고.
-    구성 실패 시 값들은 None.
-    """
-    none = {"gap_width_mm": None, "insertion_depth_mm": None, "approach": None,
-            "gap_axis": None, "channel_axis": None, "flank_ids": None}
-    if not m1:
-        return dict(none)
-    nodes = {n["id"]: n for n in m1.get("nodes", [])}
-    t = nodes.get(target_id)
-    if not t:
-        return dict(none)
-    exclude = set(exclude or ()) | {target_id}
-    tc = t["center_mm"]
-    best = None  # (gap_width, ax, other, [lo_node, hi_node])
-    for ax, other in ((0, 1), (1, 0)):
-        lo, hi = [], []
-        for n in nodes.values():
-            if n["id"] in exclude:
-                continue
-            c, s = n["center_mm"], n["bbox_mm"]
-            if abs(c[other] - tc[other]) > s[other] / 2:      # 다른 축에서 대상을 덮지 않으면 제외
-                continue
-            if c[ax] + s[ax] / 2 <= tc[ax]:
-                lo.append((c[ax] + s[ax] / 2, n))
-            elif c[ax] - s[ax] / 2 >= tc[ax]:
-                hi.append((c[ax] - s[ax] / 2, n))
-        if lo and hi:
-            w = min(h for h, _ in hi) - max(l for l, _ in lo)
-            if w > 0 and (best is None or w < best[0]):
-                lo_node = max(lo, key=lambda p: p[0])[1]
-                hi_node = min(hi, key=lambda p: p[0])[1]
-                best = (w, ax, other, [lo_node, hi_node])
-    if best is None:
-        return dict(none)
-    w, ax, other, flankers = best
-    # channel 장축 = other. 열린 끝 = 두 벽 물체가 장축으로 뻗은 바깥 가장자리.
-    edges = []
-    for n in flankers:
-        c, s = n["center_mm"], n["bbox_mm"]
-        edges += [c[other] - s[other] / 2, c[other] + s[other] / 2]
-    lo_end, hi_end = min(edges), max(edges)
-    # 접근 가능한 열린 끝 = 로봇/도구 쪽 끝. 기하학적으로 가장 가까운 끝(min)을 쓰면
-    # 로봇이 닿을 수 없는 반대편 끝을 골라 진입 깊이를 과소평가한다(c4_1: 뒤쪽 67mm를
-    # 골라 140mm 도구도 통과). 도구들이 로봇 옆에 배치되므로, 대상·양벽을 뺀 나머지
-    # 노드(도구)의 채널축 평균 위치에 가까운 끝을 접근단으로 잡고, 그 끝에서 대상의
-    # '먼 쪽 모서리'까지 거리를 진입 깊이로 쓴다(대상을 가로질러 끌어내야 하므로).
-    flank_ids = {n["id"] for n in flankers}
-    others = [n for nid, n in nodes.items()
-              if nid not in exclude and nid not in flank_ids and "center_mm" in n]
-    if others:
-        agent = sum(n["center_mm"][other] for n in others) / len(others)
-        access_end = lo_end if abs(lo_end - agent) <= abs(hi_end - agent) else hi_end
-    else:
-        access_end = lo_end
-    # 접근단 → 대상 중심 거리를 진입 깊이로 쓴다. 대상을 확실히 물으려면 중심까지는
-    # 닿아야 하고, 먼 모서리까지(=REQUIRED_REACH)로 잡으면 M1 이 도구 길이를 실측치로
-    # 약간 짧게 재는 탓에 의도한 정답 도구(길이 여유가 작은 것)까지 걸러진다.
-    insertion = abs(tc[other] - access_end)
-    return {"gap_width_mm": round(float(w), 1),
-            "insertion_depth_mm": round(float(insertion), 1),
-            "approach": "HORIZONTAL_SLIDE_FROM_OPEN_END",
-            "gap_axis": ax, "channel_axis": other,
-            "flank_ids": [n["id"] for n in flankers]}
-
-
 # 0911: 집어서 쓸 수 없는 장면 설비. 노드 id 는 obj_<class>_<instance> 꼴이다.
 FIXTURE_CLASSES = ("rack", "zone")
 
@@ -753,27 +676,13 @@ def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None)
                 # 0908: (?tool, ?o) 쌍마다 발행 + 틈 폭 동봉. 이전엔 M2가 발행하지 않아
                 # run_m3 컴파일 보충이 틈 폭 없이 질의했고, 응답은 apply_m3 게이팅에 걸렸음.
                 targets = _set_members(b.get("?o"))
-                # 틈은 대상을 양쪽에서 끼는 환경 물체(예: 카드가 떨어진 두 가전)로
-                # 이뤄진다. 그 flanking 물체 중 하나가 container_id 로 태깅돼 있는데
-                # (c4_1: container=appliance_left), 이를 제외하면 한쪽 면만 남아
-                # gap_width_mm 이 None → gap_access 가 대상 자신의 두께(카드≈0)로
-                # 폴백해 도구 전원 탈락(→ 계획 실패)했다. 여기서는 조작 대상(도구+
-                # 타깃)만 제외하고 환경 물체는 틈 후보로 남긴다.
-                excl = set(tool_ids) | set(targets)
+                excl = set(tool_ids) | set(targets) | {subgoal.get("container_id")}
                 for o in targets:
-                    # 수평 접근 전략(열린 끝에서 채널 장축으로 슬라이드)을 산출해
-                    # 틈 폭과 '실제 삽입 깊이'를 함께 넘긴다. 이전엔 gap_access 가
-                    # 깊이를 대상 두께로 잡아 reach 검사가 무의미했다(c4_1: 짧은
-                    # 도구도 통과 → 못 닿는 도구 선택).
-                    geom = gap_extraction_geometry(m1, o, excl)
+                    w = gap_width_mm(m1, o, excl)
                     for t in tool_ids:
                         call = {"kind": "gap_accessible", "tool_id": t, "target_id": o}
-                        if geom.get("gap_width_mm") is not None:
-                            call["gap_width_mm"] = geom["gap_width_mm"]
-                        if geom.get("insertion_depth_mm") is not None:
-                            call["insertion_depth_mm"] = geom["insertion_depth_mm"]
-                        if geom.get("approach") is not None:
-                            call["approach"] = geom["approach"]
+                        if w is not None:
+                            call["gap_width_mm"] = w
                         q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
                                   "call": call})
             elif head == "clear":

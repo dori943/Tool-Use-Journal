@@ -29,10 +29,18 @@ from tuj.m5_motion.ee_exchange_entry import (
     EEExchangeEntryPlanner,
     is_ee_exchange_entry_request,
 )
+from tuj.m5_motion.move_to_workspace import (
+    MoveToWorkspaceFailureCode,
+    MoveToWorkspacePlanner,
+    MoveToWorkspacePlanningError,
+    append_safe_rack_exit_plan,
+    is_move_to_workspace_request,
+)
 from tuj.m5_motion.geometry import RelativePoseResolver
 from tuj.m5_motion.kinematics import UR5eKinematics
 from tuj.m5_motion.pipeline import (
     CollisionPlanningSetup,
+    DebugKeyframeStrategyProvider,
     KeyframeStrategyProvider,
     MotionPlanningPipeline,
     MotionPlanningResult,
@@ -62,8 +70,11 @@ from tuj.m5_motion.schema import (
     KeyframePlanCandidate,
     KeyframeType,
     ModuleName,
+    MotionGoal,
     MotionPlanRequest,
+    MotionTask,
     Pose,
+    RelativeKeyframeSpec,
     WorldSnapshot,
 )
 from tuj.m5_motion.task_semantics import (
@@ -85,6 +96,8 @@ _BOUNDED_COLLISION_ALLOWANCES_KEY = "bounded_collision_allowances"
 _POST_SEGMENT_VALIDATION_CONTEXT_KEY = "post_segment_validation_context_id"
 _MAX_SUPPORT_PENETRATION_TOLERANCE_M = 0.001
 _DEFAULT_SUPPORT_MIN_HORIZONTAL_OVERLAP_RATIO = 0.5
+_SAFE_RACK_EXIT_COLLISION_MARGIN_M = 0.015
+_SAFE_RACK_EXIT_DYNAMIC_SCALING = 0.25
 
 
 class ToolUseJournalCollisionBindingError(RuntimeError):
@@ -345,6 +358,25 @@ def _relative_attachment(
     reference_name: str,
 ) -> AttachedObjectTransform:
     reference_pose = RelativePoseResolver(request.world).resolve(keyframe)
+    return _relative_attachment_from_reference_pose(
+        request,
+        reference_pose,
+        object_id=object_id,
+        reference_kind=reference_kind,
+        reference_name=reference_name,
+    )
+
+
+def _relative_attachment_from_reference_pose(
+    request: MotionPlanRequest,
+    reference_pose: Pose,
+    *,
+    object_id: str,
+    reference_kind: str,
+    reference_name: str,
+) -> AttachedObjectTransform:
+    """Express the unchanged world object pose in an actual reference pose."""
+
     object_pose = _object_pose(request.world, object_id)
     reference_rotation = _quaternion_matrix_xyzw(
         reference_pose.orientation_xyzw
@@ -367,6 +399,47 @@ def _relative_attachment(
             relative_rotation
         ),
     )
+
+
+def _materialize_selected_attachment_transform(
+    request: MotionPlanRequest,
+    contexts: dict[str, CollisionContext],
+    source_keyframe: RelativeKeyframeSpec,
+    actual_reference_pose: Pose,
+) -> None:
+    """Rebase a PICK attachment on the selected GRASP branch's actual FK."""
+
+    if KeyframeEventType.ATTACH_OBJECT not in source_keyframe.events_after:
+        return
+    after_id = source_keyframe.collision_context_after_events_id
+    if after_id is None:
+        return
+    after = contexts.get(after_id)
+    if after is None or not after.attached_object_transforms:
+        return
+
+    updated_by_object = {
+        transform.object_id: _relative_attachment_from_reference_pose(
+            request,
+            actual_reference_pose,
+            object_id=transform.object_id,
+            reference_kind=transform.reference_kind,
+            reference_name=transform.reference_name,
+        )
+        for transform in after.attached_object_transforms
+    }
+    for context in contexts.values():
+        if context.scene_state_id != after.scene_state_id:
+            continue
+        transforms = [
+            updated_by_object.get(transform.object_id, transform)
+            for transform in context.attached_object_transforms
+        ]
+        if transforms != context.attached_object_transforms:
+            # Validators retain a shallow copy of the context registry. Keep
+            # the shared context object and update only its validated transform
+            # payload so edge checks and plan materialization see the same FK.
+            context.attached_object_transforms = transforms
 
 
 def _stamp_bound_artifact(
@@ -721,35 +794,52 @@ class ToolUseJournalCollisionContextFactory:
                 default=request.constraints.collision_margin_m,
             )
             from tuj.m5_motion.grasp_geometry import (
-                support_clearance_context_from_world,
+                support_clearance_contexts_from_world,
             )
 
-            support = support_clearance_context_from_world(
+            supports = support_clearance_contexts_from_world(
                 request.world.objects.get(target),
                 request.world,
                 target,
                 tolerance_m=tolerance_m,
                 minimum_horizontal_overlap_ratio=minimum_overlap_ratio,
             )
+            supports = tuple(
+                item
+                for item in supports
+                if item.support_id != target
+                and abs(item.under_clearance_m) <= tolerance_m + 1e-9
+            )
+            if not supports:
+                return [], {}, 0.0
+            primary = next(
+                (
+                    item
+                    for item in supports
+                    if item.horizontal_overlap_ratio + 1e-9
+                    >= minimum_overlap_ratio
+                ),
+                supports[0],
+            )
             if (
-                support is None
-                or support.support_id == target
-                or abs(support.under_clearance_m) > tolerance_m + 1e-9
-                or (
-                    support.source
-                    in {"world.obstacles.aabb", "world.objects.obb"}
-                    and support.horizontal_overlap_ratio + 1e-9
-                    < minimum_overlap_ratio
-                )
+                primary.source
+                in {"world.obstacles.aabb", "world.objects.obb"}
+                and primary.horizontal_overlap_ratio + 1e-9
+                < minimum_overlap_ratio
             ):
                 return [], {}, 0.0
-            selectors = [support.support_id]
+            selectors = [
+                item.support_id
+                for item in sorted(supports, key=lambda item: item.support_id)
+            ]
             evidence = {
                 "policy": "AUTO_INITIAL_SUPPORT_V1",
-                "detection_source": support.source,
-                "support_initial_clearance_m": support.under_clearance_m,
+                "detection_source": primary.source,
+                "support_initial_clearance_m": min(
+                    item.under_clearance_m for item in supports
+                ),
                 "support_horizontal_overlap_ratio": (
-                    support.horizontal_overlap_ratio
+                    primary.horizontal_overlap_ratio
                 ),
                 "support_min_horizontal_overlap_ratio": (
                     minimum_overlap_ratio
@@ -810,19 +900,292 @@ class ToolUseJournalCollisionContextFactory:
         self,
         request: MotionPlanRequest,
         base: CollisionContext,
+        *,
+        active_ee: str | None = None,
     ) -> CollisionContext:
-        if not base.attached_object_ids or not request.task.allowed_touch_objects:
+        """Allow held tool (and its EE) to touch ``allowed_touch_objects``.
+
+        Attached↔target pairs alone are not enough for contact tool_act: when the
+        held tool engages targets, the vacuum cup / fingertips often clear the
+        same bodies closer than ``collision_margin_m``. Mirror PICK's
+        ``active_ee ↔ touch`` exemptions so CONTACT_* can make intended contact
+        while unrelated obstacles stay blocked.
+
+        Large held tools (e.g. dish sweeps) also graze non-target tabletop
+        partners beside the declared targets. Admit free bodies that share a
+        name stem with the sweep seeds near those seeds, and admit any free
+        tabletop body already in/near the goal region (prior-pass herd or
+        neighboring tools) so CONTACT_SWEEP / CONTACT_END do not fail on
+        incidental EE/tool contacts while distant distractors stay blocked.
+
+        The same policy also covers post-contact TRANSPORT/MOVE of a held tool
+        (return-to-rest): free bodies still under the tool footprint after a
+        sweep must be breakaway-exempt so the transport start keyframe is not
+        rejected for residual plate↔target margin.
+        """
+
+        if not base.attached_object_ids:
+            return base
+        touch = [
+            selector for selector in request.task.allowed_touch_objects if selector
+        ]
+        touch.extend(
+            self._tabletop_incidental_held_tool_touch_ids(request, base)
+        )
+        # Preserve order while dropping duplicates.
+        seen: set[str] = set()
+        touch = [name for name in touch if not (name in seen or seen.add(name))]
+        if not touch:
             return base
         pairs = {
             *base.allowed_collision_pairs,
             *(
                 tuple(sorted((attached, selector)))
                 for attached in base.attached_object_ids
-                for selector in request.task.allowed_touch_objects
-                if selector
+                for selector in touch
             ),
         }
+        ee = active_ee or base.active_ee
+        if ee:
+            pairs.update(self._contact_pairs(ee, touch))
         return base.model_copy(update={"allowed_collision_pairs": sorted(pairs)})
+
+    @staticmethod
+    def _object_xy_half_extent_m(
+        request: MotionPlanRequest,
+        object_id: str,
+    ) -> float:
+        record = request.world.objects.get(object_id)
+        if not isinstance(record, Mapping):
+            return 0.0
+        dims = record.get("dimensions_m")
+        if dims is None:
+            return 0.0
+        values = np.asarray(dims, dtype=float).reshape(-1)
+        if values.size < 2 or not np.isfinite(values[:2]).all():
+            return 0.0
+        return float(0.5 * max(float(values[0]), float(values[1])))
+
+    @classmethod
+    def _goal_region_xy_aabb_m(
+        cls,
+        request: MotionPlanRequest,
+    ) -> tuple[np.ndarray, np.ndarray] | None:
+        """World XY center and half-extents of ``task.goal.target_region_id``."""
+
+        region_id = request.task.goal.target_region_id
+        if not region_id:
+            return None
+        record = request.world.objects.get(str(region_id))
+        if not isinstance(record, Mapping):
+            return None
+        pose = record.get("pose")
+        if not isinstance(pose, Mapping):
+            return None
+        position = pose.get("position_m")
+        if position is None:
+            return None
+        center = np.asarray(position[:2], dtype=float)
+        if center.shape != (2,) or not np.isfinite(center).all():
+            return None
+        half = cls._object_xy_half_extent_m(request, str(region_id))
+        # Prefer full XY half-extents when both dimensions exist.
+        dims = record.get("dimensions_m")
+        if dims is not None:
+            values = np.asarray(dims, dtype=float).reshape(-1)
+            if values.size >= 2 and np.isfinite(values[:2]).all():
+                half_xy = np.asarray(
+                    (max(float(values[0]) * 0.5, 0.0), max(float(values[1]) * 0.5, 0.0)),
+                    dtype=float,
+                )
+                return center, half_xy
+        return center, np.asarray((half, half), dtype=float)
+
+    @staticmethod
+    def _object_name_stem(object_id: str) -> str:
+        """Leading alphabetic token of an object id (``block_10`` → ``block``)."""
+
+        token = str(object_id).strip().lower().split("_", 1)[0]
+        return token if token.isalpha() and len(token) >= 2 else ""
+
+    @classmethod
+    def _sweep_target_name_stems(cls, seed_ids: set[str]) -> set[str]:
+        """Shared name stems among sweep seeds; empty when seeds are mixed/unnamed."""
+
+        stems = {cls._object_name_stem(name) for name in seed_ids}
+        stems.discard("")
+        return stems
+
+    @classmethod
+    def _tabletop_support_z_m(
+        cls,
+        request: MotionPlanRequest,
+        free_z: Sequence[float],
+    ) -> float:
+        """Support/table height for tabletop partner filters (scene-relative)."""
+
+        from tuj.m5_motion.contact_keyframe_validation import _support_surface_z_m
+
+        support = _support_surface_z_m(request)
+        if support is not None and math.isfinite(float(support)):
+            return float(support)
+        finite = [float(z) for z in free_z if math.isfinite(float(z))]
+        if finite:
+            return float(np.median(np.asarray(finite, dtype=float)))
+        return 0.8
+
+    @classmethod
+    def _held_tool_center_xy_m(
+        cls,
+        request: MotionPlanRequest,
+        tool_id: str,
+    ) -> np.ndarray | None:
+        record = request.world.objects.get(tool_id)
+        if not isinstance(record, Mapping):
+            return None
+        pose = record.get("pose")
+        if not isinstance(pose, Mapping):
+            return None
+        position = pose.get("position_m")
+        if position is None or len(position) < 2:
+            return None
+        center = np.asarray(position[:2], dtype=float)
+        if center.shape != (2,) or not np.isfinite(center).all():
+            return None
+        return center
+
+    @classmethod
+    def _tabletop_incidental_held_tool_touch_ids(
+        cls,
+        request: MotionPlanRequest,
+        base: CollisionContext,
+    ) -> list[str]:
+        """Free tabletop partners near a held tool for sweep contact or transport lift-off."""
+
+        from tuj.m5_motion.task_semantics import task_operation
+
+        operation = task_operation(request.task)
+        if operation not in {"TOOL_ACT", "TRANSPORT", "MOVE"}:
+            return []
+        attached = {
+            str(object_id).strip()
+            for object_id in base.attached_object_ids
+            if str(object_id).strip()
+        }
+        tool = str(request.task.tool or "").strip()
+        held = str(
+            getattr(request.world.robot_state, "held_tool_id", None)
+            or getattr(request.world.robot_state, "attached_object_id", None)
+            or ""
+        ).strip()
+        tool_id = next(
+            (
+                name
+                for name in (tool, held, *sorted(attached))
+                if name and cls._object_xy_half_extent_m(request, name) > 0.0
+            ),
+            None,
+        )
+        if tool_id is None:
+            return []
+        tool_half_m = cls._object_xy_half_extent_m(request, tool_id)
+        if tool_half_m <= 0.0:
+            return []
+        margin_m = float(getattr(request.constraints, "collision_margin_m", 0.0) or 0.0)
+        # Centers sitting near the support (±band). Matches prior 0.70–0.86 at
+        # a 0.80 m table without baking that absolute height in.
+        free_z_samples = [
+            float(free_pose.pose.position_m[2]) for free_pose in base.free_object_poses
+        ]
+        support_z = cls._tabletop_support_z_m(request, free_z_samples)
+        tabletop_z_min_m = support_z - 0.10
+        tabletop_z_max_m = support_z + 0.06
+        free_xy: dict[str, np.ndarray] = {}
+        for free_pose in base.free_object_poses:
+            object_id = str(free_pose.object_id)
+            if object_id in attached:
+                continue
+            z = float(free_pose.pose.position_m[2])
+            if z < tabletop_z_min_m or z > tabletop_z_max_m:
+                continue
+            free_xy[object_id] = np.asarray(free_pose.pose.position_m[:2], dtype=float)
+
+        # After a contact tool_act, TRANSPORT/MOVE lift-off still overlaps the
+        # bodies that were just pushed. Exempt whatever currently sits under
+        # the held-tool footprint (generic breakaway; not task-id specific).
+        if operation in {"TRANSPORT", "MOVE"}:
+            tool_xy = cls._held_tool_center_xy_m(request, tool_id)
+            if tool_xy is None:
+                return []
+            ids: list[str] = []
+            for object_id, xy in free_xy.items():
+                neighbor_half_m = cls._object_xy_half_extent_m(request, object_id)
+                limit_m = tool_half_m + neighbor_half_m + margin_m
+                if float(np.linalg.norm(xy - tool_xy)) <= limit_m + 1e-9:
+                    ids.append(object_id)
+            return ids
+
+        seed_ids = {
+            str(name)
+            for name in (*request.task.target_ids, *request.task.allowed_touch_objects)
+            if str(name).strip()
+        }
+        seed_stems = cls._sweep_target_name_stems(seed_ids)
+        seed_xy = [
+            (seed_id, free_xy[seed_id])
+            for seed_id in seed_ids
+            if seed_id in free_xy
+        ]
+        # Seeds may sit slightly below the tabletop band in sparse fixtures;
+        # still use their XY from the request world when needed for reach.
+        for seed_id in seed_ids:
+            if seed_id in free_xy:
+                continue
+            record = request.world.objects.get(seed_id)
+            if not isinstance(record, Mapping):
+                continue
+            pose = record.get("pose")
+            if not isinstance(pose, Mapping):
+                continue
+            position = pose.get("position_m")
+            if position is None or len(position) < 2:
+                continue
+            seed_xy.append(
+                (seed_id, np.asarray(position[:2], dtype=float))
+            )
+        region_aabb = cls._goal_region_xy_aabb_m(request)
+        ids = []
+        for object_id, xy in free_xy.items():
+            if object_id in attached or object_id in seed_ids:
+                continue
+            neighbor_half_m = cls._object_xy_half_extent_m(request, object_id)
+            # Tool centered near a seed can reach this far in XY to another partner.
+            reach_m = tool_half_m + neighbor_half_m + margin_m
+            same_cohort = (not seed_stems) or (
+                cls._object_name_stem(object_id) in seed_stems
+            )
+            # Seed neighborhood: keep the target name family (block_*, …) so
+            # unrelated distractors beside the cluster stay filtered.
+            if same_cohort:
+                near_seed = False
+                for seed_id, seed in seed_xy:
+                    seed_half_m = cls._object_xy_half_extent_m(request, seed_id)
+                    limit_m = reach_m + seed_half_m
+                    if float(np.linalg.norm(xy - seed)) <= limit_m + 1e-9:
+                        near_seed = True
+                        break
+                if near_seed:
+                    ids.append(object_id)
+                    continue
+            # Goal-region halo: any free tabletop body (ladle, fork, prior-pass
+            # targets, …). CONTACT_END over a packed zone often grazes the EE
+            # (vac cup) against neighboring tools that are not sweep targets.
+            if region_aabb is not None:
+                region_center, region_half = region_aabb
+                expanded = region_half + (tool_half_m + neighbor_half_m + margin_m)
+                if float(np.max(np.abs(xy - region_center) - expanded)) <= 1e-9:
+                    ids.append(object_id)
+        return ids
 
     def _bind_default(
         self,
@@ -1171,6 +1534,15 @@ class ToolUseJournalCollisionContextFactory:
                 # that candidate-specific pose, not at the stale task goal
                 # pose captured before keyframe generation.
                 detached_target_pose = resolved_place
+            elif physical_release:
+                # Contact-friction holds have no kinematic weld. After
+                # GRIPPER_OPEN the free body must sit at the task's world
+                # target_pose. Untagged PLACE keyframes still resolve as
+                # grasp-frame poses; re-applying the friction transform would
+                # leave the free object at EEF⊕T_GB instead of the seat, so
+                # RETREAT collision prediction and later subgoals see the
+                # wrong scene.
+                detached_target_pose = target_pose
             else:
                 # Untagged generated keyframes describe the grasp reference,
                 # not the object. Keep geometry continuous across DETACH.
@@ -1209,15 +1581,16 @@ class ToolUseJournalCollisionContextFactory:
                     "context_id": release_id,
                     "allowed_collision_pairs": self._contact_pairs(active_ee, [target]),
                 })
-            # Approach keyframes (TRANSFER/PRE_PLACE) carry the held object over
-            # an increasingly crowded region.  The task packs everything into one
-            # region and permits overlap, so let the held object contact the
-            # region and its current occupants throughout the descent -- not only
-            # at the final PLACE pose -- otherwise the approach into a dense tray
-            # is collision-filtered before it can reach the drop point.  For a
-            # region with no occupants this context only adds the region/touch
-            # pairs, matching the prior place-near-region behaviour.
-            current_id = contact_id
+            # Approach keyframes (TRANSFER/PRE_PLACE) into a crowded destination
+            # region need the same occupant contact allowances as PLACE;
+            # otherwise descent is collision-filtered before the drop.  When the
+            # region has no occupants, keep the held attached/base context until
+            # PLACE so ordinary place filtering is not widened on every approach.
+            region_id = request.task.goal.target_region_id
+            crowded_destination = bool(
+                region_id and self._region_occupant_ids(request, target)
+            )
+            current_id = contact_id if crowded_destination else base.context_id
             withdrawal_pending = False
             for keyframe in candidate.keyframes:
                 keyframe.collision_context_after_events_id = None
@@ -1488,6 +1861,66 @@ class ToolUseJournalCollisionContextFactory:
             ) from error
         return contexts, registry
 
+    def prepare_move_to_workspace(
+        self,
+        request: MotionPlanRequest,
+    ) -> tuple[Mapping[str, CollisionContext], object]:
+        """Build attached-EE collision models for rack → workspace transit."""
+
+        self._validate_environment(request)
+        if not is_move_to_workspace_request(request):
+            raise ToolUseJournalCollisionBindingError(
+                "workspace transit setup requires MOVE_TO_WORKSPACE"
+            )
+        if (
+            request.world.robot_state.attached_object_id is not None
+            or request.world.robot_state.held_tool_id is not None
+        ):
+            raise ToolUseJournalCollisionBindingError(
+                "MOVE_TO_WORKSPACE requires an empty mounted end effector"
+            )
+        try:
+            active = normalize_ee_id(
+                request.world.metadata.get("physical_active_ee") or request.task.ee
+            )
+            requested = normalize_ee_id(request.task.ee)
+            physical = normalize_ee_id(
+                request.world.metadata.get("physical_active_ee")
+            )
+        except ValueError as error:
+            raise ToolUseJournalCollisionBindingError(str(error)) from error
+        if active != requested or active != physical:
+            raise ToolUseJournalCollisionBindingError(
+                "MOVE_TO_WORKSPACE EE does not match the mounted end effector"
+            )
+        contexts = self.compiler.build_ee_exchange_contexts(
+            from_ee=None,
+            to_ee=active,
+        )
+        free_poses = _free_object_poses(request.world)
+        contexts = {
+            context_id: context.model_copy(
+                update={"free_object_poses": free_poses}
+            )
+            for context_id, context in contexts.items()
+        }
+        try:
+            registry = self.compiler.build_collision_registry(
+                contexts,
+                collision_margin_m=request.constraints.collision_margin_m,
+                allowed_collision_pairs=(
+                    request.constraints.allowed_collision_pairs
+                ),
+                default_active_ee=active,
+            )
+        except ToolUseJournalCompatibilityError:
+            raise
+        except Exception as error:  # noqa: BLE001
+            raise ToolUseJournalCollisionBindingError(
+                "failed to build MOVE_TO_WORKSPACE collision registry"
+            ) from error
+        return contexts, registry
+
     def prepare(
         self,
         request: MotionPlanRequest,
@@ -1515,7 +1948,9 @@ class ToolUseJournalCollisionContextFactory:
                     request, artifact, base, active_ee
                 )
             else:
-                base = self._bind_generic_touch_policy(request, base)
+                base = self._bind_generic_touch_policy(
+                    request, base, active_ee=active_ee
+                )
                 bound, contexts = self._bind_default(request, artifact, base)
             initial_id = base.context_id
             default_ee = active_ee
@@ -1541,6 +1976,18 @@ class ToolUseJournalCollisionContextFactory:
             collision_contexts=contexts,
             initial_collision_context_id=initial_id,
             final_segment_validator=registry.final_segment_validator,
+            edge_context_materializer=(
+                lambda source_keyframe, actual_reference_pose: (
+                    _materialize_selected_attachment_transform(
+                        request,
+                        contexts,
+                        source_keyframe,
+                        actual_reference_pose,
+                    )
+                )
+                if is_acquire_task(request.task)
+                else None
+            ),
         )
 
 
@@ -1555,6 +2002,7 @@ class ToolUseJournalMotionRequestPlanner:
         precomputed_ee_attach_planner: PrecomputedEEAttachPlanner | None = None,
         precomputed_ee_exchange_planner: PrecomputedEEExchangePlanner | None = None,
         ee_exchange_entry_planner: EEExchangeEntryPlanner | None = None,
+        move_to_workspace_planner: MoveToWorkspacePlanner | None = None,
         ee_attach_policy: EEAttachPolicy | str = EEAttachPolicy.PRECOMPUTED_REQUIRED,
         log: Any = print,
     ) -> None:
@@ -1563,6 +2011,7 @@ class ToolUseJournalMotionRequestPlanner:
         self.precomputed_ee_attach_planner = precomputed_ee_attach_planner
         self.precomputed_ee_exchange_planner = precomputed_ee_exchange_planner
         self.ee_exchange_entry_planner = ee_exchange_entry_planner
+        self.move_to_workspace_planner = move_to_workspace_planner
         self.ee_attach_policy = EEAttachPolicy(ee_attach_policy)
         self._log = log
 
@@ -1583,6 +2032,7 @@ class ToolUseJournalMotionRequestPlanner:
         ee_return_trajectory_paths: Sequence[str | Path] = (),
         ee_attach_policy: EEAttachPolicy | str = EEAttachPolicy.PRECOMPUTED_REQUIRED,
         ee_attach_start_tolerance_rad: float = 0.01,
+        debug_dir: str | Path | None = None,
         log: Any = print,
         **suite_make_kwargs: Any,
     ) -> "ToolUseJournalMotionRequestPlanner":
@@ -1600,6 +2050,10 @@ class ToolUseJournalMotionRequestPlanner:
             if isinstance(selected_provider, RoutedKeyframeStrategyProvider)
             else RoutedKeyframeStrategyProvider(selected_provider)
         )
+        if debug_dir is not None:
+            routed_provider = DebugKeyframeStrategyProvider(
+                routed_provider, debug_dir
+            )
         # The routed provider still owns geometry generation.  This decorator
         # changes only explicitly selected physical PICK requests from a
         # synthetic ATTACH_OBJECT event to persistent contact friction.
@@ -1614,7 +2068,9 @@ class ToolUseJournalMotionRequestPlanner:
             kinematics = ContinuousIK(
                 kinematics, adapter.data.qpos[adapter.robot._ref_joint_pos_indexes]
             )
-        pipeline = MotionPlanningPipeline(execution_provider, kinematics)
+        pipeline = MotionPlanningPipeline(
+            execution_provider, kinematics, debug_dir=debug_dir
+        )
         # Portable (cross-environment) EE-path validation compares a template's
         # stored canonical EEF pose against current-model forward kinematics.
         # Every portable template records that pose in the bare-flange frame
@@ -1687,17 +2143,50 @@ class ToolUseJournalMotionRequestPlanner:
             joint_position_limits_rad=getattr(kinematics, "joint_limits_rad"),
             log=log,
         )
+        workspace_planner = MoveToWorkspacePlanner(
+            precomputed.registry,
+            joint_position_limits_rad=getattr(kinematics, "joint_limits_rad"),
+            log=log,
+        )
         return cls(
             pipeline,
             factory,
             precomputed_ee_attach_planner=precomputed,
             precomputed_ee_exchange_planner=precomputed_exchange,
             ee_exchange_entry_planner=entry_planner,
+            move_to_workspace_planner=workspace_planner,
             ee_attach_policy=ee_attach_policy,
             log=log,
         )
 
     def __call__(self, request: MotionPlanRequest, *, final_plan_validator=None) -> Any:
+        if is_move_to_workspace_request(request):
+            if self.move_to_workspace_planner is None:
+                raise PrecomputedEEPathError(
+                    EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_NOT_FOUND,
+                    "no MOVE_TO_WORKSPACE planner is configured",
+                )
+            try:
+                template = self.move_to_workspace_planner.load_workspace_template(
+                    request
+                )
+                contexts, collision_registry = (
+                    self.collision_context_factory.prepare_move_to_workspace(
+                        request
+                    )
+                )
+                return self.move_to_workspace_planner.plan(
+                    request,
+                    collision_contexts=contexts,
+                    collision_checker=collision_registry,
+                    template=template,
+                )
+            except PrecomputedEEPathError as error:
+                self._log(
+                    f"[M5][WORKSPACE] miss: "
+                    f"code={error.failure_code.value}"
+                )
+                raise
         if is_ee_exchange_entry_request(request):
             source = str(
                 request.task.metadata.get("entry_ee")
@@ -1742,7 +2231,7 @@ class ToolUseJournalMotionRequestPlanner:
                         request
                     )
                 )
-                return self.precomputed_ee_attach_planner.plan(
+                attach_plan = self.precomputed_ee_attach_planner.plan(
                     request,
                     collision_contexts=contexts,
                     collision_checker=collision_registry,
@@ -1756,6 +2245,8 @@ class ToolUseJournalMotionRequestPlanner:
                 if self.ee_attach_policy is EEAttachPolicy.PRECOMPUTED_REQUIRED:
                     raise
                 self._log("[M5][EE_PATH] fallback=dynamic-planner")
+            else:
+                return self._append_safe_rack_exit(request, attach_plan)
         elif is_ee_exchange_request(request):
             source = str(request.task.metadata.get("from_ee") or "")
             target = str(request.task.metadata.get("to_ee") or request.task.ee)
@@ -1771,7 +2262,7 @@ class ToolUseJournalMotionRequestPlanner:
                         request
                     )
                 )
-                return self.precomputed_ee_exchange_planner.plan(
+                exchange_plan = self.precomputed_ee_exchange_planner.plan(
                     request,
                     collision_contexts=contexts,
                     collision_checker=collision_registry,
@@ -1785,6 +2276,8 @@ class ToolUseJournalMotionRequestPlanner:
                 if self.ee_attach_policy is EEAttachPolicy.PRECOMPUTED_REQUIRED:
                     raise
                 self._log("[M5][EE_PATH] fallback=dynamic-planner")
+            else:
+                return self._append_safe_rack_exit(request, exchange_plan)
         self._ground_held_region_goal(request)
         return self.pipeline.plan(
             request,
@@ -1795,6 +2288,104 @@ class ToolUseJournalMotionRequestPlanner:
                 else {}
             ),
         )
+
+    def _append_safe_rack_exit(self, request: MotionPlanRequest, exchange_plan: Any) -> Any:
+        """Require SAFE RACK EXIT before treating attach/exchange as SUCCESS."""
+
+        if self.move_to_workspace_planner is None:
+            self._log(
+                "[M5][SAFE_EXIT] skipped: no SAFE RACK EXIT planner configured"
+            )
+            return exchange_plan
+        to_ee = normalize_ee_id(
+            request.task.metadata.get("to_ee") or request.task.ee
+        )
+        world = request.world.model_copy(deep=True)
+        world.robot_state = exchange_plan.expected_final_state.model_copy(deep=True)
+        world.metadata = dict(world.metadata)
+        world.metadata["physical_active_ee"] = to_ee
+        world.metadata["declared_active_ee"] = to_ee
+        exit_constraints = request.constraints.model_copy(deep=True)
+        # Reserve clearance for controller tracking near rack supports and
+        # reduce the exit speed so the mounted EE follows that route closely.
+        exit_constraints.collision_margin_m = max(
+            exit_constraints.collision_margin_m,
+            _SAFE_RACK_EXIT_COLLISION_MARGIN_M,
+        )
+        exit_constraints.velocity_scaling = min(
+            exit_constraints.velocity_scaling,
+            _SAFE_RACK_EXIT_DYNAMIC_SCALING,
+        )
+        exit_constraints.acceleration_scaling = min(
+            exit_constraints.acceleration_scaling,
+            _SAFE_RACK_EXIT_DYNAMIC_SCALING,
+        )
+        exit_constraints.jerk_scaling = min(
+            exit_constraints.jerk_scaling,
+            _SAFE_RACK_EXIT_DYNAMIC_SCALING,
+        )
+        exit_request = MotionPlanRequest(
+            request_id=f"{request.request_id}:safe-rack-exit",
+            provenance=ArtifactProvenance(
+                artifact_id=f"{request.provenance.artifact_id}:safe-rack-exit",
+                artifact_type="MotionPlanRequest",
+                produced_by=ModuleName.MOTION_PLANNER,
+                invocation_id=f"safe-rack-exit:{request.request_id}",
+                input_artifact_ids=[request.provenance.artifact_id],
+            ),
+            world=world,
+            task=MotionTask(
+                task_id=request.task.task_id,
+                subgoal_id=request.task.subgoal_id,
+                action_type="MOVE_TO_WORKSPACE",
+                ee=to_ee,
+                target_ids=[to_ee],
+                goal=MotionGoal(goal_type=GoalType.POSE),
+                metadata={
+                    "operation": "MOVE_TO_WORKSPACE",
+                    "to_ee": to_ee,
+                    "safe_rack_exit": True,
+                },
+            ),
+            constraints=exit_constraints,
+            options=request.options.model_copy(deep=True),
+        )
+        try:
+            template = self.move_to_workspace_planner.load_workspace_template(
+                exit_request
+            )
+            contexts, collision_registry = (
+                self.collision_context_factory.prepare_move_to_workspace(exit_request)
+            )
+            exit_plan = self.move_to_workspace_planner.plan(
+                exit_request,
+                collision_contexts=contexts,
+                collision_checker=collision_registry,
+                template=template,
+            )
+        except MoveToWorkspacePlanningError as error:
+            self._log(
+                f"[M5][SAFE_EXIT] fail: ee={to_ee} "
+                f"code={error.failure_code.value} detail={error}"
+            )
+            raise PrecomputedEEPathError(
+                EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_STALE
+                if error.failure_code
+                is MoveToWorkspaceFailureCode.FINAL_COLLISION_CHECK_FAILED
+                else EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_NOT_FOUND,
+                f"SAFE RACK EXIT failed after EE exchange: {error}",
+                trajectory_id=getattr(error, "trajectory_id", None),
+            ) from error
+        except PrecomputedEEPathError as error:
+            self._log(
+                f"[M5][SAFE_EXIT] miss: ee={to_ee} code={error.failure_code.value}"
+            )
+            raise
+        self._log(
+            f"[M5][SAFE_EXIT] ok: ee={to_ee} "
+            f"planner={exit_plan.segments[0].metadata.get('planner')}"
+        )
+        return append_safe_rack_exit_plan(exchange_plan, exit_plan)
 
     def _ground_held_region_goal(self, request: MotionPlanRequest) -> None:
         """Give a held TRANSPORT/MOVE or region PLACE an object-space destination.

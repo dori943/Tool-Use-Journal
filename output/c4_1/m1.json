@@ -45,7 +45,7 @@
       },
       "material": "aluminum",
       "density_kgm3": 3847.6,
-      "mass_kg": 1.112,
+      "mass_kg": 1.113,
       "youngs_gpa": 94.54,
       "mu": {
         "mu": 0.428,
@@ -55,11 +55,10 @@
       },
       "confidence": 0.429,
       "geometry_source": "current_observation",
-      "intrinsic_source": "memory",
-      "mass_source": "shell_mass_integral",
+      "intrinsic_source": "backend",
       "mass_range_kg": [
         0.288,
-        1.936
+        1.937
       ],
       "materials_topk": [
         {
@@ -124,7 +123,7 @@
         }
       ],
       "caption": "Flat rectangular metal sheet or panel",
-      "grounding_source": "memory",
+      "grounding_source": "backend",
       "ee": {
         "2F": {
           "feasible": false,
@@ -140,13 +139,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 1.112,
+              "value": 1.113,
               "limit": 5.0,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 12.744,
+              "value": 12.755,
               "limit": 235.0,
               "pass": true
             }
@@ -166,13 +165,13 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 1.112,
+              "value": 1.113,
               "limit": 2.5,
               "pass": true
             },
             {
               "rule": "grip_slip",
-              "value": 12.744,
+              "value": 12.755,
               "limit": 60.0,
               "pass": true
             }
@@ -180,9 +179,9 @@
         },
         "vac": {
           "feasible": false,
-          "margin": -0.612,
+          "margin": -0.613,
           "margin_unit": "kg",
-          "reason": "질량 1.112 vs 페이로드 0.5kg",
+          "reason": "질량 1.113 vs 페이로드 0.5kg",
           "checks": [
             {
               "rule": "flatness",
@@ -192,7 +191,7 @@
             },
             {
               "rule": "mass_lt_payload",
-              "value": 1.112,
+              "value": 1.113,
               "limit": 0.5,
               "pass": false
             },
@@ -294,11 +293,10 @@
       },
       "confidence": 0.364,
       "geometry_source": "current_observation",
-      "intrinsic_source": "memory",
-      "mass_source": "shell_mass_integral",
+      "intrinsic_source": "backend",
       "mass_range_kg": [
         0.603,
-        3.077
+        3.076
       ],
       "materials_topk": [
         {
@@ -363,7 +361,7 @@
         }
       ],
       "caption": "Flat rectangular metal-like panel",
-      "grounding_source": "memory",
+      "grounding_source": "backend",
       "ee": {
         "2F": {
           "feasible": false,
@@ -484,21 +482,21 @@
       "class": "card",
       "source_name": "card",
       "center_mm": [
-        882.1,
+        907.7,
         -1.0,
         921.3
       ],
       "bbox_mm": [
-        48.2,
-        28.5,
+        49.4,
+        28.4,
         0.0
       ],
       "geometry": {
-        "length_mm": 48.9,
+        "length_mm": 50.3,
         "diameter_mm": null,
         "extents_mm": [
-          48.9,
-          28.5,
+          50.3,
+          29.3,
           0.0
         ],
         "height_z_mm": 0.0,
@@ -506,18 +504,18 @@
         "surface_rms_mm": 0.0,
         "seal_patch_rms_mm": 99.9,
         "footprint_mm": [
-          48.2,
-          28.5
+          49.4,
+          28.4
         ],
         "height_mm": 0.0,
         "center": [
-          882.1,
+          907.7,
           -1.0,
           921.3
         ],
         "aabb_size": [
-          48.2,
-          28.5,
+          49.4,
+          28.4,
           0.0
         ]
       },
@@ -533,8 +531,7 @@
       },
       "confidence": 0.6,
       "geometry_source": "current_observation",
-      "intrinsic_source": "memory",
-      "mass_source": "shell_mass_integral",
+      "intrinsic_source": "backend",
       "mass_range_kg": [
         0.0,
         0.002
@@ -602,7 +599,7 @@
         }
       ],
       "caption": "Small blue plastic rectangular clip",
-      "grounding_source": "memory",
+      "grounding_source": "backend",
       "ee": {
         "2F": {
           "feasible": true,
@@ -612,7 +609,7 @@
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 28.5,
+              "value": 28.4,
               "limit": 85.0,
               "pass": true
             },
@@ -638,7 +635,7 @@
           "checks": [
             {
               "rule": "dim_lt_stroke",
-              "value": 28.5,
+              "value": 28.4,
               "limit": 140.0,
               "pass": true
             },
@@ -660,7 +657,7 @@
           "feasible": false,
           "margin": -98.4,
           "margin_unit": "mm",
-          "reason": "접촉면 폭 28 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "reason": "접촉면 폭 29 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
           "checks": [
             {
               "rule": "flatness",
@@ -677,7 +674,7 @@
             {
               "rule": "seal_contact",
               "value": 30.0,
-              "limit": 28.5,
+              "limit": 29.3,
               "pass": false
             },
             {
@@ -690,10 +687,10 @@
         }
       },
       "reachability": {
-        "distance_mm": 882.1,
+        "distance_mm": 907.7,
         "reach_mm": 850,
         "reachable": false,
-        "margin_mm": -32.1
+        "margin_mm": -57.7
       },
       "predicates": {
         "top_exposed": {
@@ -712,8 +709,246 @@
           "type": "flat_face",
           "value": false,
           "pass": false,
-          "face_mm": 28.5,
-          "check": "rms_0.0<=2.0 & patch_99.9<=1.5 & face_28.5>=40.0"
+          "face_mm": 28.4,
+          "check": "rms_0.0<=2.0 & patch_99.9<=1.5 & face_28.4>=40.0"
+        }
+      }
+    },
+    {
+      "id": "obj_tool_1_knife_tool_1_knife",
+      "canonical_id": "tool_1_knife",
+      "class": "tool_1_knife",
+      "source_name": "tool_1_knife",
+      "center_mm": [
+        465.2,
+        208.6,
+        921.7
+      ],
+      "bbox_mm": [
+        206.8,
+        11.2,
+        0.8
+      ],
+      "geometry": {
+        "length_mm": 206.8,
+        "diameter_mm": null,
+        "extents_mm": [
+          206.8,
+          11.8,
+          0.5
+        ],
+        "height_z_mm": 0.8,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.03,
+        "seal_patch_rms_mm": 99.9,
+        "footprint_mm": [
+          206.8,
+          11.2
+        ],
+        "height_mm": 0.8,
+        "center": [
+          465.2,
+          208.6,
+          921.7
+        ],
+        "aabb_size": [
+          206.8,
+          11.2,
+          0.8
+        ]
+      },
+      "material": "steel",
+      "density_kgm3": 6250.0,
+      "mass_kg": 0.009,
+      "youngs_gpa": 164.19,
+      "mu": {
+        "mu": 0.428,
+        "stage": 0,
+        "material": "steel",
+        "rms_mm": 0.03
+      },
+      "confidence": 0.381,
+      "geometry_source": "current_observation",
+      "intrinsic_source": "backend",
+      "mass_range_kg": [
+        0.002,
+        0.015
+      ],
+      "materials_topk": [
+        {
+          "name": "steel",
+          "prob": 0.381,
+          "density_kgm3": [
+            7700.0,
+            8050.0
+          ],
+          "thickness_cm": [
+            0.05,
+            0.3
+          ]
+        },
+        {
+          "name": "stainless steel",
+          "prob": 0.333,
+          "density_kgm3": [
+            7900.0,
+            8000.0
+          ],
+          "thickness_cm": [
+            0.05,
+            0.3
+          ]
+        },
+        {
+          "name": "aluminum",
+          "prob": 0.143,
+          "density_kgm3": [
+            2650.0,
+            2850.0
+          ],
+          "thickness_cm": [
+            0.05,
+            0.3
+          ]
+        },
+        {
+          "name": "carbon fiber composite",
+          "prob": 0.095,
+          "density_kgm3": [
+            1500.0,
+            1700.0
+          ],
+          "thickness_cm": [
+            0.05,
+            0.25
+          ]
+        },
+        {
+          "name": "plastic",
+          "prob": 0.048,
+          "density_kgm3": [
+            900.0,
+            1400.0
+          ],
+          "thickness_cm": [
+            0.05,
+            0.3
+          ]
+        }
+      ],
+      "caption": "Long narrow metal tool or blade",
+      "grounding_source": "backend",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.991,
+          "margin_unit": "kg",
+          "reason": "질량 0.009 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 11.2,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.009,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.103,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.491,
+          "margin_unit": "kg",
+          "reason": "질량 0.009 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 11.2,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.009,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 0.103,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": false,
+          "margin": -98.4,
+          "margin_unit": "mm",
+          "reason": "접촉면 폭 12 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.03,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.009,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 11.8,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 509.8,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 340.2
+      },
+      "predicates": {
+        "top_exposed": {
+          "type": "top_exposed",
+          "value": true,
+          "blockers": [],
+          "pass": true
+        },
+        "clear": {
+          "type": "clear",
+          "value": true,
+          "occupants": [],
+          "pass": true
+        },
+        "flat_face": {
+          "type": "flat_face",
+          "value": false,
+          "pass": false,
+          "face_mm": 11.2,
+          "check": "rms_0.03<=2.0 & patch_99.9<=1.5 & face_11.2>=40.0"
         }
       }
     },
@@ -772,8 +1007,7 @@
       },
       "confidence": 0.474,
       "geometry_source": "current_observation",
-      "intrinsic_source": "memory",
-      "mass_source": "shell_mass_integral",
+      "intrinsic_source": "backend",
       "mass_range_kg": [
         0.001,
         0.003
@@ -841,7 +1075,7 @@
         }
       ],
       "caption": "Wooden kitchen spatula or turner",
-      "grounding_source": "memory",
+      "grounding_source": "backend",
       "ee": {
         "2F": {
           "feasible": true,
@@ -1011,8 +1245,7 @@
       },
       "confidence": 0.429,
       "geometry_source": "current_observation",
-      "intrinsic_source": "memory",
-      "mass_source": "shell_mass_integral",
+      "intrinsic_source": "backend",
       "mass_range_kg": [
         0.001,
         0.011
@@ -1080,7 +1313,7 @@
         }
       ],
       "caption": "Wooden honey dipper or stirring spoon",
-      "grounding_source": "memory",
+      "grounding_source": "backend",
       "ee": {
         "2F": {
           "feasible": true,
@@ -1250,8 +1483,7 @@
       },
       "confidence": 0.588,
       "geometry_source": "current_observation",
-      "intrinsic_source": "memory",
-      "mass_source": "shell_mass_integral",
+      "intrinsic_source": "backend",
       "mass_range_kg": [
         0.001,
         0.023
@@ -1319,7 +1551,7 @@
         }
       ],
       "caption": "Wooden mallet or club-like tool",
-      "grounding_source": "memory",
+      "grounding_source": "backend",
       "ee": {
         "2F": {
           "feasible": true,
@@ -1489,8 +1721,7 @@
       },
       "confidence": 0.417,
       "geometry_source": "current_observation",
-      "intrinsic_source": "memory",
-      "mass_source": "shell_mass_integral",
+      "intrinsic_source": "backend",
       "mass_range_kg": [
         0.019,
         0.089
@@ -1558,7 +1789,7 @@
         }
       ],
       "caption": "Small rectangular wooden block with rounded corners",
-      "grounding_source": "memory",
+      "grounding_source": "backend",
       "ee": {
         "2F": {
           "feasible": true,
@@ -1685,7 +1916,7 @@
       "from": "obj_appliance_left_appliance_left",
       "to": "obj_card_card",
       "type": "near",
-      "gap_mm": 12.3
+      "gap_mm": 12.4
     },
     {
       "from": "obj_appliance_left_appliance_left",
@@ -1722,6 +1953,12 @@
       "to": "obj_tool_5_cutting_board_tool_5_cutting_board",
       "type": "near",
       "gap_mm": 145.7
+    },
+    {
+      "from": "obj_tool_1_knife_tool_1_knife",
+      "to": "obj_tool_2_spatula_a_tool_2_spatula_a",
+      "type": "near",
+      "gap_mm": 82.6
     },
     {
       "from": "obj_tool_2_spatula_a_tool_2_spatula_a",

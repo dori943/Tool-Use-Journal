@@ -411,6 +411,27 @@ def test_place_into_region_requires_detachment_and_containment() -> None:
     assert "still attached" in attached.detail
 
 
+def test_place_into_region_tolerates_post_release_rim_graze() -> None:
+    """Settle drift of a few cm still counts as on-plate; deep overhang does not."""
+    from tuj.m5_motion.push_to_region import PLACE_SETTLE_FOOTPRINT_TOLERANCE_M
+
+    request = _request(target_x_m=0.0)
+    request.task.action_type = "place"
+    request.task.contact = None
+    # Region is 0.20 m wide; block is 0.02 m.  Shift so one AABB face grazes
+    # ~10 mm past the rim — inside place settle tolerance, outside default.
+    request.world.objects["block"]["pose"]["position_m"][0] = 0.100
+    grazed = TaskAwareGoalEvaluator().evaluate(request, _report(), request.world)
+    assert grazed.status is GoalEvaluationStatus.SATISFIED
+    assert grazed.observed["contact_tolerance_m"] == pytest.approx(
+        PLACE_SETTLE_FOOTPRINT_TOLERANCE_M
+    )
+
+    request.world.objects["block"]["pose"]["position_m"][0] = 0.140
+    outside = TaskAwareGoalEvaluator().evaluate(request, _report(), request.world)
+    assert outside.status is GoalEvaluationStatus.FAILED
+
+
 def test_place_into_container_requires_vertical_containment() -> None:
     request = _request(target_x_m=0.04)
     request.task.action_type = "place"

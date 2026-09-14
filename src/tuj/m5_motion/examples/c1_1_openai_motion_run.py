@@ -2153,7 +2153,9 @@ class _PhysicalGraspControllerTrajectoryPlayer(
         settle_config: Mapping[str, float | int],
         joint_error_rad: float,
         eef_position_error_m: float | None,
+        eef_orientation_error_rad: float | None = None,
     ) -> Mapping[str, object] | None:
+        del eef_orientation_error_rad
         metadata = getattr(segment, "metadata", {})
         raw = (
             metadata.get("physical_tool_settle")
