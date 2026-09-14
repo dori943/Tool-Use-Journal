@@ -274,6 +274,23 @@ def _check_conf(v, where: str):
         raise ValueError(f"{where}: confidence가 0~1 숫자가 아님 ({v!r})")
 
 
+def _clean_id(v):
+    """빈 문자열을 '미지정'으로 본다 (0915).
+
+    일부 제공자(관측: gemini)는 해당 없는 id를 null 이 아니라 "" 로 내보낸다.
+    ""는 환각 id가 아니라 미지정이므로 검문에 넘기기 전에 None 으로 되돌린다.
+    문자열이 아닌 값은 손대지 않고 넘겨 기존 검문이 그대로 잡게 둔다.
+    """
+    if isinstance(v, str):
+        return v.strip() or None
+    return v
+
+
+def _clean_ids(seq):
+    """id 목록에서 미지정 항목만 걷어낸다. 나머지는 검문에 그대로 넘긴다."""
+    return [x for x in (_clean_id(v) for v in (seq or [])) if x is not None]
+
+
 def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
     """LLM 출력 검문 + 정규화. 프롬프트는 지시, 여기는 검문 — 둘 다 있어야 안전하다.
 
@@ -283,13 +300,19 @@ def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
     """
     known = set(ids)
     for s in subs:
-        bad = [x for x in s.get("target_ids", []) if x not in known]
-        cid = s.get("container_id")
+        s["target_ids"] = _clean_ids(s.get("target_ids"))
+        s["tool_candidate_ids"] = _clean_ids(s.get("tool_candidate_ids"))
+        s["container_id"] = _clean_id(s.get("container_id"))
+
+        bad = [x for x in s["target_ids"] if x not in known]
+        cid = s["container_id"]
         if cid is not None and cid not in known:
             bad.append(cid)
-        bad += [x for x in s.get("tool_candidate_ids", []) if x not in known]
+        bad += [x for x in s["tool_candidate_ids"] if x not in known]
         if bad:
             raise ValueError(f"장면에 없는 id: {bad}")
+        if not s["target_ids"]:                      # 걷어낸 뒤 비면 진짜 결함 → 재시도
+            raise ValueError(f"{s.get('subgoal_id')}: target_ids가 비어 있다")
         _check_conf(s.get("confidence"), f"{s.get('subgoal_id')} 분해")
 
     out = []
@@ -332,12 +355,14 @@ def validate_selection(sel: list[dict], subgoals: list[dict], ids: list[str]) ->
     by_id = {}
     for e in sel:
         sid = e.get("subgoal_id")
-        bad = [x for x in e.get("object_ids", []) + e.get("tool_candidate_ids", [])
+        e["object_ids"] = _clean_ids(e.get("object_ids"))
+        e["tool_candidate_ids"] = _clean_ids(e.get("tool_candidate_ids"))
+        bad = [x for x in e["object_ids"] + e["tool_candidate_ids"]
                if x not in known]
         if bad:
             raise ValueError(f"{sid}: 장면에 없는 id {bad}")
-        missing_tools = [t for t in e.get("tool_candidate_ids", [])
-                         if t not in e.get("object_ids", [])]
+        missing_tools = [t for t in e["tool_candidate_ids"]
+                         if t not in e["object_ids"]]
         if missing_tools:
             raise ValueError(f"{sid}: 도구 후보 {missing_tools}는 object_ids에도 포함하라")
         _check_conf(e.get("confidence"), f"{sid} 객체 선택")

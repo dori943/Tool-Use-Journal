@@ -1027,8 +1027,35 @@ def main():
         retrieval_debug=retrieval_debug,
     )
     if memory is not None:
+        def _sum_usage(key):
+            totals = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+            for debug in retrieval_debug.values():
+                usage = debug.get(key)
+                if not isinstance(usage, dict):
+                    continue
+                totals["calls"] += 1
+                totals["input_tokens"] += int(usage.get("input_tokens") or 0)
+                totals["output_tokens"] += int(usage.get("output_tokens") or 0)
+                totals["total_tokens"] += int(usage.get("total_tokens") or 0)
+            return totals
+
+        token_summary = {
+            "c3_density_only": _sum_usage("c3_token_usage"),
+            "full_siphy": _sum_usage("full_m3_token_usage"),
+        }
+        token_summary["physical_total"] = {
+            "calls": (token_summary["c3_density_only"]["calls"]
+                      + token_summary["full_siphy"]["calls"]),
+            "input_tokens": (token_summary["c3_density_only"]["input_tokens"]
+                             + token_summary["full_siphy"]["input_tokens"]),
+            "output_tokens": (token_summary["c3_density_only"]["output_tokens"]
+                              + token_summary["full_siphy"]["output_tokens"]),
+            "total_tokens": (token_summary["c3_density_only"]["total_tokens"]
+                             + token_summary["full_siphy"]["total_tokens"]),
+        }
         (OUT / "m0_retrieval.json").write_text(
-            json.dumps({"round": "m1", "objects": retrieval_debug},
+            json.dumps({"round": "m1", "objects": retrieval_debug,
+                        "token_summary": token_summary},
                        ensure_ascii=False, indent=2),
             encoding="utf-8")
     (OUT / "m1.json").write_text(
@@ -1043,6 +1070,14 @@ def main():
         print(f"[M1] memory update: new={update['new']} upgraded={update['upgraded']} "
               f"kept={update['kept']} -> {memory_path}")
         print(f"[M1] m0_retrieval -> {OUT / 'm0_retrieval.json'}")
+        c3 = token_summary["c3_density_only"]
+        full = token_summary["full_siphy"]
+        print(
+            "[M1] phys tokens: "
+            f"c3={c3['total_tokens']} (calls={c3['calls']}) "
+            f"full_siphy={full['total_tokens']} (calls={full['calls']}) "
+            f"total={token_summary['physical_total']['total_tokens']}"
+        )
     print(f"[M1] nodes={len(m1['nodes'])} edges={len(m1['edges'])} "
           f"crops={len(list((OUT / 'crops').glob('*.png')))}")
     for e in m1["edges"]:

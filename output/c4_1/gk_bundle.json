@@ -49,87 +49,88 @@
               25.0
             ]
           },
-          "material": "aluminum",
-          "density_kgm3": 3847.6,
-          "mass_kg": 1.113,
-          "youngs_gpa": 94.54,
+          "material": "steel",
+          "density_kgm3": 4574.1,
+          "mass_kg": 1.479,
+          "youngs_gpa": 110.48,
           "mu": {
             "mu": 0.428,
             "stage": 0,
-            "material": "aluminum",
+            "material": "steel",
             "rms_mm": 0.04
           },
-          "confidence": 0.429,
+          "confidence": 0.391,
           "geometry_source": "current_observation",
-          "intrinsic_source": "backend",
+          "intrinsic_source": "memory",
+          "mass_source": "shell_mass_integral",
           "mass_range_kg": [
-            0.288,
-            1.937
+            0.694,
+            2.264
           ],
           "materials_topk": [
             {
-              "name": "aluminum",
-              "prob": 0.429,
-              "density_kgm3": [
-                2650.0,
-                2750.0
-              ],
-              "thickness_cm": [
-                0.05,
-                0.3
-              ]
-            },
-            {
               "name": "steel",
-              "prob": 0.286,
+              "prob": 0.391,
               "density_kgm3": [
-                7750.0,
+                7850.0,
                 8050.0
               ],
               "thickness_cm": [
-                0.05,
+                0.1,
                 0.3
               ]
             },
             {
-              "name": "plastic",
-              "prob": 0.143,
+              "name": "aluminum",
+              "prob": 0.348,
               "density_kgm3": [
-                900.0,
-                1400.0
+                2700.0,
+                2800.0
               ],
               "thickness_cm": [
-                0.05,
+                0.1,
+                0.4
+              ]
+            },
+            {
+              "name": "polycarbonate",
+              "prob": 0.13,
+              "density_kgm3": [
+                1200.0,
+                1220.0
+              ],
+              "thickness_cm": [
+                0.2,
                 0.5
               ]
             },
             {
-              "name": "glass",
-              "prob": 0.095,
+              "name": "fiberglass",
+              "prob": 0.087,
               "density_kgm3": [
-                2400.0,
-                2600.0
+                1500.0,
+                2000.0
               ],
               "thickness_cm": [
-                0.1,
-                0.6
+                0.2,
+                0.5
               ]
             },
             {
-              "name": "wood",
-              "prob": 0.048,
+              "name": "titanium",
+              "prob": 0.043,
               "density_kgm3": [
-                400.0,
-                900.0
+                4500.0,
+                4550.0
               ],
               "thickness_cm": [
                 0.1,
-                1.0
+                0.3
               ]
             }
           ],
-          "caption": "Flat rectangular metal sheet or panel",
-          "grounding_source": "backend",
+          "caption": "Metallic rectangular enclosure or cabinet panel",
+          "grounding_source": "memory",
           "ee": {
             "2F": {
               "feasible": false,
@@ -145,13 +146,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 1.113,
+                  "value": 1.479,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 12.755,
+                  "value": 16.95,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -171,13 +172,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 1.113,
+                  "value": 1.479,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 12.755,
+                  "value": 16.95,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -185,9 +186,9 @@
             },
             "vac": {
               "feasible": false,
-              "margin": -0.613,
+              "margin": -0.979,
               "margin_unit": "kg",
-              "reason": "질량 1.113 vs 페이로드 0.5kg",
+              "reason": "질량 1.479 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
@@ -197,7 +198,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 1.113,
+                  "value": 1.479,
                   "limit": 0.5,
                   "pass": false
                 },
@@ -250,21 +251,21 @@
           "class": "card",
           "source_name": "card",
           "center_mm": [
-            907.7,
+            882.1,
             -1.0,
             921.3
           ],
           "bbox_mm": [
-            49.4,
-            28.4,
+            48.2,
+            28.5,
             0.0
           ],
           "geometry": {
-            "length_mm": 50.3,
+            "length_mm": 48.9,
             "diameter_mm": null,
             "extents_mm": [
-              50.3,
-              29.3,
+              48.9,
+              28.5,
               0.0
             ],
             "height_z_mm": 0.0,
@@ -272,18 +273,18 @@
             "surface_rms_mm": 0.0,
             "seal_patch_rms_mm": 99.9,
             "footprint_mm": [
-              49.4,
-              28.4
+              48.2,
+              28.5
             ],
             "height_mm": 0.0,
             "center": [
-              907.7,
+              882.1,
               -1.0,
               921.3
             ],
             "aabb_size": [
-              49.4,
-              28.4,
+              48.2,
+              28.5,
               0.0
             ]
           },
@@ -297,9 +298,10 @@
             "material": "plastic",
             "rms_mm": 0.0
           },
-          "confidence": 0.6,
+          "confidence": 0.474,
           "geometry_source": "current_observation",
-          "intrinsic_source": "backend",
+          "intrinsic_source": "memory",
+          "mass_source": "shell_mass_integral",
           "mass_range_kg": [
             0.0,
             0.002
@@ -307,7 +309,7 @@
           "materials_topk": [
             {
               "name": "plastic",
-              "prob": 0.6,
+              "prob": 0.474,
               "density_kgm3": [
                 900.0,
                 1400.0
@@ -318,47 +320,47 @@
               ]
             },
             {
+              "name": "aluminum",
+              "prob": 0.158,
+              "density_kgm3": [
+                2700.0,
+                2800.0
+              ],
+              "thickness_cm": [
+                0.1,
+                0.5
+              ]
+            },
+            {
+              "name": "steel",
+              "prob": 0.105,
+              "density_kgm3": [
+                7850.0,
+                7850.0
+              ],
+              "thickness_cm": [
+                0.1,
+                0.5
+              ]
+            },
+            {
               "name": "rubber",
-              "prob": 0.2,
+              "prob": 0.211,
               "density_kgm3": [
                 1100.0,
                 1300.0
               ],
               "thickness_cm": [
-                0.05,
-                0.3
-              ]
-            },
-            {
-              "name": "aluminum",
-              "prob": 0.067,
-              "density_kgm3": [
-                2650.0,
-                2800.0
-              ],
-              "thickness_cm": [
-                0.05,
-                0.2
-              ]
-            },
-            {
-              "name": "steel",
-              "prob": 0.067,
-              "density_kgm3": [
-                7750.0,
-                8050.0
-              ],
-              "thickness_cm": [
-                0.05,
-                0.2
+                0.1,
+                0.5
               ]
             },
             {
               "name": "wood",
-              "prob": 0.067,
+              "prob": 0.053,
               "density_kgm3": [
-                400.0,
-                900.0
+                600.0,
+                800.0
               ],
               "thickness_cm": [
                 0.1,
@@ -366,8 +368,8 @@
               ]
             }
           ],
-          "caption": "Small blue plastic rectangular clip",
-          "grounding_source": "backend",
+          "caption": "A blue plastic object with a small black hole.",
+          "grounding_source": "memory",
           "ee": {
             "2F": {
               "feasible": true,
@@ -377,7 +379,7 @@
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
-                  "value": 28.4,
+                  "value": 28.5,
                   "limit": 85.0,
                   "pass": true
                 },
@@ -403,7 +405,7 @@
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
-                  "value": 28.4,
+                  "value": 28.5,
                   "limit": 140.0,
                   "pass": true
                 },
@@ -425,7 +427,7 @@
               "feasible": false,
               "margin": -98.4,
               "margin_unit": "mm",
-              "reason": "접촉면 폭 29 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+              "reason": "접촉면 폭 28 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
               "checks": [
                 {
                   "rule": "flatness",
@@ -442,7 +444,7 @@
                 {
                   "rule": "seal_contact",
                   "value": 30.0,
-                  "limit": 29.3,
+                  "limit": 28.5,
                   "pass": false
                 },
                 {
@@ -455,10 +457,10 @@
             }
           },
           "reachability": {
-            "distance_mm": 907.7,
+            "distance_mm": 882.1,
             "reach_mm": 850,
             "reachable": false,
-            "margin_mm": -57.7
+            "margin_mm": -32.1
           },
           "predicates": {
             "top_exposed": {
@@ -477,246 +479,8 @@
               "type": "flat_face",
               "value": false,
               "pass": false,
-              "face_mm": 28.4,
-              "check": "rms_0.0<=2.0 & patch_99.9<=1.5 & face_28.4>=40.0"
-            }
-          }
-        },
-        "obj_tool_1_knife_tool_1_knife": {
-          "id": "obj_tool_1_knife_tool_1_knife",
-          "canonical_id": "tool_1_knife",
-          "class": "tool_1_knife",
-          "source_name": "tool_1_knife",
-          "center_mm": [
-            465.2,
-            208.6,
-            921.7
-          ],
-          "bbox_mm": [
-            206.8,
-            11.2,
-            0.8
-          ],
-          "geometry": {
-            "length_mm": 206.8,
-            "diameter_mm": null,
-            "extents_mm": [
-              206.8,
-              11.8,
-              0.5
-            ],
-            "height_z_mm": 0.8,
-            "cylinder_like": false,
-            "surface_rms_mm": 0.03,
-            "seal_patch_rms_mm": 99.9,
-            "footprint_mm": [
-              206.8,
-              11.2
-            ],
-            "height_mm": 0.8,
-            "center": [
-              465.2,
-              208.6,
-              921.7
-            ],
-            "aabb_size": [
-              206.8,
-              11.2,
-              0.8
-            ]
-          },
-          "material": "steel",
-          "density_kgm3": 6250.0,
-          "mass_kg": 0.009,
-          "youngs_gpa": 164.19,
-          "mu": {
-            "mu": 0.428,
-            "stage": 0,
-            "material": "steel",
-            "rms_mm": 0.03
-          },
-          "confidence": 0.381,
-          "geometry_source": "current_observation",
-          "intrinsic_source": "backend",
-          "mass_range_kg": [
-            0.002,
-            0.015
-          ],
-          "materials_topk": [
-            {
-              "name": "steel",
-              "prob": 0.381,
-              "density_kgm3": [
-                7700.0,
-                8050.0
-              ],
-              "thickness_cm": [
-                0.05,
-                0.3
-              ]
-            },
-            {
-              "name": "stainless steel",
-              "prob": 0.333,
-              "density_kgm3": [
-                7900.0,
-                8000.0
-              ],
-              "thickness_cm": [
-                0.05,
-                0.3
-              ]
-            },
-            {
-              "name": "aluminum",
-              "prob": 0.143,
-              "density_kgm3": [
-                2650.0,
-                2850.0
-              ],
-              "thickness_cm": [
-                0.05,
-                0.3
-              ]
-            },
-            {
-              "name": "carbon fiber composite",
-              "prob": 0.095,
-              "density_kgm3": [
-                1500.0,
-                1700.0
-              ],
-              "thickness_cm": [
-                0.05,
-                0.25
-              ]
-            },
-            {
-              "name": "plastic",
-              "prob": 0.048,
-              "density_kgm3": [
-                900.0,
-                1400.0
-              ],
-              "thickness_cm": [
-                0.05,
-                0.3
-              ]
-            }
-          ],
-          "caption": "Long narrow metal tool or blade",
-          "grounding_source": "backend",
-          "ee": {
-            "2F": {
-              "feasible": true,
-              "margin": 4.991,
-              "margin_unit": "kg",
-              "reason": "질량 0.009 vs 페이로드 5.0kg",
-              "checks": [
-                {
-                  "rule": "dim_lt_stroke",
-                  "value": 11.2,
-                  "limit": 85.0,
-                  "pass": true
-                },
-                {
-                  "rule": "mass_lt_payload",
-                  "value": 0.009,
-                  "limit": 5.0,
-                  "pass": true
-                },
-                {
-                  "rule": "grip_slip",
-                  "value": 0.103,
-                  "limit": 235.0,
-                  "pass": true
-                }
-              ]
-            },
-            "3F": {
-              "feasible": true,
-              "margin": 2.491,
-              "margin_unit": "kg",
-              "reason": "질량 0.009 vs 페이로드 2.5kg",
-              "checks": [
-                {
-                  "rule": "dim_lt_stroke",
-                  "value": 11.2,
-                  "limit": 140.0,
-                  "pass": true
-                },
-                {
-                  "rule": "mass_lt_payload",
-                  "value": 0.009,
-                  "limit": 2.5,
-                  "pass": true
-                },
-                {
-                  "rule": "grip_slip",
-                  "value": 0.103,
-                  "limit": 60.0,
-                  "pass": true
-                }
-              ]
-            },
-            "vac": {
-              "feasible": false,
-              "margin": -98.4,
-              "margin_unit": "mm",
-              "reason": "접촉면 폭 12 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
-              "checks": [
-                {
-                  "rule": "flatness",
-                  "value": 0.03,
-                  "limit": 1.5,
-                  "pass": true
-                },
-                {
-                  "rule": "mass_lt_payload",
-                  "value": 0.009,
-                  "limit": 0.5,
-                  "pass": true
-                },
-                {
-                  "rule": "seal_contact",
-                  "value": 30.0,
-                  "limit": 11.8,
-                  "pass": false
-                },
-                {
-                  "rule": "seal_patch",
-                  "value": 99.9,
-                  "limit": 1.5,
-                  "pass": false
-                }
-              ]
-            }
-          },
-          "reachability": {
-            "distance_mm": 509.8,
-            "reach_mm": 850,
-            "reachable": true,
-            "margin_mm": 340.2
-          },
-          "predicates": {
-            "top_exposed": {
-              "type": "top_exposed",
-              "value": true,
-              "blockers": [],
-              "pass": true
-            },
-            "clear": {
-              "type": "clear",
-              "value": true,
-              "occupants": [],
-              "pass": true
-            },
-            "flat_face": {
-              "type": "flat_face",
-              "value": false,
-              "pass": false,
-              "face_mm": 11.2,
-              "check": "rms_0.03<=2.0 & patch_99.9<=1.5 & face_11.2>=40.0"
+              "face_mm": 28.5,
+              "check": "rms_0.0<=2.0 & patch_99.9<=1.5 & face_28.5>=40.0"
             }
           }
         },
@@ -764,18 +528,19 @@
             ]
           },
           "material": "wood",
-          "density_kgm3": 650.0,
+          "density_kgm3": 700.0,
           "mass_kg": 0.002,
-          "youngs_gpa": 12.0,
+          "youngs_gpa": 12.5,
           "mu": {
             "mu": 0.476,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.03
           },
-          "confidence": 0.474,
+          "confidence": 0.667,
           "geometry_source": "current_observation",
-          "intrinsic_source": "backend",
+          "intrinsic_source": "memory",
+          "mass_source": "shell_mass_integral",
           "mass_range_kg": [
             0.001,
             0.003
@@ -783,67 +548,67 @@
           "materials_topk": [
             {
               "name": "wood",
-              "prob": 0.474,
+              "prob": 0.667,
               "density_kgm3": [
-                500.0,
+                600.0,
                 800.0
               ],
               "thickness_cm": [
-                0.5,
-                2.0
+                2.0,
+                10.0
               ]
             },
             {
-              "name": "bamboo",
-              "prob": 0.316,
+              "name": "steel",
+              "prob": 0.133,
               "density_kgm3": [
-                600.0,
-                900.0
-              ],
-              "thickness_cm": [
-                0.5,
-                2.0
-              ]
-            },
-            {
-              "name": "plastic",
-              "prob": 0.105,
-              "density_kgm3": [
-                900.0,
-                1400.0
-              ],
-              "thickness_cm": [
-                0.2,
-                1.5
-              ]
-            },
-            {
-              "name": "stainless steel",
-              "prob": 0.053,
-              "density_kgm3": [
-                7800.0,
-                8000.0
-              ],
-              "thickness_cm": [
-                0.1,
-                0.5
-              ]
-            },
-            {
-              "name": "silicone",
-              "prob": 0.053,
-              "density_kgm3": [
-                1100.0,
-                1300.0
+                7850.0,
+                8050.0
               ],
               "thickness_cm": [
                 0.2,
                 1.0
               ]
+            },
+            {
+              "name": "iron",
+              "prob": 0.067,
+              "density_kgm3": [
+                7000.0,
+                7800.0
+              ],
+              "thickness_cm": [
+                0.2,
+                1.0
+              ]
+            },
+            {
+              "name": "plastic",
+              "prob": 0.067,
+              "density_kgm3": [
+                900.0,
+                1400.0
+              ],
+              "thickness_cm": [
+                2.0,
+                5.0
+              ]
+            },
+            {
+              "name": "aluminum",
+              "prob": 0.067,
+              "density_kgm3": [
+                2700.0,
+                2800.0
+              ],
+              "thickness_cm": [
+                0.5,
+                2.0
+              ]
             }
           ],
-          "caption": "Wooden kitchen spatula or turner",
-          "grounding_source": "backend",
+          "caption": "A rustic wooden paddle or shovel handle",
+          "grounding_source": "memory",
           "ee": {
             "2F": {
               "feasible": true,
@@ -1002,41 +767,54 @@
             ]
           },
           "material": "wood",
-          "density_kgm3": 952.4,
-          "mass_kg": 0.006,
-          "youngs_gpa": 18.79,
+          "density_kgm3": 650.0,
+          "mass_kg": 0.005,
+          "youngs_gpa": 11.5,
           "mu": {
             "mu": 0.476,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.04
           },
-          "confidence": 0.429,
+          "confidence": 0.556,
           "geometry_source": "current_observation",
-          "intrinsic_source": "backend",
+          "intrinsic_source": "memory",
+          "mass_source": "shell_mass_integral",
           "mass_range_kg": [
             0.001,
-            0.011
+            0.009
           ],
           "materials_topk": [
             {
               "name": "wood",
-              "prob": 0.429,
+              "prob": 0.556,
               "density_kgm3": [
                 500.0,
                 800.0
               ],
               "thickness_cm": [
-                0.3,
-                1.5
+                2.0,
+                8.0
               ]
             },
             {
-              "name": "bamboo",
-              "prob": 0.19,
+              "name": "fiberglass",
+              "prob": 0.167,
               "density_kgm3": [
-                600.0,
-                900.0
+                1500.0,
+                2000.0
+              ],
+              "thickness_cm": [
+                0.5,
+                2.0
+              ]
+            },
+            {
+              "name": "carbon fiber",
+              "prob": 0.111,
+              "density_kgm3": [
+                1500.0,
+                1600.0
               ],
               "thickness_cm": [
                 0.3,
@@ -1044,50 +822,38 @@
               ]
             },
             {
-              "name": "hardwood",
-              "prob": 0.286,
+              "name": "aluminum",
+              "prob": 0.111,
               "density_kgm3": [
-                650.0,
-                900.0
+                2700.0,
+                2800.0
               ],
               "thickness_cm": [
-                0.3,
-                1.5
+                0.5,
+                2.0
               ]
             },
             {
               "name": "plastic",
-              "prob": 0.048,
+              "prob": 0.056,
               "density_kgm3": [
                 900.0,
                 1400.0
               ],
               "thickness_cm": [
-                0.2,
-                1.2
-              ]
-            },
-            {
-              "name": "metal",
-              "prob": 0.048,
-              "density_kgm3": [
-                2700.0,
-                8000.0
-              ],
-              "thickness_cm": [
-                0.1,
-                0.8
+                0.5,
+                3.0
               ]
             }
           ],
-          "caption": "Wooden honey dipper or stirring spoon",
-          "grounding_source": "backend",
+          "caption": "A wooden paddle or oar for watercraft propulsion.",
+          "grounding_source": "memory",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.994,
+              "margin": 4.995,
               "margin_unit": "kg",
-              "reason": "질량 0.006 vs 페이로드 5.0kg",
+              "reason": "질량 0.005 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -1097,13 +863,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.006,
+                  "value": 0.005,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.062,
+                  "value": 0.052,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -1111,9 +877,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.494,
+              "margin": 2.495,
               "margin_unit": "kg",
-              "reason": "질량 0.006 vs 페이로드 2.5kg",
+              "reason": "질량 0.005 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -1123,13 +889,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.006,
+                  "value": 0.005,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.062,
+                  "value": 0.052,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -1137,9 +903,9 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.494,
+              "margin": 0.495,
               "margin_unit": "kg",
-              "reason": "질량 0.006 vs 페이로드 0.5kg",
+              "reason": "질량 0.005 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
@@ -1149,7 +915,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.006,
+                  "value": 0.005,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -1239,93 +1005,94 @@
               3.9
             ]
           },
-          "material": "wood",
-          "density_kgm3": 700.0,
-          "mass_kg": 0.012,
-          "youngs_gpa": 12.0,
+          "material": "twigs",
+          "density_kgm3": 602.6,
+          "mass_kg": 0.01,
+          "youngs_gpa": 8.12,
           "mu": {
-            "mu": 0.477,
+            "mu": 0.429,
             "stage": 0,
-            "material": "wood",
+            "material": "twigs",
             "rms_mm": 0.08
           },
-          "confidence": 0.588,
+          "confidence": 0.263,
           "geometry_source": "current_observation",
-          "intrinsic_source": "backend",
+          "intrinsic_source": "memory",
+          "mass_source": "shell_mass_integral",
           "mass_range_kg": [
-            0.001,
-            0.023
+            0.003,
+            0.018
           ],
           "materials_topk": [
             {
               "name": "wood",
-              "prob": 0.588,
+              "prob": 0.237,
+              "density_kgm3": [
+                400.0,
+                800.0
+              ],
+              "thickness_cm": [
+                2.0,
+                5.0
+              ]
+            },
+            {
+              "name": "twigs",
+              "prob": 0.263,
+              "density_kgm3": [
+                300.0,
+                600.0
+              ],
+              "thickness_cm": [
+                1.0,
+                3.0
+              ]
+            },
+            {
+              "name": "straw",
+              "prob": 0.211,
+              "density_kgm3": [
+                100.0,
+                250.0
+              ],
+              "thickness_cm": [
+                0.5,
+                2.0
+              ]
+            },
+            {
+              "name": "fiber",
+              "prob": 0.158,
+              "density_kgm3": [
+                1200.0,
+                1500.0
+              ],
+              "thickness_cm": [
+                0.1,
+                0.5
+              ]
+            },
+            {
+              "name": "vine",
+              "prob": 0.132,
               "density_kgm3": [
                 500.0,
                 900.0
               ],
               "thickness_cm": [
                 0.5,
-                5.0
-              ]
-            },
-            {
-              "name": "rubber",
-              "prob": 0.118,
-              "density_kgm3": [
-                1100.0,
-                1300.0
-              ],
-              "thickness_cm": [
-                0.2,
-                2.0
-              ]
-            },
-            {
-              "name": "steel",
-              "prob": 0.059,
-              "density_kgm3": [
-                7700.0,
-                8050.0
-              ],
-              "thickness_cm": [
-                0.1,
-                1.0
-              ]
-            },
-            {
-              "name": "plastic",
-              "prob": 0.176,
-              "density_kgm3": [
-                900.0,
-                1400.0
-              ],
-              "thickness_cm": [
-                0.2,
-                3.0
-              ]
-            },
-            {
-              "name": "fiberglass",
-              "prob": 0.059,
-              "density_kgm3": [
-                1800.0,
-                2000.0
-              ],
-              "thickness_cm": [
-                0.2,
                 2.0
               ]
             }
           ],
-          "caption": "Wooden mallet or club-like tool",
-          "grounding_source": "backend",
+          "caption": "A rustic wooden broom made of natural materials",
+          "grounding_source": "memory",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.988,
+              "margin": 4.99,
               "margin_unit": "kg",
-              "reason": "질량 0.012 vs 페이로드 5.0kg",
+              "reason": "질량 0.01 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -1335,13 +1102,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.012,
+                  "value": 0.01,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.123,
+                  "value": 0.114,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -1349,9 +1116,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.488,
+              "margin": 2.49,
               "margin_unit": "kg",
-              "reason": "질량 0.012 vs 페이로드 2.5kg",
+              "reason": "질량 0.01 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -1361,13 +1128,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.012,
+                  "value": 0.01,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.123,
+                  "value": 0.114,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -1375,9 +1142,9 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.488,
+              "margin": 0.49,
               "margin_unit": "kg",
-              "reason": "질량 0.012 vs 페이로드 0.5kg",
+              "reason": "질량 0.01 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
@@ -1387,7 +1154,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.012,
+                  "value": 0.01,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -1440,64 +1207,65 @@
           "class": "tool_5_cutting_board",
           "source_name": "tool_5_cutting_board",
           "center_mm": [
-            470.6,
-            -209.7,
-            931.0
+            470.5,
+            208.2,
+            930.7
           ],
           "bbox_mm": [
-            220.1,
-            72.3,
-            11.7
+            220.3,
+            71.9,
+            12.4
           ],
           "geometry": {
-            "length_mm": 220.2,
+            "length_mm": 220.4,
             "diameter_mm": null,
             "extents_mm": [
-              220.2,
-              72.9,
-              11.6
+              220.4,
+              72.5,
+              12.3
             ],
-            "height_z_mm": 11.7,
+            "height_z_mm": 12.4,
             "cylinder_like": false,
-            "surface_rms_mm": 0.25,
-            "seal_patch_rms_mm": 0.019,
+            "surface_rms_mm": 0.27,
+            "seal_patch_rms_mm": 0.045,
             "footprint_mm": [
-              220.1,
-              72.3
+              220.3,
+              71.9
             ],
-            "height_mm": 11.7,
+            "height_mm": 12.4,
             "center": [
-              470.6,
-              -209.7,
-              931.0
+              470.5,
+              208.2,
+              930.7
             ],
             "aabb_size": [
-              220.1,
-              72.3,
-              11.7
+              220.3,
+              71.9,
+              12.4
             ]
           },
           "material": "wood",
-          "density_kgm3": 650.0,
-          "mass_kg": 0.054,
-          "youngs_gpa": 12.0,
+          "density_kgm3": 908.7,
+          "mass_kg": 0.073,
+          "youngs_gpa": 17.02,
           "mu": {
-            "mu": 0.481,
+            "mu": 0.482,
             "stage": 0,
             "material": "wood",
-            "rms_mm": 0.25
+            "rms_mm": 0.27
           },
-          "confidence": 0.417,
+          "confidence": 0.435,
           "geometry_source": "current_observation",
-          "intrinsic_source": "backend",
+          "intrinsic_source": "memory",
+          "mass_source": "shell_mass_integral",
           "mass_range_kg": [
-            0.019,
-            0.089
+            0.028,
+            0.118
           ],
           "materials_topk": [
             {
               "name": "wood",
-              "prob": 0.417,
+              "prob": 0.435,
               "density_kgm3": [
                 500.0,
                 800.0
@@ -1509,7 +1277,7 @@
             },
             {
               "name": "bamboo",
-              "prob": 0.208,
+              "prob": 0.391,
               "density_kgm3": [
                 600.0,
                 900.0
@@ -1520,66 +1288,66 @@
               ]
             },
             {
-              "name": "plywood",
-              "prob": 0.167,
-              "density_kgm3": [
-                450.0,
-                700.0
-              ],
-              "thickness_cm": [
-                1.0,
-                3.0
-              ]
-            },
-            {
-              "name": "hardwood",
-              "prob": 0.167,
-              "density_kgm3": [
-                650.0,
-                900.0
-              ],
-              "thickness_cm": [
-                1.0,
-                3.0
-              ]
-            },
-            {
               "name": "plastic",
-              "prob": 0.042,
+              "prob": 0.087,
               "density_kgm3": [
                 900.0,
                 1400.0
               ],
               "thickness_cm": [
+                0.8,
+                2.5
+              ]
+            },
+            {
+              "name": "glass",
+              "prob": 0.043,
+              "density_kgm3": [
+                2400.0,
+                2800.0
+              ],
+              "thickness_cm": [
+                0.5,
+                1.5
+              ]
+            },
+            {
+              "name": "stone",
+              "prob": 0.043,
+              "density_kgm3": [
+                2500.0,
+                3000.0
+              ],
+              "thickness_cm": [
                 1.0,
-                3.0
+                2.0
               ]
             }
           ],
-          "caption": "Small rectangular wooden block with rounded corners",
-          "grounding_source": "backend",
+          "caption": "Rectangular wooden cutting board with rounded corners",
+          "grounding_source": "memory",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.946,
+              "margin": 4.927,
               "margin_unit": "kg",
-              "reason": "질량 0.054 vs 페이로드 5.0kg",
+              "reason": "질량 0.073 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
-                  "value": 72.3,
+                  "value": 71.9,
                   "limit": 85.0,
                   "pass": true
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.054,
+                  "value": 0.073,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.551,
+                  "value": 0.743,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -1587,25 +1355,25 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.446,
+              "margin": 2.427,
               "margin_unit": "kg",
-              "reason": "질량 0.054 vs 페이로드 2.5kg",
+              "reason": "질량 0.073 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
-                  "value": 72.3,
+                  "value": 71.9,
                   "limit": 140.0,
                   "pass": true
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.054,
+                  "value": 0.073,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.551,
+                  "value": 0.743,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -1613,31 +1381,31 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.446,
+              "margin": 0.427,
               "margin_unit": "kg",
-              "reason": "질량 0.054 vs 페이로드 0.5kg",
+              "reason": "질량 0.073 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
-                  "value": 0.25,
+                  "value": 0.27,
                   "limit": 1.5,
                   "pass": true
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.054,
+                  "value": 0.073,
                   "limit": 0.5,
                   "pass": true
                 },
                 {
                   "rule": "seal_contact",
                   "value": 30.0,
-                  "limit": 72.9,
+                  "limit": 72.5,
                   "pass": true
                 },
                 {
                   "rule": "seal_patch",
-                  "value": 0.019,
+                  "value": 0.045,
                   "limit": 1.5,
                   "pass": true
                 }
@@ -1645,10 +1413,10 @@
             }
           },
           "reachability": {
-            "distance_mm": 515.2,
+            "distance_mm": 514.5,
             "reach_mm": 850,
             "reachable": true,
-            "margin_mm": 334.8
+            "margin_mm": 335.5
           },
           "predicates": {
             "top_exposed": {
@@ -1667,8 +1435,8 @@
               "type": "flat_face",
               "value": true,
               "pass": true,
-              "face_mm": 72.3,
-              "check": "rms_0.25<=2.0 & patch_0.019<=1.5 & face_72.3>=40.0"
+              "face_mm": 71.9,
+              "check": "rms_0.27<=2.0 & patch_0.045<=1.5 & face_71.9>=40.0"
             }
           }
         }
@@ -1678,7 +1446,7 @@
           "from": "obj_appliance_left_appliance_left",
           "to": "obj_card_card",
           "type": "near",
-          "gap_mm": 12.4
+          "gap_mm": 12.3
         },
         {
           "from": "obj_appliance_left_appliance_left",
@@ -1693,10 +1461,10 @@
           "gap_mm": 148.9
         },
         {
-          "from": "obj_tool_1_knife_tool_1_knife",
-          "to": "obj_tool_2_spatula_a_tool_2_spatula_a",
+          "from": "obj_appliance_left_appliance_left",
+          "to": "obj_tool_5_cutting_board_tool_5_cutting_board",
           "type": "near",
-          "gap_mm": 82.6
+          "gap_mm": 145.7
         },
         {
           "from": "obj_tool_2_spatula_a_tool_2_spatula_a",
@@ -1705,16 +1473,16 @@
           "gap_mm": 71.5
         },
         {
+          "from": "obj_tool_2_spatula_a_tool_2_spatula_a",
+          "to": "obj_tool_5_cutting_board_tool_5_cutting_board",
+          "type": "near",
+          "gap_mm": 51.9
+        },
+        {
           "from": "obj_tool_3_spatula_b_tool_3_spatula_b",
           "to": "obj_tool_4_spatula_c_tool_4_spatula_c",
           "type": "near",
           "gap_mm": 60.6
-        },
-        {
-          "from": "obj_tool_4_spatula_c_tool_4_spatula_c",
-          "to": "obj_tool_5_cutting_board_tool_5_cutting_board",
-          "type": "near",
-          "gap_mm": 42.7
         }
       ],
       "roles": {
@@ -1723,7 +1491,6 @@
         ],
         "container": "obj_appliance_left_appliance_left",
         "tool_candidates": [
-          "obj_tool_1_knife_tool_1_knife",
           "obj_tool_2_spatula_a_tool_2_spatula_a",
           "obj_tool_3_spatula_b_tool_3_spatula_b",
           "obj_tool_4_spatula_c_tool_4_spatula_c",
@@ -1762,22 +1529,13 @@
             "batch_groups": null
           },
           {
-            "node": "obj_tool_1_knife_tool_1_knife",
-            "feasible_ees": [
-              "2F",
-              "3F"
-            ],
-            "reach_margin_mm": 340.2,
-            "batch_groups": null
-          },
-          {
             "node": "obj_tool_5_cutting_board_tool_5_cutting_board",
             "feasible_ees": [
               "2F",
               "3F",
               "vac"
             ],
-            "reach_margin_mm": 334.8,
+            "reach_margin_mm": 335.5,
             "batch_groups": null
           }
         ]
@@ -1799,11 +1557,6 @@
               "status": "sat",
               "evidence": [
                 {
-                  "node": "obj_tool_1_knife_tool_1_knife",
-                  "reachable": true,
-                  "margin_mm": 340.2
-                },
-                {
                   "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
                   "reachable": true,
                   "margin_mm": 368.8
@@ -1821,7 +1574,7 @@
                 {
                   "node": "obj_tool_5_cutting_board_tool_5_cutting_board",
                   "reachable": true,
-                  "margin_mm": 334.8
+                  "margin_mm": 335.5
                 }
               ]
             },
@@ -1832,11 +1585,6 @@
               "eval_by": "m3",
               "status": "sat",
               "evidence": [
-                {
-                  "node": "obj_tool_1_knife_tool_1_knife",
-                  "top_exposed": true,
-                  "blockers": []
-                },
                 {
                   "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
                   "top_exposed": true,
@@ -1866,13 +1614,6 @@
               "eval_by": "m3",
               "status": "sat",
               "evidence": [
-                {
-                  "node": "obj_tool_1_knife_tool_1_knife",
-                  "feasible_ees": [
-                    "2F",
-                    "3F"
-                  ]
-                },
                 {
                   "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
                   "feasible_ees": [
@@ -1915,17 +1656,6 @@
               "status": "sat",
               "evidence": [
                 {
-                  "node": "obj_tool_1_knife_tool_1_knife",
-                  "graspable_on_support": true,
-                  "graspable_ees": [
-                    "2F",
-                    "3F",
-                    "vac"
-                  ],
-                  "supports": [],
-                  "height_mm": 0.8
-                },
-                {
                   "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
                   "graspable_on_support": true,
                   "graspable_ees": [
@@ -1967,7 +1697,7 @@
                     "vac"
                   ],
                   "supports": [],
-                  "height_mm": 11.7
+                  "height_mm": 12.4
                 }
               ]
             },
@@ -2013,32 +1743,27 @@
               "expr": "gap_accessible(?tool, obj_card_card)",
               "head": "gap_accessible",
               "eval_by": "m3",
-              "status": "unsat",
+              "status": "sat",
               "evidence": [
                 {
-                  "node": "obj_tool_1_knife_tool_1_knife",
-                  "gap_accessible": false,
-                  "margin_mm": -0.8
-                },
-                {
                   "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
-                  "gap_accessible": false,
-                  "margin_mm": -1.4
+                  "gap_accessible": true,
+                  "margin_mm": 16.5
                 },
                 {
                   "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
-                  "gap_accessible": false,
-                  "margin_mm": -2.4
+                  "gap_accessible": true,
+                  "margin_mm": 11.9
                 },
                 {
                   "node": "obj_tool_4_spatula_c_tool_4_spatula_c",
                   "gap_accessible": false,
-                  "margin_mm": -3.9
+                  "margin_mm": -2.8
                 },
                 {
                   "node": "obj_tool_5_cutting_board_tool_5_cutting_board",
                   "gap_accessible": false,
-                  "margin_mm": -22.9
+                  "margin_mm": -23.7
                 }
               ]
             },
@@ -2185,143 +1910,6 @@
         {
           "subgoal_id": "SG1",
           "queried_by": "SG1_d1_p0",
-          "node_id": "obj_tool_1_knife_tool_1_knife",
-          "geometry": {
-            "length_mm": 206.8,
-            "diameter_mm": null,
-            "extents_mm": [
-              206.8,
-              11.8,
-              0.5
-            ],
-            "height_z_mm": 0.8,
-            "cylinder_like": false,
-            "surface_rms_mm": 0.03,
-            "seal_patch_rms_mm": 99.9,
-            "footprint_mm": [
-              206.8,
-              11.2
-            ],
-            "height_mm": 0.8,
-            "center": [
-              465.2,
-              208.6,
-              921.7
-            ],
-            "aabb_size": [
-              206.8,
-              11.2,
-              0.8
-            ]
-          },
-          "material": "steel",
-          "density_kgm3": 6250.0,
-          "mass_kg": 0.009,
-          "youngs_gpa": 164.19,
-          "mu": {
-            "mu": 0.428,
-            "stage": 0,
-            "material": "steel",
-            "rms_mm": 0.03
-          },
-          "confidence": 0.381,
-          "caption": "Long narrow metal tool or blade",
-          "ee": {
-            "2F": {
-              "feasible": true,
-              "margin": 4.991,
-              "margin_unit": "kg",
-              "reason": "질량 0.009 vs 페이로드 5.0kg",
-              "checks": [
-                {
-                  "rule": "dim_lt_stroke",
-                  "value": 11.2,
-                  "limit": 85.0,
-                  "pass": true
-                },
-                {
-                  "rule": "mass_lt_payload",
-                  "value": 0.009,
-                  "limit": 5.0,
-                  "pass": true
-                },
-                {
-                  "rule": "grip_slip",
-                  "value": 0.103,
-                  "limit": 235.0,
-                  "pass": true
-                }
-              ]
-            },
-            "3F": {
-              "feasible": true,
-              "margin": 2.491,
-              "margin_unit": "kg",
-              "reason": "질량 0.009 vs 페이로드 2.5kg",
-              "checks": [
-                {
-                  "rule": "dim_lt_stroke",
-                  "value": 11.2,
-                  "limit": 140.0,
-                  "pass": true
-                },
-                {
-                  "rule": "mass_lt_payload",
-                  "value": 0.009,
-                  "limit": 2.5,
-                  "pass": true
-                },
-                {
-                  "rule": "grip_slip",
-                  "value": 0.103,
-                  "limit": 60.0,
-                  "pass": true
-                }
-              ]
-            },
-            "vac": {
-              "feasible": false,
-              "margin": -98.4,
-              "margin_unit": "mm",
-              "reason": "접촉면 폭 12 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
-              "checks": [
-                {
-                  "rule": "flatness",
-                  "value": 0.03,
-                  "limit": 1.5,
-                  "pass": true
-                },
-                {
-                  "rule": "mass_lt_payload",
-                  "value": 0.009,
-                  "limit": 0.5,
-                  "pass": true
-                },
-                {
-                  "rule": "seal_contact",
-                  "value": 30.0,
-                  "limit": 11.8,
-                  "pass": false
-                },
-                {
-                  "rule": "seal_patch",
-                  "value": 99.9,
-                  "limit": 1.5,
-                  "pass": false
-                }
-              ]
-            }
-          },
-          "reachability": {
-            "distance_mm": 509.8,
-            "reach_mm": 850,
-            "reachable": true,
-            "margin_mm": 340.2
-          }
-        },
-        {
-          "subgoal_id": "SG1",
-          "queried_by": "SG1_d1_p0",
           "node_id": "obj_tool_2_spatula_a_tool_2_spatula_a",
           "geometry": {
             "length_mm": 134.1,
@@ -2352,17 +1940,17 @@
             ]
           },
           "material": "wood",
-          "density_kgm3": 650.0,
+          "density_kgm3": 700.0,
           "mass_kg": 0.002,
-          "youngs_gpa": 12.0,
+          "youngs_gpa": 12.5,
           "mu": {
             "mu": 0.476,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.03
           },
-          "confidence": 0.474,
-          "caption": "Wooden kitchen spatula or turner",
+          "confidence": 0.667,
+          "caption": "A rustic wooden paddle or shovel handle",
           "ee": {
             "2F": {
               "feasible": true,
@@ -2489,23 +2077,23 @@
             ]
           },
           "material": "wood",
-          "density_kgm3": 952.4,
-          "mass_kg": 0.006,
-          "youngs_gpa": 18.79,
+          "density_kgm3": 650.0,
+          "mass_kg": 0.005,
+          "youngs_gpa": 11.5,
           "mu": {
             "mu": 0.476,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.04
           },
-          "confidence": 0.429,
-          "caption": "Wooden honey dipper or stirring spoon",
+          "confidence": 0.556,
+          "caption": "A wooden paddle or oar for watercraft propulsion.",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.994,
+              "margin": 4.995,
               "margin_unit": "kg",
-              "reason": "질량 0.006 vs 페이로드 5.0kg",
+              "reason": "질량 0.005 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -2515,13 +2103,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.006,
+                  "value": 0.005,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.062,
+                  "value": 0.052,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -2529,9 +2117,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.494,
+              "margin": 2.495,
               "margin_unit": "kg",
-              "reason": "질량 0.006 vs 페이로드 2.5kg",
+              "reason": "질량 0.005 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -2541,13 +2129,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.006,
+                  "value": 0.005,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.062,
+                  "value": 0.052,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -2555,9 +2143,9 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.494,
+              "margin": 0.495,
               "margin_unit": "kg",
-              "reason": "질량 0.006 vs 페이로드 0.5kg",
+              "reason": "질량 0.005 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
@@ -2567,7 +2155,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.006,
+                  "value": 0.005,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -2625,24 +2213,24 @@
               3.9
             ]
           },
-          "material": "wood",
-          "density_kgm3": 700.0,
-          "mass_kg": 0.012,
-          "youngs_gpa": 12.0,
+          "material": "twigs",
+          "density_kgm3": 602.6,
+          "mass_kg": 0.01,
+          "youngs_gpa": 8.12,
           "mu": {
-            "mu": 0.477,
+            "mu": 0.429,
             "stage": 0,
-            "material": "wood",
+            "material": "twigs",
             "rms_mm": 0.08
           },
-          "confidence": 0.588,
-          "caption": "Wooden mallet or club-like tool",
+          "confidence": 0.263,
+          "caption": "A rustic wooden broom made of natural materials",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.988,
+              "margin": 4.99,
               "margin_unit": "kg",
-              "reason": "질량 0.012 vs 페이로드 5.0kg",
+              "reason": "질량 0.01 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -2652,13 +2240,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.012,
+                  "value": 0.01,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.123,
+                  "value": 0.114,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -2666,9 +2254,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.488,
+              "margin": 2.49,
               "margin_unit": "kg",
-              "reason": "질량 0.012 vs 페이로드 2.5kg",
+              "reason": "질량 0.01 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -2678,13 +2266,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.012,
+                  "value": 0.01,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.123,
+                  "value": 0.114,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -2692,9 +2280,9 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.488,
+              "margin": 0.49,
               "margin_unit": "kg",
-              "reason": "질량 0.012 vs 페이로드 0.5kg",
+              "reason": "질량 0.01 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
@@ -2704,7 +2292,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.012,
+                  "value": 0.01,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -2735,67 +2323,67 @@
           "queried_by": "SG1_d1_p0",
           "node_id": "obj_tool_5_cutting_board_tool_5_cutting_board",
           "geometry": {
-            "length_mm": 220.2,
+            "length_mm": 220.4,
             "diameter_mm": null,
             "extents_mm": [
-              220.2,
-              72.9,
-              11.6
+              220.4,
+              72.5,
+              12.3
             ],
-            "height_z_mm": 11.7,
+            "height_z_mm": 12.4,
             "cylinder_like": false,
-            "surface_rms_mm": 0.25,
-            "seal_patch_rms_mm": 0.019,
+            "surface_rms_mm": 0.27,
+            "seal_patch_rms_mm": 0.045,
             "footprint_mm": [
-              220.1,
-              72.3
+              220.3,
+              71.9
             ],
-            "height_mm": 11.7,
+            "height_mm": 12.4,
             "center": [
-              470.6,
-              -209.7,
-              931.0
+              470.5,
+              208.2,
+              930.7
             ],
             "aabb_size": [
-              220.1,
-              72.3,
-              11.7
+              220.3,
+              71.9,
+              12.4
             ]
           },
           "material": "wood",
-          "density_kgm3": 650.0,
-          "mass_kg": 0.054,
-          "youngs_gpa": 12.0,
+          "density_kgm3": 908.7,
+          "mass_kg": 0.073,
+          "youngs_gpa": 17.02,
           "mu": {
-            "mu": 0.481,
+            "mu": 0.482,
             "stage": 0,
             "material": "wood",
-            "rms_mm": 0.25
+            "rms_mm": 0.27
           },
-          "confidence": 0.417,
-          "caption": "Small rectangular wooden block with rounded corners",
+          "confidence": 0.435,
+          "caption": "Rectangular wooden cutting board with rounded corners",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.946,
+              "margin": 4.927,
               "margin_unit": "kg",
-              "reason": "질량 0.054 vs 페이로드 5.0kg",
+              "reason": "질량 0.073 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
-                  "value": 72.3,
+                  "value": 71.9,
                   "limit": 85.0,
                   "pass": true
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.054,
+                  "value": 0.073,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.551,
+                  "value": 0.743,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -2803,25 +2391,25 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.446,
+              "margin": 2.427,
               "margin_unit": "kg",
-              "reason": "질량 0.054 vs 페이로드 2.5kg",
+              "reason": "질량 0.073 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
-                  "value": 72.3,
+                  "value": 71.9,
                   "limit": 140.0,
                   "pass": true
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.054,
+                  "value": 0.073,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.551,
+                  "value": 0.743,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -2829,31 +2417,31 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.446,
+              "margin": 0.427,
               "margin_unit": "kg",
-              "reason": "질량 0.054 vs 페이로드 0.5kg",
+              "reason": "질량 0.073 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
-                  "value": 0.25,
+                  "value": 0.27,
                   "limit": 1.5,
                   "pass": true
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.054,
+                  "value": 0.073,
                   "limit": 0.5,
                   "pass": true
                 },
                 {
                   "rule": "seal_contact",
                   "value": 30.0,
-                  "limit": 72.9,
+                  "limit": 72.5,
                   "pass": true
                 },
                 {
                   "rule": "seal_patch",
-                  "value": 0.019,
+                  "value": 0.045,
                   "limit": 1.5,
                   "pass": true
                 }
@@ -2861,20 +2449,11 @@
             }
           },
           "reachability": {
-            "distance_mm": 515.2,
+            "distance_mm": 514.5,
             "reach_mm": 850,
             "reachable": true,
-            "margin_mm": 334.8
+            "margin_mm": 335.5
           }
-        },
-        {
-          "subgoal_id": "SG1",
-          "queried_by": "SG1_d1_p1",
-          "node_id": "obj_tool_1_knife_tool_1_knife",
-          "type": "top_exposed",
-          "value": true,
-          "pass": true,
-          "blockers": []
         },
         {
           "subgoal_id": "SG1",
@@ -2915,143 +2494,6 @@
         {
           "subgoal_id": "SG1",
           "queried_by": "SG1_d1_p2",
-          "node_id": "obj_tool_1_knife_tool_1_knife",
-          "geometry": {
-            "length_mm": 206.8,
-            "diameter_mm": null,
-            "extents_mm": [
-              206.8,
-              11.8,
-              0.5
-            ],
-            "height_z_mm": 0.8,
-            "cylinder_like": false,
-            "surface_rms_mm": 0.03,
-            "seal_patch_rms_mm": 99.9,
-            "footprint_mm": [
-              206.8,
-              11.2
-            ],
-            "height_mm": 0.8,
-            "center": [
-              465.2,
-              208.6,
-              921.7
-            ],
-            "aabb_size": [
-              206.8,
-              11.2,
-              0.8
-            ]
-          },
-          "material": "steel",
-          "density_kgm3": 6250.0,
-          "mass_kg": 0.009,
-          "youngs_gpa": 164.19,
-          "mu": {
-            "mu": 0.428,
-            "stage": 0,
-            "material": "steel",
-            "rms_mm": 0.03
-          },
-          "confidence": 0.381,
-          "caption": "Long narrow metal tool or blade",
-          "ee": {
-            "2F": {
-              "feasible": true,
-              "margin": 4.991,
-              "margin_unit": "kg",
-              "reason": "질량 0.009 vs 페이로드 5.0kg",
-              "checks": [
-                {
-                  "rule": "dim_lt_stroke",
-                  "value": 11.2,
-                  "limit": 85.0,
-                  "pass": true
-                },
-                {
-                  "rule": "mass_lt_payload",
-                  "value": 0.009,
-                  "limit": 5.0,
-                  "pass": true
-                },
-                {
-                  "rule": "grip_slip",
-                  "value": 0.103,
-                  "limit": 235.0,
-                  "pass": true
-                }
-              ]
-            },
-            "3F": {
-              "feasible": true,
-              "margin": 2.491,
-              "margin_unit": "kg",
-              "reason": "질량 0.009 vs 페이로드 2.5kg",
-              "checks": [
-                {
-                  "rule": "dim_lt_stroke",
-                  "value": 11.2,
-                  "limit": 140.0,
-                  "pass": true
-                },
-                {
-                  "rule": "mass_lt_payload",
-                  "value": 0.009,
-                  "limit": 2.5,
-                  "pass": true
-                },
-                {
-                  "rule": "grip_slip",
-                  "value": 0.103,
-                  "limit": 60.0,
-                  "pass": true
-                }
-              ]
-            },
-            "vac": {
-              "feasible": false,
-              "margin": -98.4,
-              "margin_unit": "mm",
-              "reason": "접촉면 폭 12 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
-              "checks": [
-                {
-                  "rule": "flatness",
-                  "value": 0.03,
-                  "limit": 1.5,
-                  "pass": true
-                },
-                {
-                  "rule": "mass_lt_payload",
-                  "value": 0.009,
-                  "limit": 0.5,
-                  "pass": true
-                },
-                {
-                  "rule": "seal_contact",
-                  "value": 30.0,
-                  "limit": 11.8,
-                  "pass": false
-                },
-                {
-                  "rule": "seal_patch",
-                  "value": 99.9,
-                  "limit": 1.5,
-                  "pass": false
-                }
-              ]
-            }
-          },
-          "reachability": {
-            "distance_mm": 509.8,
-            "reach_mm": 850,
-            "reachable": true,
-            "margin_mm": 340.2
-          }
-        },
-        {
-          "subgoal_id": "SG1",
-          "queried_by": "SG1_d1_p2",
           "node_id": "obj_tool_2_spatula_a_tool_2_spatula_a",
           "geometry": {
             "length_mm": 134.1,
@@ -3082,17 +2524,17 @@
             ]
           },
           "material": "wood",
-          "density_kgm3": 650.0,
+          "density_kgm3": 700.0,
           "mass_kg": 0.002,
-          "youngs_gpa": 12.0,
+          "youngs_gpa": 12.5,
           "mu": {
             "mu": 0.476,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.03
           },
-          "confidence": 0.474,
-          "caption": "Wooden kitchen spatula or turner",
+          "confidence": 0.667,
+          "caption": "A rustic wooden paddle or shovel handle",
           "ee": {
             "2F": {
               "feasible": true,
@@ -3219,23 +2661,23 @@
             ]
           },
           "material": "wood",
-          "density_kgm3": 952.4,
-          "mass_kg": 0.006,
-          "youngs_gpa": 18.79,
+          "density_kgm3": 650.0,
+          "mass_kg": 0.005,
+          "youngs_gpa": 11.5,
           "mu": {
             "mu": 0.476,
             "stage": 0,
             "material": "wood",
             "rms_mm": 0.04
           },
-          "confidence": 0.429,
-          "caption": "Wooden honey dipper or stirring spoon",
+          "confidence": 0.556,
+          "caption": "A wooden paddle or oar for watercraft propulsion.",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.994,
+              "margin": 4.995,
               "margin_unit": "kg",
-              "reason": "질량 0.006 vs 페이로드 5.0kg",
+              "reason": "질량 0.005 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -3245,13 +2687,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.006,
+                  "value": 0.005,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.062,
+                  "value": 0.052,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -3259,9 +2701,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.494,
+              "margin": 2.495,
               "margin_unit": "kg",
-              "reason": "질량 0.006 vs 페이로드 2.5kg",
+              "reason": "질량 0.005 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -3271,13 +2713,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.006,
+                  "value": 0.005,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.062,
+                  "value": 0.052,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -3285,9 +2727,9 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.494,
+              "margin": 0.495,
               "margin_unit": "kg",
-              "reason": "질량 0.006 vs 페이로드 0.5kg",
+              "reason": "질량 0.005 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
@@ -3297,7 +2739,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.006,
+                  "value": 0.005,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -3355,24 +2797,24 @@
               3.9
             ]
           },
-          "material": "wood",
-          "density_kgm3": 700.0,
-          "mass_kg": 0.012,
-          "youngs_gpa": 12.0,
+          "material": "twigs",
+          "density_kgm3": 602.6,
+          "mass_kg": 0.01,
+          "youngs_gpa": 8.12,
           "mu": {
-            "mu": 0.477,
+            "mu": 0.429,
             "stage": 0,
-            "material": "wood",
+            "material": "twigs",
             "rms_mm": 0.08
           },
-          "confidence": 0.588,
-          "caption": "Wooden mallet or club-like tool",
+          "confidence": 0.263,
+          "caption": "A rustic wooden broom made of natural materials",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.988,
+              "margin": 4.99,
               "margin_unit": "kg",
-              "reason": "질량 0.012 vs 페이로드 5.0kg",
+              "reason": "질량 0.01 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -3382,13 +2824,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.012,
+                  "value": 0.01,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.123,
+                  "value": 0.114,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -3396,9 +2838,9 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.488,
+              "margin": 2.49,
               "margin_unit": "kg",
-              "reason": "질량 0.012 vs 페이로드 2.5kg",
+              "reason": "질량 0.01 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
@@ -3408,13 +2850,13 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.012,
+                  "value": 0.01,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.123,
+                  "value": 0.114,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -3422,9 +2864,9 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.488,
+              "margin": 0.49,
               "margin_unit": "kg",
-              "reason": "질량 0.012 vs 페이로드 0.5kg",
+              "reason": "질량 0.01 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
@@ -3434,7 +2876,7 @@
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.012,
+                  "value": 0.01,
                   "limit": 0.5,
                   "pass": true
                 },
@@ -3465,67 +2907,67 @@
           "queried_by": "SG1_d1_p2",
           "node_id": "obj_tool_5_cutting_board_tool_5_cutting_board",
           "geometry": {
-            "length_mm": 220.2,
+            "length_mm": 220.4,
             "diameter_mm": null,
             "extents_mm": [
-              220.2,
-              72.9,
-              11.6
+              220.4,
+              72.5,
+              12.3
             ],
-            "height_z_mm": 11.7,
+            "height_z_mm": 12.4,
             "cylinder_like": false,
-            "surface_rms_mm": 0.25,
-            "seal_patch_rms_mm": 0.019,
+            "surface_rms_mm": 0.27,
+            "seal_patch_rms_mm": 0.045,
             "footprint_mm": [
-              220.1,
-              72.3
+              220.3,
+              71.9
             ],
-            "height_mm": 11.7,
+            "height_mm": 12.4,
             "center": [
-              470.6,
-              -209.7,
-              931.0
+              470.5,
+              208.2,
+              930.7
             ],
             "aabb_size": [
-              220.1,
-              72.3,
-              11.7
+              220.3,
+              71.9,
+              12.4
             ]
           },
           "material": "wood",
-          "density_kgm3": 650.0,
-          "mass_kg": 0.054,
-          "youngs_gpa": 12.0,
+          "density_kgm3": 908.7,
+          "mass_kg": 0.073,
+          "youngs_gpa": 17.02,
           "mu": {
-            "mu": 0.481,
+            "mu": 0.482,
             "stage": 0,
             "material": "wood",
-            "rms_mm": 0.25
+            "rms_mm": 0.27
           },
-          "confidence": 0.417,
-          "caption": "Small rectangular wooden block with rounded corners",
+          "confidence": 0.435,
+          "caption": "Rectangular wooden cutting board with rounded corners",
           "ee": {
             "2F": {
               "feasible": true,
-              "margin": 4.946,
+              "margin": 4.927,
               "margin_unit": "kg",
-              "reason": "질량 0.054 vs 페이로드 5.0kg",
+              "reason": "질량 0.073 vs 페이로드 5.0kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
-                  "value": 72.3,
+                  "value": 71.9,
                   "limit": 85.0,
                   "pass": true
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.054,
+                  "value": 0.073,
                   "limit": 5.0,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.551,
+                  "value": 0.743,
                   "limit": 235.0,
                   "pass": true
                 }
@@ -3533,25 +2975,25 @@
             },
             "3F": {
               "feasible": true,
-              "margin": 2.446,
+              "margin": 2.427,
               "margin_unit": "kg",
-              "reason": "질량 0.054 vs 페이로드 2.5kg",
+              "reason": "질량 0.073 vs 페이로드 2.5kg",
               "checks": [
                 {
                   "rule": "dim_lt_stroke",
-                  "value": 72.3,
+                  "value": 71.9,
                   "limit": 140.0,
                   "pass": true
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.054,
+                  "value": 0.073,
                   "limit": 2.5,
                   "pass": true
                 },
                 {
                   "rule": "grip_slip",
-                  "value": 0.551,
+                  "value": 0.743,
                   "limit": 60.0,
                   "pass": true
                 }
@@ -3559,31 +3001,31 @@
             },
             "vac": {
               "feasible": true,
-              "margin": 0.446,
+              "margin": 0.427,
               "margin_unit": "kg",
-              "reason": "질량 0.054 vs 페이로드 0.5kg",
+              "reason": "질량 0.073 vs 페이로드 0.5kg",
               "checks": [
                 {
                   "rule": "flatness",
-                  "value": 0.25,
+                  "value": 0.27,
                   "limit": 1.5,
                   "pass": true
                 },
                 {
                   "rule": "mass_lt_payload",
-                  "value": 0.054,
+                  "value": 0.073,
                   "limit": 0.5,
                   "pass": true
                 },
                 {
                   "rule": "seal_contact",
                   "value": 30.0,
-                  "limit": 72.9,
+                  "limit": 72.5,
                   "pass": true
                 },
                 {
                   "rule": "seal_patch",
-                  "value": 0.019,
+                  "value": 0.045,
                   "limit": 1.5,
                   "pass": true
                 }
@@ -3591,52 +3033,10 @@
             }
           },
           "reachability": {
-            "distance_mm": 515.2,
+            "distance_mm": 514.5,
             "reach_mm": 850,
             "reachable": true,
-            "margin_mm": 334.8
-          }
-        },
-        {
-          "subgoal_id": "SG1",
-          "queried_by": "SG1_d1_p3",
-          "node_id": "obj_tool_1_knife_tool_1_knife",
-          "type": "graspable_on_support",
-          "value": true,
-          "pass": true,
-          "graspable_ees": [
-            "2F",
-            "3F",
-            "vac"
-          ],
-          "per_ee": {
-            "2F": {
-              "type": "graspable_on_support",
-              "ee_id": "2F",
-              "supports": [],
-              "height_mm": 0.8,
-              "value": true,
-              "pass": true,
-              "check": "no_support_node"
-            },
-            "3F": {
-              "type": "graspable_on_support",
-              "ee_id": "3F",
-              "supports": [],
-              "height_mm": 0.8,
-              "value": true,
-              "pass": true,
-              "check": "no_support_node"
-            },
-            "vac": {
-              "type": "graspable_on_support",
-              "ee_id": "vac",
-              "supports": [],
-              "height_mm": 0.8,
-              "value": true,
-              "pass": true,
-              "check": "no_support_node"
-            }
+            "margin_mm": 335.5
           }
         },
         {
@@ -3782,7 +3182,7 @@
               "type": "graspable_on_support",
               "ee_id": "2F",
               "supports": [],
-              "height_mm": 11.7,
+              "height_mm": 12.4,
               "value": true,
               "pass": true,
               "check": "no_support_node"
@@ -3791,7 +3191,7 @@
               "type": "graspable_on_support",
               "ee_id": "3F",
               "supports": [],
-              "height_mm": 11.7,
+              "height_mm": 12.4,
               "value": true,
               "pass": true,
               "check": "no_support_node"
@@ -3800,42 +3200,12 @@
               "type": "graspable_on_support",
               "ee_id": "vac",
               "supports": [],
-              "height_mm": 11.7,
+              "height_mm": 12.4,
               "value": true,
               "pass": true,
               "check": "no_support_node"
             }
           }
-        },
-        {
-          "subgoal_id": "SG1",
-          "queried_by": "SG1_d2_p1",
-          "from": "obj_tool_1_knife_tool_1_knife",
-          "to": "obj_card_card",
-          "type": "gap_accessible",
-          "value_mm": -0.8,
-          "check": "thickness<gap & contact<=target & reach>=depth",
-          "checks": [
-            {
-              "rule": "thickness_lt_gap",
-              "value_mm": 0.8,
-              "limit_mm": 0.0,
-              "pass": false
-            },
-            {
-              "rule": "contact_le_target",
-              "value_mm": 11.2,
-              "limit_mm": 49.4,
-              "pass": true
-            },
-            {
-              "rule": "reach_ge_depth",
-              "value_mm": 206.8,
-              "limit_mm": 0.0,
-              "pass": true
-            }
-          ],
-          "pass": false
         },
         {
           "subgoal_id": "SG1",
@@ -3843,19 +3213,19 @@
           "from": "obj_tool_2_spatula_a_tool_2_spatula_a",
           "to": "obj_card_card",
           "type": "gap_accessible",
-          "value_mm": -1.4,
+          "value_mm": 16.5,
           "check": "thickness<gap & contact<=target & reach>=depth",
           "checks": [
             {
               "rule": "thickness_lt_gap",
               "value_mm": 1.4,
-              "limit_mm": 0.0,
-              "pass": false
+              "limit_mm": 52.0,
+              "pass": true
             },
             {
               "rule": "contact_le_target",
               "value_mm": 31.7,
-              "limit_mm": 49.4,
+              "limit_mm": 48.2,
               "pass": true
             },
             {
@@ -3865,7 +3235,7 @@
               "pass": true
             }
           ],
-          "pass": false
+          "pass": true
         },
         {
           "subgoal_id": "SG1",
@@ -3873,19 +3243,19 @@
           "from": "obj_tool_3_spatula_b_tool_3_spatula_b",
           "to": "obj_card_card",
           "type": "gap_accessible",
-          "value_mm": -2.4,
+          "value_mm": 11.9,
           "check": "thickness<gap & contact<=target & reach>=depth",
           "checks": [
             {
               "rule": "thickness_lt_gap",
               "value_mm": 2.4,
-              "limit_mm": 0.0,
-              "pass": false
+              "limit_mm": 52.0,
+              "pass": true
             },
             {
               "rule": "contact_le_target",
               "value_mm": 36.3,
-              "limit_mm": 49.4,
+              "limit_mm": 48.2,
               "pass": true
             },
             {
@@ -3895,7 +3265,7 @@
               "pass": true
             }
           ],
-          "pass": false
+          "pass": true
         },
         {
           "subgoal_id": "SG1",
@@ -3903,19 +3273,19 @@
           "from": "obj_tool_4_spatula_c_tool_4_spatula_c",
           "to": "obj_card_card",
           "type": "gap_accessible",
-          "value_mm": -3.9,
+          "value_mm": -2.8,
           "check": "thickness<gap & contact<=target & reach>=depth",
           "checks": [
             {
               "rule": "thickness_lt_gap",
               "value_mm": 3.9,
-              "limit_mm": 0.0,
-              "pass": false
+              "limit_mm": 52.0,
+              "pass": true
             },
             {
               "rule": "contact_le_target",
               "value_mm": 51.0,
-              "limit_mm": 49.4,
+              "limit_mm": 48.2,
               "pass": false
             },
             {
@@ -3933,24 +3303,24 @@
           "from": "obj_tool_5_cutting_board_tool_5_cutting_board",
           "to": "obj_card_card",
           "type": "gap_accessible",
-          "value_mm": -22.9,
+          "value_mm": -23.7,
           "check": "thickness<gap & contact<=target & reach>=depth",
           "checks": [
             {
               "rule": "thickness_lt_gap",
-              "value_mm": 11.7,
-              "limit_mm": 0.0,
-              "pass": false
+              "value_mm": 12.4,
+              "limit_mm": 52.0,
+              "pass": true
             },
             {
               "rule": "contact_le_target",
-              "value_mm": 72.3,
-              "limit_mm": 49.4,
+              "value_mm": 71.9,
+              "limit_mm": 48.2,
               "pass": false
             },
             {
               "rule": "reach_ge_depth",
-              "value_mm": 220.1,
+              "value_mm": 220.3,
               "limit_mm": 0.0,
               "pass": true
             }

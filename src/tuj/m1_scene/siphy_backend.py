@@ -205,6 +205,24 @@ class SiPhyBackend(PropertyBackend):
         # 최신 OpenAI reasoning 계열(gpt-5.x)도 추론 토큰이 completion 예산을 잠식하므로
         # 500 이면 finish_reason=length 로 빈 응답이 온다. 양쪽 모두 넉넉히 준다.
         self._max_tokens = 4096
+        # Per-call / cumulative VLM usage for M0/M1 retrieval logs.
+        self.last_usage: dict | None = None
+        self.usage = {
+            "calls": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+        }
+
+    @staticmethod
+    def _usage_from_response(usage) -> dict | None:
+        if usage is None:
+            return None
+        return {
+            "input_tokens": getattr(usage, "prompt_tokens", None) or 0,
+            "output_tokens": getattr(usage, "completion_tokens", None) or 0,
+            "total_tokens": getattr(usage, "total_tokens", None) or 0,
+        }
 
     @staticmethod
     def _make_client(api_key, repo_root, model="gpt-4o-mini"):
@@ -278,8 +296,19 @@ class SiPhyBackend(PropertyBackend):
                 if self._supports_seed:              # Gemini 는 seed 미지원 → 생략
                     kwargs["seed"] = self.seed + t
                 r = self.client.chat.completions.create(**kwargs)
-                if self.verbose and getattr(r, "usage", None):
-                    print(f"  [siphy] tokens: {r.usage.total_tokens}")
+                usage = self._usage_from_response(getattr(r, "usage", None))
+                self.last_usage = usage
+                if usage:
+                    self.usage["calls"] += 1
+                    self.usage["input_tokens"] += int(usage["input_tokens"])
+                    self.usage["output_tokens"] += int(usage["output_tokens"])
+                    self.usage["total_tokens"] += int(usage["total_tokens"])
+                if self.verbose and usage:
+                    print(
+                        f"  [siphy] tokens: total={usage['total_tokens']} "
+                        f"(prompt={usage['input_tokens']} "
+                        f"completion={usage['output_tokens']})"
+                    )
                 choice = r.choices[0]
                 text = choice.message.content or ""
                 if getattr(choice, "finish_reason", None) == "length":
