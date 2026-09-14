@@ -199,8 +199,31 @@ def test_runner_logs_skipped_m4_and_rejects_foreign_m5_plan(tmp_path, monkeypatc
     runner.run(args, pipeline)
     report = read(tmp_path / "without_planner_result.json")
     assert report["m5_status"] == "SUCCESS"
-    assert report["evaluation_scope"] == "partial" and report["success"] is None
+    assert report["evaluation_scope"] == "partial"
+    assert report["m5_execution_success"] is None
+    assert report["task_success"] is None
+    assert "success" not in report
     assert "m5_failure_detail" not in report
+
+    args.m5_args = []
+    runner.run(args, pipeline)
+    report = read(tmp_path / "without_planner_result.json")
+    assert report["m5_execution_success"] is True
+    assert report["task_success"] is None
+
+    def failed_m5(task, out, args):
+        (out / "m5" / "m5_summary.json").write_text(
+            '{"status": "FAILED", "detail": "motion rejected"}', encoding="utf-8"
+        )
+        raise RuntimeError("motion rejected")
+
+    monkeypatch.setattr(pipeline, "stage_m5", failed_m5)
+    with pytest.raises(RuntimeError, match="motion rejected"):
+        runner.run(args, pipeline)
+    report = read(tmp_path / "without_planner_result.json")
+    assert report["m5_execution_success"] is False
+    assert report["task_success"] is None
+
     (tmp_path / "m4.json").write_text("{}", encoding="utf-8")
     with pytest.raises(ValueError, match="unchanged independent plan"):
         runner.run(args, pipeline)
@@ -226,7 +249,9 @@ def test_runner_rejects_m2_from_obsolete_instruction(tmp_path, monkeypatch):
             str(tmp_path),
         ]
     )
-    monkeypatch.setattr(pipeline, "stage_gk", lambda *a: pytest.fail("stale M2 reached G_k"))
+    monkeypatch.setattr(
+        pipeline, "stage_gk", lambda *a: pytest.fail("stale M2 reached G_k")
+    )
     with pytest.raises(ValueError, match="M2 task instruction mismatch for c4_2"):
         runner.run(args, pipeline)
     manifest = read(tmp_path / "ablation_manifest.json")

@@ -47,7 +47,8 @@ python scripts/run.py c1_1 --seed 0 --planner-mode without-planner --provider op
 실제 keyframe 생성에는 선택한 provider의 API 키를 환경변수로 제공한다. 키는
 명령문이나 설정 파일에 저장하지 않는다. `--m5-args`로 M5의 세부 옵션을 전달할
 수 있으며 대조군에도 동일 옵션을 적용한다. `--stop-after-subgoal` 및
-`--stop-after-pick` 실행은 `evaluation_scope=partial`, `success=null`로 기록한다.
+`--stop-after-pick` 실행은 `evaluation_scope=partial`,
+`m5_execution_success=null`로 기록한다.
 
 ## 산출물과 비교
 
@@ -59,11 +60,13 @@ python scripts/run.py c1_1 --seed 0 --planner-mode without-planner --provider op
 M5 산출물을 잘못 재사용하지 않게 한다.
 
 `without_planner_result.json`은 method, task, seed, plan_status, m5_status,
-success와 N_EE(EE 교체), N_tool(tool pick), motion_cost, execution_cost,
+`m5_execution_success`와 N_EE(EE 교체), N_tool(tool pick), motion_cost, execution_cost,
 planning_time_ms(공동 탐색 생략으로 0), assignment_time_ms(독립 선택 소요)를 담는다.
 N_EE는 공통 M4 비용 정의상 처음 bare 상태에서 EE를 장착하는 횟수는 제외한다.
 별도 결과 집계기가 없는 현재 저장소에서는 이 method 필드로 full 결과와 구분한다.
-M5 입력 검증만 수행한 결과와 M4까지만 수행한 결과는 task success가 아니다.
+`m5_execution_success`는 전체 M5 시퀀스의 종료 상태만 뜻한다. M5 입력 검증,
+부분 실행, 계획 생성 실패에서는 null이다. 최종 태스크 목표 판정기는 아직 연결되지
+않았으므로 `task_success`는 null이며 논문의 task SR에 사용하지 않는다.
 
 한 task의 성공/실패만으로 planner ablation의 성공률 차이나 인과효과를 추정할 수
 없다. 같은 입력 장면, seed, M1/M2 산출물, M5 설정으로 paired 평가를 반복하고,
