@@ -3,6 +3,20 @@
 이 worktree는 최신 M5 Motion Planner 실행 브랜치다. Python 패키지 경로는
 `tuj.m5_motion`이다.
 
+## M4 Greedy mode
+
+M4 Task Planner는 기본적으로 `optimal` 검색을 사용하며, 다음 전이의 비용을
+우선하는 Greedy 검색은 `--mode greedy`로 선택할 수 있다. 최종 비용 벡터의
+집계 순서는 기존과 동일하게 `EE 교체 → Tool 교체 → motion → execution`이다.
+
+```powershell
+python -m tuj.m4_taskplanner.cli plan `
+  --gk output\c1_1\gk_bundle.json `
+  --m2 output\c1_1\m2.json `
+  --mode greedy `
+  --output output\c1_1\task_planner_greedy.json
+```
+
 ## 바로 확인하기
 
 저장소 루트에서 Python 3.11 가상환경을 만들고 의존성을 설치한다. 저장소에

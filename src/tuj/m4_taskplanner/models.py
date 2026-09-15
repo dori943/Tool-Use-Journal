@@ -343,6 +343,10 @@ class TerminalPolicy(_ExtensibleModel):
 
 class PlanningPolicy(_ExtensibleModel):
 
+    # ``optimal`` keeps the existing lexicographic Dijkstra behaviour.
+    # ``greedy`` prioritizes the locally cheapest next transition while
+    # retaining accumulated costs for dominance and result reporting.
+    search_mode: Literal["optimal", "greedy"] = "optimal"
     candidate_score_threshold: float = Field(default=0.6, ge=0, le=1)
     top_k_per_subgoal: int = Field(default=3, ge=0)
     preserve_ee_coverage: bool = True

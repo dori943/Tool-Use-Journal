@@ -85,6 +85,12 @@ def _build_parser() -> argparse.ArgumentParser:
     p_plan.add_argument("--resources", default=None)
     p_plan.add_argument("--candidates", default=None)
     p_plan.add_argument("--policy", default=None)
+    p_plan.add_argument(
+        "--mode",
+        choices=("optimal", "greedy"),
+        default=None,
+        help="search mode; overrides planning_policy.search_mode",
+    )
     p_plan.add_argument("--output", required=True)
 
     p_replan = sub.add_parser("replan", help="replan after an execution failure")
@@ -126,6 +132,9 @@ def main(argv: Sequence[str] | None = None) -> int:
                 if args.policy is not None
                 else None
             )
+            if args.mode is not None:
+                policy = policy or PlanningPolicy()
+                policy.search_mode = args.mode
             proposals = (
                 _load_proposals(args.candidates)
                 if args.candidates is not None
