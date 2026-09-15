@@ -1224,6 +1224,12 @@ def main(
         if raw_grasp_profile is not None:
             acquire_task_metadata["grasp_profile"] = dict(raw_grasp_profile)
         selected, envelope = load_selected_plan(task_planner)
+        task_blob = envelope.get("task")
+        greedy_extra = isinstance(task_blob, Mapping) and bool(
+            task_blob.get("scripted_grasp_greedy_extra")
+        )
+        if greedy_extra:
+            acquire_task_metadata["scripted_grasp_greedy_extra"] = True
         if args.stop_after_pick:
             if (
                 args.start_from_subgoal
@@ -1297,6 +1303,9 @@ def main(
                     scripted_grasps=args.scripted_grasps,
                     settle_seconds=args.settle_seconds,
                 )
+
+        if greedy_extra:
+            world.metadata["scripted_grasp_greedy_extra"] = True
 
         constraints = _load_source(
             args.constraints.expanduser().resolve() if args.constraints else None,

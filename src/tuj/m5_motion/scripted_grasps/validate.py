@@ -86,6 +86,7 @@ def resolve_case(
     from tuj.m5_motion.scripted_grasps.registry import (
         ALTERNATIVE_ENTRIES,
         ENTRIES,
+        GREEDY_EXTRA_ENTRIES,
         ScriptedGraspUnavailable,
         VALIDATOR_EXPERIMENTAL_ENTRIES,
         _recipe_keys_for_target,
@@ -119,6 +120,8 @@ def resolve_case(
         candidates = ENTRIES + ALTERNATIVE_ENTRIES
         if request.task.metadata.get("scripted_grasp_validator_experimental", False):
             candidates += VALIDATOR_EXPERIMENTAL_ENTRIES
+        if request.task.metadata.get("scripted_grasp_greedy_extra", False):
+            candidates += GREEDY_EXTRA_ENTRIES
         type_matches = []
         for key in _recipe_keys_for_target(object_id, environment):
             type_matches = [

@@ -35,6 +35,7 @@ from tuj.m5_motion.move_to_workspace import (
     MoveToWorkspacePlanningError,
     append_safe_rack_exit_plan,
     is_move_to_workspace_request,
+    safe_rack_exit_context_id,
 )
 from tuj.m5_motion.geometry import RelativePoseResolver
 from tuj.m5_motion.kinematics import UR5eKinematics
@@ -83,6 +84,7 @@ from tuj.m5_motion.task_semantics import (
     is_release_task,
 )
 from tuj.m5_motion.tool_use_journal import (
+    TOOL_USE_JOURNAL_EE_GRIPPER_TYPES,
     ToolUseJournalCollisionModelCompiler,
     ToolUseJournalCompatibilityError,
     ToolUseJournalEnvironmentAdapter,
@@ -1501,8 +1503,9 @@ class ToolUseJournalCollisionContextFactory:
         bound = artifact.model_copy(deep=True)
         contexts: dict[str, CollisionContext] = {base.context_id: base}
         contact_selectors = list(request.task.allowed_touch_objects)
-        if request.task.goal.target_region_id:
-            contact_selectors.append(request.task.goal.target_region_id)
+        region_id = request.task.goal.target_region_id
+        if region_id:
+            contact_selectors.append(region_id)
             # Objects already packed into the destination region may be
             # contacted (or rested upon) by the held object -- the task packs
             # everything into one region and permits overlap -- so admit each
@@ -1510,6 +1513,19 @@ class ToolUseJournalCollisionContextFactory:
             for occupant in self._region_occupant_ids(request, target):
                 if occupant not in contact_selectors:
                     contact_selectors.append(occupant)
+        # Packing / kitting: EE and held object may graze any free tabletop body
+        # near the seat (neighbor mug on the tray, prior food on the plate, …).
+        # Do not auto-exempt the support plane / region id for the EE — that
+        # still comes only via held↔allowed_touch so the hand cannot sink into
+        # the table. Free plate/mug/… bodies are enough for packed place.
+        pack_touch = [
+            pose.object_id
+            for pose in base.free_object_poses
+            if pose.object_id and pose.object_id != target
+        ]
+        for oid in pack_touch:
+            if oid not in contact_selectors:
+                contact_selectors.append(oid)
         for candidate in bound.candidates:
             place = self._event_keyframe(
                 candidate,
@@ -1549,12 +1565,16 @@ class ToolUseJournalCollisionContextFactory:
                 )
             contact_id = f"place-contact:{target}:{token}"
             detached_id = f"object-detached:{target}:{token}"
+            contact_pairs = sorted(
+                {
+                    *self._contact_pairs(target, contact_selectors),
+                    *self._contact_pairs(active_ee, pack_touch),
+                }
+            )
             contact = base.model_copy(
                 update={
                     "context_id": contact_id,
-                    "allowed_collision_pairs": self._contact_pairs(
-                        target, contact_selectors
-                    ),
+                    "allowed_collision_pairs": contact_pairs,
                 }
             )
             detached = CollisionContext(
@@ -1579,16 +1599,9 @@ class ToolUseJournalCollisionContextFactory:
                     "context_id": release_id,
                     "allowed_collision_pairs": self._contact_pairs(active_ee, [target]),
                 })
-            # Approach keyframes (TRANSFER/PRE_PLACE) into a crowded destination
-            # region need the same occupant contact allowances as PLACE;
-            # otherwise descent is collision-filtered before the drop.  When the
-            # region has no occupants, keep the held attached/base context until
-            # PLACE so ordinary place filtering is not widened on every approach.
-            region_id = request.task.goal.target_region_id
-            crowded_destination = bool(
-                region_id and self._region_occupant_ids(request, target)
-            )
-            current_id = contact_id if crowded_destination else base.context_id
+            # Approach uses the same packing ACM as PLACE so descent past a
+            # neighboring free body (mug beside the plate, …) is not filtered.
+            current_id = contact_id
             withdrawal_pending = False
             for keyframe in candidate.keyframes:
                 keyframe.collision_context_after_events_id = None
@@ -1605,20 +1618,12 @@ class ToolUseJournalCollisionContextFactory:
         from tuj.m5_motion.release_separation import bind_release_separation
 
         bind_release_separation(self.compiler, request, bound, contexts, target)
-        # Withdrawal from a crowded region.  After the held object is released,
-        # the empty gripper retreats past objects already packed into the same
-        # region.  The descent already tolerates the HELD object contacting
-        # those occupants (the task packs everything into one region and permits
-        # overlap); extend the identical tolerance to the withdrawing GRIPPER so
-        # a post-release retreat that grazes a neighbour -- e.g. an open 2F
-        # finger passing 2.5 mm from an already-placed spoon while lifting away
-        # -- is not collision-filtered.  Scoped to the release/retreat contexts
-        # of this place only (every keyframe after the PLACE); approach,
-        # transport and free-space margins are unchanged, and a single-object
-        # region has no occupants so those tasks are untouched.
-        occupants = self._region_occupant_ids(request, target)
-        occupant_pairs = self._contact_pairs(active_ee, occupants) if occupants else []
-        if occupant_pairs:
+        # Withdrawal: empty gripper may graze the same free packing partners
+        # the descent already tolerated (EE ↔ free objects / region).
+        pack_ee_pairs = (
+            self._contact_pairs(active_ee, pack_touch) if pack_touch else []
+        )
+        if pack_ee_pairs:
             for candidate in bound.candidates:
                 place_kf = next(
                     (
@@ -1643,7 +1648,7 @@ class ToolUseJournalCollisionContextFactory:
                 for context_id in retreat_context_ids:
                     ctx = contexts[context_id]
                     merged = list(ctx.allowed_collision_pairs)
-                    for pair in occupant_pairs:
+                    for pair in pack_ee_pairs:
                         if pair not in merged:
                             merged.append(pair)
                     contexts[context_id] = ctx.model_copy(
@@ -1902,6 +1907,45 @@ class ToolUseJournalCollisionContextFactory:
             )
             for context_id, context in contexts.items()
         }
+        # SAFE RACK EXIT leaves the dock corridor where a mounted hand (esp.
+        # 3F thumb) can graze a neighboring pedestal *or* a parked EE mount by
+        # a few mm under the controller. Dock-contact already relaxes the home
+        # support; exit must also tolerate the full rack-support row and the
+        # stowed grippers (entity id == ee) or tracking fails after a planner
+        # that only sampled discrete waypoints. Use a distinct context_id so
+        # the merged attach+exit plan never redefines ee-attached:{ee}.
+        if bool(request.task.metadata.get("safe_rack_exit")):
+            attached_id = f"ee-attached:{active}"
+            base = contexts.get(attached_id)
+            if base is not None and base.active_ee == active:
+                rack_ees = sorted(TOOL_USE_JOURNAL_EE_GRIPPER_TYPES)
+                rack_pairs = [
+                    *(
+                        (active, f"rack_support:{ee}")
+                        for ee in rack_ees
+                    ),
+                    *(
+                        (active, ee)
+                        for ee in rack_ees
+                        if ee != active
+                    ),
+                ]
+                existing = list(base.allowed_collision_pairs)
+                seen = {tuple(sorted(pair)) for pair in existing}
+                for pair in rack_pairs:
+                    key = tuple(sorted(pair))
+                    if key in seen:
+                        continue
+                    existing.append(pair)
+                    seen.add(key)
+                exit_id = safe_rack_exit_context_id(active)
+                contexts = dict(contexts)
+                contexts[exit_id] = base.model_copy(
+                    update={
+                        "context_id": exit_id,
+                        "allowed_collision_pairs": existing,
+                    }
+                )
         try:
             registry = self.compiler.build_collision_registry(
                 contexts,

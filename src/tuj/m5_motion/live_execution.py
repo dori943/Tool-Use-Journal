@@ -261,11 +261,16 @@ class LivePlanExecutionSession:
         return self.output_dir / "live-execution-manifest.json"
 
     def save_manifest(self) -> Path:
+        from tuj.gt.ee_swap_metrics import count_executed_ee_metrics
+
+        metrics = count_executed_ee_metrics(self.records)
         payload = {
             "manifest_version": "generic-live-1",
             "status": self.status,
             "failure": self.failure,
             "steps": self.records,
+            "executed_ee_metrics": metrics,
+            "executed_ee_switches": metrics["executed_ee_switches"],
             "final_world": (
                 self.final_world.model_dump(mode="json")
                 if self.final_world is not None

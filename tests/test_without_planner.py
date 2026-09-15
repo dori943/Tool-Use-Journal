@@ -138,6 +138,50 @@ def test_real_c1_1_m2_gk_to_m5_contract(tmp_path, monkeypatch):
     assert read(tmp_path / "m5" / "m5_summary.json")["status"] == "INPUT_VALIDATED"
 
 
+def test_build_timing_summary_matches_report_shape():
+    import run_without_planner as planner_runner
+    from tuj.ablations.timing_summary import build_timing_summary
+
+    summary = build_timing_summary(
+        stage_order=planner_runner.STAGE_ORDER,
+        stage_seconds={
+            "m1": 0.03,
+            "m2": 5.33,
+            "independent_assignment": 2.86,
+            "m5": 311.91,
+        },
+        stage_status={
+            "m1": "completed",
+            "m2": "completed",
+            "independent_assignment": "SUCCESS",
+            "m5": "FAILED",
+        },
+        llm_usage={
+            "분해": {
+                "calls": 1,
+                "prompt_tokens": 967,
+                "completion_tokens": 74,
+                "tokens": 1041,
+                "seconds": 2.56,
+            },
+            "선택": {
+                "calls": 1,
+                "prompt_tokens": 1321,
+                "completion_tokens": 112,
+                "tokens": 1433,
+                "seconds": 2.77,
+            },
+        },
+        wall_seconds=None,
+        combined_stage_keys=("m2", "independent_assignment"),
+        combined_label="m2_through_assignment_seconds",
+    )
+    summary["total_seconds"] = summary["measured_stage_sum_seconds"]
+    assert summary["llm_total"]["total_tokens"] == 2474
+    assert summary["m2_through_assignment_seconds"] == pytest.approx(8.19)
+    assert summary["total_seconds"] == pytest.approx(320.13)
+
+
 def test_cli_default_and_separate_baseline_route(monkeypatch, tmp_path):
     import run as pipeline
     import run_without_planner as runner

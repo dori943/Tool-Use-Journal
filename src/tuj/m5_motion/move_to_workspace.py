@@ -62,6 +62,12 @@ from tuj.m5_motion.trajectory_processing import (
 _JOINT_MATCH_TOL_RAD = 1e-6
 
 
+def safe_rack_exit_context_id(active_ee: str) -> str:
+    """Distinct ACM id for mounted rack exit (neighbor-support allowances)."""
+
+    return f"ee-attached-safe-rack-exit:{normalize_ee_id(active_ee)}"
+
+
 def is_move_to_workspace_request(request: MotionPlanRequest) -> bool:
     return task_operation(request.task) == "MOVE_TO_WORKSPACE"
 
@@ -352,7 +358,15 @@ class MoveToWorkspacePlanner:
     ) -> MotionPlan:
         selected = template or self.load_workspace_template(request)
         active = self._validate_request(request, selected)
-        context_id = f"ee-attached:{active}"
+        preferred_ids = (
+            (safe_rack_exit_context_id(active), f"ee-attached:{active}")
+            if bool(request.task.metadata.get("safe_rack_exit"))
+            else (f"ee-attached:{active}",)
+        )
+        context_id = next(
+            (candidate for candidate in preferred_ids if candidate in collision_contexts),
+            preferred_ids[-1],
+        )
         context = collision_contexts.get(context_id)
         if context is None or context.active_ee != active:
             raise PrecomputedEEPathError(
@@ -636,6 +650,25 @@ class MoveToWorkspacePlanner:
         )
 
 
+def _unique_allowed_collision_pairs(
+    *pair_lists: Sequence[tuple[str, str]] | None,
+) -> list[tuple[str, str]]:
+    """Merge ACM pairs without violating CollisionContext uniqueness."""
+
+    merged: list[tuple[str, str]] = []
+    seen: set[tuple[str, str]] = set()
+    for pairs in pair_lists:
+        if not pairs:
+            continue
+        for left, right in pairs:
+            key = tuple(sorted((str(left), str(right))))
+            if key in seen:
+                continue
+            seen.add(key)
+            merged.append((str(left), str(right)))
+    return merged
+
+
 def append_safe_rack_exit_plan(
     exchange_plan: MotionPlan,
     exit_plan: MotionPlan,
@@ -675,12 +708,54 @@ def append_safe_rack_exit_plan(
             "waypoints": waypoints,
             "metadata": metadata,
         }
+        exit_before = segment.collision_context_before
+        exit_after = segment.collision_context_after
         if index == 0 and boundary is not None:
-            # Keep MotionPlan adjacency contract with the exchange finale even
-            # when the exit factory rebuilds an equivalent ee-attached context.
-            updates["collision_context_before"] = boundary.model_copy(deep=True)
-            if segment.collision_context_after is None:
-                updates["collision_context_after"] = boundary.model_copy(deep=True)
+            # Preserve exit-only ACM pairs (neighbor rack supports) under a
+            # distinct context_id so the merged plan does not reuse
+            # ee-attached:{ee} with two incompatible definitions.
+            active = (
+                (exit_before.active_ee if exit_before is not None else None)
+                or boundary.active_ee
+                or "unknown"
+            )
+            stitched_id = (
+                exit_before.context_id
+                if exit_before is not None
+                and exit_before.context_id != boundary.context_id
+                else safe_rack_exit_context_id(str(active))
+            )
+            stitched = boundary.model_copy(
+                update={
+                    "context_id": stitched_id,
+                    "allowed_collision_pairs": _unique_allowed_collision_pairs(
+                        boundary.allowed_collision_pairs,
+                        None
+                        if exit_before is None
+                        else exit_before.allowed_collision_pairs,
+                        None
+                        if exit_after is None
+                        else exit_after.allowed_collision_pairs,
+                    ),
+                }
+            )
+            # Use one definition for both boundaries so free-pose / ACM fields
+            # cannot diverge under the same context_id.
+            updates["collision_context_before"] = stitched
+            updates["collision_context_after"] = stitched.model_copy(deep=True)
+        elif exit_before is not None and exit_after is not None:
+            # Later exit segments must not keep the attach-era context_id when
+            # they carry exit-only ACM pairs.
+            active = exit_before.active_ee or exit_after.active_ee or "unknown"
+            exit_id = safe_rack_exit_context_id(str(active))
+            if exit_before.context_id != exit_id and exit_before.allowed_collision_pairs:
+                updates["collision_context_before"] = exit_before.model_copy(
+                    update={"context_id": exit_id}
+                )
+            if exit_after.context_id != exit_id and exit_after.allowed_collision_pairs:
+                updates["collision_context_after"] = exit_after.model_copy(
+                    update={"context_id": exit_id}
+                )
         shifted_segments.append(segment.model_copy(update=updates))
     shifted_events = [
         event.model_copy(
@@ -722,5 +797,6 @@ __all__ = [
     "append_safe_rack_exit_plan",
     "commissioned_reverse_workspace_path",
     "is_move_to_workspace_request",
+    "safe_rack_exit_context_id",
     "select_mounted_workspace_target",
 ]

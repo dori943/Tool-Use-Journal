@@ -29,6 +29,9 @@ EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M = 0.008
 VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M = 0.01
 # Soft resting immersion deeper than this is treated as an invalid scene state.
 MAX_VACUUM_SUPPORT_BREAKAWAY_M = 0.02
+# 3F enclosure CLOSE can press a mug deeper than vac soft contact (~20 mm live
+# mug_b need 0.027787 m with early-LIFT pad). Vac keeps the tighter 20 mm cap.
+MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M = 0.03
 # Live bread_b vac grasp inherits ~7° object tilt. Absolute JOINT_POSITION
 # playback then sags ~0.083 rad / ~35 mm during M5 transport and fails the
 # place DETACH settle gate (0.05 rad / 5 mm). Level the tool after LIFT when
@@ -75,8 +78,10 @@ def vacuum_support_breakaway_lift_m(
     penetration. Vac defaults leave ``pad + post-breakaway dip margin`` so the
     first impedance LIFT ticks cannot re-immerse the object.  3F enclosure
     carry passes ``dip_margin_m=0`` — it has no vac-style TCP dip, and adding
-    the 10 mm margin on top of mug CLOSE immersion exceeded the 20 mm bound
-    (live mug_b: need 0.0229 m).
+    the 10 mm margin on top of mug CLOSE immersion exceeded the 20 mm vac bound
+    (live mug_b: need 0.0229 m). Enclosure callers use
+    ``MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M`` for deeper CLOSE crush
+    (live mug_b: need 0.027787 m).
     Returns 0 when already at/above that target. Raises when required lift
     exceeds the safety bound (deep/invalid immersion, not soft resting contact).
     """
@@ -426,7 +431,8 @@ def breakaway_vacuum_from_support(
     """If a kinematically held object is immersed in support, lift before LIFT.
 
     Vac defaults keep pad+dip-margin clearance.  Enclosure (3F) callers pass
-    ``dip_margin_m=0`` so mug CLOSE immersion does not request >20 mm of climb.
+    ``dip_margin_m=0`` and ``max_breakaway_m=MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M``
+    so deeper mug CLOSE immersion can still clear without the vac 20 mm cap.
     """
 
     pad = (

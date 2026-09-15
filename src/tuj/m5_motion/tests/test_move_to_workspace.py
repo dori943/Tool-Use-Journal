@@ -376,13 +376,32 @@ def test_invalid_start_fails_closed() -> None:
 
 
 def test_append_safe_rack_exit_shifts_segments_and_final_state() -> None:
-    context = CollisionContext(
-        context_id="ee-attached:vac",
-        active_ee="vac",
+    exchange_context = CollisionContext(
+        context_id="ee-attached:3F",
+        active_ee="3F",
         collision_model_version="v1",
+        allowed_collision_pairs=[("3F", "rack_support:3F")],
+    )
+    exit_context = CollisionContext(
+        context_id="ee-attached:3F",
+        active_ee="3F",
+        collision_model_version="v1",
+        allowed_collision_pairs=[
+            ("3F", "rack_support:2F"),
+            ("3F", "rack_support:3F"),
+            ("3F", "rack_support:vac"),
+            ("3F", "2F"),
+            ("3F", "vac"),
+        ],
     )
 
-    def _plan(*, joints: list[float], duration: float, plan_id: str) -> MotionPlan:
+    def _plan(
+        *,
+        joints: list[float],
+        duration: float,
+        plan_id: str,
+        context: CollisionContext,
+    ) -> MotionPlan:
         return MotionPlan(
             plan_id=plan_id,
             request_id="request:exchange",
@@ -429,8 +448,18 @@ def test_append_safe_rack_exit_shifts_segments_and_final_state() -> None:
         )
 
     merged = append_safe_rack_exit_plan(
-        _plan(joints=_q(2.0), duration=1.0, plan_id="exchange"),
-        _plan(joints=_q(0.5), duration=2.0, plan_id="exit"),
+        _plan(
+            joints=_q(2.0),
+            duration=1.0,
+            plan_id="exchange",
+            context=exchange_context,
+        ),
+        _plan(
+            joints=_q(0.5),
+            duration=2.0,
+            plan_id="exit",
+            context=exit_context,
+        ),
     )
     assert merged.duration_s == pytest.approx(3.0)
     assert len(merged.segments) == 2
@@ -438,3 +467,22 @@ def test_append_safe_rack_exit_shifts_segments_and_final_state() -> None:
     assert merged.segments[1].metadata["safe_rack_exit"] is True
     assert merged.expected_final_state.joint_positions_rad[0] == pytest.approx(0.5)
     assert merged.metadata["safe_rack_exit"] is True
+    exit_seg = merged.segments[1]
+    assert exit_seg.collision_context_before.context_id == "ee-attached-safe-rack-exit:3F"
+    before_pairs = {
+        tuple(sorted(pair))
+        for pair in exit_seg.collision_context_before.allowed_collision_pairs
+    }
+    assert before_pairs == {
+        ("2F", "3F"),
+        ("3F", "rack_support:2F"),
+        ("3F", "rack_support:3F"),
+        ("3F", "rack_support:vac"),
+        ("3F", "vac"),
+    }
+    # Attach-era context id must remain distinct from the exit ACM definition.
+    assert merged.segments[0].collision_context_before.context_id == "ee-attached:3F"
+    assert {
+        tuple(sorted(pair))
+        for pair in merged.segments[0].collision_context_before.allowed_collision_pairs
+    } == {("3F", "rack_support:3F")}

@@ -259,16 +259,67 @@ class VisualSemanticRough:
 
 
 def build_m2(task: str, scene: dict, rough) -> dict:
+    from tuj.m2_subgoal.regroup import split_by_partition
+
     scene = decision_scene(scene)
     out = run_m2(task, scene, rough=rough)
     out["ablation"] = {"mode": MODE, "policy_version": POLICY_VERSION}
+    # No apply_grounding / update_confidence: measurements stay unknown.
+    # Still apply the unmeasured-batch fallback from ingest: split multi-object
+    # relocate/stack into one object per subgoal. Otherwise set bindings leave
+    # detail target_ids empty and M5 cannot ground a pose/object target.
     for s in out["m2_subgoals"]:
-        # Do not call apply_grounding/update_confidence/regroup on this path.
+        if s.get("tool_candidate_ids") or s.get("partition_plan"):
+            continue
+        targets = s.get("target_ids") or []
+        if len(targets) >= 2 and s.get("kind") in {"relocate", "stack"}:
+            s["partition_plan"] = [[t] for t in targets]
+    for line in split_by_partition(out):
+        print(line)
+    for s in out["m2_subgoals"]:
         for d in s["details"]:
             for p in d["pre"]:
                 if p["eval_by"] == "m3":
                     p.update(status="unknown", evidence=[])
+        decision = s.get("visual_decision")
+        if not decision:
+            continue
+        decision = dict(decision)
+        decision["subgoal_id"] = s["subgoal_id"]
+        if s["kind"] not in TOOL_KINDS:
+            keep = set(s.get("target_ids") or [])
+            decision["ee_candidates_by_object"] = {
+                k: list(v)
+                for k, v in (decision.get("ee_candidates_by_object") or {}).items()
+                if k in keep
+            }
+        s["visual_decision"] = decision
     return out
+
+
+def _hypothesis_owners(sg, parent: dict, aliases: dict) -> list[str]:
+    """Objects whose EE hypotheses constrain this detail.
+
+    Tool tasks use the selected tool. Single-object details use ``target_ids``.
+    Multi-object relocate/stack often bind ``?o`` as a set, which leaves detail
+    ``target_ids`` empty in ``gk_adapter``; fall back to grasped binding roles
+    or the parent rough targets (same fallback as grounded ``feasible_ee``).
+    """
+    if sg.tool_id:
+        return [sg.tool_id]
+    if sg.target_ids:
+        return list(sg.target_ids)
+    binding = sg.source_binding or {}
+    grasped: list[str] = []
+    for role in ("?o", "?t"):
+        value = binding.get(role)
+        if isinstance(value, list):
+            grasped.extend(x for x in value if isinstance(x, str))
+        elif isinstance(value, str) and not value.startswith("?"):
+            grasped.append(value)
+    if grasped:
+        return grasped
+    return [aliases.get(t, t) for t in parent.get("target_ids") or []]
 
 
 def build_m4_request(scene: dict, m2: dict, robot: dict, assemble):
@@ -296,7 +347,7 @@ def build_m4_request(scene: dict, m2: dict, robot: dict, assemble):
                 "ee_candidates_by_object"
             ].items()
         }
-        owners = [sg.tool_id] if sg.tool_id else sg.target_ids
+        owners = _hypothesis_owners(sg, parent, aliases)
         sets = [hypotheses[o] for o in owners]
         sg.feasible_ee = sorted(set.intersection(*sets)) if sets else []
         sg.feasible_ee_source = "request"

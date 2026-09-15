@@ -22,9 +22,136 @@ from __future__ import annotations
 
 import json
 import os
+import re
 import time
 
 from .core import TOOL_KINDS
+
+
+_FOOD_MARKERS = ("bread", "fruit", "food")
+_PLATE_MARKERS = ("plate",)
+_TRAY_MARKERS = ("tray",)
+_UTENSIL_MARKERS = ("plate", "mug", "fork", "spoon", "cup", "bowl")
+
+
+def _id_has(nid: str, markers: tuple[str, ...]) -> bool:
+    low = nid.lower()
+    return any(m in low for m in markers)
+
+
+def _pair_letter(nid: str) -> str | None:
+    """obj_fork_a_fork_a / tray_b → 'a'/'b'. 페어 접미사가 없으면 None."""
+    m = re.search(r"_([ab])(?:_|$)", nid.lower())
+    return m.group(1) if m else None
+
+
+def _matching_id(ids: list[str], markers: tuple[str, ...], letter: str | None) -> str | None:
+    cands = [i for i in ids if _id_has(i, markers)]
+    if letter is not None:
+        paired = [i for i in cands if _pair_letter(i) == letter]
+        if paired:
+            return paired[0]
+    return cands[0] if len(cands) == 1 else None
+
+
+def _task_wants_food_on_plate(task: str) -> bool:
+    t = task.lower()
+    return (
+        ("접시" in task or "plate" in t)
+        and ("위" in task or "올려" in task or " on " in f" {t} " or t.startswith("on "))
+    )
+
+
+def _task_wants_paired_trays(task: str) -> bool:
+    return any(
+        k in task
+        for k in ("각 트레이", "두 트레이", "같은 구성", "each tray", "both trays", "two trays")
+    ) or ("tray" in task.lower() and ("각" in task or "두" in task or "both" in task.lower() or "each" in task.lower()))
+
+
+def _repair_destination_bindings(subs: list[dict], ids: list[str], task: str) -> None:
+    """약한 모델이 자주 틀리는 목적지 바인딩을 태스크 단서가 있을 때만 고친다.
+
+    - 음식→tray 인데 '접시 위' 지시 → 같은 짝의 plate로
+    - 식기→tray 짝 불일치 / 한쪽 tray로 몰림 → 짝 tray로
+    - 빵·과일만 plate 위에 stack → relocate (나란히 올리기)
+    """
+    if not task:
+        return
+    food_on_plate = _task_wants_food_on_plate(task)
+    paired_trays = _task_wants_paired_trays(task)
+    plates = [i for i in ids if _id_has(i, _PLATE_MARKERS)]
+    trays = [i for i in ids if _id_has(i, _TRAY_MARKERS)]
+
+    for s in subs:
+        targets = list(s.get("target_ids") or [])
+        cid = s.get("container_id")
+        if not targets:
+            continue
+
+        if food_on_plate and cid and plates and _id_has(cid, _TRAY_MARKERS):
+            food_targets = [t for t in targets if _id_has(t, _FOOD_MARKERS)]
+            if food_targets and all(_id_has(t, _FOOD_MARKERS) for t in targets):
+                letter = _pair_letter(food_targets[0])
+                plate = _matching_id(ids, _PLATE_MARKERS, letter)
+                if plate is None:
+                    raise ValueError(
+                        f"{s.get('subgoal_id')}: 빵/과일을 tray({cid})로 보냈지만 "
+                        "태스크는 접시 위를 요구한다. container_id를 짝 plate로 바꿔라."
+                    )
+                s["container_id"] = plate
+                cid = plate
+
+        if food_on_plate and cid and _id_has(cid, _PLATE_MARKERS):
+            food_targets = [t for t in targets if _id_has(t, _FOOD_MARKERS)]
+            if food_targets and all(_id_has(t, _FOOD_MARKERS) for t in targets):
+                letters = {_pair_letter(t) for t in food_targets}
+                letters.discard(None)
+                if len(letters) > 1:
+                    raise ValueError(
+                        f"{s.get('subgoal_id')}: 빵/과일을 한 plate({cid})에 "
+                        f"짝이 다른 대상 {food_targets}로 묶었다. "
+                        "plate_a/plate_b에 맞춰 서브골을 나눠라."
+                    )
+                want = _matching_id(
+                    ids, _PLATE_MARKERS, next(iter(letters)) if letters else None
+                )
+                if want and want != cid:
+                    s["container_id"] = want
+                    cid = want
+
+        # 나란히 올리기: 음식만 plate 위에 stack이면 relocate로 강등
+        # (목적지 교정 이후에 판정 — tray로 나왔다가 plate로 고쳐진 경우 포함)
+        if (
+            s.get("kind") == "stack"
+            and cid
+            and _id_has(cid, _PLATE_MARKERS)
+            and all(_id_has(t, _FOOD_MARKERS) for t in targets)
+        ):
+            s["kind"] = "relocate"
+            s["ordered"] = False
+
+        if paired_trays and cid and len(trays) >= 2 and _id_has(cid, _TRAY_MARKERS):
+            utensil_targets = [
+                t for t in targets
+                if _id_has(t, _UTENSIL_MARKERS) and not _id_has(t, _FOOD_MARKERS)
+            ]
+            if not utensil_targets:
+                continue
+            # 대상 짝 글자와 tray 짝 글자가 다르면 교정
+            letters = {_pair_letter(t) for t in utensil_targets}
+            letters.discard(None)
+            if len(letters) == 1:
+                want = _matching_id(ids, _TRAY_MARKERS, next(iter(letters)))
+                if want and want != cid:
+                    s["container_id"] = want
+            elif len(letters) > 1 and _pair_letter(cid) is not None:
+                # a/b를 한 서브골·한 tray로 묶은 경우 — 재시도로 분리 유도
+                raise ValueError(
+                    f"{s.get('subgoal_id')}: 두 트레이 태스크인데 "
+                    f"짝이 다른 식기 {utensil_targets}를 한 container({cid})로 묶었다. "
+                    "tray_a/tray_b에 맞춰 서브골을 나눠라."
+                )
 
 
 class TemplateRough:
@@ -95,6 +222,10 @@ PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 �
 - 단 stack은 위로 층을 쌓는 것이라 target_ids 순서가 아래에서 위다. 여러 물체를
   같은 받침 위에 나란히 올리는 것(예: 접시 하나에 빵과 과일)은 서로 얹는 것이
   아니므로 stack이 아니라 relocate이고, container_id를 그 받침으로 둔다.
+- 목적지(container_id)는 지시문의 받침/용기를 따른다. "접시 위에 올려라"면
+  빵·과일의 container_id는 tray가 아니라 plate다. "각 트레이"/"두 트레이를
+  같은 구성"이면 plate/mug/fork/spoon 등 식기는 짝(_a↔tray_a, _b↔tray_b)에
+  맞게 넣고, 한쪽 tray로 몰지 않는다.
 - 태스크에 명시된 목표만 서브골로 만든다. 태스크에 없는 목표(예: 장애물 치우기,
   정리하기)를 발명하지 않는다.
 - "도구를 골라", "~를 써서", "~로" 처럼 수행 수단을 가리키는 어구는 목표가 아니다.
@@ -185,6 +316,10 @@ PROMPT_COMBINED = """로봇 매니퓰레이션 태스크를 planning-level 서�
 - 단 stack은 위로 층을 쌓는 것이라 target_ids 순서가 아래에서 위다. 여러 물체를
   같은 받침 위에 나란히 올리는 것(예: 접시 하나에 빵과 과일)은 서로 얹는 것이
   아니므로 stack이 아니라 relocate이고, container_id를 그 받침으로 둔다.
+- 목적지(container_id)는 지시문의 받침/용기를 따른다. "접시 위에 올려라"면
+  빵·과일의 container_id는 tray가 아니라 plate다. "각 트레이"/"두 트레이를
+  같은 구성"이면 plate/mug/fork/spoon 등 식기는 짝(_a↔tray_a, _b↔tray_b)에
+  맞게 넣고, 한쪽 tray로 몰지 않는다.
 - 태스크에 명시된 목표만 서브골로 만든다. 태스크에 없는 목표(예: 장애물 치우기,
   정리하기)를 발명하지 않는다.
 - "도구를 골라", "~를 써서", "~로" 처럼 수행 수단을 가리키는 어구는 목표가 아니다.
@@ -274,11 +409,12 @@ def _check_conf(v, where: str):
         raise ValueError(f"{where}: confidence가 0~1 숫자가 아님 ({v!r})")
 
 
-def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
+def validate_subgoals(subs: list[dict], ids: list[str], task: str = "") -> list[dict]:
     """LLM 출력 검문 + 정규화. 프롬프트는 지시, 여기는 검문 — 둘 다 있어야 안전하다.
 
     검사: 장면에 없는 id / sweep_collect의 빈 도구 후보 → ValueError (호출부가 재시도)
-    정규화: 같은 (kind, 목적지) 서브골 병합, subgoal_id 재부여
+    정규화: 태스크 단서 기반 목적지 보정(약한 모델 보정) 후 같은 (kind, 목적지) 병합,
+            subgoal_id 재부여
     (0828: relocate 물체당 강제 분리 제거 — 분할은 측정 후 regroup이 한다)
     """
     known = set(ids)
@@ -300,6 +436,10 @@ def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
         # "target_ids 순서가 곧 쌓는 순서"로 정의하므로 순서가 없을 수 없다.
         s["ordered"] = bool(s.get("ordered", False)) or s.get("kind") == "stack"
         out.append(s)   # 0828: relocate 물체당 강제 분리 제거 — 분할은 측정 후 regroup이 한다
+
+    # mini 등이 목적지/kind를 자주 틀리므로, 태스크 문구가 분명할 때만 교정한다.
+    # 병합 전에 고쳐서 (kind, container) 키가 올바른 단위로 묶이게 한다.
+    _repair_destination_bindings(out, ids, task)
 
     # 같은 (kind, 목적지) 서브골은 하나로 합친다. 분해 시점에는 목적지 단위로만 묶고,
     # 몇 그룹으로 나눠 처리할지는 측정(batch 질의) 후 regroup이 정한다 (0828 결정).
@@ -327,19 +467,29 @@ def validate_subgoals(subs: list[dict], ids: list[str]) -> list[dict]:
 
 
 def validate_selection(sel: list[dict], subgoals: list[dict], ids: list[str]) -> dict:
-    """2차(객체 선택) 출력 검문. 통과 시 {subgoal_id: 선택 항목} 반환, 위반 시 ValueError."""
+    """2차(객체 선택) 출력 검문. 통과 시 {subgoal_id: 선택 항목} 반환, 위반 시 ValueError.
+
+    tool_candidate_ids ⊆ object_ids 는 스키마 요구사항이지만, LLM이 후보만 내고
+    object_ids 표기를 빠뜨리는 경우가 있어 누락분은 object_ids에 합친다
+    (장면 id 여부는 아래에서 그대로 검문).
+    """
     known = set(ids)
     by_id = {}
     for e in sel:
         sid = e.get("subgoal_id")
-        bad = [x for x in e.get("object_ids", []) + e.get("tool_candidate_ids", [])
-               if x not in known]
+        objects = list(e.get("object_ids") or [])
+        tools = list(e.get("tool_candidate_ids") or [])
+        # Keep LLM order for object_ids; append any omitted tool candidates.
+        seen = set(objects)
+        for t in tools:
+            if t not in seen:
+                objects.append(t)
+                seen.add(t)
+        e["object_ids"] = objects
+        e["tool_candidate_ids"] = tools
+        bad = [x for x in objects + tools if x not in known]
         if bad:
             raise ValueError(f"{sid}: 장면에 없는 id {bad}")
-        missing_tools = [t for t in e.get("tool_candidate_ids", [])
-                         if t not in e.get("object_ids", [])]
-        if missing_tools:
-            raise ValueError(f"{sid}: 도구 후보 {missing_tools}는 object_ids에도 포함하라")
         _check_conf(e.get("confidence"), f"{sid} 객체 선택")
         by_id[sid] = e
     for s in subgoals:
@@ -493,7 +643,7 @@ class LLMRough:
         if self.feedback:
             base += "\n\n" + self.feedback
         subgoals = self._json_call(
-            base, lambda subs: validate_subgoals(subs, ids), "서브골 분해")
+            base, lambda subs: validate_subgoals(subs, ids, task=task), "서브골 분해")
 
         # 2차 — 서브골별 객체 선택 (도구로 쓸 물체 선별 포함)
         brief = [{"subgoal_id": s["subgoal_id"], "goal": s["goal"], "kind": s["kind"],
@@ -539,7 +689,7 @@ class LLMRough:
             subs = [dict(e, _conf=e.get("confidence") or {},
                          confidence=(e.get("confidence") or {}).get("decomposition"))
                     for e in parsed]
-            subs = validate_subgoals(subs, ids)
+            subs = validate_subgoals(subs, ids, task=task)
             # 기존 2차 검문 재사용
             sel = [{"subgoal_id": s["subgoal_id"],
                     "object_ids": s.get("object_ids", []),

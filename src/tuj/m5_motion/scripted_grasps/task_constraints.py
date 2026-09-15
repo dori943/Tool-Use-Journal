@@ -1,5 +1,10 @@
 """Expose scripted recipe compatibility to upstream task planning."""
-from .registry import ALIASES, ENABLED_ENTRIES, ALTERNATIVE_ENTRIES, _recipe_keys_for_target
+from .registry import (
+    ALIASES,
+    ENABLED_ENTRIES,
+    ALTERNATIVE_ENTRIES,
+    _recipe_keys_for_target,
+)
 
 
 def scene_id_aliases(scene):
@@ -15,10 +20,16 @@ def scene_id_aliases(scene):
     return aliases
 
 
-def constrain_task_request(request, environment):
+def constrain_task_request(request, environment, *, extra_entries=()):
+    """Narrow each subgoal's feasible_ee to scripted-compatible EEs.
+
+    Production callers omit ``extra_entries``. The greedy EE-order experiment
+    passes ``GREEDY_EXTRA_ENTRIES`` so graspable 2F recipes become selectable
+    without changing the production registry surface.
+    """
     result=request.model_copy(deep=True)
     changes=[]
-    candidates=ENABLED_ENTRIES + ALTERNATIVE_ENTRIES
+    candidates=ENABLED_ENTRIES + ALTERNATIVE_ENTRIES + tuple(extra_entries)
     for subgoal in result.task_graph.subgoals:
         target=subgoal.tool_id
         if target is None and len(subgoal.target_ids)==1:

@@ -34,6 +34,7 @@ M5가 자체적으로 다시 만드는 환경도 같은 시드로 맞춰진다.
   m4.json
   m5/
   m5.json
+  timing_summary.json   # 모듈별 wall time / token / plan step counts
 """
 
 from __future__ import annotations
@@ -44,6 +45,7 @@ import json
 import os
 import random
 import sys
+import time
 from pathlib import Path
 
 
@@ -60,10 +62,155 @@ sys.path.insert(0, str(ROOT / "src"))
 # --start-from / --stop-after에서는 사용자가 보는 module 이름 기준으로
 # m1, m2, m4, m5를 유지한다.
 STAGES = ("m1", "m2", "m4", "m5")
+# Wall-time report includes G_k even though the CLI stage list collapses it
+# into the m2→m4 span.
+TIMING_STAGES = ("m1", "m2", "gk", "m4", "m5")
 
 
 # 태스크 id <-> 환경 이름 단일 출처
 from task_registry import TASK_ENVS as TASK_ENV  # noqa: E402
+
+
+# ══════════════════════════════════════════════════════════════════════
+# Timing / token summary (inlined so ours does not require tuj.ablations)
+# ══════════════════════════════════════════════════════════════════════
+
+def _llm_usage_rows(usage: dict | None) -> list[dict]:
+    rows: list[dict] = []
+    for name, entry in (usage or {}).items():
+        if not isinstance(entry, dict):
+            continue
+        rows.append(
+            {
+                "call": name,
+                "prompt_tokens": int(entry.get("prompt_tokens") or 0),
+                "completion_tokens": int(entry.get("completion_tokens") or 0),
+                "total_tokens": int(
+                    entry.get("tokens") or entry.get("total_tokens") or 0
+                ),
+                "seconds": float(entry.get("seconds") or 0.0),
+                "calls": int(entry.get("calls") or 0),
+            }
+        )
+    return rows
+
+
+def _sum_llm_rows(rows: list[dict]) -> dict:
+    return {
+        "prompt_tokens": sum(row["prompt_tokens"] for row in rows),
+        "completion_tokens": sum(row["completion_tokens"] for row in rows),
+        "total_tokens": sum(row["total_tokens"] for row in rows),
+        "seconds": round(sum(row["seconds"] for row in rows), 2),
+        "calls": sum(row["calls"] for row in rows),
+    }
+
+
+def build_timing_summary(
+    *,
+    stage_order: tuple[str, ...],
+    stage_seconds: dict[str, float | None],
+    stage_status: dict[str, str],
+    llm_usage: dict | None,
+    wall_seconds: float | None,
+    extras: dict | None = None,
+) -> dict:
+    llm_calls = _llm_usage_rows(llm_usage)
+    stages: dict[str, dict] = {}
+    for name in stage_order:
+        seconds = stage_seconds.get(name)
+        stages[name] = {
+            "seconds": None if seconds is None else round(float(seconds), 2),
+            "status": stage_status.get(name, "not_run"),
+        }
+    measured = [
+        stages[name]["seconds"]
+        for name in stage_order
+        if stages[name]["seconds"] is not None
+    ]
+    summary: dict = {
+        "llm_calls": llm_calls,
+        "llm_total": _sum_llm_rows(llm_calls),
+        "stages": stages,
+        "total_seconds": (
+            None if wall_seconds is None else round(float(wall_seconds), 2)
+        ),
+        "measured_stage_sum_seconds": (
+            None if not measured else round(sum(measured), 2)
+        ),
+    }
+    if extras:
+        summary.update(extras)
+    return summary
+
+
+def merge_stage_seconds(
+    previous: dict | None,
+    current: dict[str, float | None],
+) -> dict[str, float | None]:
+    merged = dict(current)
+    if not previous:
+        return merged
+    prior_stages = previous.get("stages") or {}
+    for name, entry in prior_stages.items():
+        if not isinstance(entry, dict):
+            continue
+        if merged.get(name) is None and entry.get("seconds") is not None:
+            merged[name] = float(entry["seconds"])
+    return merged
+
+
+def merge_stage_status(
+    previous: dict | None,
+    current: dict[str, str],
+) -> dict[str, str]:
+    merged = dict(current)
+    if not previous:
+        return merged
+    prior_stages = previous.get("stages") or {}
+    for name, entry in prior_stages.items():
+        if not isinstance(entry, dict):
+            continue
+        status = entry.get("status")
+        if merged.get(name, "not_run") in {"not_run", "resumed"} and status:
+            if merged.get(name) == "not_run" and status not in {None, "not_run"}:
+                merged[name] = str(status)
+            elif merged.get(name) == "resumed" and status not in {
+                None,
+                "not_run",
+                "resumed",
+            }:
+                merged[name] = f"resumed:{status}"
+    return merged
+
+
+def print_timing_summary(
+    summary: dict,
+    *,
+    stage_order: tuple[str, ...],
+) -> None:
+    llm = summary.get("llm_total") or {}
+    print(
+        "[timing] LLM "
+        f"prompt={llm.get('prompt_tokens', 0)} "
+        f"completion={llm.get('completion_tokens', 0)} "
+        f"total={llm.get('total_tokens', 0)} "
+        f"({llm.get('seconds', 0):.2f}s)"
+    )
+    for row in summary.get("llm_calls") or []:
+        print(
+            f"  [{row['call']}] "
+            f"{row['prompt_tokens']}+{row['completion_tokens']}="
+            f"{row['total_tokens']}tok {row['seconds']:.2f}s"
+        )
+    stages = summary.get("stages") or {}
+    for name in stage_order:
+        entry = stages.get(name) or {}
+        seconds = entry.get("seconds")
+        label = "n/a" if seconds is None else f"{seconds:.2f}s"
+        print(f"  [{name}] {label} ({entry.get('status', 'not_run')})")
+    total = summary.get("total_seconds")
+    if total is not None:
+        print(f"  [total] {total:.2f}s")
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -157,6 +304,202 @@ def read_json(path):
     return json.loads(
         Path(path).read_text(encoding="utf-8")
     )
+
+
+def write_json(path, value):
+    Path(path).write_text(
+        json.dumps(value, ensure_ascii=False, indent=2),
+        encoding="utf-8",
+    )
+
+
+def _m2_llm_usage(out: Path) -> dict | None:
+    path = out / "m2.json"
+    if not path.is_file():
+        return None
+    return (read_json(path).get("m2_stats") or {}).get("llm_usage")
+
+
+def _m1_physical_token_summary(out: Path) -> dict | None:
+    path = out / "m0_retrieval.json"
+    if not path.is_file():
+        return None
+    summary = read_json(path).get("token_summary")
+    return summary if isinstance(summary, dict) else None
+
+
+def _plan_execution_metrics(out: Path) -> dict | None:
+    """Task-plan step / EE-exchange counts from a successful M4 selected plan."""
+
+    path = out / "m4.json"
+    if not path.is_file():
+        return None
+    plan = read_json(path).get("selected_plan")
+    if not isinstance(plan, dict):
+        return None
+    order = plan.get("subgoal_order") or []
+    steps = plan.get("steps") or []
+    action_counts = plan.get("action_counts") or {}
+    cost = plan.get("cost_vector") or {}
+    metrics = {
+        "subgoal_count": len(order),
+        "plan_step_count": len(steps),
+        "transition_step_count": sum(
+            1 for step in steps if step.get("kind") == "transition"
+        ),
+        "subgoal_step_count": sum(
+            1 for step in steps if step.get("kind") == "subgoal"
+        ),
+        "action_counts": action_counts,
+        "n_ee_attaches": int(action_counts.get("n_ee_attaches") or 0),
+        "n_ee_detaches": int(action_counts.get("n_ee_detaches") or 0),
+        "planned_ee_switches": int(cost.get("ee_switches") or 0),
+    }
+    executed = _executed_ee_metrics(out)
+    if executed is not None:
+        metrics.update(executed)
+    return metrics
+
+
+def _executed_ee_metrics(out: Path) -> dict | None:
+    """Live-executed EE swap counts (SReg actual), when an M5 live manifest exists."""
+
+    try:
+        from tuj.gt.ee_swap_metrics import (
+            find_latest_live_manifest,
+            load_executed_ee_metrics,
+        )
+    except ImportError:
+        return None
+
+    m5_dir = out / "m5"
+    summary_path = m5_dir / "m5_summary.json"
+    if summary_path.is_file():
+        summary = read_json(summary_path)
+        if isinstance(summary.get("executed_ee_metrics"), dict):
+            metrics = dict(summary["executed_ee_metrics"])
+            return {
+                "executed_ee_switches": metrics.get("executed_ee_switches"),
+                "executed_n_ee_attaches": metrics.get("executed_n_ee_attaches"),
+                "executed_n_ee_detaches": metrics.get("executed_n_ee_detaches"),
+                "executed_ee_source": "m5_summary.json",
+            }
+        if summary.get("executed_ee_switches") is not None:
+            return {
+                "executed_ee_switches": int(summary["executed_ee_switches"]),
+                "executed_ee_source": "m5_summary.json",
+            }
+
+    manifest = find_latest_live_manifest(m5_dir)
+    if manifest is None:
+        return None
+    metrics = load_executed_ee_metrics(manifest)
+    if metrics is None:
+        return None
+    return {
+        "executed_ee_switches": metrics.get("executed_ee_switches"),
+        "executed_n_ee_attaches": metrics.get("executed_n_ee_attaches"),
+        "executed_n_ee_detaches": metrics.get("executed_n_ee_detaches"),
+        "executed_ee_source": str(manifest),
+    }
+
+
+def _token_totals(out: Path, llm_usage: dict | None) -> dict:
+    """Per-module and overall token totals for the ours pipeline."""
+
+    m1 = _m1_physical_token_summary(out)
+    m1_total = int((m1 or {}).get("physical_total", {}).get("total_tokens") or 0)
+    m2_rows = []
+    if isinstance(llm_usage, dict):
+        for name, entry in llm_usage.items():
+            if not isinstance(entry, dict):
+                continue
+            m2_rows.append(
+                {
+                    "call": name,
+                    "total_tokens": int(
+                        entry.get("tokens") or entry.get("total_tokens") or 0
+                    ),
+                    "prompt_tokens": int(entry.get("prompt_tokens") or 0),
+                    "completion_tokens": int(entry.get("completion_tokens") or 0),
+                    "seconds": float(entry.get("seconds") or 0.0),
+                    "calls": int(entry.get("calls") or 0),
+                }
+            )
+    m2_total = sum(row["total_tokens"] for row in m2_rows)
+    modules = {
+        "m1_physical": m1,
+        "m2_llm": {
+            "calls": m2_rows,
+            "total_tokens": m2_total,
+        },
+        # M4 is symbolic search (no LLM). M5 VLM usage is not aggregated yet.
+        "m4_llm": {"total_tokens": 0, "note": "no_llm"},
+        "m5_llm": {"total_tokens": None, "note": "not_instrumented"},
+    }
+    known = [m1_total, m2_total]
+    return {
+        "modules": modules,
+        "total_tokens": sum(known),
+        "total_tokens_note": (
+            "sum of instrumented modules only "
+            "(m1 physical + m2 llm; m5 llm not included)"
+        ),
+    }
+
+
+def persist_ours_timing_summary(
+    out: Path,
+    *,
+    stage_seconds: dict[str, float | None],
+    stage_status: dict[str, str],
+    previous_timing: dict | None,
+    wall_seconds: float | None,
+    incomplete: bool = False,
+) -> dict:
+    """Write output/<task>/timing_summary.json for the integrated ours run."""
+
+    llm_usage = _m2_llm_usage(out)
+    summary = build_timing_summary(
+        stage_order=TIMING_STAGES,
+        stage_seconds=merge_stage_seconds(previous_timing, stage_seconds),
+        stage_status=merge_stage_status(previous_timing, stage_status),
+        llm_usage=llm_usage,
+        wall_seconds=wall_seconds,
+        extras={
+            "pipeline": "ours",
+            "plan_metrics": _plan_execution_metrics(out),
+            "token_totals": _token_totals(out, llm_usage),
+            "session_wall_seconds": (
+                None if wall_seconds is None else round(float(wall_seconds), 2)
+            ),
+        },
+    )
+    measured = summary.get("measured_stage_sum_seconds")
+    if measured is not None:
+        summary["total_seconds"] = measured
+    if incomplete:
+        summary["incomplete"] = True
+    write_json(out / "timing_summary.json", summary)
+    print_timing_summary(summary, stage_order=TIMING_STAGES)
+    plan = summary.get("plan_metrics") or {}
+    if plan:
+        print(
+            "[timing] plan "
+            f"subgoals={plan.get('subgoal_count')} "
+            f"steps={plan.get('plan_step_count')} "
+            f"ee_attach={plan.get('n_ee_attaches')} "
+            f"ee_detach={plan.get('n_ee_detaches')} "
+            f"planned_ee_switches={plan.get('planned_ee_switches')} "
+            f"executed_ee_switches={plan.get('executed_ee_switches')}"
+        )
+    tokens = summary.get("token_totals") or {}
+    print(
+        f"[timing] tokens total={tokens.get('total_tokens')} "
+        f"({tokens.get('total_tokens_note')})"
+    )
+    print(f"[timing] -> {out / 'timing_summary.json'}")
+    return summary
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -790,13 +1133,21 @@ def stage_m5(task, out, args):
             ]
             # 재생은 계획과 같이 한 번만 돈다 — 리플레이 경로가 없으므로 영상을
             # 그때 안 남기면 보려고 전체를 다시 돌려야 한다. 그래서 기본으로 남긴다.
-            if "--video" not in args.m5_args:
+            # `--m5-args --no-video` 로 끄면 오프스크린 녹화/카메라 캡처를 생략한다.
+            m5_extra = [
+                a for a in args.m5_args if a != "--no-video"
+            ]
+            if (
+                "--video" not in m5_extra
+                and "--no-video" not in args.m5_args
+            ):
                 argv += [
                     "--video",
                     str(m5_dir / f"{task}.mp4"),
                 ]
-
-        argv += args.m5_args
+            argv += m5_extra
+        else:
+            argv += args.m5_args
 
         run_m5_runner(
             module,
@@ -850,8 +1201,16 @@ def build_parser():
 
     p.add_argument("--grounding-mode", choices=("full", "without_grounding"), default="full",
                    help="Separate upper-level grounding ablation; default keeps the full pipeline")
-    p.add_argument("--planner-mode", choices=("full", "without-planner"), default="full",
-                   help="Independent per-subgoal EE/tool assignment without M4 joint search")
+    p.add_argument(
+        "--planner-mode",
+        choices=("full", "without-planner", "greedy-ee-order"),
+        default="full",
+        help=(
+            "full=M4 joint search; without-planner=M2-order suitability baseline; "
+            "greedy-ee-order=myopic min EE-switch among ready subgoals "
+            "(exposes C3_2 2F scripted extras only on that path)"
+        ),
+    )
     p.add_argument("--scene-frame", type=Path,
                    help="Matching scene image for without_grounding when reusing M1")
     p.add_argument(
@@ -1184,109 +1543,173 @@ def _run_integrated(
     M5
     """
 
+    out = Path(out)
+    run_started = time.monotonic()
+    previous_timing = (
+        read_json(out / "timing_summary.json")
+        if (out / "timing_summary.json").is_file()
+        else None
+    )
+    stage_seconds: dict[str, float | None] = {
+        name: None for name in TIMING_STAGES
+    }
+    stage_status: dict[str, str] = {
+        name: "not_run" for name in TIMING_STAGES
+    }
     gk_paths = None
 
-    # ----------------------------------------------------------
-    # M1
-    # ----------------------------------------------------------
-
-    if start <= 0:
-        banner(
-            "M1  Scene + Physical Grounding"
-        )
-
-        stage_m1(
-            task,
+    def persist(*, incomplete: bool = False) -> dict:
+        return persist_ours_timing_summary(
             out,
-            args,
+            stage_seconds=stage_seconds,
+            stage_status=stage_status,
+            previous_timing=previous_timing,
+            wall_seconds=time.monotonic() - run_started,
+            incomplete=incomplete,
         )
 
-    if stop < 1:
-        return
+    def mark_resumed_before(index: int) -> None:
+        # CLI stages: m1=0, m2=1, m4=2, m5=3. G_k is timed between m2 and m4.
+        mapping = {
+            0: (),
+            1: ("m1",),
+            2: ("m1", "m2", "gk"),
+            3: ("m1", "m2", "gk", "m4"),
+        }
+        for name in mapping.get(index, ()):
+            if stage_status[name] == "not_run":
+                stage_status[name] = "resumed"
 
-    # ----------------------------------------------------------
-    # M2
-    # ----------------------------------------------------------
+    mark_resumed_before(start)
 
-    if start <= 1:
-        banner(
-            "M2  Subgoal Decomposition"
-        )
+    try:
+        # ----------------------------------------------------------
+        # M1
+        # ----------------------------------------------------------
 
-        stage_m2(
-            task,
-            out,
-            args,
-        )
-
-    if stop < 2:
-        return
-
-    # ----------------------------------------------------------
-    # G_k
-    # ----------------------------------------------------------
-
-    if start <= 2:
-        banner(
-            "G_k  Subgoal Graph Assembly"
-        )
-
-        gk_paths = stage_gk(
-            task,
-            out,
-        )
-
-    # ----------------------------------------------------------
-    # M4
-    # ----------------------------------------------------------
-
-    if (
-        args.skip_m4
-        or start > 2
-    ):
-        print(
-            "\n[M4] "
-            + (
-                "skipped"
-                if args.skip_m4
-                else "using existing m4.json"
+        if start <= 0:
+            banner(
+                "M1  Scene + Physical Grounding"
             )
-        )
+            t0 = time.monotonic()
+            stage_m1(
+                task,
+                out,
+                args,
+            )
+            stage_seconds["m1"] = time.monotonic() - t0
+            stage_status["m1"] = "completed"
 
-    else:
+        if stop < 1:
+            persist()
+            return
+
+        # ----------------------------------------------------------
+        # M2
+        # ----------------------------------------------------------
+
+        if start <= 1:
+            banner(
+                "M2  Subgoal Decomposition"
+            )
+            t0 = time.monotonic()
+            stage_m2(
+                task,
+                out,
+                args,
+            )
+            stage_seconds["m2"] = time.monotonic() - t0
+            stage_status["m2"] = "completed"
+
+        if stop < 2:
+            persist()
+            return
+
+        # ----------------------------------------------------------
+        # G_k
+        # ----------------------------------------------------------
+
+        if start <= 2:
+            banner(
+                "G_k  Subgoal Graph Assembly"
+            )
+            t0 = time.monotonic()
+            gk_paths = stage_gk(
+                task,
+                out,
+            )
+            stage_seconds["gk"] = time.monotonic() - t0
+            stage_status["gk"] = "completed"
+
+        # ----------------------------------------------------------
+        # M4
+        # ----------------------------------------------------------
+
+        if (
+            args.skip_m4
+            or start > 2
+        ):
+            print(
+                "\n[M4] "
+                + (
+                    "skipped"
+                    if args.skip_m4
+                    else "using existing m4.json"
+                )
+            )
+            stage_status["m4"] = (
+                "skipped" if args.skip_m4 else "resumed"
+            )
+
+        else:
+            banner(
+                "M4  Task Planner"
+            )
+            t0 = time.monotonic()
+            stage_m4(
+                task,
+                out,
+                args,
+                gk_paths,
+            )
+            stage_seconds["m4"] = time.monotonic() - t0
+            stage_status["m4"] = "completed"
+
+        if stop < 3:
+            persist()
+            return
+
+        # ----------------------------------------------------------
+        # M5
+        # ----------------------------------------------------------
+
+        if args.skip_m5:
+            print(
+                "\n[M5] skipped"
+            )
+            stage_status["m5"] = "skipped"
+            persist()
+            return
+
         banner(
-            "M4  Task Planner"
+            "M5  Motion Planner"
         )
-
-        stage_m4(
+        t0 = time.monotonic()
+        stage_m5(
             task,
             out,
             args,
-            gk_paths,
         )
+        stage_seconds["m5"] = time.monotonic() - t0
+        stage_status["m5"] = "completed"
+        persist()
 
-    if stop < 3:
-        return
-
-    # ----------------------------------------------------------
-    # M5
-    # ----------------------------------------------------------
-
-    if args.skip_m5:
-        print(
-            "\n[M5] skipped"
-        )
-        return
-
-    banner(
-        "M5  Motion Planner"
-    )
-
-    stage_m5(
-        task,
-        out,
-        args,
-    )
+    except SystemExit:
+        persist(incomplete=True)
+        raise
+    except Exception:
+        persist(incomplete=True)
+        raise
 
 
 # ══════════════════════════════════════════════════════════════════════
@@ -1303,6 +1726,10 @@ def main():
 
     if args.planner_mode == "without-planner":
         from run_without_planner import run
+        return run(args, sys.modules[__name__])
+
+    if args.planner_mode == "greedy-ee-order":
+        from run_greedy_ee_order import run
         return run(args, sys.modules[__name__])
 
     if args.grounding_mode == "without_grounding":

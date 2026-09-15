@@ -159,7 +159,14 @@ class ScriptedGraspSession:
         directory.mkdir(parents=True, exist_ok=True)
         store = MotionPlanStore(directory)
         request_path = store.save_request(request, index=0)
-        record = {"request_id": request.request_id, "request": str(request_path), "status": "RUNNING"}
+        record = {
+            "index": index,
+            "request_id": request.request_id,
+            "request": str(request_path),
+            "subgoal_id": request.task.subgoal_id,
+            "action_type": request.task.action_type,
+            "status": "RUNNING",
+        }
         self.records.append(record)
         try:
             entry = resolve(request)
@@ -224,10 +231,15 @@ class ScriptedGraspSession:
             self.save_manifest()
 
     def save_manifest(self):
+        from tuj.gt.ee_swap_metrics import count_executed_ee_metrics
+
         path = self.output / "live-execution-manifest.json"
+        metrics = count_executed_ee_metrics(self.records)
         save_json(path, {"manifest_version": "scripted-live-1", "steps": self.records,
             "status": "FAILED" if self.failure or any(r["status"] != "SUCCESS" for r in self.records) else (self.sequence_status or "SUCCESS"),
             "failure": self.failure,
+            "executed_ee_metrics": metrics,
+            "executed_ee_switches": metrics["executed_ee_switches"],
             "final_world": self.world.model_dump(mode="json")})
         return path
 

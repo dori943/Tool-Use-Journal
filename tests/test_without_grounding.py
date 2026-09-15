@@ -164,6 +164,63 @@ def test_empty_hypothesis_is_failure_not_fallback(tmp_path):
     assert result.selected_plan is None
 
 
+def test_multi_object_relocate_keeps_parent_ee_intersection(tmp_path):
+    """Multi-object relocate must split so each detail has a grounded target."""
+    c3 = ROOT / "output/c3_2/m1.json"
+    if not c3.is_file():
+        pytest.skip("c3_2 m1 fixture missing")
+    scene = json.loads(c3.read_text(encoding="utf-8"))
+    targets = [
+        "obj_plate_a_plate_a",
+        "obj_mug_a_mug_a",
+        "obj_fork_a_fork_a",
+        "obj_spoon_a_spoon_a",
+        "obj_bread_a_bread_a",
+        "obj_fruit_a_fruit_a",
+    ]
+    outputs = [
+        [
+            {
+                "subgoal_id": "SG1",
+                "goal": "Load tray_a",
+                "kind": "relocate",
+                "target_ids": targets,
+                "container_id": "obj_tray_a_tray_a",
+                "ordered": False,
+                "confidence": 0.9,
+            }
+        ],
+        [
+            {
+                "subgoal_id": "SG1",
+                "selected_tool_id": None,
+                "ee_candidates_by_object": {
+                    "obj_plate_a_plate_a": ["2F", "3F", "vac"],
+                    "obj_mug_a_mug_a": ["2F", "3F"],
+                    "obj_fork_a_fork_a": ["2F", "3F"],
+                    "obj_spoon_a_spoon_a": ["2F", "3F"],
+                    "obj_bread_a_bread_a": ["2F", "3F", "vac"],
+                    "obj_fruit_a_fruit_a": ["2F", "3F", "vac"],
+                },
+                "reason": "visual hypothesis",
+                "confidence": 0.8,
+            }
+        ],
+    ]
+    frame = tmp_path / "frame.png"
+    frame.write_bytes(b"test-image")
+    client = FakeClient(outputs)
+    rough = VisualSemanticRough("test-model", frame, robot(), client)
+    m2 = build_m2("Load tray", scene, rough)
+    assert len(m2["m2_subgoals"]) == len(targets)
+    assert all(len(s["target_ids"]) == 1 for s in m2["m2_subgoals"])
+    request, _ = build_m4_request(scene, m2, robot(), assemble)
+    assert all(s.target_ids for s in request.task_graph.subgoals)
+    assert all(s.feasible_ee for s in request.task_graph.subgoals)
+    result = plan(request)
+    assert result.status.value != "INFEASIBLE_NO_CANDIDATE"
+
+
 def test_foreign_m2_rejected(tmp_path):
     m2, _, _, _ = build(tmp_path)
     m2.pop("ablation")

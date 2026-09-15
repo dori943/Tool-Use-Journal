@@ -56,6 +56,38 @@ KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS = frozenset(
 PORTABLE_REFERENCE_EE = "3F"
 PORTABLE_START_POSITION_TOLERANCE_M = 0.015
 PORTABLE_START_ORIENTATION_TOLERANCE_RAD = 0.03
+# Every portable bare→EE cache must begin at TOOL_USE_JOURNAL_BARE_HOME_QPOS.
+# A kitchen bare_to_3F commissioned off this seam produced live
+# START_STATE_MISMATCH (0.924656 rad) on c3_2.
+PORTABLE_BARE_HOME_START_TOLERANCE_RAD = 0.01
+
+
+def max_joint_position_error_rad(
+    left: Sequence[float], right: Sequence[float]
+) -> float:
+    if len(left) != len(right):
+        raise ValueError("joint vectors must have the same length")
+    return max(abs(float(a) - float(b)) for a, b in zip(left, right))
+
+
+def assert_portable_attach_starts_at_bare_home(template: object) -> None:
+    """Reject portable bare→EE templates whose seam is not the shared bare home."""
+
+    if not is_portable_ee_path(template):
+        return
+    from tuj.m5_motion.tool_use_journal import TOOL_USE_JOURNAL_BARE_HOME_QPOS
+
+    start = getattr(template, "start_joint_positions_rad", None)
+    if not isinstance(start, Sequence):
+        raise ValueError("portable attach template is missing start joints")
+    error = max_joint_position_error_rad(start, TOOL_USE_JOURNAL_BARE_HOME_QPOS)
+    if error > PORTABLE_BARE_HOME_START_TOLERANCE_RAD:
+        raise ValueError(
+            "portable bare→EE template start joints differ from "
+            f"TOOL_USE_JOURNAL_BARE_HOME_QPOS by {error:.6f} rad "
+            f"(limit {PORTABLE_BARE_HOME_START_TOLERANCE_RAD:.6f} rad); "
+            "recommission from bare home"
+        )
 
 
 def portable_ee_path_directory_for(environment_name: str) -> str:
@@ -809,6 +841,15 @@ class PrecomputedEEAttachRegistry:
                 "trajectory metadata does not match the registry lookup",
                 trajectory_id=template.trajectory_id,
             )
+        if use_shared_path:
+            try:
+                assert_portable_attach_starts_at_bare_home(template)
+            except ValueError as error:
+                raise PrecomputedEEPathError(
+                    EEAttachPathFailureCode.PRECOMPUTED_EE_PATH_STALE,
+                    str(error),
+                    trajectory_id=template.trajectory_id,
+                ) from error
         return template
 
     def _preferred_portable_directory(
@@ -1430,6 +1471,7 @@ def save_ee_attach_template(
         collision_contexts=collision_contexts,
         trajectory_id=trajectory_id,
     )
+    assert_portable_attach_starts_at_bare_home(template)
     destination = Path(path)
     destination.parent.mkdir(parents=True, exist_ok=True)
     temporary = destination.with_suffix(destination.suffix + ".tmp")
@@ -1445,8 +1487,11 @@ __all__ = [
     "EEAttachTrajectorySegmentTemplate",
     "EEAttachTrajectoryTemplate",
     "KITCHEN_PORTABLE_EE_PATH_ENVIRONMENTS",
+    "PORTABLE_BARE_HOME_START_TOLERANCE_RAD",
     "PORTABLE_EE_PATH_DIRECTORY",
     "PORTABLE_EE_PATH_DIRECTORY_KITCHEN",
+    "assert_portable_attach_starts_at_bare_home",
+    "max_joint_position_error_rad",
     "PORTABLE_EE_PATH_SCOPE",
     "PORTABLE_EE_PATH_SIGNATURE_PREFIX_LENGTH",
     "PrecomputedEEAttachPlanner",

@@ -494,14 +494,15 @@ class CatalogContext(SpoonContext):
             if kinematic_carry:
                 from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
                     EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
+                    MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M,
                     breakaway_vacuum_from_support,
                     move_vacuum_cartesian_kinematic,
                     settle_vacuum_arm_tracking)
                 # Clear residual support immersion before the long LIFT path so
                 # early-LIFT controller dip cannot deepen object↔island contacts
                 # past the early-LIFT exemption window.  Vac keeps the dip
-                # margin; 3F enclosure omits it (live mug_b exceeded the 20 mm
-                # bound when CLOSE immersion + vac dip were stacked).
+                # margin; 3F enclosure omits it and uses a higher climb cap
+                # (live mug_b: need 0.027787 m > vac 20 mm bound).
                 if recipe.ee_id=='vac':
                     q, breakaway = breakaway_vacuum_from_support(
                         self, q, hold_opening)
@@ -511,6 +512,7 @@ class CatalogContext(SpoonContext):
                         self, q, hold_opening,
                         pad_m=EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
                         dip_margin_m=0.0,
+                        max_breakaway_m=MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M,
                     )
                 result['support_breakaway'] = breakaway
                 if breakaway.get('applied'):

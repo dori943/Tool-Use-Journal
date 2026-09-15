@@ -31,6 +31,23 @@ def fruit_recipe():
     )
 
 
+def fruit_2f_c3_2_recipe():
+    """Greedy-extra 2F pinch: fruit diameter (~81 mm) fits the 85 mm stroke."""
+    return CatalogRecipe(
+        'fruit', 'c3_2', '2F', FRUIT_EXPECTED_SIZE_M,
+        offset_fraction=(0.0, 0.0, 0.08),
+        offset_m=(LATERAL_OFFSET_M, 0.0, 0.0),
+        approach_distance_m=0.07,
+        lift_distance_m=0.12,
+        minimum_lift_m=0.08,
+        preshape_aperture_m=0.084,
+        preshape_closure_command=-0.7,
+        two_finger_force_target_n=8.0,
+        # Smooth fruit can yaw about the pinch axis (same class as apple_2f).
+        maximum_slip_deg=25.0,
+    )
+
+
 def build_fruit_targets(T_WB, center_in_body_m, local_size_m, recipe=None):
     return build_catalog_targets(
         T_WB, center_in_body_m, local_size_m, recipe or fruit_recipe())

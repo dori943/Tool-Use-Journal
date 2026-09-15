@@ -556,6 +556,7 @@ def test_enclosure_support_breakaway_omits_vac_dip_margin():
     from tuj.m5_motion.scripted_grasps.runtime import GraspFailure
     from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
         EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
+        MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M,
         MAX_VACUUM_SUPPORT_BREAKAWAY_M,
         vacuum_support_breakaway_lift_m,
     )
@@ -569,9 +570,31 @@ def test_enclosure_support_breakaway_omits_vac_dip_margin():
         mesh_penetration_m=mesh_pen,
         pad_m=EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
         dip_margin_m=0.0,
+        max_breakaway_m=MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M,
     )
     assert enclosure == pytest.approx(mesh_pen + EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M)
-    assert enclosure <= MAX_VACUUM_SUPPORT_BREAKAWAY_M
+    assert enclosure <= MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M
+
+    # Deeper CLOSE crush (c3_2 live): need 0.027787 m > vac 20 mm, under 30 mm.
+    deep_need = 0.027787
+    deep_mesh = deep_need - EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M
+    with pytest.raises(GraspFailure, match='SUPPORT_BREAKAWAY_EXCEEDS_BOUND'):
+        vacuum_support_breakaway_lift_m(
+            0.0,
+            mesh_penetration_m=deep_mesh,
+            pad_m=EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
+            dip_margin_m=0.0,
+            max_breakaway_m=MAX_VACUUM_SUPPORT_BREAKAWAY_M,
+        )
+    deep = vacuum_support_breakaway_lift_m(
+        0.0,
+        mesh_penetration_m=deep_mesh,
+        pad_m=EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
+        dip_margin_m=0.0,
+        max_breakaway_m=MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M,
+    )
+    assert deep == pytest.approx(deep_need)
+    assert deep <= MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M
 
 
 def test_move_vacuum_cartesian_kinematic_plays_path_then_settles(tmp_path):

@@ -145,6 +145,13 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
             live_run_dir=str(run_dir.resolve()),
             scripted_grasp_count=sum(r["route"] == "SCRIPTED_GRASP" for r in session.records),
             motion_plan_count=sum(r["route"] == "M5_MOTION_PLAN" for r in session.records))
+        try:
+            payload = json.loads(manifest.read_text(encoding="utf-8"))
+            metrics = payload.get("executed_ee_metrics") or {}
+            summary["executed_ee_switches"] = metrics.get("executed_ee_switches")
+            summary["executed_ee_metrics"] = metrics
+        except (OSError, json.JSONDecodeError, TypeError):
+            pass
         if recorder:
             recorder.hold_final_frame(args.video_hold_seconds)
         elif runtime.scripted_render:
@@ -171,6 +178,13 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
             summary["live_run_dir"] = str(session.output.resolve())
             latest = session.output.parent / "live-execution-manifest.json"
             latest.write_text(manifest.read_text(encoding="utf-8"), encoding="utf-8")
+            try:
+                payload = json.loads(manifest.read_text(encoding="utf-8"))
+                metrics = payload.get("executed_ee_metrics") or {}
+                summary["executed_ee_switches"] = metrics.get("executed_ee_switches")
+                summary["executed_ee_metrics"] = metrics
+            except (OSError, json.JSONDecodeError, TypeError):
+                pass
     finally:
         if recorder:
             recorder.close()

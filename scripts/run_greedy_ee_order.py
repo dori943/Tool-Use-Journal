@@ -1,4 +1,4 @@
-"""Separate M2-order, independent EE/tool baseline for scripts/run.py."""
+"""Separate greedy EE-order experiment runner (production C3-2 untouched)."""
 
 from __future__ import annotations
 
@@ -7,18 +7,19 @@ import json
 import time
 from pathlib import Path
 
+from tuj.ablations.greedy_ee_order import METHOD, greedy_ee_order_plan
 from tuj.ablations.timing_summary import (
     build_timing_summary,
     merge_stage_seconds,
     merge_stage_status,
     print_timing_summary,
 )
-from tuj.ablations.without_planner import METHOD, independent_plan
 from tuj.m4_taskplanner.gk_adapter import build_request_from_gk
 from tuj.m4_taskplanner.models import InitialState
 from tuj.m4_taskplanner.serialization import dump_result
+from tuj.m5_motion.scripted_grasps.registry import GREEDY_EXTRA_ENTRIES
 
-STAGE_ORDER = ("m1", "m2", "independent_assignment", "m5")
+STAGE_ORDER = ("m1", "m2", "greedy_assignment", "m5")
 
 
 def _read(path):
@@ -36,14 +37,18 @@ def _hash(path):
 
 
 def run(args, pipeline):
-    if args.grounding_mode != "full":
+    if getattr(args, "grounding_mode", "full") != "full":
         raise ValueError(
-            "without-planner and without_grounding are separate experimental conditions"
+            "greedy-ee-order requires grounding_mode=full"
+        )
+    if getattr(args, "planner_mode", "full") not in {"full", "greedy-ee-order"}:
+        raise ValueError(
+            "greedy-ee-order cannot be combined with without-planner"
         )
     if args.skip_m4:
-        raise ValueError("--skip-m4 would skip the independent assignment as well")
+        raise ValueError("--skip-m4 would skip the greedy assignment as well")
     if any(token.split("=", 1)[0] == "--task-planner" for token in args.m5_args):
-        raise ValueError("M5 must consume this run's independent-assignment m4.json")
+        raise ValueError("M5 must consume this run's greedy-assignment m4.json")
     partial_execution = any(
         token.split("=", 1)[0] in ("--stop-after-subgoal", "--stop-after-pick")
         for token in args.m5_args
@@ -69,7 +74,7 @@ def run(args, pipeline):
             args.seed,
         ):
             raise ValueError(
-                "output directory belongs to a different ablation/task/seed"
+                "output directory belongs to a different experiment/task/seed"
             )
         if not args.start_from:
             raise ValueError(
@@ -78,22 +83,23 @@ def run(args, pipeline):
     else:
         if not args.start_from and any(out.iterdir()):
             raise ValueError(
-                "new without-planner run requires an empty output directory"
+                "new greedy-ee-order run requires an empty output directory"
             )
         if (out / "m4.json").exists():
             raise ValueError(
-                "cannot overwrite an existing plan without a matching ablation manifest"
+                "cannot overwrite an existing plan without a matching experiment manifest"
             )
         manifest = {
             "method": METHOD,
             "task": task,
             "seed": args.seed,
             "m4_invoked": False,
+            "scripted_grasp_greedy_extra": True,
             "stages": {},
             "m4_sha256": None,
         }
 
-    result_path = out / "without_planner_result.json"
+    result_path = out / "greedy_ee_order_result.json"
     report = (
         _read(result_path)
         if result_path.exists()
@@ -113,7 +119,7 @@ def run(args, pipeline):
     _write(manifest_path, manifest)
     _write(result_path, report)
     print(f"[run] method={METHOD} task={task} seed={args.seed} out={out}")
-    print("[without-planner] M4 EE Swap-Aware Planner invocation: SKIPPED")
+    print("[greedy-ee-order] M4 global search: SKIPPED; myopic EE-switch policy")
     stage = "m1"
     summary_path = out / "m5" / "m5_summary.json"
     previous_summary_mtime_ns = None
@@ -141,14 +147,13 @@ def run(args, pipeline):
             assign_ms = _read(out / "m4.json").get("task", {}).get("assignment_time_ms")
         merged_seconds = merge_stage_seconds(previous_timing, stage_seconds)
         merged_status = merge_stage_status(previous_timing, stage_status)
-        # Wall clock for this process only; prefer measured stage sum across resumes.
         summary = build_timing_summary(
             stage_order=STAGE_ORDER,
             stage_seconds=merged_seconds,
             stage_status=merged_status,
             llm_usage=usage,
             wall_seconds=None,
-            combined_stage_keys=("m2", "independent_assignment"),
+            combined_stage_keys=("m2", "greedy_assignment"),
             combined_label="m2_through_assignment_seconds",
             extras={
                 "assignment_time_ms": assign_ms,
@@ -216,7 +221,7 @@ def run(args, pipeline):
             persist_timing()
             return
 
-        stage = "independent_assignment"
+        stage = "greedy_assignment"
         if start <= 2:
             manifest["stages"]["m4"] = "skipped"
             manifest["m4_sha256"] = None
@@ -243,22 +248,36 @@ def run(args, pipeline):
                     constrain_task_request,
                 )
 
-                request, changes = constrain_task_request(request, environment)
+                request, changes = constrain_task_request(
+                    request,
+                    environment,
+                    extra_entries=GREEDY_EXTRA_ENTRIES,
+                )
             else:
                 changes = []
-            result = independent_plan(request)
+            result = greedy_ee_order_plan(request)
             result.task["execution_compatibility"] = {
-                "source": "scripted_grasp_registry" if changes else "none",
+                "source": (
+                    "scripted_grasp_registry+greedy_extra" if changes else "none"
+                ),
                 "environment": environment,
+                "greedy_extra_ees": sorted(
+                    {
+                        (e.object_id, e.ee)
+                        for e in GREEDY_EXTRA_ENTRIES
+                        if e.environment == environment
+                    }
+                ),
                 "changes": changes,
             }
+            result.task["scripted_grasp_greedy_extra"] = True
             _write(
                 out / "m4_request.json", request.model_dump(mode="json", by_alias=True)
             )
             dump_result(result, out / "m4.json")
-            stage_seconds["independent_assignment"] = time.monotonic() - t0
+            stage_seconds["greedy_assignment"] = time.monotonic() - t0
             assignment_time_ms = result.task.get("assignment_time_ms")
-            stage_status["independent_assignment"] = result.status.value
+            stage_status["greedy_assignment"] = result.status.value
             manifest["m4_sha256"] = _hash(out / "m4.json")
             manifest["stages"][stage] = result.status.value
             report["plan_status"] = result.status.value
@@ -266,13 +285,14 @@ def run(args, pipeline):
             _write(manifest_path, manifest)
             _write(result_path, report)
             print(
-                f"[without-planner] independent assignment: {result.status.value}; M4 search calls=0"
+                f"[greedy-ee-order] assignment: {result.status.value}; "
+                f"M4 search calls=0"
             )
             if result.selected_plan is None:
                 report["success"] = False
                 _write(result_path, report)
                 raise RuntimeError(
-                    f"independent assignment failed: {result.status.value}; see m4.json rejections"
+                    f"greedy assignment failed: {result.status.value}; see m4.json"
                 )
         else:
             if (
@@ -280,13 +300,17 @@ def run(args, pipeline):
                 or _hash(out / "m4.json") != manifest["m4_sha256"]
             ):
                 raise ValueError(
-                    "M5 resume requires this run's unchanged independent plan"
+                    "M5 resume requires this run's unchanged greedy plan"
                 )
             plan = _read(out / "m4.json")
             if plan.get("method") != METHOD or plan.get("m4_invoked") is not False:
-                raise ValueError("M5 plan was not produced by without-planner")
+                raise ValueError("M5 plan was not produced by greedy-ee-order")
+            if not plan.get("task", {}).get("scripted_grasp_greedy_extra"):
+                raise ValueError(
+                    "greedy plan missing scripted_grasp_greedy_extra for M5 resolve"
+                )
             assignment_time_ms = plan.get("task", {}).get("assignment_time_ms")
-            stage_status["independent_assignment"] = "resumed"
+            stage_status["greedy_assignment"] = "resumed"
         if stop == 2 or args.skip_m5:
             persist_timing()
             return
@@ -324,8 +348,8 @@ def run(args, pipeline):
         manifest["stages"][stage] = "failed"
         if stage in stage_status:
             stage_status[stage] = "failed"
-        elif stage == "independent_assignment":
-            stage_status["independent_assignment"] = "failed"
+        elif stage == "greedy_assignment":
+            stage_status["greedy_assignment"] = "failed"
         manifest["failure"] = {
             "stage": stage,
             "type": type(error).__name__,

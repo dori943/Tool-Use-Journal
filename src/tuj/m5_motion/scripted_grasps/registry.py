@@ -153,14 +153,21 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
 # EE feasibility check can select it alongside the validated 2F plate entry.
 ALTERNATIVE_ENTRIES: tuple[GraspEntry, ...] = ()
 
-# Explicit validator-only feasibility probes. They do not alter M4 choices or
-# the normal M5 registry surface.
-VALIDATOR_EXPERIMENTAL_ENTRIES: tuple[GraspEntry, ...] = (
+# Explicit validator-only / greedy-only feasibility probes. They do not alter
+# production M4 choices or the normal M5 registry surface unless a caller opts in.
+_C3_2_2F_CORE: tuple[GraspEntry, ...] = (
     GraspEntry("bread", "C3_2_BreakfastTrayPreparation", "2F", "catalog",
                "bread", recipe_name="bread_2f_c3_2_recipe"),
     GraspEntry("spoon", "C3_2_BreakfastTrayPreparation", "2F", "spoon"),
     GraspEntry("fork", "C3_2_BreakfastTrayPreparation", "2F", "catalog",
                "fork", recipe_name="fork_2f_c3_2_recipe"),
+)
+VALIDATOR_EXPERIMENTAL_ENTRIES: tuple[GraspEntry, ...] = _C3_2_2F_CORE
+# Greedy EE-order experiment only: same 2F core plus fruit 2F. C3_2 mug AABB
+# (~88 mm) exceeds the Robotiq 85 stroke, so mug stays 3F-only even for greedy.
+GREEDY_EXTRA_ENTRIES: tuple[GraspEntry, ...] = _C3_2_2F_CORE + (
+    GraspEntry("fruit", "C3_2_BreakfastTrayPreparation", "2F", "catalog",
+               "fruit", recipe_name="fruit_2f_c3_2_recipe"),
 )
 
 # Exact M1 identifiers only; no substring or fuzzy matching of object names.
@@ -191,7 +198,7 @@ def integration_status(entry):
         return "BLOCKED"
     if entry in ALTERNATIVE_ENTRIES:
         return "VALIDATED"
-    if entry in VALIDATOR_EXPERIMENTAL_ENTRIES:
+    if entry in VALIDATOR_EXPERIMENTAL_ENTRIES or entry in GREEDY_EXTRA_ENTRIES:
         return "EXPERIMENTAL"
     if (entry.object_id, entry.environment) in EXPERIMENTAL_ENTRY_KEYS:
         return "EXPERIMENTAL"
@@ -212,10 +219,36 @@ def _recipe_keys_for_target(target: str, environment: str) -> tuple[str, ...]:
         base = target[:-2]
         if any(
             entry.object_id == base and entry.environment == environment
-            for entry in ENTRIES + ALTERNATIVE_ENTRIES + VALIDATOR_EXPERIMENTAL_ENTRIES
+            for entry in (
+                ENTRIES + ALTERNATIVE_ENTRIES
+                + VALIDATOR_EXPERIMENTAL_ENTRIES + GREEDY_EXTRA_ENTRIES
+            )
         ):
             keys.append(base)
     return tuple(keys)
+
+
+def _opt_in_extra_entries(task_metadata, world_metadata) -> tuple[GraspEntry, ...]:
+    """Return opted-in extra recipes without duplicating shared 2F core rows."""
+    extras: list[GraspEntry] = []
+    seen: set[tuple[str, str, str]] = set()
+
+    def _extend(entries: tuple[GraspEntry, ...]) -> None:
+        for entry in entries:
+            key = (entry.object_id, entry.environment, entry.ee)
+            if key in seen:
+                continue
+            seen.add(key)
+            extras.append(entry)
+
+    if task_metadata.get("scripted_grasp_validator_experimental", False):
+        _extend(VALIDATOR_EXPERIMENTAL_ENTRIES)
+    if (
+        task_metadata.get("scripted_grasp_greedy_extra", False)
+        or world_metadata.get("scripted_grasp_greedy_extra", False)
+    ):
+        _extend(GREEDY_EXTRA_ENTRIES)
+    return tuple(extras)
 
 
 def resolve(request):
@@ -231,6 +264,9 @@ def resolve(request):
 
     Multi-instance scenes (``plate_b``) may resolve a type-keyed entry
     (``plate``) while preserving the request target as ``body_object_id``.
+
+    Production callers never set ``scripted_grasp_greedy_extra``; only the
+    greedy EE-order experiment exposes C3_2 2F extras through that flag.
     """
     if not is_acquire_task(request.task):
         return None
@@ -242,9 +278,10 @@ def resolve(request):
         target = task.tool
     target = ALIASES.get(target, target)
     environment = request.world.metadata.get("environment_name")
-    candidates = ENTRIES + ALTERNATIVE_ENTRIES
-    if task.metadata.get("scripted_grasp_validator_experimental", False):
-        candidates += VALIDATOR_EXPERIMENTAL_ENTRIES
+    candidates = (
+        ENTRIES + ALTERNATIVE_ENTRIES
+        + _opt_in_extra_entries(task.metadata, request.world.metadata)
+    )
     matched_key = None
     matches: list[GraspEntry] = []
     for key in _recipe_keys_for_target(target, environment):
