@@ -1,0 +1,15 @@
+<mujoco model="sim_002">
+  <option gravity="0 0 -9.81" integrator="RK4" timestep="0.002"/>
+  <worldbody>
+    <body name="table" pos="0 0 0">
+      <geom name="table_top" type="box" size="0.20 0.20 0.01" pos="0 0 0"/>
+      <body name="opening_left" pos="-0.04000000 0 0.06"><geom type="box" size="0.00500000 0.03500000 0.05"/></body>
+      <body name="opening_right" pos="0.04000000 0 0.06"><geom type="box" size="0.00500000 0.03500000 0.05"/></body>
+    </body>
+    <body name="object" pos="0 0 0.06000000" quat="1 0 0 0">
+      <freejoint/>
+      <geom name="object_geom" type="box" size="0.02750000 0.02750000 0.04000000"
+            mass="0.48000000" friction="0.6 0.01 0.001"/>
+    </body>
+  </worldbody>
+</mujoco>

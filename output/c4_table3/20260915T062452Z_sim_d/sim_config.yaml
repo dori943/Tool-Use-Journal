@@ -1,0 +1,20 @@
+benchmark: C4 Table III D_SIM
+panel: D_SIM
+generator: experiments/c4_table3/sim_d/generate_sim_gt.py
+input_manifest: sim_manifest.yaml
+evaluator_only_gt: sim_gt.yaml
+conditions:
+- name_only
+- affordance_labels
+- siphy_adopted
+- geometric_grounding
+- ours_full
+- gt_numerics
+inference:
+  allowed: false
+  reason: No simulator D prediction adapters are registered in this preparation step
+protocol:
+  crit_threshold_kg: 0.5
+  crit_half_width_kg: 0.05
+  object_macro: equal
+generated_at_utc: '2026-09-15T06:24:52.440918+00:00'

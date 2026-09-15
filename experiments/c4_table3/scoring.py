@@ -235,7 +235,8 @@ def score_binary_macro(expected: list[dict], predictions: list[dict]) -> dict:
 
 
 def score_mass_acc(samples: list[dict], predictions: list[dict],
-                   payload_kg: dict[str, float]) -> dict:
+                   payload_kg: dict[str, float], *,
+                   required_gt_source: str = "independent_scale") -> dict:
     """Each independently weighed sample contributes all three EE decisions."""
     if set(payload_kg) != {"2F", "3F", "vac"}:
         raise ValueError("EE_PAYLOAD_SET_MISMATCH")
@@ -247,7 +248,7 @@ def score_mass_acc(samples: list[dict], predictions: list[dict],
         gt = sample.get("mass_gt_kg")
         if (not isinstance(gt, (int, float)) or not math.isfinite(gt) or gt <= 0 or
                 sample.get("payload_applicability_verified") is not True or
-                sample.get("gt_source") != "independent_scale"):
+                sample.get("gt_source") != required_gt_source):
             raise ValueError("MISSING_INDEPENDENT_MASS_OR_PAYLOAD_APPLICABILITY")
         predicted_mass = _valid_numeric(indexed.get(sample["sample_id"]), positive=True)
         for ee_id, payload in payload_kg.items():
@@ -262,12 +263,13 @@ def score_mass_acc(samples: list[dict], predictions: list[dict],
     return score_binary_macro(units, decisions)
 
 
-def score_independent_trials(expected: list[dict], predictions: list[dict]) -> dict:
+def score_independent_trials(expected: list[dict], predictions: list[dict], *,
+                             required_gt_source: str = "independent_physical_trials") -> dict:
     """Suction/Feasibility: five physical trials, >=4 successes, fixed units."""
     units = []
     for row in expected:
         trials = row.get("trial_success")
-        if (row.get("gt_source") != "independent_physical_trials" or
+        if (row.get("gt_source") != required_gt_source or
                 not isinstance(trials, list) or len(trials) != 5 or
                 any(type(t) is not bool for t in trials)):
             raise ValueError("MISSING_INDEPENDENT_FIVE_TRIAL_GT")
@@ -276,7 +278,8 @@ def score_independent_trials(expected: list[dict], predictions: list[dict]) -> d
     return score_binary_macro(units, predictions)
 
 
-def score_suction_pf(pairs: list[dict], predictions: list[dict]) -> dict:
+def score_suction_pf(pairs: list[dict], predictions: list[dict], *,
+                     required_gt_source: str = "independent_physical_trials") -> dict:
     indexed = _unique_predictions(predictions)
     grouped = defaultdict(list)
     required_pose_ids = set()
@@ -290,7 +293,7 @@ def score_suction_pf(pairs: list[dict], predictions: list[dict]) -> dict:
             raise ValueError("MISSING_POSE_GT")
         if {p["gt_label"] for p in poses} != {True, False}:
             raise ValueError("PF_PAIR_MUST_CONTRAST_FEASIBLE_AND_INFEASIBLE")
-        if any(p.get("gt_source") != "independent_physical_trials" or
+        if any(p.get("gt_source") != required_gt_source or
                not isinstance(p.get("trial_success"), list) or
                len(p["trial_success"]) != 5 or
                any(type(t) is not bool for t in p["trial_success"]) or
@@ -317,7 +320,8 @@ def score_suction_pf(pairs: list[dict], predictions: list[dict]) -> dict:
 
 
 def score_clearance(expected: list[dict], predictions: list[dict],
-                    *, denominator_floor_mm: float = 5.0) -> dict:
+                    *, denominator_floor_mm: float = 5.0,
+                    required_gt_source: str = "independent_caliper_or_3d") -> dict:
     indexed = _unique_predictions(predictions)
     if set(indexed) - {r["unit_id"] for r in expected} or denominator_floor_mm != 5.0:
         raise ValueError("CLEARANCE_SET_OR_PROTOCOL_FLOOR_MISMATCH")
@@ -326,7 +330,7 @@ def score_clearance(expected: list[dict], predictions: list[dict],
     for row in expected:
         gt = row["gt_margin_mm"]
         if (not isinstance(gt, (int, float)) or not math.isfinite(gt) or
-                row.get("gt_source") != "independent_caliper_or_3d" or
+                row.get("gt_source") != required_gt_source or
                 not row.get("reference_frame")):
             raise ValueError("MISSING_INDEPENDENT_CLEARANCE_GT")
         pred = _valid_numeric(indexed.get(row["unit_id"]))
@@ -368,14 +372,15 @@ def score_da(expected: list[dict], predictions: list[dict]) -> dict:
 
 
 def score_critical_mass(expected: list[dict], predictions: list[dict],
-                        *, threshold_kg: float = 0.5, half_width_kg: float = 0.05) -> dict:
+                        *, threshold_kg: float = 0.5, half_width_kg: float = 0.05,
+                        required_gt_source: str = "independent_scale") -> dict:
     if threshold_kg != 0.5 or half_width_kg != 0.05:
         raise ValueError("CRIT_PROTOCOL_MISMATCH")
     subset = []
     for row in expected:
         mass = row["mass_gt_kg"]
         if (not isinstance(mass, (int, float)) or not math.isfinite(mass) or mass <= 0 or
-                row.get("gt_source") != "independent_scale"):
+                row.get("gt_source") != required_gt_source):
             raise ValueError("MISSING_INDEPENDENT_MASS_GT")
         if abs(mass - threshold_kg) <= half_width_kg:
             subset.append({"unit_id": row["unit_id"], "object_id": row["object_id"],

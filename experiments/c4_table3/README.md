@@ -5,6 +5,8 @@
 2026-09-14의 Static Real-5 실행은 잠긴 50개 정지 입력으로 5회 inference와 평가를 완료했다. SiPhy Mass MnRE, shared + Geometric Mass MnRE, shared Ours Mass MnRE는 `0.9085 ± 0.0046`, Ours Static visual Friction MAE는 `0.1550 ± 0.0048`이다. 이 결과는 `output/c4_table3/20260914T160924Z_static_real5_evaluate/`에서 재현한다. D 패널과 Name-only/Affordance는 독립 GT 또는 adapter 부족으로 계속 차단된다. 기존 trajectory friction 경로는 이 static 결과에 섞지 않는다.
 표 원본은 `output/c4_table3/20260914T160924Z_static_real5_evaluate/table3_filled.md`와 `.csv`이며, 값은 저장된 per-repeat macro 점수에서 독립 재집계된다.
 
+실물 D 패널은 독립 조작 GT가 없어 계속 `BLOCKED`다. 시뮬레이터만으로 후속 작업할 때는 [D_SIM protocol](../table3_protocol/D_SIM_PROTOCOL_KO.md)과 `experiments/c4_table3/sim_d/`를 사용한다. D_SIM은 MuJoCo hidden state로 evaluator-only GT와 입력 manifest를 만들며, Real-5 또는 실물 D 점수와 섞지 않는다. 현재 준비 run에는 prediction이 없고 condition cells는 adapter 구현 전 `NEEDS_IMPLEMENTATION`이다.
+
 ```powershell
 Set-Location C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal
 .venv\Scripts\python.exe experiments\c4_table3\run.py

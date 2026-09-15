@@ -1,0 +1,67 @@
+schema_version: table3_panel_d_sim_v1
+status: READY_GT_ONLY
+panel: D_SIM
+source_dataset: MuJoCo compiled fixture
+source_version: mujoco-3.3.1-compatible
+split: test
+ee_ids:
+- 2F
+- 3F
+- vac
+payload_kg:
+  2F: 5.0
+  3F: 2.5
+  vac: 0.5
+suction_trials_per_pose: 5
+suction_positive_at_least: 4
+feasibility_trials_per_sample_ee: 5
+feasibility_positive_at_least: 4
+clearance:
+  unit: mm
+  target: signed_horizontal_opening_margin
+  denominator_floor_mm: 5.0
+critical_subset:
+  ee_id: vac
+  mass_threshold_kg: 0.5
+  inclusive_half_width_kg: 0.05
+samples:
+- sample_id: sim_001
+  object_instance_id: sim_001_instance
+  object_name: sim_box_light
+  observation_path: observations/sim_001.json
+  observation_sha256: e1d8f70b803d7f1535e08c69eacee00d54a0de80e9d622f2c9bbd321581e1c25
+  split: test
+  source: D_SIM_MUJOCO
+- sample_id: sim_002
+  object_instance_id: sim_002_instance
+  object_name: sim_can_near_low
+  observation_path: observations/sim_002.json
+  observation_sha256: a1211dd424480df6549129e63b5829e6f54c83c7cc7d1623e0129921150feb95
+  split: test
+  source: D_SIM_MUJOCO
+- sample_id: sim_003
+  object_instance_id: sim_003_instance
+  object_name: sim_can_equal
+  observation_path: observations/sim_003.json
+  observation_sha256: b7980c8afb7f90527fde60df029dabfb7451ed24f80110730220687c6db2bd35
+  split: test
+  source: D_SIM_MUJOCO
+- sample_id: sim_004
+  object_instance_id: sim_004_instance
+  object_name: sim_can_near_high
+  observation_path: observations/sim_004.json
+  observation_sha256: bd98d9db492a482fbd1e10d6a2d19072996851cb53786fb1da08890db2aa360f
+  split: test
+  source: D_SIM_MUJOCO
+- sample_id: sim_005
+  object_instance_id: sim_005_instance
+  object_name: sim_wide_heavy
+  observation_path: observations/sim_005.json
+  observation_sha256: 5af7c7e7ed95d8c75a6c3d1f9b09b5c213aa52763913baecf2146f8be25c0cf3
+  split: test
+  source: D_SIM_MUJOCO
+review_and_leakage:
+  gt_used_for_input_generation: false
+  gt_used_for_prediction: false
+  predictions_present: false
+  evaluator_only_gt_file: sim_gt.yaml

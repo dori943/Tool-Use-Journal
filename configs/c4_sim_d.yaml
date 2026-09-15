@@ -1,0 +1,20 @@
+benchmark: C4_Table_III_D_SIM
+panel: D_SIM
+status: PREPARED_GT_ONLY
+generator: experiments/c4_table3/sim_d/generate_sim_gt.py
+validator: experiments/c4_table3/sim_d/validate_sim_gt.py
+scorer: experiments/c4_table3/sim_d/score_sim_d.py
+input_manifest: sim_manifest.yaml
+evaluator_only_gt: sim_gt.yaml
+real_world_transfer: forbidden
+inference: disabled_until_condition_adapters_are_registered
+protocol:
+  mass_payload_equality: infeasible
+  suction_trials: 5
+  positive_at_least: 4
+  feasibility_trials: 5
+  clearance_denominator_floor_mm: 5.0
+  crit_threshold_kg: 0.50
+  crit_half_width_kg: 0.05
+  macro: equal_object_weight
+
