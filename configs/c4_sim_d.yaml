@@ -4,6 +4,8 @@ status: PREPARED_GT_ONLY
 generator: experiments/c4_table3/sim_d/generate_sim_gt.py
 validator: experiments/c4_table3/sim_d/validate_sim_gt.py
 scorer: experiments/c4_table3/sim_d/score_sim_d.py
+adapter: experiments/c4_table3/sim_d/adapters.py
+adapter_audit: experiments/c4_table3/sim_d/audit_adapters.py
 input_manifest: sim_manifest.yaml
 evaluator_only_gt: sim_gt.yaml
 real_world_transfer: forbidden
@@ -17,4 +19,3 @@ protocol:
   crit_threshold_kg: 0.50
   crit_half_width_kg: 0.05
   macro: equal_object_weight
-

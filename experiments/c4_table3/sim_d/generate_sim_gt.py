@@ -78,6 +78,7 @@ def _scene_xml(spec: dict[str, Any]) -> str:
     return f'''<mujoco model="{spec["sample_id"]}">
   <option gravity="0 0 -9.81" integrator="RK4" timestep="0.002"/>
   <worldbody>
+    <camera name="agentview" pos="0 -0.55 0.42" xyaxes="1 0 0 0 0.65 0.76"/>
     <body name="table" pos="0 0 0">
       <geom name="table_top" type="box" size="0.20 0.20 0.01" pos="0 0 0"/>
       <body name="opening_left" pos="{-ox/2-wall/2:.8f} 0 0.06"><geom type="box" size="{wall/2:.8f} {oy/2:.8f} 0.05"/></body>
@@ -108,6 +109,12 @@ def _compile_and_extract(spec: dict[str, Any]) -> dict[str, Any]:
     before_z = float(data.xpos[object_bid][2])
     mujoco.mj_step(model, data)
     after_z = float(data.xpos[object_bid][2])
+    renderer = mujoco.Renderer(model, height=128, width=128)
+    renderer.update_scene(data, camera="agentview")
+    rgb = renderer.render().copy()
+    renderer.enable_depth_rendering()
+    depth = renderer.render().copy()
+    renderer.disable_depth_rendering()
     return {
         "scene_xml_sha256": _sha256_bytes(xml.encode("utf-8")),
         "compiled_object_mass_kg": model_mass,
@@ -115,6 +122,8 @@ def _compile_and_extract(spec: dict[str, Any]) -> dict[str, Any]:
         "initial_object_z_m": before_z,
         "post_step_object_z_m": after_z,
         "support_rollout_valid": bool(math.isfinite(after_z) and after_z > 0),
+        "rgb": rgb,
+        "depth": depth,
         "xml": xml,
     }
 
@@ -194,12 +203,28 @@ def generate(output_dir: Path) -> dict[str, Any]:
         scene_path = scene_dir / f'{spec["sample_id"]}.xml'
         scene_path.write_text(compiled.pop("xml"), encoding="utf-8")
         scene_hash = _sha256_file(scene_path)
+        rgb_path = obs_dir / f'{spec["sample_id"]}_rgb.png'
+        depth_path = obs_dir / f'{spec["sample_id"]}_depth.npy'
+        from PIL import Image
+        Image.fromarray(compiled.pop("rgb")).save(rgb_path)
+        import numpy as np
+        np.save(depth_path, compiled.pop("depth"))
         observation = {
             "sample_id": spec["sample_id"],
+            "input_id": spec["sample_id"],
+            "object_instance_id": f'{spec["sample_id"]}_instance',
             "object_name": spec["object_name"],
             "modality": "mujoco_state_observation",
             "scene_path": str(scene_path.relative_to(output_dir)).replace("\\", "/"),
             "scene_sha256": scene_hash,
+            # Observation files live beside their RGB/depth assets; keeping
+            # these paths local makes the manifest relocatable after cloning.
+            "rgb_path": rgb_path.name,
+            "depth_path": depth_path.name,
+            "rgb_sha256": _sha256_file(rgb_path),
+            "depth_sha256": _sha256_file(depth_path),
+            "mass_crop_path": rgb_path.name,
+            "friction_context_path": rgb_path.name,
             "visible_geometry_mm": {"extents": [float(v) for v in spec["size_mm"]],
                                     "opening_widths": [float(v) for v in spec["opening_mm"]]},
             "visible_support_context": {"table": "sim_table", "contact_surface": "sim_table_top"},
@@ -243,6 +268,8 @@ def generate(output_dir: Path) -> dict[str, Any]:
     (output_dir / "sim_gt.yaml").write_text(yaml.safe_dump(gt, allow_unicode=True, sort_keys=False), encoding="utf-8")
     config = {
         "benchmark": "C4 Table III D_SIM", "panel": "D_SIM", "generator": "experiments/c4_table3/sim_d/generate_sim_gt.py",
+        "adapter": "experiments/c4_table3/sim_d/adapters.py",
+        "adapter_audit": "experiments/c4_table3/sim_d/audit_adapters.py",
         "input_manifest": "sim_manifest.yaml", "evaluator_only_gt": "sim_gt.yaml",
         "conditions": ["name_only", "affordance_labels", "siphy_adopted", "geometric_grounding", "ours_full", "gt_numerics"],
         "inference": {"allowed": False, "reason": "No simulator D prediction adapters are registered in this preparation step"},

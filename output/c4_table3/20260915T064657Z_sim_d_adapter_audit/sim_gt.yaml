@@ -1,0 +1,469 @@
+schema_version: table3_panel_d_sim_gt_v1
+status: READY_GT_ONLY
+panel: D_SIM
+source:
+  generator: generate_sim_gt.py
+  simulator: MuJoCo
+  source_sha256: 6e0d80d75ea735ad233b740320d08fda7e9d694197bb742319e5621139855af2
+samples:
+- sample_id: sim_001
+  object_instance_id: sim_001_instance
+  object_name: sim_box_light
+  mass_gt_kg: 0.2
+  mass_gt_source: simulator_hidden_state_compiled_subtree_mass
+  payload_applicability_verified: true
+  payload_spec_source: configs/robot_spec.json
+  scene_xml_sha256: 909f61631b1fbd886a0ba1d5538d6200de327dca975941192a47842befa4f57f
+  compiled_object_size_mm:
+  - 45.0
+  - 45.0
+  - 80.0
+  support_rollout_valid: true
+  suction_pose_pair:
+    poses:
+    - pose_id: sim_001_pose_A
+      pose_index: 0
+      surface_rms_mm: 0.4
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    - pose_id: sim_001_pose_B
+      pose_index: 1
+      surface_rms_mm: 2.0
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: simulator_hidden_state
+    trial_contract:
+      trials: 5
+      positive_at_least: 4
+      lift_mm: 50
+      hold_s: 2.0
+  clearance_gt:
+    reference_frame: sim_table_frame
+    opening_inner_widths_mm:
+    - 80.0
+    - 80.0
+    projected_object_footprint_mm:
+    - 45.0
+    - 45.0
+    signed_margin_gt_mm: 35.0
+    gt_source: simulator_geometry
+  ee_trial_gt:
+    2F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    3F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    vac:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+  decision_gt:
+    allowed_ee_ids:
+    - vac
+    all_feasible_ee_ids:
+    - 2F
+    - 3F
+    - vac
+    no_feasible_ee: false
+    objective_frozen: true
+    objective: minimum frozen task_cost among feasible EE; ties are allowed
+    independent_trial_and_constraint_evidence_ids:
+    - sim_001::sim_trial_contract
+  critical_subset_member: false
+- sample_id: sim_002
+  object_instance_id: sim_002_instance
+  object_name: sim_can_near_low
+  mass_gt_kg: 0.48
+  mass_gt_source: simulator_hidden_state_compiled_subtree_mass
+  payload_applicability_verified: true
+  payload_spec_source: configs/robot_spec.json
+  scene_xml_sha256: bc941f4e5e356a426eed32894bba834bf7d7437c7296898fecccca1ac7035525
+  compiled_object_size_mm:
+  - 55.0
+  - 55.0
+  - 80.0
+  support_rollout_valid: true
+  suction_pose_pair:
+    poses:
+    - pose_id: sim_002_pose_A
+      pose_index: 0
+      surface_rms_mm: 0.6
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    - pose_id: sim_002_pose_B
+      pose_index: 1
+      surface_rms_mm: 2.0
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: simulator_hidden_state
+    trial_contract:
+      trials: 5
+      positive_at_least: 4
+      lift_mm: 50
+      hold_s: 2.0
+  clearance_gt:
+    reference_frame: sim_table_frame
+    opening_inner_widths_mm:
+    - 70.0
+    - 70.0
+    projected_object_footprint_mm:
+    - 55.0
+    - 55.0
+    signed_margin_gt_mm: 15.0
+    gt_source: simulator_geometry
+  ee_trial_gt:
+    2F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    3F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    vac:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+  decision_gt:
+    allowed_ee_ids:
+    - vac
+    all_feasible_ee_ids:
+    - 2F
+    - 3F
+    - vac
+    no_feasible_ee: false
+    objective_frozen: true
+    objective: minimum frozen task_cost among feasible EE; ties are allowed
+    independent_trial_and_constraint_evidence_ids:
+    - sim_002::sim_trial_contract
+  critical_subset_member: true
+- sample_id: sim_003
+  object_instance_id: sim_003_instance
+  object_name: sim_can_equal
+  mass_gt_kg: 0.5
+  mass_gt_source: simulator_hidden_state_compiled_subtree_mass
+  payload_applicability_verified: true
+  payload_spec_source: configs/robot_spec.json
+  scene_xml_sha256: 86b6e4a81171ddcf22b034c9bfa535407428b67e7fa1f5d05e58bcfde1d6114c
+  compiled_object_size_mm:
+  - 60.0
+  - 60.0
+  - 80.0
+  support_rollout_valid: true
+  suction_pose_pair:
+    poses:
+    - pose_id: sim_003_pose_A
+      pose_index: 0
+      surface_rms_mm: 0.8
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    - pose_id: sim_003_pose_B
+      pose_index: 1
+      surface_rms_mm: 2.0
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: simulator_hidden_state
+    trial_contract:
+      trials: 5
+      positive_at_least: 4
+      lift_mm: 50
+      hold_s: 2.0
+  clearance_gt:
+    reference_frame: sim_table_frame
+    opening_inner_widths_mm:
+    - 72.0
+    - 72.0
+    projected_object_footprint_mm:
+    - 60.0
+    - 60.0
+    signed_margin_gt_mm: 12.0
+    gt_source: simulator_geometry
+  ee_trial_gt:
+    2F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    3F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    vac:
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: simulator_hidden_state
+  decision_gt:
+    allowed_ee_ids:
+    - 3F
+    all_feasible_ee_ids:
+    - 2F
+    - 3F
+    no_feasible_ee: false
+    objective_frozen: true
+    objective: minimum frozen task_cost among feasible EE; ties are allowed
+    independent_trial_and_constraint_evidence_ids:
+    - sim_003::sim_trial_contract
+  critical_subset_member: true
+- sample_id: sim_004
+  object_instance_id: sim_004_instance
+  object_name: sim_can_near_high
+  mass_gt_kg: 0.52
+  mass_gt_source: simulator_hidden_state_compiled_subtree_mass
+  payload_applicability_verified: true
+  payload_spec_source: configs/robot_spec.json
+  scene_xml_sha256: 133310a8f094889396c0ccb1462ce2702843ea2c2a5cf131c9958dbbe305aa0c
+  compiled_object_size_mm:
+  - 62.0
+  - 62.0
+  - 80.0
+  support_rollout_valid: true
+  suction_pose_pair:
+    poses:
+    - pose_id: sim_004_pose_A
+      pose_index: 0
+      surface_rms_mm: 0.9
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    - pose_id: sim_004_pose_B
+      pose_index: 1
+      surface_rms_mm: 2.0
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: simulator_hidden_state
+    trial_contract:
+      trials: 5
+      positive_at_least: 4
+      lift_mm: 50
+      hold_s: 2.0
+  clearance_gt:
+    reference_frame: sim_table_frame
+    opening_inner_widths_mm:
+    - 70.0
+    - 70.0
+    projected_object_footprint_mm:
+    - 62.0
+    - 62.0
+    signed_margin_gt_mm: 8.0
+    gt_source: simulator_geometry
+  ee_trial_gt:
+    2F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    3F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    vac:
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: simulator_hidden_state
+  decision_gt:
+    allowed_ee_ids:
+    - 3F
+    all_feasible_ee_ids:
+    - 2F
+    - 3F
+    no_feasible_ee: false
+    objective_frozen: true
+    objective: minimum frozen task_cost among feasible EE; ties are allowed
+    independent_trial_and_constraint_evidence_ids:
+    - sim_004::sim_trial_contract
+  critical_subset_member: true
+- sample_id: sim_005
+  object_instance_id: sim_005_instance
+  object_name: sim_wide_heavy
+  mass_gt_kg: 0.8
+  mass_gt_source: simulator_hidden_state_compiled_subtree_mass
+  payload_applicability_verified: true
+  payload_spec_source: configs/robot_spec.json
+  scene_xml_sha256: 6a77181057e832658289e67243d9d5877cfeff06d9fac6ebd14b1d6d5536ce42
+  compiled_object_size_mm:
+  - 95.0
+  - 95.0
+  - 100.0
+  support_rollout_valid: true
+  suction_pose_pair:
+    poses:
+    - pose_id: sim_005_pose_A
+      pose_index: 0
+      surface_rms_mm: 0.7
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    - pose_id: sim_005_pose_B
+      pose_index: 1
+      surface_rms_mm: 2.0
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: simulator_hidden_state
+    trial_contract:
+      trials: 5
+      positive_at_least: 4
+      lift_mm: 50
+      hold_s: 2.0
+  clearance_gt:
+    reference_frame: sim_table_frame
+    opening_inner_widths_mm:
+    - 100.0
+    - 100.0
+    projected_object_footprint_mm:
+    - 95.0
+    - 95.0
+    signed_margin_gt_mm: 5.0
+    gt_source: simulator_geometry
+  ee_trial_gt:
+    2F:
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: simulator_hidden_state
+    3F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: simulator_hidden_state
+    vac:
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: simulator_hidden_state
+  decision_gt:
+    allowed_ee_ids:
+    - 3F
+    all_feasible_ee_ids:
+    - 3F
+    no_feasible_ee: false
+    objective_frozen: true
+    objective: minimum frozen task_cost among feasible EE; ties are allowed
+    independent_trial_and_constraint_evidence_ids:
+    - sim_005::sim_trial_contract
+  critical_subset_member: false
