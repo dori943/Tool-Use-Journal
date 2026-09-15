@@ -25,7 +25,9 @@ SUPPORTED = {
     "siphy_adopted": ["Mass_Acc", "Feasibility_Acc", "DA", "Crit"],
     "geometric_grounding": ["Mass_Acc", "Suction_Acc", "Suction_PF", "Clearance_RelErr", "Feasibility_Acc", "DA", "Crit"],
     "ours_full": ["Mass_Acc", "Suction_Acc", "Suction_PF", "Clearance_RelErr", "Feasibility_Acc", "DA", "Crit"],
+    "gt_numerics": ["Mass_Acc", "Suction_Acc", "Suction_PF", "Clearance_RelErr", "Feasibility_Acc", "DA", "Crit"],
 }
+DEFAULT_CONDITIONS = tuple(condition for condition in SUPPORTED if condition != "gt_numerics")
 
 
 def _normalize(rows: list[dict]) -> list[dict]:
@@ -59,12 +61,15 @@ def main() -> None:
     ap.add_argument("--gt", type=Path, required=True)
     ap.add_argument("--predictions", type=Path, required=True)
     ap.add_argument("--output", type=Path, required=True)
+    ap.add_argument("--conditions", nargs="+", choices=tuple(SUPPORTED), default=list(DEFAULT_CONDITIONS))
     args = ap.parse_args()
     rows = [json.loads(line) for line in args.predictions.read_text(encoding="utf-8").splitlines() if line]
     root = args.gt.parent
     repeats = sorted({int(r["repeat_id"]) for r in rows})
     per_repeat = []
-    for condition, metrics in SUPPORTED.items():
+    selected_conditions = tuple(args.conditions)
+    for condition in selected_conditions:
+        metrics = SUPPORTED[condition]
         for repeat_id in repeats:
             selected = _normalize([r for r in rows if r.get("condition") == condition and int(r.get("repeat_id", -1)) == repeat_id])
             if not selected:
@@ -79,7 +84,7 @@ def main() -> None:
                 per_repeat.append({"condition": condition, "repeat_id": repeat_id, "metric": metric, **item})
     args.output.write_text(json.dumps(per_repeat, ensure_ascii=False, indent=2), encoding="utf-8")
     summary = []
-    for condition in SUPPORTED:
+    for condition in selected_conditions:
         for metric in SUPPORTED[condition]:
             vals = [x["score"] for x in per_repeat if x["condition"] == condition and x["metric"] == metric and x.get("score") is not None]
             summary.append({"condition": condition, "metric": metric,

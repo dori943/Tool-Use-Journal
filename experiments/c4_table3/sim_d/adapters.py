@@ -446,11 +446,20 @@ class OracleAdapter:
             raise AdapterError(f"METRIC_UNSUPPORTED:{metric}")
         if not isinstance(gt_row, dict) or gt_row.get("sample_id") != observation.sample_id:
             raise AdapterError("ORACLE_SAMPLE_MISMATCH")
-        field = {"Mass_Acc": "mass_gt_kg", "Crit": "mass_gt_kg",
-                 "Clearance_RelErr": ("clearance_gt", "signed_margin_gt_mm")}.get(metric)
-        if field is None:
+        if metric in {"Mass_Acc", "Crit"}:
+            value = gt_row["mass_gt_kg"]
+        elif metric == "Clearance_RelErr":
+            value = gt_row["clearance_gt"]["signed_margin_gt_mm"]
+        elif metric in {"Suction_Acc", "Suction_PF"}:
+            poses = gt_row["suction_pose_pair"]["poses"]
+            value = {"pose_A": bool(poses[0]["gt_label"]), "pose_B": bool(poses[1]["gt_label"])}
+        elif metric == "Feasibility_Acc":
+            value = {ee: bool(trial["gt_label"]) for ee, trial in gt_row["ee_trial_gt"].items()}
+        elif metric == "DA":
+            allowed = list(gt_row["decision_gt"].get("allowed_ee_ids", []))
+            value = next((ee for ee in ("2F", "3F", "vac") if ee in allowed), "NO_FEASIBLE_EE")
+        else:
             raise AdapterError("ORACLE_METRIC_FIELD_NOT_REGISTERED")
-        value = gt_row[field] if isinstance(field, str) else gt_row[field[0]][field[1]]
         return {"input_id": observation.input_id, "condition_id": "gt_numerics", "metric": metric,
                 "value": value, "unit": ConditionAdapter._unit(metric), "oracle_channel": "evaluator_only",
                 "shared_prediction": False, "independent_model_call": False}
