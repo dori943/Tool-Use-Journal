@@ -37,6 +37,8 @@
 - [반복별 집계](../../output/c4_table3/20260914T160924Z_static_real5_evaluate/per_repeat_metrics.csv)
 - [평가 실행 로그](../../output/c4_table3/20260914T160924Z_static_real5_evaluate/run.log)
 - [Inference 검증 결과](../../output/c4_table3/20260914T064753Z_static_real5_inference/inference_validation.json)
+- [Raw predictions](../../output/c4_table3/20260914T064753Z_static_real5_inference/raw_predictions.jsonl)
+- [Inference checkpoint](../../output/c4_table3/20260914T064753Z_static_real5_inference/checkpoint.jsonl)
 - [입력 manifest](../../output/c4_table3/20260914T062054Z_static_real5_prep/selected_static_inputs.csv)
 - [잠긴 입력 이미지·점군](../../output/c4_table3/20260914T062054Z_static_real5_prep/inputs/)
 - [입력 contact sheet](../../output/c4_table3/20260914T062054Z_static_real5_prep/static_input_contact_sheet.png)
@@ -53,7 +55,7 @@
 - [Data gaps](data_preparation/data_gaps.md)
 - [C4 실행기 README](../c4_table3/README.md)
 
-브랜치에는 잠긴 평가용 mass crop, friction context, point cloud, mask overlay 200개(약 30.6MB)와 contact sheet를 포함했다. 원본 EV-RealPhys 전체 archive는 공식 URL과 SHA-256으로 별도 확보한다.
+브랜치에는 잠긴 평가용 mass crop, friction context, point cloud, mask overlay 200개(약 30.6MB), contact sheet, 반복별 raw prediction과 checkpoint를 포함했다. 원본 EV-RealPhys 전체 archive는 공식 URL과 SHA-256으로 별도 확보한다.
 
 ## 5. 아직 채우면 안 되는 셀
 
