@@ -266,6 +266,9 @@ def run(prep: Path, run_dir: Path, repeats: int = 3, conditions: tuple[str, ...]
         for cached in cached_rows:
             if (cached.get("condition") or cached.get("condition_id")) == "siphy_adopted" and cached.get("metric") == "Mass_Acc" and int(cached.get("repeat_id", -1)) == repeat_id and cached.get("parse_status") == "OK":
                 cache.put(cached)
+        for (cid, rid, _iid, metric), cached in reuse_index.items():
+            if cid == "siphy_adopted" and metric == "Mass_Acc" and rid == repeat_id:
+                cache.put(cached)
         for condition_id in conditions:
             adapter = ConditionAdapter(condition_id, provider, shared_cache=cache)
             for item in inputs:
