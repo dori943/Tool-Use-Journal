@@ -96,6 +96,8 @@ _BOUNDED_COLLISION_ALLOWANCES_KEY = "bounded_collision_allowances"
 _POST_SEGMENT_VALIDATION_CONTEXT_KEY = "post_segment_validation_context_id"
 _MAX_SUPPORT_PENETRATION_TOLERANCE_M = 0.001
 _DEFAULT_SUPPORT_MIN_HORIZONTAL_OVERLAP_RATIO = 0.5
+_SAFE_RACK_EXIT_COLLISION_MARGIN_M = 0.015
+_SAFE_RACK_EXIT_DYNAMIC_SCALING = 0.25
 
 
 class ToolUseJournalCollisionBindingError(RuntimeError):
@@ -2303,6 +2305,25 @@ class ToolUseJournalMotionRequestPlanner:
         world.metadata = dict(world.metadata)
         world.metadata["physical_active_ee"] = to_ee
         world.metadata["declared_active_ee"] = to_ee
+        exit_constraints = request.constraints.model_copy(deep=True)
+        # Reserve clearance for controller tracking near rack supports and
+        # reduce the exit speed so the mounted EE follows that route closely.
+        exit_constraints.collision_margin_m = max(
+            exit_constraints.collision_margin_m,
+            _SAFE_RACK_EXIT_COLLISION_MARGIN_M,
+        )
+        exit_constraints.velocity_scaling = min(
+            exit_constraints.velocity_scaling,
+            _SAFE_RACK_EXIT_DYNAMIC_SCALING,
+        )
+        exit_constraints.acceleration_scaling = min(
+            exit_constraints.acceleration_scaling,
+            _SAFE_RACK_EXIT_DYNAMIC_SCALING,
+        )
+        exit_constraints.jerk_scaling = min(
+            exit_constraints.jerk_scaling,
+            _SAFE_RACK_EXIT_DYNAMIC_SCALING,
+        )
         exit_request = MotionPlanRequest(
             request_id=f"{request.request_id}:safe-rack-exit",
             provenance=ArtifactProvenance(
@@ -2326,7 +2347,7 @@ class ToolUseJournalMotionRequestPlanner:
                     "safe_rack_exit": True,
                 },
             ),
-            constraints=request.constraints.model_copy(deep=True),
+            constraints=exit_constraints,
             options=request.options.model_copy(deep=True),
         )
         try:
