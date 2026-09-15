@@ -146,6 +146,33 @@ def _append_jsonl(path: Path, row: dict[str, Any]) -> None:
         handle.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 
 
+def _siphy_rows(obs, repeat_id: int, cfg: dict[str, Any], manifest_sha256: str, backend: Any) -> list[dict[str, Any]]:
+    """Run the repository SiPhyBackend once and derive Mass Acc/Crit locally."""
+    adapter = SiPhyAdapter(backend=backend)
+    result = adapter.predict_mass_with_backend(obs)
+    props = result["raw_backend_output"]
+    from tuj.m1_scene.siphy_backend import SYS_MSG
+    raw = {"backend_output": props, "vlm_attempts": getattr(backend, "last_vlm_attempts", [])}
+    prediction_id = f"siphy_adopted:Mass_Acc:{repeat_id}:{obs.input_id}"
+    base = {"input_id": obs.input_id, "sample_id": obs.sample_id,
+            "object_id": obs.payload.get("object_instance_id", obs.sample_id),
+            "condition_id": "siphy_adopted", "value": result["mass_kg"],
+            "unit": "kg", "raw_response": raw, "request_id": None,
+            "parse_status": "OK", "failure_reason": None,
+            "prompt_sha256": hashlib.sha256(SYS_MSG.encode()).hexdigest(),
+            "model_version": str(getattr(backend, "model", cfg["model"])),
+            "temperature": float(cfg["temperature"]), "shared_prediction": False,
+            "shared_prediction_source": None, "independent_model_call": True,
+            "prediction_id": prediction_id, "repeat_id": repeat_id,
+            "requested_seed": repeat_id, "provider_seed_supported": bool(getattr(backend, "_supports_seed", False)),
+            "provider_seed_sent": bool(getattr(backend, "_supports_seed", False)), "manifest_sha256": manifest_sha256}
+    crit = {**base, "metric": "Crit", "unit": "kg", "shared_prediction": True,
+            "shared_prediction_source": "siphy_adopted_mass", "source_prediction_id": prediction_id,
+            "independent_model_call": False, "prediction_id": f"{prediction_id}:Crit"}
+    mass = {**base, "metric": "Mass_Acc"}
+    return [mass, crit]
+
+
 def run(prep: Path, run_dir: Path, repeats: int = 3) -> dict[str, Any]:
     run_dir.mkdir(parents=True, exist_ok=True)
     manifest, inputs = _load_manifest(prep)
@@ -176,6 +203,7 @@ def run(prep: Path, run_dir: Path, repeats: int = 3) -> dict[str, Any]:
         (run_dir / "reproduce_inference.bat").write_text(
             f"@echo off\nsetlocal\nset PREP={prep}\n.venv\\Scripts\\python.exe experiments\\c4_table3\\sim_d\\run_inference.py --prep %PREP% --output {run_dir} --repeats {repeats}\n",
             encoding="utf-8")
+        failure["model_calls"] = 0
         return failure
     provider = OpenAIJsonProvider(cfg)
     cache = SharedPredictionCache()
@@ -189,13 +217,19 @@ def run(prep: Path, run_dir: Path, repeats: int = 3) -> dict[str, Any]:
                 key_prefix = {"condition": condition_id, "repeat_id": repeat_id, "input_id": obs.input_id,
                               "manifest_sha256": config_snapshot["manifest_sha256"], "model_version": cfg["model"]}
                 try:
-                    rows = adapter.predict_bundle(obs, METRICS[condition_id])
+                    if condition_id == "siphy_adopted":
+                        from tuj.m1_scene.siphy_backend import SiPhyBackend
+                        backend = SiPhyBackend(model=cfg["model"], temperature=cfg["temperature"])
+                        rows = _siphy_rows(obs, repeat_id, cfg, config_snapshot["manifest_sha256"], backend)
+                        cache.put(rows[0])
+                    else:
+                        rows = adapter.predict_bundle(obs, METRICS[condition_id])
                     # one provider request is represented by every parsed metric,
                     # but counted once through request_id/prompt/input.
                     unique_requests = {(r.get("request_id"), r.get("prompt_sha256"), r.get("input_id")) for r in rows if r.get("independent_model_call")}
                     counts["provider_calls"] += len(unique_requests)
                     for row in rows:
-                        row.update(key_prefix, repeat_id=repeat_id, requested_seed=100 + repeat_id,
+                        row.update(key_prefix, repeat_id=repeat_id, requested_seed=repeat_id,
                                   provider_seed_supported=False, provider_seed_sent=False)
                         _append_jsonl(raw_path, row)
                         _append_jsonl(parsed_path, row)
@@ -204,8 +238,31 @@ def run(prep: Path, run_dir: Path, repeats: int = 3) -> dict[str, Any]:
                 except Exception as error:  # keep independent inputs running
                     counts["failures"] += 1
                     _append_jsonl(run_dir / "failures.jsonl", {**key_prefix, "failure_reason": _redact(str(error))})
+                    detail = str(error).lower()
+                    if any(token in detail for token in ("authentication", "api key", "401", "permission", "quota exceeded")):
+                        log_lines.append("fatal_provider_error=1")
+                        (run_dir / "run.log").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
+                        return {"status": "BLOCKED_PROVIDER_FAILURE", **counts,
+                                "model_calls": counts["provider_calls"], "reason": _redact(str(error))}
     (run_dir / "run.log").write_text("\n".join(log_lines + ["status=COMPLETE", *(f"{k}={v}" for k, v in counts.items()), "sim_gt_read=0"]) + "\n", encoding="utf-8")
-    return {"status": "COMPLETE", **counts}
+    # Keep the same replay/metadata artifacts for successful and blocked runs.
+    if not metadata_path.exists():
+        metadata_path.write_text("", encoding="utf-8")
+    failures_path = run_dir / "failures.csv"
+    if not failures_path.exists():
+        failure_rows = []
+        failure_jsonl = run_dir / "failures.jsonl"
+        if failure_jsonl.exists():
+            failure_rows = [json.loads(line) for line in failure_jsonl.read_text(encoding="utf-8").splitlines() if line]
+        fields = ["condition", "repeat_id", "input_id", "manifest_sha256", "model_version", "failure_reason"]
+        with failures_path.open("w", encoding="utf-8", newline="") as handle:
+            writer = csv.DictWriter(handle, fieldnames=fields)
+            writer.writeheader()
+            writer.writerows({field: row.get(field) for field in fields} for row in failure_rows)
+    (run_dir / "reproduce_inference.bat").write_text(
+        f"@echo off\nsetlocal\nset PREP={prep}\n.venv\\Scripts\\python.exe experiments\\c4_table3\\sim_d\\run_inference.py --prep %PREP% --output {run_dir} --repeats {repeats}\n",
+        encoding="utf-8")
+    return {"status": "COMPLETE", **counts, "model_calls": counts["provider_calls"]}
 
 
 def main() -> None:
