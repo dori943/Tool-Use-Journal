@@ -38,6 +38,8 @@
 - [평가 실행 로그](../../output/c4_table3/20260914T160924Z_static_real5_evaluate/run.log)
 - [Inference 검증 결과](../../output/c4_table3/20260914T064753Z_static_real5_inference/inference_validation.json)
 - [입력 manifest](../../output/c4_table3/20260914T062054Z_static_real5_prep/selected_static_inputs.csv)
+- [잠긴 입력 이미지·점군](../../output/c4_table3/20260914T062054Z_static_real5_prep/inputs/)
+- [입력 contact sheet](../../output/c4_table3/20260914T062054Z_static_real5_prep/static_input_contact_sheet.png)
 - [Inference 설정](../../output/c4_table3/20260914T062054Z_static_real5_prep/inference_config.yaml)
 - [Adapter 감사](../../output/c4_table3/20260914T062054Z_static_real5_prep/adapter_audit.md)
 - [Evaluator-only GT](../../output/c4_table3/20260914T062054Z_static_real5_prep/evaluator_only_gt.yaml)
@@ -50,6 +52,8 @@
 - [표본 수와 차단 상태](data_preparation/metric_sample_counts.json)
 - [Data gaps](data_preparation/data_gaps.md)
 - [C4 실행기 README](../c4_table3/README.md)
+
+브랜치에는 잠긴 평가용 mass crop, friction context, point cloud, mask overlay 200개(약 30.6MB)와 contact sheet를 포함했다. 원본 EV-RealPhys 전체 archive는 공식 URL과 SHA-256으로 별도 확보한다.
 
 ## 5. 아직 채우면 안 되는 셀
 
