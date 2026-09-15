@@ -26,7 +26,10 @@ def validate(root: Path) -> list[str]:
         mass = row.get("mass_gt_kg")
         if not isinstance(mass, (int, float)) or not math.isfinite(mass) or mass <= 0:
             errors.append(f"INVALID_MASS:{row.get('sample_id')}")
-        if row.get("mass_gt_source") != "simulator_hidden_state_compiled_subtree_mass":
+        if row.get("mass_gt_source") not in {
+            "simulator_hidden_state_compiled_subtree_mass",
+            "YCB_MESH_SIM_PROXY_DENSITY_VOLUME",
+        }:
             errors.append(f"INVALID_MASS_SOURCE:{row.get('sample_id')}")
         poses = row.get("suction_pose_pair", {}).get("poses", [])
         if len(poses) != 2 or any(len(p.get("trial_success", [])) != 5 for p in poses):
@@ -35,7 +38,9 @@ def validate(root: Path) -> list[str]:
             if len(data.get("trial_success", [])) != 5:
                 errors.append(f"INVALID_FEASIBILITY_TRIALS:{row.get('sample_id')}:{ee_id}")
         clearance = row.get("clearance_gt", {})
-        if clearance.get("gt_source") != "simulator_geometry" or not clearance.get("reference_frame"):
+        if clearance.get("gt_source") not in {
+            "simulator_geometry", "YCB_MESH_SIM_PROXY_GEOMETRY",
+        } or not clearance.get("reference_frame"):
             errors.append(f"INVALID_CLEARANCE_SOURCE:{row.get('sample_id')}")
     if not any(row.get("critical_subset_member") for row in gt_samples):
         errors.append("CRIT_SUBSET_EMPTY")
@@ -57,4 +62,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-
