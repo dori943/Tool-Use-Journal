@@ -7,6 +7,19 @@
 
 실물 D 패널은 독립 조작 GT가 없어 계속 `BLOCKED`다. 시뮬레이터만으로 후속 작업할 때는 [D_SIM protocol](../table3_protocol/D_SIM_PROTOCOL_KO.md)과 `experiments/c4_table3/sim_d/`를 사용한다. D_SIM은 MuJoCo hidden state로 evaluator-only GT와 입력 manifest를 만들며, Real-5 또는 실물 D 점수와 섞지 않는다. 현재 준비 run에는 prediction이 없고 condition cells는 adapter 구현 전 `NEEDS_IMPLEMENTATION`이다.
 
+## YCB mesh를 robosuite에 연결하는 경우
+
+공식 robosuite 배포물에는 YCB 객체 mesh가 포함되어 있지 않다. EV-RealPhys의 5개 ID를 시뮬레이터에서 재현하려면 YCB 공식 모델을 `data/external/ycb/`에 별도로 내려받고, `ycb_robosuite_audit.py`로 파일 hash·단위·매핑 상태를 먼저 기록한다.
+
+```powershell
+.venv\Scripts\python.exe experiments\c4_table3\ycb_robosuite_audit.py `
+  --robosuite external\robosuite `
+  --ycb-root data\external\ycb `
+  --output output\c4_table3\<UTC>_ycb_robosuite_audit
+```
+
+`--emit-mjcf`는 source unit을 독립적으로 검증한 뒤에만 `--unit-scale`과 함께 사용한다. wrapper에는 질량·마찰을 넣지 않는다. 모래 충전 real-world mass와 Table 5 friction은 시뮬레이터 입력으로 주입할 수 없고, calibration split에서 정한 별도 파라미터로만 관리한다. YCB 파일명이 같아도 EV-RealPhys 이미지와 동일한 실물 인스턴스라는 증거가 아니므로, 해당 결과는 `SIM-PROXY`로 별도 보고한다. Tuna Fish Can(007)은 항상 제외한다.
+
 ```powershell
 Set-Location C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal
 .venv\Scripts\python.exe experiments\c4_table3\run.py
