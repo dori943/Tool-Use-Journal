@@ -34,10 +34,10 @@ except ImportError:  # direct script execution
 
 CONDITION_ORDER = ("name_only", "affordance_labels", "siphy_adopted", "geometric_grounding", "ours_full")
 METRICS = {
-    "name_only": ["Mass_Acc", "Crit"],
-    "affordance_labels": ["Mass_Acc", "Crit"],
-    "siphy_adopted": ["Mass_Acc", "Crit"],
-    "geometric_grounding": ["Mass_Acc", "Clearance_RelErr", "Feasibility_Acc", "DA", "Crit"],
+    "name_only": ["Mass_Acc", "Suction_Acc", "Suction_PF", "Feasibility_Acc", "DA", "Crit"],
+    "affordance_labels": ["Mass_Acc", "Suction_Acc", "Suction_PF", "Feasibility_Acc", "DA", "Crit"],
+    "siphy_adopted": ["Mass_Acc", "Feasibility_Acc", "DA", "Crit"],
+    "geometric_grounding": ["Mass_Acc", "Suction_Acc", "Suction_PF", "Clearance_RelErr", "Feasibility_Acc", "DA", "Crit"],
     "ours_full": ["Mass_Acc", "Suction_Acc", "Suction_PF", "Clearance_RelErr", "Feasibility_Acc", "DA", "Crit"],
 }
 
@@ -235,6 +235,14 @@ def run(prep: Path, run_dir: Path, repeats: int = 3, conditions: tuple[str, ...]
                         backend = SiPhyBackend(model=cfg["model"], temperature=cfg["temperature"])
                         rows = _siphy_rows(obs, repeat_id, cfg, config_snapshot["manifest_sha256"], backend)
                         cache.put(rows[0])
+                        extra_metrics = [metric for metric in METRICS[condition_id]
+                                         if metric not in {"Mass_Acc", "Crit"}]
+                        if extra_metrics:
+                            # SiPhy mass remains the repository backend output;
+                            # downstream decisions are requested separately and
+                            # never silently fabricated from the mass estimate.
+                            rows.extend(ConditionAdapter(condition_id, provider,
+                                                         shared_cache=cache).predict_bundle(obs, extra_metrics))
                     else:
                         rows = adapter.predict_bundle(obs, METRICS[condition_id])
                     # one provider request is represented by every parsed metric,

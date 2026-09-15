@@ -20,10 +20,10 @@ except ImportError:
 
 
 SUPPORTED = {
-    "name_only": ["Mass_Acc", "Crit"],
-    "affordance_labels": ["Mass_Acc", "Crit"],
-    "siphy_adopted": ["Mass_Acc", "Crit"],
-    "geometric_grounding": ["Mass_Acc", "Clearance_RelErr", "Feasibility_Acc", "DA", "Crit"],
+    "name_only": ["Mass_Acc", "Suction_Acc", "Suction_PF", "Feasibility_Acc", "DA", "Crit"],
+    "affordance_labels": ["Mass_Acc", "Suction_Acc", "Suction_PF", "Feasibility_Acc", "DA", "Crit"],
+    "siphy_adopted": ["Mass_Acc", "Feasibility_Acc", "DA", "Crit"],
+    "geometric_grounding": ["Mass_Acc", "Suction_Acc", "Suction_PF", "Clearance_RelErr", "Feasibility_Acc", "DA", "Crit"],
     "ours_full": ["Mass_Acc", "Suction_Acc", "Suction_PF", "Clearance_RelErr", "Feasibility_Acc", "DA", "Crit"],
 }
 

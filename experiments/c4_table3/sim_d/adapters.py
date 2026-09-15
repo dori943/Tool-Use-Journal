@@ -173,18 +173,18 @@ def _make_points(obs: Observation) -> np.ndarray:
 
 SPECS = {
     "name_only": AdapterSpec("name_only", "Name-only", ("object_name", "image_path"),
-                              ("name_prompt",), "name_only", ("Mass_Acc", "Crit")),
+                              ("name_prompt", "M4_downstream"), "name_only", ("Mass_Acc", "Suction_Acc", "Suction_PF", "Feasibility_Acc", "DA", "Crit")),
     "affordance_labels": AdapterSpec("affordance_labels", "+ Affordance labels",
                                       ("object_name", "affordance_labels", "image_path"),
-                                      ("affordance_prompt",), "affordance_labels", ("Mass_Acc", "Crit")),
+                                      ("affordance_prompt", "M4_downstream"), "affordance_labels", ("Mass_Acc", "Suction_Acc", "Suction_PF", "Feasibility_Acc", "DA", "Crit")),
     "siphy_adopted": AdapterSpec("siphy_adopted", "SiPhy (as adopted)",
                                   ("object_name", "image_path", "visible_geometry_mm"),
-                                  ("SiPhyBackend", "shell_mass_integral"), "siphy_adopted",
-                                  ("Mass_Acc", "Crit")),
+                                  ("SiPhyBackend", "shell_mass_integral", "M4_downstream"), "siphy_adopted",
+                                  ("Mass_Acc", "Feasibility_Acc", "DA", "Crit")),
     "geometric_grounding": AdapterSpec("geometric_grounding", "+ Geometric grounding (ours)",
                                         ("object_name", "image_path", "visible_geometry_mm", "visible_support_context"),
-                                        ("SiPhyBackend", "M1_geometry", "clearance_normalization"),
-                                        "siphy_adopted", ("Mass_Acc", "Clearance_RelErr", "Feasibility_Acc", "DA", "Crit")),
+                                        ("SiPhyBackend", "M1_geometry", "clearance_normalization", "M4_downstream"),
+                                        "siphy_adopted", ("Mass_Acc", "Suction_Acc", "Suction_PF", "Clearance_RelErr", "Feasibility_Acc", "DA", "Crit")),
     "ours_full": AdapterSpec("ours_full", "Ours (full)",
                               ("object_name", "image_path", "friction_context_path", "visible_geometry_mm", "visible_support_context"),
                               ("SiPhyBackend", "M1_geometry", "visual_friction", "M4_downstream"),
@@ -223,6 +223,8 @@ class ConditionAdapter:
             base.append(f"support_context={obs.payload['visible_support_context']}")
         if self.spec.condition_id == "ours_full":
             base.append("estimate static object-table combined friction from visual context; no trajectory dynamics")
+        if metric in {"Suction_Acc", "Suction_PF"}:
+            base.append("classify the two pre-registered simulator contact poses independently as suction feasible or infeasible")
         prompt = "\n".join(base)
         self.last_prompt = prompt
         return prompt
