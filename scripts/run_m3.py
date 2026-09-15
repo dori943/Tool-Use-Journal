@@ -375,12 +375,50 @@ def main():
         encoding="utf-8")
     (OUT / "m3_intrinsic.json").write_text(
         json.dumps(strip(dict(mat._cache)), ensure_ascii=False, indent=2), encoding="utf-8")
-    retrieval_debug = strip({"round": debug_label, "objects": mat.retrieval_debug})
+    def _sum_usage(objects, key):
+        totals = {"calls": 0, "input_tokens": 0, "output_tokens": 0, "total_tokens": 0}
+        for debug in objects.values():
+            usage = debug.get(key) if isinstance(debug, dict) else None
+            if not isinstance(usage, dict):
+                continue
+            totals["calls"] += 1
+            totals["input_tokens"] += int(usage.get("input_tokens") or 0)
+            totals["output_tokens"] += int(usage.get("output_tokens") or 0)
+            totals["total_tokens"] += int(usage.get("total_tokens") or 0)
+        return totals
+
+    token_summary = {
+        "c3_density_only": _sum_usage(mat.retrieval_debug, "c3_token_usage"),
+        "full_siphy": _sum_usage(mat.retrieval_debug, "full_m3_token_usage"),
+    }
+    token_summary["physical_total"] = {
+        "calls": (token_summary["c3_density_only"]["calls"]
+                  + token_summary["full_siphy"]["calls"]),
+        "input_tokens": (token_summary["c3_density_only"]["input_tokens"]
+                         + token_summary["full_siphy"]["input_tokens"]),
+        "output_tokens": (token_summary["c3_density_only"]["output_tokens"]
+                          + token_summary["full_siphy"]["output_tokens"]),
+        "total_tokens": (token_summary["c3_density_only"]["total_tokens"]
+                         + token_summary["full_siphy"]["total_tokens"]),
+    }
+    retrieval_debug = strip({
+        "round": debug_label,
+        "objects": mat.retrieval_debug,
+        "token_summary": token_summary,
+    })
     debug_text = json.dumps(retrieval_debug, ensure_ascii=False, indent=2)
     (OUT / "m0_retrieval.json").write_text(debug_text, encoding="utf-8")
     debug_slug = "".join(ch.lower() if ch.isalnum() else "_" for ch in debug_label).strip("_")
     (OUT / f"m0_retrieval.{debug_slug or 'm3'}.json").write_text(
         debug_text, encoding="utf-8")
+    print(
+        "[M3] phys tokens: "
+        f"c3={token_summary['c3_density_only']['total_tokens']} "
+        f"(calls={token_summary['c3_density_only']['calls']}) "
+        f"full_siphy={token_summary['full_siphy']['total_tokens']} "
+        f"(calls={token_summary['full_siphy']['calls']}) "
+        f"total={token_summary['physical_total']['total_tokens']}"
+    )
 
     n_t2 = len(mat._cache)
     if memory is not None:

@@ -26,20 +26,6 @@ def _hash(path):
     return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
 
-def _validate_task_instruction(task, m2_path):
-    """Reject M2 artifacts generated for an obsolete task instruction."""
-    from task_registry import instruction
-
-    recorded = _read(m2_path).get("task")
-    current = instruction(task)
-    if recorded != current:
-        raise ValueError(
-            f"M2 task instruction mismatch for {task}: "
-            f"stored={recorded!r}, current={current!r}. "
-            "Regenerate M2 from the current task registry before planning."
-        )
-
-
 def run(args, pipeline):
     if args.grounding_mode != "full":
         raise ValueError(
@@ -109,21 +95,11 @@ def run(args, pipeline):
             "m4_invoked": False,
             "plan_status": None,
             "m5_status": None,
-            "m5_execution_success": None,
-            "task_success": None,
+            "success": None,
             "evaluation_scope": "partial" if partial_execution else "full",
             "metrics": None,
         }
     )
-    legacy_success = report.pop("success", None)
-    report.setdefault(
-        "m5_execution_success",
-        legacy_success
-        if report.get("m5_status") is not None
-        and report.get("evaluation_scope") == "full"
-        else None,
-    )
-    report.setdefault("task_success", None)
     report["evaluation_scope"] = "partial" if partial_execution else "full"
     _write(manifest_path, manifest)
     _write(result_path, report)
@@ -136,14 +112,9 @@ def run(args, pipeline):
         manifest.pop("failure", None)
         if start <= 0:
             manifest["m4_sha256"] = None
-            for field in (
-                "plan_status",
-                "m5_status",
-                "m5_execution_success",
-                "task_success",
-                "metrics",
-            ):
-                report[field] = None
+            report["plan_status"] = report["m5_status"] = report["success"] = report[
+                "metrics"
+            ] = None
             report.pop("m5_failure_detail", None)
             pipeline.stage_m1(task, out, args)
             manifest["stages"][stage] = "completed"
@@ -154,20 +125,14 @@ def run(args, pipeline):
         stage = "m2"
         if start <= 1:
             manifest["m4_sha256"] = None
-            for field in (
-                "plan_status",
-                "m5_status",
-                "m5_execution_success",
-                "task_success",
-                "metrics",
-            ):
-                report[field] = None
+            report["plan_status"] = report["m5_status"] = report["success"] = report[
+                "metrics"
+            ] = None
             report.pop("m5_failure_detail", None)
             pipeline.stage_m2(task, out, args)
             manifest["stages"][stage] = "completed"
             _write(manifest_path, manifest)
             _write(result_path, report)
-        _validate_task_instruction(task, out / "m2.json")
         if stop == 1:
             return
 
@@ -175,8 +140,7 @@ def run(args, pipeline):
         if start <= 2:
             manifest["stages"]["m4"] = "skipped"
             manifest["m4_sha256"] = None
-            report["m5_status"] = report["m5_execution_success"] = None
-            report["task_success"] = None
+            report["m5_status"] = report["success"] = None
             report.pop("m5_failure_detail", None)
             gk_paths = pipeline.stage_gk(task, out)
             bundle = pipeline.build_gk_bundle(out, gk_paths)
@@ -221,6 +185,7 @@ def run(args, pipeline):
                 f"[without-planner] independent assignment: {result.status.value}; M4 search calls=0"
             )
             if result.selected_plan is None:
+                report["success"] = False
                 _write(result_path, report)
                 raise RuntimeError(
                     f"independent assignment failed: {result.status.value}; see m4.json rejections"
@@ -240,8 +205,7 @@ def run(args, pipeline):
             return
 
         stage = "m5"
-        report["m5_status"] = report["m5_execution_success"] = None
-        report["task_success"] = None
+        report["m5_status"] = report["success"] = None
         report.pop("m5_failure_detail", None)
         manifest["stages"][stage] = "running"
         _write(result_path, report)
@@ -257,7 +221,7 @@ def run(args, pipeline):
             raise RuntimeError("M5 returned without a new m5_summary.json")
         summary = _read(summary_path)
         report["m5_status"] = summary.get("status")
-        report["m5_execution_success"] = (
+        report["success"] = (
             None
             if args.m5_validate_only or partial_execution
             else summary.get("status") == "SUCCESS"
@@ -280,7 +244,7 @@ def run(args, pipeline):
             summary = _read(summary_path) if fresh_summary else {}
             report["m5_status"] = summary.get("status", "FAILED")
             report["m5_failure_detail"] = summary.get("detail", str(error))
-            report["m5_execution_success"] = (
+            report["success"] = (
                 None if args.m5_validate_only or partial_execution else False
             )
         _write(result_path, report)

@@ -233,7 +233,7 @@ class ObjectKnowledgeManager:
                  "density_threshold": self.density_relative_threshold,
                  "threshold_status": "provisional", "c3_llm_called": False,
                  "c3_token_usage": None, "full_m3_called": False,
-                 "full_m3_skipped": False,
+                 "full_m3_skipped": False, "full_m3_token_usage": None,
                  "memory_entry_count": len(self.objects),
                  "query_bbox_mm": query_bbox}
         exact, key, exact_reason = self.lookup_exact(task_id, object_id)

@@ -73,6 +73,12 @@ def ground_scene(
         "geom_refreshed": 0,
         "grounded": 0,
         "n_nodes": len(m1["nodes"]),
+        "full_m3_token_usage": {
+            "calls": 0,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "total_tokens": 0,
+        },
     }
 
     cache: dict[str, dict] = {}
@@ -133,6 +139,7 @@ def ground_scene(
                 debug = retrieval_debug[nid]
                 debug["geometry_source"] = "current_observation"
                 debug["intrinsic_source"] = "memory"
+                debug["full_m3_token_usage"] = None
 
                 log(
                     module="m1",
@@ -158,12 +165,20 @@ def ground_scene(
             )
 
             stats["grounded"] += 1
+            full_usage = getattr(backend, "last_usage", None)
+            if isinstance(full_usage, dict):
+                totals = stats["full_m3_token_usage"]
+                totals["calls"] += 1
+                totals["input_tokens"] += int(full_usage.get("input_tokens") or 0)
+                totals["output_tokens"] += int(full_usage.get("output_tokens") or 0)
+                totals["total_tokens"] += int(full_usage.get("total_tokens") or 0)
 
             if use_m0:
                 debug = retrieval_debug.setdefault(nid, {})
                 debug.update(
                     full_m3_called=True,
                     full_m3_skipped=False,
+                    full_m3_token_usage=full_usage,
                 )
 
             log(
@@ -171,6 +186,7 @@ def ground_scene(
                 event="grounded",
                 node=nid,
                 mu_stage=intr["mu"]["stage"],
+                full_m3_tokens=(full_usage or {}).get("total_tokens"),
             )
 
             how = "backend"

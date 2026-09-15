@@ -72,6 +72,7 @@ class Materializer:
                         self.nodes[node_id], reused)
                     debug["geometry_source"] = "current_observation"
                     debug["intrinsic_source"] = "memory"
+                    debug["full_m3_token_usage"] = None
                     self.log(module="m0", event="object_knowledge_hit", node=node_id,
                              lookup_type=debug["lookup_type"])
             hooks = {}
@@ -86,9 +87,15 @@ class Materializer:
                 self._cache[node_id] = ground_intrinsic(
                     self.nodes[node_id], crop_rgb, self.backend, self.friction, **hooks)
                 debug = self.retrieval_debug.setdefault(node_id, {})
-                debug.update(full_m3_called=True, full_m3_skipped=False)
+                full_usage = getattr(self.backend, "last_usage", None)
+                debug.update(
+                    full_m3_called=True,
+                    full_m3_skipped=False,
+                    full_m3_token_usage=full_usage,
+                )
                 self.log(module="m3", event="intrinsic", node=node_id,
-                         mu_stage=self._cache[node_id]["mu"]["stage"])
+                         mu_stage=self._cache[node_id]["mu"]["stage"],
+                         full_m3_tokens=(full_usage or {}).get("total_tokens"))
         entry = gk["nodes"].setdefault(node_id, {"queried_by": []})
         entry.update(self._cache[node_id])
         entry["queried_by"].append(queried_by)

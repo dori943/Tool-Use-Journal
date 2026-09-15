@@ -845,18 +845,10 @@ def build_parser():
         ),
     )
 
-    p.add_argument(
-        "--grounding-mode",
-        choices=("full", "without_grounding"),
-        default="full",
-        help="Separate upper-level grounding ablation; default keeps the full pipeline",
-    )
-    p.add_argument(
-        "--planner-mode",
-        choices=("full", "without-planner"),
-        default="full",
-        help="Independent per-subgoal EE/tool assignment without M4 joint search",
-    )
+    p.add_argument("--grounding-mode", choices=("full", "without_grounding"), default="full",
+                   help="Separate upper-level grounding ablation; default keeps the full pipeline")
+    p.add_argument("--planner-mode", choices=("full", "without-planner"), default="full",
+                   help="Independent per-subgoal EE/tool assignment without M4 joint search")
     p.add_argument("--scene-frame", type=Path,
                    help="Matching scene image for without_grounding when reusing M1")
     p.add_argument(
