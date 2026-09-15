@@ -1,0 +1,160 @@
+protocol_version: table3_v1_pre_execution_2026-09-14
+execution_state: PROTOCOL_ONLY
+status_values:
+  READY: "정확한 조건·지표의 데이터, loader, 실행·평가 코드와 계보 검증이 모두 준비됨"
+  NEEDS_DATA: "독립 GT, 훈련 prior/label 또는 잠긴 패널 sample이 부족함; 구현도 필요할 수 있음"
+  NEEDS_IMPLEMENTATION: "필요 데이터는 있으나 정확한 조건 adapter/scorer/계보 연결이 부족함"
+  NOT_APPLICABLE: "그 조건이 해당 물리량을 추정하지 않거나 oracle 수치 대입 오차가 추정 성능이 아님"
+panels:
+  R:
+    name: EV-RealPhys Real-5
+    source_split: test_sliding
+    physical_objects: 5
+    planned_sequences_per_object: 5
+    ground_truth: configs/c4_real5_gt.json
+    prediction_inputs: "Static Real-5 실행 변형: 객체당 10개 정지 RGB/RGB-D 입력(질량 crop; 객체·지지면 context 마찰). 기존 30 Hz 자유 활주 RGB-D 경로는 trajectory auxiliary로 보존"
+    note: "기존 24/25 유효 이력 점수는 보존; 향후 조건 비교의 QC 제외 목록은 예측 전 공통으로 잠금"
+  D:
+    name: independent_manipulation_and_geometry_panel
+    availability: NEEDS_DATA
+    prediction_inputs: "모든 조건에 동일한 객체/작업 RGB-D 관측과 사전 고정한 객체별 두 흡착 pose"
+    ground_truth: "해당 물리 인스턴스의 저울 질량, 독립 치수/개구 annotation, 별도 진공·EE 실행 성공 기록"
+    note: "R의 실측 GT를 다른 물리 인스턴스 또는 YCB-V 사진에 이식하지 않음"
+global_rules:
+  eligible_set: "조건 출력 전 잠긴 panel별 sample/object/EE/pose ID와 공통 입력 QC 제외 목록"
+  condition_specific_failure: "분류는 오답/고정 분모; 연속량은 전체 cell TBD와 coverage 공개, 사후 complete-case 평균 금지"
+  missing_gt: "결과 확인 전 NEEDS_DATA; 분모를 사후 축소하지 않음"
+  object_macro_weight: equal
+  repeats: 3
+  repeat_ids: [0, 1, 2]
+  seed_if_supported: [100, 101, 102]
+  seed_unsupported: "미전달을 기록; temperature 0이어도 결정론 주장 금지"
+  repeat_score: "각 run의 객체 macro 점수 평균"
+  object_std: "run별 객체 오차/정확도 표본 std(ddof=1); 이질성 기술통계, 안정성/신뢰구간 아님"
+  repeat_std: "run별 macro 점수 표본 std(ddof=1); run 하나면 N/A"
+  confidence_interval: "객체 간 std를 CI로 변환하지 않음"
+  raw_accuracy_unit: fraction_0_to_1
+  displayed_accuracy_unit: percent
+  numeric_error_unit: dimensionless_fraction
+  direct_oracle_error: "수치 주입 일치성 검사에 한함; 추정 성능 점수로 게시하지 않음"
+metrics:
+  Mass_MnRE:
+    display: "Mass MnRE↓"
+    panel: R
+    unit: dimensionless_fraction
+    displayed_percent: true
+    evaluation_unit: "물리 객체; 각 고정 시퀀스의 단일 프레임 질량 예측"
+    gt: "Table 5에서 그 동일 실물 객체를 저울로 측정한 mass_gt_kg > 0"
+    prediction: mass_est_kg
+    per_object: "mhat_o = median_s(mhat_os); e_o = abs(mhat_o - m_gt_o) / m_gt_o"
+    denominator: "고정된 적격 객체 수 N_R (현재 이력에서는 5)"
+    primary_aggregation: "mean_o(e_o), 각 객체 가중치 1/N_R"
+    sensitivity_only:
+      sequence_mean_error: "시퀀스별 오차를 먼저 평균; 주 MnRE로 재명명 금지"
+      object_mean_prediction: "객체별 mean_s(mhat_os) 후 오차; 주 MnRE로 재명명 금지"
+    failure: "사전 공통 QC 제외만 허용; 조건별 결측/비유한값이면 cell TBD와 coverage"
+    oracle: NOT_APPLICABLE_DIRECT_NUMERIC_INJECTION
+  Mass_Acc:
+    display: "Mass Acc↑"
+    panel: D
+    unit: fraction_0_to_1
+    evaluation_unit: "사전 고정 sample × EE (2F, 3F, vac)"
+    gt: "해당 sample의 독립 scale 질량과 동결된 EE payload_kg; y=1[m_gt < payload_ee]"
+    prediction: "yhat=1[mhat < payload_ee]; 등호는 초과/불가로 처리"
+    per_unit: "1[yhat == y]"
+    denominator: "객체 o별 고정 sample 수 × 해당 EE 수; 후속 조건마다 동일"
+    primary_aggregation: "객체별 sample×EE 정확도 평균 후 객체 균등 macro 평균"
+    failure: "abstain, 숫자 누락, 모듈 실패는 해당 sample×EE 오답"
+    oracle: "직접 질량 대입의 산술 확인은 추정 성능 아님; 독립 GT/사양 판정과 비교해 기록"
+  Suction_Acc:
+    display: "Suction Acc↑"
+    panel: D
+    unit: fraction_0_to_1
+    evaluation_unit: "사전 지정 객체 × pose (각 객체 정확히 두 pose)"
+    gt: "독립 vacuum grasp trial 5회 중 4회 이상 seal, 50 mm lift, 2 s hold 성공이면 1; 예측에 사용한 RMS/patch 부등식으로 GT 생성 금지"
+    prediction: "같은 pose 입력에서 조건별 vacuum 가능 이진 판정"
+    per_unit: "1[yhat_pose == y_pose]"
+    denominator: "고정된 pose 수 = 적격 객체 수 × 2"
+    primary_aggregation: "객체별 두 pose 정확도 평균 후 객체 균등 macro 평균"
+    failure: "한 pose prediction 실패/abstain은 그 pose 오답"
+    oracle: "정답 수치만 사용; suction 성공 라벨 직접 주입 금지"
+  Suction_PF:
+    display: "Suction PF↑"
+    panel: D
+    unit: fraction_0_to_1
+    evaluation_unit: "같은 객체의 사전 고정 pose A/B 한 쌍"
+    gt: "각 pose의 위 독립 vacuum trial 이진 GT"
+    prediction: "두 pose 모두에 대한 각 조건의 suction 이진 판정"
+    per_unit: "1[yhat_A == y_A and yhat_B == y_B]"
+    denominator: "독립 GT가 완비된 사전 고정 객체 pose 쌍 수"
+    primary_aggregation: "객체별 pair 정답 비율 후 객체 균등 macro 평균"
+    failure: "어느 pose 하나라도 실패/abstain이면 해당 pair 0; GT 누락 pair는 사전 데이터 미완료"
+    oracle: "GT suction label 직접 대입 금지"
+  Friction_MAE:
+    display: "Friction MAE-Real5↓"
+    panel: R
+    unit: dimensionless_combined_object_table_coefficient
+    evaluation_unit: "Static Real-5 변형: 물리 객체; 사전 고정 정지 context 입력 10개. 자유 활주 경로는 별도 auxiliary"
+    gt: "Table 5의 10회 기울인 테이블 실험 중앙값 mu_combined_gt; source_trial_count는 inference 횟수가 아님"
+    prediction: "Static visual variant: mu_table_est from an object+support-table still-image visual-property adapter; legacy auxiliary: FrictionHead.probe_mu_from_track(RGB-D centroid trajectory, dt=1/30 s)"
+    per_object: "muhat_o=median_s(muhat_os); e_o=abs(muhat_o-mu_table_gt_o)"
+    denominator: "고정된 적격 R 객체 수 N_R"
+    primary_aggregation: "mean_o(e_o), 각 객체 가중치 1/N_R"
+    failure: "사전 공통 QC 제외만 허용; 조건별 추적 실패는 cell TBD와 coverage"
+    forbidden_target: "FrictionHead.stage0의 material/RMS gripper-slip proxy와 비교 금지"
+    oracle: NOT_APPLICABLE_DIRECT_NUMERIC_INJECTION
+  Clearance_RelErr:
+    display: "Clearance RelErr↓"
+    panel: D
+    unit: dimensionless_fraction
+    evaluation_unit: "사전 지정 물체–개구 관계 sample와 고정 물체 방향"
+    gt: "독립 caliper/3D annotation의 signed horizontal opening margin(mm): min(inner opening widths)-min(projected object horizontal footprint); M1 bbox 또는 동일 estimator 출력으로 GT 생성 금지"
+    prediction: "같은 signed margin(mm); +Geom은 기존 coarse_clearance/fits_inside 기반, full은 공간 접지 결과를 동일 target으로 정규화"
+    per_unit: "abs(c_hat_mm-c_gt_mm)/max(abs(c_gt_mm),5.0 mm)"
+    denominator: "객체별 사전 고정 관계 sample 수; 5 mm 분모 바닥값으로 near-zero 발산 억제"
+    primary_aggregation: "객체별 sample 상대오차 중앙값 후 객체 균등 macro 평균"
+    failure: "조건별 결측/비유한값이면 cell TBD와 coverage"
+    forbidden_target: "relations.depth_clearance의 전도 margin 또는 M5 EE swept clearance와 혼합 금지"
+    oracle: NOT_APPLICABLE_DIRECT_NUMERIC_INJECTION
+  Feasibility_Acc:
+    display: "Feasibility Acc↑"
+    panel: D
+    unit: fraction_0_to_1
+    evaluation_unit: "사전 고정 sample × EE (2F, 3F, vac)"
+    gt: "각 EE의 독립 검증 trial 5회 중 4회 이상 사전 잠긴 task terminal predicate 충족, 금지 충돌 없음, 시간 제한 준수; 조건별 evaluate_ee 부등식으로 GT 생성 금지"
+    trial_contract: "D manifest에 sample별 시작 상태, 목표·terminal predicate, EE 후보, collision 금지, 시간 제한을 결과 전에 고정하고 같은 조건으로 5회 검증"
+    prediction: "공통 evaluate_ee와 추가 고정 hard constraints를 적용한 feasible 이진 판정"
+    per_unit: "1[yhat_feasible == y_feasible]"
+    denominator: "적격 객체별 고정 sample×EE 수; GT는 조건과 무관하게 동일"
+    primary_aggregation: "객체별 sample×EE 정확도 평균 후 객체 균등 macro 평균"
+    failure: "미지/abstain/모듈 실패는 오답; 독립 GT가 없으면 NEEDS_DATA"
+    oracle: "GT numerics도 동일 downstream과 독립 GT 비교; 자동 100% 금지"
+  DA:
+    display: "DA↑ (최종 EE 선택 정확도)"
+    panel: D
+    unit: fraction_0_to_1
+    evaluation_unit: "사전 고정 객체·task 상태·subgoal·EE 후보를 묶은 한 EE 선택 이벤트"
+    gt: "독립 trial·hard constraints로 확정한 허용 EE 집합 A_s; 복수 허용, 임의 단일 정답 금지"
+    prediction: "조건별 동일 M4 후보/DAG/비용/tie-break에서 선택한 EE 또는 NO_FEASIBLE_EE"
+    per_unit: "A_s가 비어 있지 않으면 1[selected_ee in A_s]; 비면 1[selected_ee == NO_FEASIBLE_EE]"
+    denominator: "객체별 사전 고정 EE 선택 이벤트 수; 다중 subgoal은 이벤트 ID별 분리"
+    primary_aggregation: "객체별 decision 정확도 평균 후 객체 균등 macro 평균"
+    failure: "planner failure, timeout, abstain은 오답(정답이 NO_FEASIBLE_EE인 명시 출력만 예외)"
+    oracle: "GT numerics로도 나쁜 후보/기하/계획 때문에 실패할 수 있음; 자동 100% 금지"
+  Crit:
+    display: "Crit↑ (vac payload 경계 정확도)"
+    panel: D
+    unit: fraction_0_to_1
+    evaluation_unit: "vac sample 중 독립 m_gt가 잠긴 critical band 안인 sample"
+    physical_quantity: mass_kg
+    ee: vac
+    threshold_kg: 0.50
+    half_width_kg: 0.05
+    inclusive_subset: "abs(m_gt_kg - 0.50) <= 0.05"
+    gt: "독립 scale 질량에 대한 1[m_gt < 0.50 kg]"
+    prediction: "1[mhat < 0.50 kg]"
+    per_unit: "1[yhat == y]"
+    denominator: "사전 고정 subset의 sample 수; 0이면 0/0 점수 대신 NEEDS_DATA"
+    primary_aggregation: "critical sample 정확도를 객체별 평균 후 적격 객체 균등 macro 평균"
+    failure: "subset에서 abstain/실패는 오답; 조건 출력 후 subset 변경 금지"
+    note: "이 폭은 향후 Table 3 결과 전에 고정한 값이며 기존 Real-5 결과에 대한 사전등록 주장 아님"

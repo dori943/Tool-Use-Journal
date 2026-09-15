@@ -1,0 +1,41 @@
+benchmark: C4 Static Real-5 evaluator-only
+source:
+  paper: Kandukuri et al., Physics-Based Rigid Body Object Tracking and Friction Filtering
+    From RGB-D Videos, arXiv:2309.15703v3
+  gt_table: 'Table 5: real-world object properties'
+  dataset: EV-RealPhys
+  dataset_url: https://keeper.mpdl.mpg.de/d/5ec213b655b44e40a382/
+  archive_name: ev-realphys.tar.gz
+  friction_target: combined_object_table
+  friction_definition: tan(table_tilt_angle) - sliding_acceleration / 9.81
+  source_trial_count_meaning: tilted-table GT sliding trials; not 10 static images
+    or five model repeats
+  original_gt_sha256: 4a0f66e54e8676abc16ca3634fed7564cc2ad2cf9da737a858540d35950433b3
+  static_friction_interpretation: visual prior compared with measured combined object-table
+    kinetic coefficient
+objects:
+- object_id: 003_cracker_box
+  object_name: Cracker Box
+  mass_gt_kg: 0.0565
+  combined_friction_gt: 0.28
+  source_trial_count: 10
+- object_id: 006_mustard_bottle
+  object_name: Mustard Bottle
+  mass_gt_kg: 0.318
+  combined_friction_gt: 0.159
+  source_trial_count: 10
+- object_id: 019_pitcher_base
+  object_name: Pitcher
+  mass_gt_kg: 0.712
+  combined_friction_gt: 0.22
+  source_trial_count: 10
+- object_id: 021_bleach_cleanser
+  object_name: Bleach Cleanser
+  mass_gt_kg: 0.403
+  combined_friction_gt: 0.169
+  source_trial_count: 10
+- object_id: 025_mug
+  object_name: Mug
+  mass_gt_kg: 0.103
+  combined_friction_gt: 0.11
+  source_trial_count: 10

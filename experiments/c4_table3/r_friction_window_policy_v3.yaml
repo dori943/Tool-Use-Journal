@@ -1,0 +1,18 @@
+schema_version: c4_r_friction_window_v3
+locked_before_prediction_or_gt_comparison: true
+revision_reason: >-
+  v2 discards the clean early track of 000009 after later segmentation jumps.
+  This revision uses only RGB-D centroid continuity and applies to every sequence.
+input: full RGB-D centroid track from friction_from_rgbd.track_scene, reference frame 15
+dt_s: 0.03333333333333333
+max_step_mm: 80.0
+minimum_intervals: 8
+minimum_net_travel_mm: 50.0
+stop_step_mm: 3.0
+stop_consecutive_steps: 3
+selection: >-
+  Split at every step over max_step_mm; truncate each segment at the first three
+  consecutive stop steps; keep candidates meeting minimum intervals and travel;
+  select longest candidate, then lowest longitudinal quadratic RMS, then earliest.
+  No physical GT, previous prediction, or estimated mu enters selection.
+human_review: required for push-contact, rotation, support level and tracking

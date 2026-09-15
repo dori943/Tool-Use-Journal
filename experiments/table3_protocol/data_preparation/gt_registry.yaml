@@ -1,0 +1,38 @@
+schema_version: table3_gt_registry_v1
+protocol: ../metric_registry.yaml
+real5:
+  status: READY_GT_ONLY
+  panel: R
+  gt_file: ../../../configs/c4_real5_gt.json
+  gt_sha256: 4a0f66e54e8676abc16ca3634fed7564cc2ad2cf9da737a858540d35950433b3
+  source_table: "Kandukuri et al. arXiv:2309.15703v3, Table 5, real-world measurements"
+  source_url: https://arxiv.org/html/2309.15703
+  dataset_url: https://keeper.mpdl.mpg.de/d/5ec213b655b44e40a382/
+  archive_sha256: 4c484ec1e5f3f66ccb6a930437404ba7c67a1bb5590791027ced9741e1136eab
+  split: test_sliding
+  permitted_metrics: [Mass_MnRE, Friction_MAE]
+  forbidden_transfer: "다른 실물, 일반 YCB/YCB-V 영상, Table 4 합성 수치, scene_properties 물리 수치"
+  forbidden_object: 007_tuna_fish_can
+  source_trial_count: "객체별 GT 기울인 테이블 활주 10회; 추론 반복 수 아님"
+independent_manipulation_panel:
+  status: BLOCKED
+  panel: D
+  dataset_manifest: panel_d_manifest.yaml
+  objects: []
+  gt: []
+  missing:
+    - "독립 저울 질량과 EE payload 적용 검증"
+    - "동일 진공 EE/압력/접촉 조건으로 측정한 두 pose×5회 suction trial"
+    - "좌표계·단위·독립 측정 수단을 갖춘 signed clearance"
+    - "3종 EE 각각의 독립 물리 실행 GT"
+    - "작업 제약과 선택 목적을 동결한 허용 선택 집합"
+    - "vac 0.50 kg ±0.05 kg 경계 근처 독립 sample"
+  contact_friction_gt:
+    status: BLOCKED
+    meaning: object_gripper_contact
+    value: null
+    note: "Real-5의 combined object-table μ를 contact μ로 대용 금지"
+  calibration_split:
+    status: BLOCKED
+    objects: []
+    note: "prompt/threshold 수정 필요시 독립 calibration 인스턴스만 사용; test GT 접근 금지"

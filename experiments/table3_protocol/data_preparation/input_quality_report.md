@@ -1,0 +1,23 @@
+# Table 3 입력 품질 결과 — 점수 산출 전 단계
+
+원본 [`manifest.json`](../../../data/external/kandukuri_ev_realphys/manifest.json)과 과거 [`predictions.json`](../../../output/c4_real5/20260914T025828Z/predictions.json), [`result.json`](../../../output/c4_real5/20260914T030346Z/result.json)은 수정하지 않았다. 25개 scene의 새 선택·제외 상태는 [`real5_input_manifest.json`](real5_input_manifest.json), 객체별/지표별 수는 [`metric_sample_counts.json`](metric_sample_counts.json)이다. QA 산출 원본은 [`frame15 audit`](../../../output/table3_data_preparation/20260914T051643Z/audit.json) 및 [frame15 crop 모음](../../../output/table3_data_preparation/20260914T051643Z/frame15_crop_contact_sheet.png)이다. 실패 모드를 확인하기 위한 [frame30 audit](../../../output/table3_data_preparation/20260914T051351Z/audit.json)도 별개로 보존한다. 이 필터는 **이전에 존재한 C4 결과보다 뒤에** 정했으며, 과거 점수에 대한 사전등록을 주장하지 않는다. 향후 여섯 조건의 결과·오차를 보지 않고 적용한다.
+
+보존 검사 SHA-256: 원본 manifest `07752e7d89b244db2210041d8fe308a2761d0a99dc166b98210ad4198ab6b8ee`, Table 5 GT 설정 `4a0f66e54e8676abc16ca3634fed7564cc2ad2cf9da737a858540d35950433b3`, 기존 prediction `043f16ef5ebc90c6b45d5a8ee3bb4db8d3ae8853d7d19abe0c6b3412e86f63a6`, 기존 result `e932b7cd2350f8718d11af7b0280e955f03e92eca034692256f5a5ad2386a56e`.
+
+## 입력과 crop
+
+- 5객체×5 scene=25; 주석 RGB/depth pair 1,485, 전체 pair 1,497(미주석 12), 근접 중복 연속 ROI 쌍 125. 원래 검사기에서 projected GT center의 프레임 이탈 0, Laplacian variance<20의 저선명 프레임 0이었다. 전체 프레임 읽기/파일 인덱스·크기·calibration은 기존 loader/inspector에서 확인했다. 근접 중복 프레임은 독립적인 모델 반복으로 세지 않는다.
+- 이전 질량 프레임은 MoCap/GT pose로 투영한 중심 ROI의 선명도 최대값이어서 입력 선택에 annotation이 영향을 미쳤다. 새 manifest는 모든 scene의 **고정 index 15**만 사용한다. 이 선택은 이번 원시 입력 QA에서 30번 프레임의 일괄 적용 문제를 발견한 뒤 정한 것이며, 향후 조건 예측을 살펴 맞춘 것이 아니다. historical selected_frame은 비교 감사용으로만 기록했다. 마찰도 기존 tracker의 평면 reference를 index 15로 고정했다.
+- mask는 [`real_rgbd.py`](../../c4_real5/real_rgbd.py)의 0-seed depth RANSAC table plane→above-plane depth component→RGB GrabCut→18 mm point mask→9×9 closing이다. 공개 데이터셋에는 GT mask가 없다. 이번 QA에서는 **마스크 픽셀을 수정하지 않았다**. 새 crop은 기존 코드로 다른 고정 프레임에서 생성했고 각각 SHA를 기록했다. 테이블/로봇의 오분할이 관찰됐으며, 색·깊이의 프레임 페어링만으로 픽셀 등록 정확도를 보증하지 않는다.
+- `000015`의 기존 29번 crop과 새 15번 crop 모두 파란 Pitcher 왼쪽으로 길게 테이블 경계가 붙는다. **BLOCKED_MASK_QC**다. `000017`은 과거에 마찰 창 실패를 이유로 질량 추론도 건너뛰었지만 [raw strip](../../../output/table3_data_preparation/20260914T051351Z/000017_raw_strip.png)에서 Bleach 객체는 15/18/30번에 보인다. 30번의 분할은 아예 배경 띠만 선택했고, 15번에는 객체와 양옆 배경 띠가 같이 든다. 질량 후보로 **별도 보존**하되 crop은 **BLOCKED_MASK_QC**다. 마찰 실패를 질량 자동 제외로 전파하지 않았다.
+- 나머지 23 crop도 자동 segmentation 성공만으로 독립 시각 승인을 대체하지 않아 **BLOCKED_PENDING_INDEPENDENT_VISUAL_QC**다. 접촉 sheet에 회색 테이블·그리퍼 조각이 여러 곳에 보인다. 현재 준비 상태는 `질량 원시 후보 25/25, 승인된 0/25`이며 점수 분모를 사후 23으로 바꾸지 않는다. 독립 검토자가 prediction을 보지 않고 각 원본 RGB/depth와 mask를 판정·서명한 후, 수정된 mask 출처와 버전/SHA를 새 manifest로 봉인해야 한다.
+- 기존 blur 검사에서 선명도<20인 annotation 중심 ROI는 없었으나 이 기준은 객체 전체의 motion blur를 보증하지 않는다. GT 투영 중심이 프레임에 남은 1,485개도 물체의 일부 잘림(frame-out)이나 손·도구에 의한 occlusion이 없다는 의미는 아니다. 대표 raw strip에 초기 밀대/손 접촉이 보이고, 새 crop 일부에는 그리퍼가 남는다. 전 프레임 occlusion/절단 판독과 독립 블라인드 서명이 아직 없다.
+
+## 마찰 궤적·목표 의미
+
+- index 15 reference에서 24/25 RGB-D 궤적과 길이·이동량 조건을 통과하는 창이 검출됐다. `000009` Mug는 `free-slide window too short or under 50 mm`로 **BLOCKED_TRACK**다. 기존 pose-selected reference에서 제외된 것은 `000017` Bleach였으며, index 15에서는 6–23번 창과 약 449 mm 이동이 검출됐다. 이는 reference/segmentation 민감성을 보여 주는 **입력 진단**이지 000017의 유효한 결합 마찰 추정 승인이나 과거 점수 수정이 아니다.
+- `track_scene`은 RGB-D 깊이로 테이블 평면을 추정하고 world z와 법선 내적의 **반올림값**이 0.95 이상인지 확인한다. 이는 최대 약 18°도 허용하는 느슨한 검사이며, BOP world z가 실제 중력 방향인지/테이블이 독립 수평측정으로 0.5° 이내인지 증명하지 않는다. 새 audit에 보인 `z_abs=1.0`은 반올림 값일 뿐 물리적 수평성 교정서가 아니다.
+- `choose_slide_window`는 초기 80 mm 급변을 무시한 뒤 3점 smoothing 최대 속도 부근을 시작으로 정하고 8간격·50 mm 이상을 요구한다. 손/밀대 접촉 해제, 테이블 가장자리 충돌, 접촉점 이동은 감지하지 않는다. `probe_mu_from_track`은 정지 직후 일부를 자르고 **병진 중심점의 2차식**만 적합한다. 실제 부력·회전 관성·전도·rolling과 MoCap/RGBD centroid 편차를 모델링하지 않는다. 선형 적합 RMS·lateral RMS·반전 횟수와 MoCap orientation QA는 25개 row에 기록했다. MoCap은 윈도 선택/estimator 입력이 아니고 **추적 창 선택 후 QA**에만 읽었다.
+- 24개 검출 창의 MoCap 누적 회전은 **15.11°–365.38°**로 모두 사전 고정 10°의 순수 병진 허용치를 넘는다. 회전 시 `a/g`는 일반적으로 Table 5의 combined kinetic μ가 아닌 effective translational drag다. 이 판정은 **legacy trajectory 경로**에만 적용되며, 해당 row에는 `TARGET_SEMANTICS_MISMATCH`를 유지한다. 외부 접촉 해제·독립 테이블 수평·픽셀 수준 RGB/depth 정렬 검증도 아직 없다. 원 논문의 회전·접촉을 포함하는 EKF parameter와 단순 centroid 감속식을 동일 estimator라 부르지 않는다. 기존 0.0241은 보존되는 잠정 이력 숫자다. Table 3의 현재 Friction MAE-Real5는 별도 Static Real-5 visual-prior 평가 run에서 산출한다.
+
+이 QA의 마스크 오류와 회전 판단은 예측 오차를 읽지 않고 원시 영상, 기존 RGB-D 추적, 별도로 격리된 MoCap orientation으로 작성했다. 과거 결과를 이미 본 시점의 입력 검토라는 한계 때문에 블라인드 독립 승인과 calibration 분할을 추가로 요구한다. `qc_policy.yaml`을 변경하려면 새로운 버전/해시와 이유를 남기고, 결과를 본 후 적격 집합을 좁히지 않는다.

@@ -1,0 +1,98 @@
+schema_version: table3_panel_d_v1
+status: BLOCKED
+protocol: ../metric_registry.yaml
+panel: D
+source_dataset: null
+source_version: null
+source_sha256: null
+split: test
+split_frozen_at_utc: null
+calibration_split_sha256: null
+robot_spec: ../../../configs/robot_spec.json
+robot_spec_sha256: null
+ee_ids: [2F, 3F, vac]
+mass_decision: "1[mass_gt_kg < ee.payload_kg]; equality is infeasible"
+suction_trials_per_pose: 5
+suction_positive_at_least: 4
+suction_success: "seal and 50 mm lift and 2 s hold under the same vac EE, vacuum pressure, cup, contact force, approach and payload condition"
+feasibility_trials_per_sample_ee: 5
+feasibility_positive_at_least: 4
+feasibility_success: "fixed task terminal predicate, no prohibited collision, within time limit"
+clearance:
+  unit: mm
+  target: signed_horizontal_opening_margin
+  gt_method: "caliper or independent calibrated 3D annotation, not M1 bbox"
+  relative_error_denominator_floor_mm: 5.0
+  formula: "abs(predicted_margin_mm-gt_margin_mm)/max(abs(gt_margin_mm),5.0)"
+critical_subset:
+  ee_id: vac
+  mass_threshold_kg: 0.50
+  inclusive_half_width_kg: 0.05
+  selection_basis: "independent scale mass before condition predictions"
+samples: []
+required_sample_schema:
+  sample_id: "stable ID; required"
+  object_instance_id: "physical instance ID, never inferred from YCB name; required"
+  object_name: "display only; required"
+  raw_observation_rgbd: "relative RGB-D input paths plus SHA-256; required"
+  input_capture_conditions: "camera calibration, frame/time ID, illumination, object orientation; required"
+  mass_scale_gt:
+    mass_gt_kg: null
+    uncertainty_kg: null
+    scale_id_calibration_record: null
+    measurement_timestamp_utc: null
+    item_state: "contents/fill state logged for annotator; hidden from model input"
+  ee_payload_applicability:
+    spec_version_sha256: null
+    ee_mount_and_tool_configuration: null
+    payload_includes_tool_mass: null
+    derating_or_orientation_qualifiers: null
+    measured_payload_limits_kg: null
+  suction_pose_pair:
+    contrast_required: "one independently verified feasible and one infeasible pose"
+    shared_setup:
+      vacuum_ee_id: vac
+      cup_diameter_mm: null
+      vacuum_pressure_kpa_gauge: null
+      vacuum_flow_or_leak_threshold: null
+      approach_speed_mm_s: null
+      normal_force_n: null
+      environment_and_surface_state: null
+    poses:
+      A: {pose_id: null, object_T_pose: null, frame_id: null, trial_ids: [], trial_success: [], gt_label: null}
+      B: {pose_id: null, object_T_pose: null, frame_id: null, trial_ids: [], trial_success: [], gt_label: null}
+  clearance_gt:
+    reference_frame: null
+    object_orientation_in_reference_frame: null
+    horizontal_axes: null
+    opening_inner_widths_mm: null
+    projected_object_footprint_mm: null
+    signed_margin_gt_mm: null
+    instrument_and_calibration: null
+    independent_annotator_id: null
+    uncertainty_mm: null
+  task_contract:
+    initial_state_id: null
+    goal_and_terminal_predicate: null
+    forbidden_contacts_or_collisions: null
+    time_limit_s: null
+    ee_candidate_ids: [2F, 3F, vac]
+    selection_objective_and_costs: null
+    tie_handling: "explicit allowed set or frozen deterministic tie rule"
+  ee_trial_gt:
+    2F: {trial_ids: [], success: [], independently_measured_label: null}
+    3F: {trial_ids: [], success: [], independently_measured_label: null}
+    vac: {trial_ids: [], success: [], independently_measured_label: null}
+  feasibility_proxy_label:
+    status: "optional; never counts as independently verified GT"
+    generator_rule_sha256: null
+    labels: null
+  decision_gt:
+    allowed_ee_ids: null
+    no_feasible_ee: null
+    independent_trial_and_constraint_evidence_ids: []
+    frozen_tie_rule_or_equivalent_set: null
+  review_and_leakage:
+    source_annotation_sha256: null
+    annotator_blind_to_predictions: null
+    test_gt_not_used_for_prompt_or_threshold: null

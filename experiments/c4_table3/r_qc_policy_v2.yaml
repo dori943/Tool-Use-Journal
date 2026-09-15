@@ -1,0 +1,30 @@
+schema_version: c4_r_qc_v2
+locked_before_candidate_review: true
+reference_frame: 15
+candidate_frames: [15, 10, 20, 25, 30, 5, 35, 40, 45, 50]
+selection: first_candidate_passing_all_input_only_checks
+mass:
+  minimum_point_count: 200
+  minimum_valid_depth_fraction_in_rgb_mask: 0.80
+  minimum_laplacian_variance_in_bbox: 20.0
+  minimum_distance_to_image_edge_px: 5
+  maximum_refined_to_seed_bbox_width_ratio: 1.50
+  maximum_near_plane_fraction_in_final_mask: 0.20
+  near_plane_height_range_mm: [18, 35]
+  visual_review_required: true
+  original_masks_preserved: true
+friction:
+  reference_frame: 15
+  frame_interval_s: 0.03333333333333333
+  maximum_centroid_jump_mm_per_frame: 80.0
+  minimum_window_intervals: 8
+  minimum_travel_mm: 50.0
+  stop_step_mm: 3.0
+  stop_consecutive_steps: 3
+  window_rule: existing_choose_slide_window; never use physical GT or prediction error
+  visual_contact_review_required: true
+  semantics_rule: >-
+    A positive deceleration divided by 9.81 on a level support estimates combined
+    object-table kinetic friction only if contact is uninterrupted and no external
+    force acts during the selected window. Rotation or tracking uncertainty alone
+    is TARGET_SEMANTICS_UNVERIFIED, not TARGET_SEMANTICS_MISMATCH.

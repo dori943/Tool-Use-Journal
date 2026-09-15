@@ -1,0 +1,22 @@
+# C4 Table 3 평가 실행기
+
+`run.py`는 [`condition_matrix.csv`](../table3_protocol/condition_matrix.csv)에서 `READY`인 셀만 실행 대상으로 잡는다. 현재 검증된 Static Real-5 R 결과는 별도 `run_locked_inference.py`와 평가 bundle에서 보존하며, `run.py`는 기존 25-sequence trajectory 경로용 legacy 실행기다. 수치 GT는 추론 입력으로 만들지 않으며 evaluator가 결과 디렉터리에 snapshot을 만들 때만 읽는다. GT numerics oracle 입력은 일반 prediction과 별도 로그로 격리한다.
+
+2026-09-14의 Static Real-5 실행은 잠긴 50개 정지 입력으로 5회 inference와 평가를 완료했다. SiPhy Mass MnRE, shared + Geometric Mass MnRE, shared Ours Mass MnRE는 `0.9085 ± 0.0046`, Ours Static visual Friction MAE는 `0.1550 ± 0.0048`이다. 이 결과는 `output/c4_table3/20260914T160924Z_static_real5_evaluate/`에서 재현한다. D 패널과 Name-only/Affordance는 독립 GT 또는 adapter 부족으로 계속 차단된다. 기존 trajectory friction 경로는 이 static 결과에 섞지 않는다.
+표 원본은 `output/c4_table3/20260914T160924Z_static_real5_evaluate/table3_filled.md`와 `.csv`이며, 값은 저장된 per-repeat macro 점수에서 독립 재집계된다.
+
+```powershell
+Set-Location C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal
+.venv\Scripts\python.exe experiments\c4_table3\run.py
+.venv\Scripts\python.exe experiments\c4_table3\run.py --resume output\c4_table3\20260914T053234Z
+.venv\Scripts\python.exe -m unittest discover -s experiments\c4_table3 -p test_scoring.py -v
+.venv\Scripts\python.exe experiments\c4_table3\independent_arithmetic.py
+```
+
+새 실행은 `output/c4_table3/<run_id>/`에 `config.json`, `manifest.json`, 원본 matrix/registry/QC 정책, `gt_snapshot/`, `raw_predictions.jsonl`, `oracle_inputs.jsonl`, `failures.json`, 객체별·반복별·전체 summary, `checkpoint.json`, `table3.csv`, `table3.md`, `run.log`를 새로 만든다. 재개 시 config/manifest 및 prediction 파일 해시와 고유 `(condition, metric, input_id, repeat_id)` 키를 검사하고 완결된 실행은 그대로 반환한다. model version·API에 실제 전달된 seed·prompt hash·raw response 등은 prediction마다 필수 필드이며 호출이 없는 현재 run에서는 null/빈 파일로 남는다.
+
+`scoring.py`는 Real-5에서 **시퀀스 예측 중앙값→객체 GT 오차→5개 객체 동일 가중 macro**를 주 점수로 구현한다. 객체별 평균 예측은 `sensitivity_object_mean_prediction`이라는 별도 이름으로만 산출한다. 연속량의 조건별 예측 누락은 오차를 대입하거나 complete-case 분모를 줄이지 않고 `INCOMPLETE`와 coverage로 기록한다. accuracy는 고정 단위의 누락 예측을 오답으로 센다. Suction PF는 같은 객체의 두 pose가 모두 맞아야 1이고, DA는 독립 허용 EE 집합의 복수 정답을 인정한다. Clearance의 5 mm 분모 바닥값과 Crit의 vac 0.50±0.05 kg 범위는 기존 규약을 그대로 사용한다. run 간 표본 std(ddof=1), 객체 간 표본 std(ddof=1), 시퀀스 예측 std(ddof=1)를 별도 필드로 둔다.
+
+향후 입력/GT가 준비되더라도 **matrix만 READY로 수정해 실행할 수는 없다**. 정확한 조건별 어댑터와 공통 M3/M4 downstream 연결, `SiPhyBackend`의 전체 raw VLM response 보존, frame-15 mass와 활주 마찰의 분리 실행, oracle 숫자 채널 격리를 구현·검증해야 한다. 기존 `experiments/c4_real5/run_inference.py`는 마찰 추적 실패 시 질량도 건너뛰고 raw response를 기록하지 않으므로 그대로 Table 3 READY 실행기로 사용할 수 없다. 어댑터가 아직 없는데 READY가 나타나면 `run.py`는 `READY_ADAPTER_NOT_IMPLEMENTED`로 중단한다. 이는 불완전한 점수를 내지 않기 위한 명시적 보호다.
+
+검증: focused test 14개 통과. config를 바꾼 재개는 `RESUME_CONFIG_OR_MANIFEST_HASH_MISMATCH`로 거부됐고, 동일 config의 재개는 `UNCHANGED`·예측 0개를 반환했다. [`independent_arithmetic.py`](independent_arithmetic.py)는 보존된 과거 24개 prediction의 숫자만 독립 재집계해 Mass MnRE `0.9227010043238545`, Friction MAE `0.0241`을 확인한다. 과거 `result.json`은 다른 run 디렉터리에 있고 prediction hash가 없어, 이 일치는 실행 계보나 어느 Table 3 조건의 결과도 증명하지 않는다. 새 run은 이를 재사용하거나 재채점하지 않았다.

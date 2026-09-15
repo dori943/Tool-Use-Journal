@@ -1,0 +1,39 @@
+policy_version: table3_input_qc_v1_2026-09-14
+scope: "future Table 3 conditions only; historical C4 outputs are preserved"
+fixed_before: "any future condition inference or Table 3 scoring; historical C4 predictions already existed"
+prohibited_decision_inputs: [prediction_values, GT_mass_error, GT_friction_error, model_condition_id]
+real5_scope:
+  archive_sha256: 4c484ec1e5f3f66ccb6a930437404ba7c67a1bb5590791027ced9741e1136eab
+  split: test_sliding
+  object_count: 5
+  sequence_count: 25
+  exclude_tuna: true
+mass:
+  frame_rule: "use annotated RGB/depth index 15, same for every sequence; no GT pose ROI or best-sharpness search"
+  decoded_rgb_depth_pair_required: true
+  minimum_projected_points: 200
+  mask_source: "real_rgbd.object_crop_and_points: RANSAC table plane + above-plane depth + RGB GrabCut + 18 mm depth point mask + 9x9 closing; no GT mask"
+  visual_gate: "a reviewer blinded to all condition outputs signs that the crop contains the intended object and no material table/gripper/background fragment; save review ID and raw-frame evidence"
+  known_failed_visual_gate: [test_sliding/000015, test_sliding/000017]
+  other_rows_without_independent_signoff: BLOCKED_PENDING_QC
+  friction_failure_does_not_exclude_mass: true
+friction:
+  target: combined_object_table_kinetic_friction
+  source: "RGB-D-only centroid track + FrictionHead.probe_mu_from_track; stage0 contact/gripper proxy forbidden"
+  reference_frame_rule: "fixed index 15; changes from historical GT-pose-dependent per-scene reference"
+  minimum_window_frames: 9
+  minimum_travel_mm: 50
+  existing_jump_limit_mm_per_frame: 80
+  required_external_level_check: "inclinometer/MoCap table plane against gravity; do not infer gravity alignment from BOP world z alone"
+  maximum_table_tilt_deg: 0.5
+  maximum_cumulative_rotation_deg: 10
+  maximum_quadratic_residual_rms_mm: 5
+  maximum_lateral_rms_fraction_of_travel: 0.05
+  required_release_contact_annotation: "no hand, push tool, gripper or other external contact throughout retained window"
+  rotation_diagnostic_source: "scene_gt MoCap orientation for post-selection QA only; no pose fed to estimator or window picker"
+  mismatch_rule: "tracked window above 10 deg cumulative rotation cannot equate translation-only a/g to the combined sliding coefficient; status TARGET_SEMANTICS_MISMATCH"
+  failure_rule: "if object/window tracking fails, BLOCKED_TRACK; if contact/level not independently verified, BLOCKED_EVIDENCE; never compute an MAE for an ineligible object"
+rgb_depth_alignment:
+  verified: "per-frame filename indices, decode, equal 848x480 dimensions, camera intrinsics/depth scale availability"
+  not_verified: "independent pixel-level color/depth registration and temporal sync"
+  gate: "pixel-level registration test required before claiming calibrated RGB-D; preserve uncertainty meanwhile"
