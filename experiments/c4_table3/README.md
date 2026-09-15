@@ -20,6 +20,15 @@
 
 `--emit-mjcf`는 source unit을 독립적으로 검증한 뒤에만 `--unit-scale`과 함께 사용한다. wrapper에는 질량·마찰을 넣지 않는다. 모래 충전 real-world mass와 Table 5 friction은 시뮬레이터 입력으로 주입할 수 없고, calibration split에서 정한 별도 파라미터로만 관리한다. YCB 파일명이 같아도 EV-RealPhys 이미지와 동일한 실물 인스턴스라는 증거가 아니므로, 해당 결과는 `SIM-PROXY`로 별도 보고한다. Tuna Fish Can(007)은 항상 제외한다.
 
+정적 RGB-D 입력을 simulator 좌표계로 옮길 때는 `estimate_static_sim_pose.py`를 사용한다. 이 도구는 잠긴 QC bounding box 안의 depth centroid와 `scene_camera.json`의 intrinsics만 계산하고, 물체 회전·테이블 평면·metric scale은 `UNRESOLVED`/`NEEDS_CALIBRATION`으로 남긴다.
+
+```powershell
+.venv\Scripts\python.exe experiments\c4_table3\estimate_static_sim_pose.py `
+  --static-manifest output\c4_table3\<prep>\selected_static_inputs.csv `
+  --qc-jsonl output\c4_table3\<prep>\candidate_qc.jsonl `
+  --output output\c4_table3\<UTC>_static_sim_pose_bridge
+```
+
 ```powershell
 Set-Location C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal
 .venv\Scripts\python.exe experiments\c4_table3\run.py
