@@ -1,0 +1,25 @@
+benchmark: C4_Table_III_D_SIM
+panel: D_SIM
+input_source: output/c4_table3/<run>_sim_d_adapter_audit/sim_manifest.yaml
+gt_input: forbidden
+evaluator_import: forbidden
+conditions:
+  - name_only
+  - affordance_labels
+  - siphy_adopted
+  - geometric_grounding
+  - ours_full
+oracle_condition: excluded_from_inference
+repeats: 3
+requested_seed_base: 100
+provider_seed_supported: false
+provider_seed_sent: false
+temperature: environment:C4_SIM_TEMPERATURE
+model: environment:C4_SIM_MODEL
+retry_policy: provider_sdk_default_only
+cache_key: [condition_id, metric, repeat_id, input_id, manifest_sha256, model_version]
+outputs:
+  raw: raw_predictions.jsonl
+  parsed: parsed_predictions.jsonl
+  checkpoint: checkpoint.jsonl
+  failures: failures.csv

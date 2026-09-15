@@ -4,7 +4,10 @@ from __future__ import annotations
 import argparse
 from pathlib import Path
 
-from adapters import adapter_audit
+try:
+    from .adapters import adapter_audit
+except ImportError:  # direct script execution
+    from adapters import adapter_audit
 
 
 def render(rows: list[dict]) -> str:
@@ -43,4 +46,3 @@ def main() -> None:
 
 if __name__ == "__main__":
     main()
-

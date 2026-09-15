@@ -48,6 +48,17 @@ def test_affordance_labels_are_required_and_passed_as_input(tmp_path: Path):
     assert "side_grasp" in provider.calls[0]["prompt"]
 
 
+def test_bundle_uses_one_provider_call_and_preserves_raw_response(tmp_path: Path):
+    obs = _observation(tmp_path)
+    provider = RecordingProvider({"mass_kg": 0.2, "feasible_by_ee": {"2F": True, "3F": True, "vac": True}})
+    rows = ConditionAdapter("geometric_grounding", provider).predict_bundle(
+        obs, ["Clearance_RelErr", "Feasibility_Acc"])
+    assert len(provider.calls) == 1
+    assert rows[0]["parse_status"] == "FAILED"  # clearance field was absent
+    assert rows[1]["parse_status"] == "OK"
+    assert rows[1]["raw_response"]["feasible_by_ee"]["vac"] is True
+
+
 def test_geo_and_ours_share_siphy_source(tmp_path: Path):
     obs = _observation(tmp_path)
     provider = RecordingProvider({"mass_kg": 0.2})

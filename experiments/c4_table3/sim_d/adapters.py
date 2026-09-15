@@ -41,6 +41,13 @@ class JsonProvider(Protocol):
         ...
 
 
+@dataclass(frozen=True)
+class ProviderResponse:
+    parsed: dict[str, Any]
+    raw_response: str
+    request_id: str | None = None
+
+
 class SharedPredictionCache:
     """In-memory provenance cache used to prevent duplicate mass calls."""
 
@@ -246,7 +253,15 @@ class ConditionAdapter:
             }
         prompt = self.build_prompt(obs, metric)
         image = obs.friction_context_path if metric in {"Suction_Acc", "Suction_PF", "Clearance_RelErr", "Feasibility_Acc", "DA"} else obs.image_path
-        raw = self.provider.predict(prompt=prompt, image_path=image, input_id=obs.input_id)
+        response = self.provider.predict(prompt=prompt, image_path=image, input_id=obs.input_id)
+        if isinstance(response, ProviderResponse):
+            raw = response.parsed
+            raw_response: Any = response.raw_response
+            request_id = response.request_id
+        else:
+            raw = response
+            raw_response = response
+            request_id = None
         if not isinstance(raw, dict):
             raise AdapterError("INVALID_FORMAT")
         value = self._parse_value(raw, metric)
@@ -258,7 +273,8 @@ class ConditionAdapter:
             "metric": metric,
             "value": value,
             "unit": self._unit(metric),
-            "raw_response": raw,
+            "raw_response": raw_response,
+            "request_id": request_id,
             "parse_status": "OK",
             "failure_reason": None,
             "prompt_sha256": _prompt_hash(prompt),
@@ -271,6 +287,101 @@ class ConditionAdapter:
         if self.shared_cache is not None and self.spec.condition_id == "siphy_adopted":
             self.shared_cache.put(result)
         return result
+
+    def predict_bundle(self, obs: Observation, metrics: list[str]) -> list[dict[str, Any]]:
+        """One provider call for all requested outputs for this input.
+
+        This is the cost-controlled execution path for D_SIM.  Missing fields
+        become per-metric failures in the runner; one response is never silently
+        reused as a different metric.
+        """
+        if not metrics:
+            return []
+        unsupported = sorted(set(metrics) - set(self.spec.supports))
+        if unsupported:
+            raise AdapterError(f"METRIC_UNSUPPORTED:{self.spec.condition_id}:{','.join(unsupported)}")
+        shared_mass: dict[str, Any] | None = None
+        if "Mass_Acc" in metrics and self.spec.prediction_source == "siphy_adopted" and self.spec.condition_id != "siphy_adopted":
+            if self.shared_cache is None:
+                raise AdapterError("SHARED_SIPHY_PREDICTION_REQUIRED")
+            shared_mass = self.shared_cache.get(obs.input_id, "Mass_Acc")
+            if shared_mass is None:
+                raise AdapterError("SHARED_SIPHY_PREDICTION_MISSING")
+        call_metrics = [m for m in metrics if not (m == "Mass_Acc" and shared_mass is not None)]
+        raw: dict[str, Any] = {}
+        raw_response: Any = None
+        request_id = None
+        if call_metrics:
+            if self.provider is None:
+                raise AdapterError("MODEL_PROVIDER_NOT_CONFIGURED")
+            prompt = self.build_bundle_prompt(obs, call_metrics)
+            image = obs.friction_context_path if any(m in {"Suction_Acc", "Suction_PF", "Clearance_RelErr", "Feasibility_Acc", "DA"} for m in call_metrics) else obs.image_path
+            response = self.provider.predict(prompt=prompt, image_path=image, input_id=obs.input_id)
+            if isinstance(response, ProviderResponse):
+                raw, raw_response, request_id = response.parsed, response.raw_response, response.request_id
+            else:
+                raw, raw_response = response, response
+            if not isinstance(raw, dict):
+                raise AdapterError("INVALID_FORMAT")
+        rows = []
+        for metric in metrics:
+            if metric == "Mass_Acc" and shared_mass is not None:
+                row = {**shared_mass, "condition_id": self.spec.condition_id,
+                       "shared_prediction": True, "shared_prediction_source": "siphy_adopted",
+                       "source_prediction_id": shared_mass.get("prediction_id", f'{shared_mass["condition_id"]}:{shared_mass["input_id"]}'),
+                       "independent_model_call": False}
+                rows.append(row)
+                continue
+            try:
+                value = self._parse_value(raw, metric)
+                row = self._envelope(obs, metric, value, raw_response, request_id)
+            except AdapterError as error:
+                row = self._failure_envelope(obs, metric, raw_response, request_id, str(error))
+            rows.append(row)
+        return rows
+
+    def build_bundle_prompt(self, obs: Observation, metrics: list[str]) -> str:
+        base = [self.build_prompt(obs, metrics[0]), f"requested_metrics={metrics}",
+                "Return one JSON object with only the requested fields."]
+        fields = []
+        if "Mass_Acc" in metrics or "Crit" in metrics:
+            fields.append('"mass_kg": positive number')
+        if "Clearance_RelErr" in metrics:
+            fields.append('"clearance_mm": finite number')
+        if "Suction_Acc" in metrics or "Suction_PF" in metrics:
+            fields.append('"suction_feasible": boolean')
+        if "Feasibility_Acc" in metrics:
+            fields.append('"feasible_by_ee": {"2F": boolean, "3F": boolean, "vac": boolean}')
+        if "DA" in metrics:
+            fields.append('"selected_ee": "2F" | "3F" | "vac" | "NO_FEASIBLE_EE"')
+        return "\n".join(base + ["JSON fields:", *fields])
+
+    def _envelope(self, obs: Observation, metric: str, value: Any,
+                  raw_response: Any, request_id: str | None) -> dict[str, Any]:
+        prompt = self.last_prompt or ""
+        return {"input_id": obs.input_id, "sample_id": obs.sample_id,
+                "object_id": obs.payload.get("object_instance_id", obs.sample_id),
+                "condition_id": self.spec.condition_id, "metric": metric,
+                "value": value, "unit": self._unit(metric), "raw_response": raw_response,
+                "request_id": request_id, "parse_status": "OK", "failure_reason": None,
+                "prompt_sha256": _prompt_hash(prompt),
+                "model_version": str(getattr(self.provider, "model_version", "unknown")),
+                "temperature": float(getattr(self.provider, "temperature", 0.0)),
+                "shared_prediction": False, "shared_prediction_source": None,
+                "independent_model_call": True}
+
+    def _failure_envelope(self, obs: Observation, metric: str, raw_response: Any,
+                          request_id: str | None, reason: str) -> dict[str, Any]:
+        return {"input_id": obs.input_id, "sample_id": obs.sample_id,
+                "object_id": obs.payload.get("object_instance_id", obs.sample_id),
+                "condition_id": self.spec.condition_id, "metric": metric,
+                "value": None, "unit": self._unit(metric), "raw_response": raw_response,
+                "request_id": request_id, "parse_status": "FAILED", "failure_reason": reason,
+                "prompt_sha256": _prompt_hash(self.last_prompt or ""),
+                "model_version": str(getattr(self.provider, "model_version", "unknown")),
+                "temperature": float(getattr(self.provider, "temperature", 0.0)),
+                "shared_prediction": False, "shared_prediction_source": None,
+                "independent_model_call": True}
 
     @staticmethod
     def _unit(metric: str) -> str:
