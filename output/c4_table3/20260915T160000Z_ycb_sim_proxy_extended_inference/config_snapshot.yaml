@@ -1,0 +1,57 @@
+panel: D_SIM
+prep_dir: output\c4_table3\20260915T133500Z_ycb_sim_proxy_prep
+manifest_sha256: 9adafd4b2da680afc4510372a5d61ca8f0bae8ca34aef25bbfcfe6eff81519a5
+conditions:
+- name_only
+- affordance_labels
+- siphy_adopted
+- geometric_grounding
+- ours_full
+metrics:
+  name_only:
+  - Mass_Acc
+  - Suction_Acc
+  - Suction_PF
+  - Feasibility_Acc
+  - DA
+  - Crit
+  affordance_labels:
+  - Mass_Acc
+  - Suction_Acc
+  - Suction_PF
+  - Feasibility_Acc
+  - DA
+  - Crit
+  siphy_adopted:
+  - Mass_Acc
+  - Feasibility_Acc
+  - DA
+  - Crit
+  geometric_grounding:
+  - Mass_Acc
+  - Suction_Acc
+  - Suction_PF
+  - Clearance_RelErr
+  - Feasibility_Acc
+  - DA
+  - Crit
+  ours_full:
+  - Mass_Acc
+  - Suction_Acc
+  - Suction_PF
+  - Clearance_RelErr
+  - Feasibility_Acc
+  - DA
+  - Crit
+repeats: 3
+provider:
+  provider: gemini
+  model: gemini-3.6-flash
+  temperature: 0.0
+  provider_seed_supported: false
+  provider_seed_sent: false
+shared_predictions: null
+reuse_predictions: output\c4_table3\_tmp_ycb\reuse_raw.jsonl
+gt_access:
+  sim_gt_read: false
+  evaluator_imported: false

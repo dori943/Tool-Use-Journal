@@ -1,0 +1,473 @@
+schema_version: table3_panel_d_sim_ycb_proxy_gt_v1
+status: READY_GT_ONLY
+panel: D_SIM
+benchmark: SIM_PROXY
+source:
+  generator: generate_ycb_proxy.py
+  simulator: MuJoCo
+  real5_gt_used: false
+  source_sha256: 5af052c979431e3ae72b041e9bd9d3dbd847437830f8e30e55153f97050a55ba
+samples:
+- sample_id: ycb_001_003_cracker_box
+  object_instance_id: ycb_001_003_cracker_box_instance
+  object_id: 003_cracker_box
+  object_name: Cracker Box
+  mass_gt_kg: 0.272754104
+  mass_gt_source: YCB_MESH_SIM_PROXY_DENSITY_VOLUME
+  proxy_density_kgm3: 800.0
+  occupancy_fraction: 0.125
+  scene_xml_sha256: 3f8329582631da904bac4b32c7aa986438d01f56808575e556263d174f65fc8d
+  compiled_object_size_mm:
+  - 64.46502806420429
+  - 151.6584073828822
+  - 221.29132833413396
+  support_rollout_valid: true
+  suction_pose_pair:
+    poses:
+    - pose_id: ycb_001_003_cracker_box_pose_A
+      pose_index: 0
+      surface_rms_mm: 0.5
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+    - pose_id: ycb_001_003_cracker_box_pose_B
+      pose_index: 1
+      surface_rms_mm: 2.0
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    trial_contract:
+      trials: 5
+      positive_at_least: 4
+      lift_mm: 50
+      hold_s: 2.0
+  clearance_gt:
+    reference_frame: sim_table_frame
+    opening_inner_widths_mm:
+    - 172.963077
+    - 172.963077
+    projected_object_footprint_mm:
+    - 82.041785
+    - 152.963077
+    signed_margin_gt_mm: 20.0
+    gt_source: YCB_MESH_SIM_PROXY_GEOMETRY
+  ee_trial_gt:
+    2F:
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    3F:
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    vac:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+  decision_gt:
+    allowed_ee_ids:
+    - vac
+    all_feasible_ee_ids:
+    - vac
+    no_feasible_ee: false
+    objective_frozen: true
+    objective: minimum fixed proxy task cost among feasible EE; ties allowed
+    independent_trial_and_constraint_evidence_ids:
+    - ycb_001_003_cracker_box::proxy_trial_contract
+  critical_subset_member: false
+- sample_id: ycb_002_006_mustard_bottle
+  object_instance_id: ycb_002_006_mustard_bottle_instance
+  object_id: 006_mustard_bottle
+  object_name: Mustard Bottle
+  mass_gt_kg: 0.14336028
+  mass_gt_source: YCB_MESH_SIM_PROXY_DENSITY_VOLUME
+  proxy_density_kgm3: 800.0
+  occupancy_fraction: 0.125
+  scene_xml_sha256: 0e98678c423801c0b09cb08d85a297de5db6aa8ac0def5cea634963e4eab406f
+  compiled_object_size_mm:
+  - 62.99361346342769
+  - 103.14084799303924
+  - 211.71145414754275
+  support_rollout_valid: true
+  suction_pose_pair:
+    poses:
+    - pose_id: ycb_002_006_mustard_bottle_pose_A
+      pose_index: 0
+      surface_rms_mm: 0.5
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+    - pose_id: ycb_002_006_mustard_bottle_pose_B
+      pose_index: 1
+      surface_rms_mm: 2.0
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    trial_contract:
+      trials: 5
+      positive_at_least: 4
+      lift_mm: 50
+      hold_s: 2.0
+  clearance_gt:
+    reference_frame: sim_table_frame
+    opening_inner_widths_mm:
+    - 113.42168600000001
+    - 113.42168600000001
+    projected_object_footprint_mm:
+    - 82.36147199999999
+    - 93.42168600000001
+    signed_margin_gt_mm: 20.0
+    gt_source: YCB_MESH_SIM_PROXY_GEOMETRY
+  ee_trial_gt:
+    2F:
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    3F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+    vac:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+  decision_gt:
+    allowed_ee_ids:
+    - vac
+    all_feasible_ee_ids:
+    - 3F
+    - vac
+    no_feasible_ee: false
+    objective_frozen: true
+    objective: minimum fixed proxy task cost among feasible EE; ties allowed
+    independent_trial_and_constraint_evidence_ids:
+    - ycb_002_006_mustard_bottle::proxy_trial_contract
+  critical_subset_member: false
+- sample_id: ycb_003_019_pitcher_base
+  object_instance_id: ycb_003_019_pitcher_base_instance
+  object_id: 019_pitcher_base
+  object_name: Pitcher Base
+  mass_gt_kg: 0.497920449
+  mass_gt_source: YCB_MESH_SIM_PROXY_DENSITY_VOLUME
+  proxy_density_kgm3: 800.0
+  occupancy_fraction: 0.125
+  scene_xml_sha256: 04935c01e052c0c8cb2678938cee7d26c7bbbeb2c8255d77d7f8db8b0d9ac87c
+  compiled_object_size_mm:
+  - 133.61203030593327
+  - 204.2585229806892
+  - 255.24324030650664
+  support_rollout_valid: true
+  suction_pose_pair:
+    poses:
+    - pose_id: ycb_003_019_pitcher_base_pose_A
+      pose_index: 0
+      surface_rms_mm: 0.5
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+    - pose_id: ycb_003_019_pitcher_base_pose_B
+      pose_index: 1
+      surface_rms_mm: 2.0
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    trial_contract:
+      trials: 5
+      positive_at_least: 4
+      lift_mm: 50
+      hold_s: 2.0
+  clearance_gt:
+    reference_frame: sim_table_frame
+    opening_inner_widths_mm:
+    - 163.050403
+    - 163.050403
+    projected_object_footprint_mm:
+    - 139.90370299999998
+    - 143.050403
+    signed_margin_gt_mm: 20.0
+    gt_source: YCB_MESH_SIM_PROXY_GEOMETRY
+  ee_trial_gt:
+    2F:
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    3F:
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    vac:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+  decision_gt:
+    allowed_ee_ids:
+    - vac
+    all_feasible_ee_ids:
+    - vac
+    no_feasible_ee: false
+    objective_frozen: true
+    objective: minimum fixed proxy task cost among feasible EE; ties allowed
+    independent_trial_and_constraint_evidence_ids:
+    - ycb_003_019_pitcher_base::proxy_trial_contract
+  critical_subset_member: true
+- sample_id: ycb_004_021_bleach_cleanser
+  object_instance_id: ycb_004_021_bleach_cleanser_instance
+  object_id: 021_bleach_cleanser
+  object_name: Bleach Cleanser
+  mass_gt_kg: 0.221657951
+  mass_gt_source: YCB_MESH_SIM_PROXY_DENSITY_VOLUME
+  proxy_density_kgm3: 800.0
+  occupancy_fraction: 0.125
+  scene_xml_sha256: f73487e9ff6600037ad0f7a4ac83ad339089c29c2ec1fdea99858d873ab2608f
+  compiled_object_size_mm:
+  - 69.77906871282717
+  - 98.29580736735704
+  - 281.1616598834947
+  support_rollout_valid: true
+  suction_pose_pair:
+    poses:
+    - pose_id: ycb_004_021_bleach_cleanser_pose_A
+      pose_index: 0
+      surface_rms_mm: 0.5
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+    - pose_id: ycb_004_021_bleach_cleanser_pose_B
+      pose_index: 1
+      surface_rms_mm: 2.0
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    trial_contract:
+      trials: 5
+      positive_at_least: 4
+      lift_mm: 50
+      hold_s: 2.0
+  clearance_gt:
+    reference_frame: sim_table_frame
+    opening_inner_widths_mm:
+    - 121.689132
+    - 121.689132
+    projected_object_footprint_mm:
+    - 89.784304
+    - 101.689132
+    signed_margin_gt_mm: 20.0
+    gt_source: YCB_MESH_SIM_PROXY_GEOMETRY
+  ee_trial_gt:
+    2F:
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    3F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+    vac:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+  decision_gt:
+    allowed_ee_ids:
+    - vac
+    all_feasible_ee_ids:
+    - 3F
+    - vac
+    no_feasible_ee: false
+    objective_frozen: true
+    objective: minimum fixed proxy task cost among feasible EE; ties allowed
+    independent_trial_and_constraint_evidence_ids:
+    - ycb_004_021_bleach_cleanser::proxy_trial_contract
+  critical_subset_member: false
+- sample_id: ycb_005_025_mug
+  object_instance_id: ycb_005_025_mug_instance
+  object_id: 025_mug
+  object_name: Mug
+  mass_gt_kg: 0.091502711
+  mass_gt_source: YCB_MESH_SIM_PROXY_DENSITY_VOLUME
+  proxy_density_kgm3: 800.0
+  occupancy_fraction: 0.125
+  scene_xml_sha256: 1e5e1fe0fbb2863a5c3b28a43a7cc01fbdd29e05cc9e4bd0dcc3a3132358b24f
+  compiled_object_size_mm:
+  - 91.32189261505616
+  - 121.16984939354114
+  - 124.47392716484337
+  support_rollout_valid: true
+  suction_pose_pair:
+    poses:
+    - pose_id: ycb_005_025_mug_pose_A
+      pose_index: 0
+      surface_rms_mm: 0.5
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+    - pose_id: ycb_005_025_mug_pose_B
+      pose_index: 1
+      surface_rms_mm: 2.0
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    trial_contract:
+      trials: 5
+      positive_at_least: 4
+      lift_mm: 50
+      hold_s: 2.0
+  clearance_gt:
+    reference_frame: sim_table_frame
+    opening_inner_widths_mm:
+    - 124.55429400000001
+    - 124.55429400000001
+    projected_object_footprint_mm:
+    - 85.603607
+    - 104.55429400000001
+    signed_margin_gt_mm: 20.0
+    gt_source: YCB_MESH_SIM_PROXY_GEOMETRY
+  ee_trial_gt:
+    2F:
+      trial_success:
+      - false
+      - false
+      - false
+      - false
+      - false
+      gt_label: false
+      gt_source: YCB_MESH_SIM_PROXY
+    3F:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+    vac:
+      trial_success:
+      - true
+      - true
+      - true
+      - true
+      - true
+      gt_label: true
+      gt_source: YCB_MESH_SIM_PROXY
+  decision_gt:
+    allowed_ee_ids:
+    - vac
+    all_feasible_ee_ids:
+    - 3F
+    - vac
+    no_feasible_ee: false
+    objective_frozen: true
+    objective: minimum fixed proxy task cost among feasible EE; ties allowed
+    independent_trial_and_constraint_evidence_ids:
+    - ycb_005_025_mug::proxy_trial_contract
+  critical_subset_member: false

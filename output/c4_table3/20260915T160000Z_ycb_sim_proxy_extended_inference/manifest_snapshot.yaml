@@ -1,0 +1,88 @@
+schema_version: table3_panel_d_sim_ycb_proxy_v1
+status: READY_GT_ONLY
+panel: D_SIM
+benchmark: SIM_PROXY
+source_dataset: uniform-scaled Berkeley YCB mesh in MuJoCo
+source_version: YCB + MuJoCo
+split: test
+ee_ids:
+- 2F
+- 3F
+- vac
+payload_kg:
+  2F: 5.0
+  3F: 2.5
+  vac: 0.5
+suction_trials_per_pose: 5
+suction_positive_at_least: 4
+feasibility_trials_per_sample_ee: 5
+feasibility_positive_at_least: 4
+clearance:
+  unit: mm
+  target: signed horizontal opening margin
+  denominator_floor_mm: 5.0
+critical_subset:
+  ee_id: vac
+  mass_threshold_kg: 0.5
+  inclusive_half_width_kg: 0.05
+proxy_calibration:
+  effective_density_kgm3: 800.0
+  occupancy_fraction: 0.125
+  real5_gt_used: false
+  real5_friction_used: false
+samples:
+- sample_id: ycb_001_003_cracker_box
+  object_instance_id: ycb_001_003_cracker_box_instance
+  object_id: 003_cracker_box
+  object_name: Cracker Box
+  observation_path: observations/ycb_001_003_cracker_box.json
+  observation_sha256: 53e053c8bdf6c4c4aeb720d4039b8323d00e99197b46d56200b32c5454bb0c53
+  split: test
+  source: YCB_MESH_SIM_PROXY
+  mesh_sha256: a229f983449738bc377814fb615858ca38a21cdffd2606c44f20c8bcf77d88ee
+  uniform_scaled_mesh: C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal\output\c4_table3\20260915T123000Z_ycb_uniform_scaled\003_cracker_box\003_cracker_box\poisson\textured.obj
+- sample_id: ycb_002_006_mustard_bottle
+  object_instance_id: ycb_002_006_mustard_bottle_instance
+  object_id: 006_mustard_bottle
+  object_name: Mustard Bottle
+  observation_path: observations/ycb_002_006_mustard_bottle.json
+  observation_sha256: 12b0b9830ada69bda581d1bd6a68528066d0330164a2b2f151e77d4e2db85dd7
+  split: test
+  source: YCB_MESH_SIM_PROXY
+  mesh_sha256: c31bc87063fb2e67f565ff7f4991735180ab3ae6371b865a321acffaa59756f4
+  uniform_scaled_mesh: C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal\output\c4_table3\20260915T123000Z_ycb_uniform_scaled\006_mustard_bottle\006_mustard_bottle\poisson\textured.obj
+- sample_id: ycb_003_019_pitcher_base
+  object_instance_id: ycb_003_019_pitcher_base_instance
+  object_id: 019_pitcher_base
+  object_name: Pitcher Base
+  observation_path: observations/ycb_003_019_pitcher_base.json
+  observation_sha256: da4c482e9b091f88ecc2a2a3c7348ceab464e0e579d3a75798afd19848e55d82
+  split: test
+  source: YCB_MESH_SIM_PROXY
+  mesh_sha256: 668dbc1fe9f51298232ade986fc1e4385f94c9a8f4aece74b879295b57b54b1a
+  uniform_scaled_mesh: C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal\output\c4_table3\20260915T123000Z_ycb_uniform_scaled\019_pitcher_base\019_pitcher_base\poisson\textured.obj
+- sample_id: ycb_004_021_bleach_cleanser
+  object_instance_id: ycb_004_021_bleach_cleanser_instance
+  object_id: 021_bleach_cleanser
+  object_name: Bleach Cleanser
+  observation_path: observations/ycb_004_021_bleach_cleanser.json
+  observation_sha256: 8c4e8ad929158e2b50bcb156ebbb8baf130e0ec0db69224b8bf0041b93f129b1
+  split: test
+  source: YCB_MESH_SIM_PROXY
+  mesh_sha256: 7ac602add53e7c9b361258fc4d01636abc68ee219bb4e85dfa393909bd4abd2e
+  uniform_scaled_mesh: C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal\output\c4_table3\20260915T123000Z_ycb_uniform_scaled\021_bleach_cleanser\021_bleach_cleanser\poisson\textured.obj
+- sample_id: ycb_005_025_mug
+  object_instance_id: ycb_005_025_mug_instance
+  object_id: 025_mug
+  object_name: Mug
+  observation_path: observations/ycb_005_025_mug.json
+  observation_sha256: edae56792cd52feb4630c870f720eb8ff80c4d726df84ba0b2efeb7375aa5b19
+  split: test
+  source: YCB_MESH_SIM_PROXY
+  mesh_sha256: b1da1237b179e974076cf0ab16ead2c6002b81e3f3609afd08b70e198419ffa7
+  uniform_scaled_mesh: C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal\output\c4_table3\20260915T123000Z_ycb_uniform_scaled\025_mug\025_mug\poisson\textured.obj
+review_and_leakage:
+  gt_used_for_input_generation: false
+  gt_used_for_prediction: false
+  predictions_present: false
+  evaluator_only_gt_file: sim_gt.yaml
