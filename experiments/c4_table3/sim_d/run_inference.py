@@ -146,6 +146,47 @@ def _append_jsonl(path: Path, row: dict[str, Any]) -> None:
         handle.write(json.dumps(row, ensure_ascii=False, default=str) + "\n")
 
 
+def _load_reusable_predictions(path: Path, manifest_sha256: str, model_version: str) -> dict[tuple[str, int, str, str], dict[str, Any]]:
+    """Load only successful rows compatible with the locked manifest/model.
+
+    Rows with the old sample-level suction schema are deliberately rejected so
+    they cannot masquerade as pose-level predictions after the adapter change.
+    """
+    indexed: dict[tuple[str, int, str, str], dict[str, Any]] = {}
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.strip():
+            continue
+        row = json.loads(line)
+        condition = str(row.get("condition_id", row.get("condition", "")))
+        metric = str(row.get("metric", ""))
+        try:
+            repeat_id = int(row.get("repeat_id", -1))
+        except (TypeError, ValueError):
+            continue
+        key = (condition, repeat_id, str(row.get("input_id", "")), metric)
+        if key in indexed:
+            raise RuntimeError(f"REUSE_DUPLICATE_KEY:{key}")
+        if row.get("manifest_sha256") not in (None, manifest_sha256):
+            raise RuntimeError(f"REUSE_MANIFEST_MISMATCH:{key}")
+        if row.get("model_version") not in (None, model_version):
+            continue
+        if row.get("parse_status") != "OK":
+            continue
+        value = row.get("value")
+        valid = True
+        if metric in {"Mass_Acc", "Crit", "Clearance_RelErr"}:
+            valid = isinstance(value, (int, float)) and not isinstance(value, bool)
+        elif metric in {"Suction_Acc", "Suction_PF"}:
+            valid = isinstance(value, dict) and set(value) == {"pose_A", "pose_B"} and all(type(v) is bool for v in value.values())
+        elif metric == "Feasibility_Acc":
+            valid = isinstance(value, dict) and set(value) == {"2F", "3F", "vac"} and all(type(v) is bool for v in value.values())
+        elif metric == "DA":
+            valid = value in {"2F", "3F", "vac", "NO_FEASIBLE_EE"}
+        if valid:
+            indexed[key] = row
+    return indexed
+
+
 def _siphy_rows(obs, repeat_id: int, cfg: dict[str, Any], manifest_sha256: str, backend: Any) -> list[dict[str, Any]]:
     """Run the repository SiPhyBackend once and derive Mass Acc/Crit locally."""
     adapter = SiPhyAdapter(backend=backend)
@@ -174,7 +215,7 @@ def _siphy_rows(obs, repeat_id: int, cfg: dict[str, Any], manifest_sha256: str, 
 
 
 def run(prep: Path, run_dir: Path, repeats: int = 3, conditions: tuple[str, ...] = CONDITION_ORDER,
-        shared_predictions: Path | None = None) -> dict[str, Any]:
+        shared_predictions: Path | None = None, reuse_predictions: Path | None = None) -> dict[str, Any]:
     run_dir.mkdir(parents=True, exist_ok=True)
     manifest, inputs = _load_manifest(prep)
     _write_snapshot(run_dir, prep, manifest)
@@ -186,6 +227,7 @@ def run(prep: Path, run_dir: Path, repeats: int = 3, conditions: tuple[str, ...]
                        "conditions": list(conditions), "metrics": {k: METRICS[k] for k in conditions}, "repeats": repeats,
                        "provider": {k: v for k, v in cfg.items() if k != "configured"},
                        "shared_predictions": str(shared_predictions) if shared_predictions else None,
+                       "reuse_predictions": str(reuse_predictions) if reuse_predictions else None,
                        "gt_access": {"sim_gt_read": False, "evaluator_imported": False}}
     (run_dir / "config_snapshot.yaml").write_text(yaml.safe_dump(config_snapshot, allow_unicode=True, sort_keys=False), encoding="utf-8")
     (run_dir / "manifest_hash.txt").write_text(config_snapshot["manifest_sha256"] + "\n", encoding="utf-8")
@@ -214,6 +256,7 @@ def run(prep: Path, run_dir: Path, repeats: int = 3, conditions: tuple[str, ...]
     cached_rows: list[dict[str, Any]] = []
     if shared_predictions:
         cached_rows = [json.loads(line) for line in shared_predictions.read_text(encoding="utf-8").splitlines() if line]
+    reuse_index = _load_reusable_predictions(reuse_predictions, config_snapshot["manifest_sha256"], cfg["model"]) if reuse_predictions else {}
     counts = {"provider_calls": 0, "prediction_rows": 0, "failures": 0}
     raw_path, parsed_path, metadata_path, checkpoint_path = [run_dir / name for name in ("raw_predictions.jsonl", "parsed_predictions.jsonl", "request_metadata.jsonl", "checkpoint.jsonl")]
     for repeat_id in range(repeats):
@@ -229,25 +272,42 @@ def run(prep: Path, run_dir: Path, repeats: int = 3, conditions: tuple[str, ...]
                 obs = item["observation"]
                 key_prefix = {"condition": condition_id, "repeat_id": repeat_id, "input_id": obs.input_id,
                               "manifest_sha256": config_snapshot["manifest_sha256"], "model_version": cfg["model"]}
+                existing = {metric: row for (cid, rid, iid, metric), row in reuse_index.items()
+                            if cid == condition_id and rid == repeat_id and iid == obs.input_id}
+                new_rows: list[dict[str, Any]] = []
                 try:
                     if condition_id == "siphy_adopted":
-                        from tuj.m1_scene.siphy_backend import SiPhyBackend
-                        backend = SiPhyBackend(model=cfg["model"], temperature=cfg["temperature"])
-                        rows = _siphy_rows(obs, repeat_id, cfg, config_snapshot["manifest_sha256"], backend)
-                        cache.put(rows[0])
+                        rows = []
+                        if "Mass_Acc" not in existing or "Crit" not in existing:
+                            from tuj.m1_scene.siphy_backend import SiPhyBackend
+                            backend = SiPhyBackend(model=cfg["model"], temperature=cfg["temperature"])
+                            rows.extend(_siphy_rows(obs, repeat_id, cfg, config_snapshot["manifest_sha256"], backend))
+                            new_rows.extend(rows)
+                        else:
+                            rows.extend(existing[m] for m in ("Mass_Acc", "Crit"))
+                        cache.put(next(r for r in rows if r.get("metric") == "Mass_Acc"))
                         extra_metrics = [metric for metric in METRICS[condition_id]
-                                         if metric not in {"Mass_Acc", "Crit"}]
+                                         if metric not in {"Mass_Acc", "Crit"} and metric not in existing]
                         if extra_metrics:
                             # SiPhy mass remains the repository backend output;
                             # downstream decisions are requested separately and
                             # never silently fabricated from the mass estimate.
-                            rows.extend(ConditionAdapter(condition_id, provider,
-                                                         shared_cache=cache).predict_bundle(obs, extra_metrics))
+                            fresh = ConditionAdapter(condition_id, provider,
+                                                     shared_cache=cache).predict_bundle(obs, extra_metrics)
+                            rows.extend(fresh)
+                            new_rows.extend(fresh)
+                        rows.extend(existing[m] for m in METRICS[condition_id]
+                                     if m not in {"Mass_Acc", "Crit"} and m in existing)
                     else:
-                        rows = adapter.predict_bundle(obs, METRICS[condition_id])
+                        missing_metrics = [metric for metric in METRICS[condition_id] if metric not in existing]
+                        rows = [existing[metric] for metric in METRICS[condition_id] if metric in existing]
+                        if missing_metrics:
+                            fresh = adapter.predict_bundle(obs, missing_metrics)
+                            rows.extend(fresh)
+                            new_rows.extend(fresh)
                     # one provider request is represented by every parsed metric,
                     # but counted once through request_id/prompt/input.
-                    unique_requests = {(r.get("request_id"), r.get("prompt_sha256"), r.get("input_id")) for r in rows if r.get("independent_model_call")}
+                    unique_requests = {(r.get("request_id"), r.get("prompt_sha256"), r.get("input_id")) for r in new_rows if r.get("independent_model_call")}
                     counts["provider_calls"] += len(unique_requests)
                     for row in rows:
                         row.update(key_prefix, repeat_id=repeat_id, requested_seed=repeat_id,
@@ -281,7 +341,7 @@ def run(prep: Path, run_dir: Path, repeats: int = 3, conditions: tuple[str, ...]
             writer.writeheader()
             writer.writerows({field: row.get(field) for field in fields} for row in failure_rows)
     (run_dir / "reproduce_inference.bat").write_text(
-        f"@echo off\nsetlocal\nset PREP={prep}\n.venv\\Scripts\\python.exe experiments\\c4_table3\\sim_d\\run_inference.py --prep %PREP% --output {run_dir} --repeats {repeats} --conditions {' '.join(conditions)}\n",
+            f"@echo off\nsetlocal\nset PREP={prep}\n.venv\\Scripts\\python.exe experiments\\c4_table3\\sim_d\\run_inference.py --prep %PREP% --output {run_dir} --repeats {repeats} --conditions {' '.join(conditions)}" + (f" --reuse-predictions {reuse_predictions}" if reuse_predictions else "") + "\n",
         encoding="utf-8")
     return {"status": "COMPLETE", **counts, "model_calls": counts["provider_calls"]}
 
@@ -294,8 +354,10 @@ def main() -> None:
     parser.add_argument("--conditions", nargs="+", choices=CONDITION_ORDER, default=list(CONDITION_ORDER))
     parser.add_argument("--shared-predictions", type=Path,
                         help="existing parsed JSONL containing repeat-matched SiPhy Mass_Acc rows")
+    parser.add_argument("--reuse-predictions", type=Path,
+                        help="existing parsed JSONL; compatible successful rows are reused without provider calls")
     args = parser.parse_args()
-    result = run(args.prep, args.output, args.repeats, tuple(args.conditions), args.shared_predictions)
+    result = run(args.prep, args.output, args.repeats, tuple(args.conditions), args.shared_predictions, args.reuse_predictions)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     if result.get("status", "").startswith("BLOCKED"):
         raise SystemExit(2)

@@ -88,6 +88,9 @@ Suction Acc/PF를 채점하려면 adapter가 반환한 `suction_pose_predictions
 SIM_PROXY에서 추가 구현된 조건은 Name-only/Affordance의 suction·feasibility·DA,
 SiPhy의 feasibility·DA, Geometric grounding의 suction·PF·feasibility·DA이다.
 이 확장은 D_SIM proxy 조건에만 적용되며, 공식 Real-5 조건의 `—` 셀을 변경하지 않는다.
+기존 raw/parsed JSONL을 `--reuse-predictions`로 넘기면 manifest·model·parse schema가
+맞는 성공 행만 재사용하고, 새로 필요한 metric만 호출한다. 오래된 sample-level suction
+행은 pose schema 불일치로 자동 재사용하지 않는다.
 
 향후 입력/GT가 준비되더라도 **matrix만 READY로 수정해 실행할 수는 없다**. 정확한 조건별 어댑터와 공통 M3/M4 downstream 연결, `SiPhyBackend`의 전체 raw VLM response 보존, frame-15 mass와 활주 마찰의 분리 실행, oracle 숫자 채널 격리를 구현·검증해야 한다. 기존 `experiments/c4_real5/run_inference.py`는 마찰 추적 실패 시 질량도 건너뛰고 raw response를 기록하지 않으므로 그대로 Table 3 READY 실행기로 사용할 수 없다. 어댑터가 아직 없는데 READY가 나타나면 `run.py`는 `READY_ADAPTER_NOT_IMPLEMENTED`로 중단한다. 이는 불완전한 점수를 내지 않기 위한 명시적 보호다.
 
