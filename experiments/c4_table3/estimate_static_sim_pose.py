@@ -48,23 +48,32 @@ def build(static_manifest: Path, qc_jsonl: Path, output: Path, repo_root: Path) 
         camera_path = depth_path.parent.parent / "scene_camera.json"
         camera = json.loads(camera_path.read_text(encoding="utf-8"))[str(int(row["frame_id"]))]
         K = camera["cam_K"]
+        R = np.asarray(camera.get("cam_R_w2c", np.eye(3)), dtype=float).reshape(3, 3)
+        t = np.asarray(camera.get("cam_t_w2c", [0.0, 0.0, 0.0]), dtype=float)
         fx, fy, cx, cy = float(K[0]), float(K[4]), float(K[2]), float(K[5])
         u, v = (x0 + x1) / 2.0, (y0 + y1) / 2.0
         # Keep the native depth units; scene_camera depth_scale is recorded but
         # not assumed to mean metres until an external calibration confirms it.
         X, Y = (u - cx) * z / fx, (v - cy) * z / fy
+        camera_xyz = np.asarray([X, Y, z], dtype=float)
+        # The dataset provides w2c extrinsics.  Keep this transform in native
+        # units and label it as such; no metre conversion is inferred here.
+        world_xyz = R.T @ (camera_xyz - t)
         out.append({
             "input_id": row["input_id"], "object_id": row["object_id"],
             "sequence_id": sequence_id, "frame_id": row["frame_id"],
             "bbox_xyxy": json.dumps([x0, y0, x1, y1]),
-            "camera_K": json.dumps(K), "depth_scale_metadata": camera.get("depth_scale"),
+            "camera_K": json.dumps(K), "camera_R_w2c": json.dumps(R.tolist()),
+            "camera_t_w2c_native": json.dumps(t.tolist()), "depth_scale_metadata": camera.get("depth_scale"),
             "centroid_u_px": u, "centroid_v_px": v, "depth_median_native": z,
-            "centroid_camera_native_xyz": json.dumps([X, Y, z]),
+            "centroid_camera_native_xyz": json.dumps(camera_xyz.tolist()),
+            "centroid_world_native_xyz": json.dumps(world_xyz.tolist()),
             "pose_status": "DEPTH_CENTROID_ONLY",
             "orientation_status": "UNRESOLVED",
             "table_plane_status": "UNRESOLVED",
             "metric_scale_status": "NEEDS_CALIBRATION",
             "mesh_pose_alignment": "UNVERIFIED",
+            "extrinsics_transform_status": "NATIVE_UNITS_ONLY",
         })
     output.mkdir(parents=True, exist_ok=True)
     csv_path = output / "static_sim_pose_bridge.csv"

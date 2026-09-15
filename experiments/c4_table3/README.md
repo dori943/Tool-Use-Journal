@@ -38,6 +38,16 @@
   --output output\c4_table3\<UTC>_static_table_plane
 ```
 
+매핑·pose·평면 결과를 합친 scene manifest는 `build_static_sim_manifest.py`로 만든다. 평면이 추정된 행은 `READY_FOR_CALIBRATION`, 나머지는 `BLOCKED_FOR_TRIAL`로 기록되며, 회전·단위가 확정되기 전에는 simulator trial을 실행하지 않는다.
+
+```powershell
+.venv\Scripts\python.exe experiments\c4_table3\build_static_sim_manifest.py `
+  --mapping output\c4_table3\<mapping>\ycb_static_mapping.csv `
+  --pose output\c4_table3\<pose>\static_sim_pose_bridge.csv `
+  --plane output\c4_table3\<plane>\table_plane_estimates.csv `
+  --output output\c4_table3\<UTC>_static_sim_scene_manifest
+```
+
 ```powershell
 Set-Location C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal
 .venv\Scripts\python.exe experiments\c4_table3\run.py
