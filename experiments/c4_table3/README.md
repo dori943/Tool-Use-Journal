@@ -29,6 +29,15 @@
   --output output\c4_table3\<UTC>_static_sim_pose_bridge
 ```
 
+테이블 평면은 같은 입력과 QC bbox를 사용해 `fit_static_table_plane.py`로 보조 추정할 수 있다. 전역 5 depth-unit RANSAC 기준을 적용하며, 성공하지 못한 프레임은 `UNRESOLVED`로 남긴다. 이 결과만으로 world-frame pose나 접촉 GT를 만들지 않는다.
+
+```powershell
+.venv\Scripts\python.exe experiments\c4_table3\fit_static_table_plane.py `
+  --static-manifest output\c4_table3\<prep>\selected_static_inputs.csv `
+  --qc-jsonl output\c4_table3\<prep>\candidate_qc.jsonl `
+  --output output\c4_table3\<UTC>_static_table_plane
+```
+
 ```powershell
 Set-Location C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal
 .venv\Scripts\python.exe experiments\c4_table3\run.py
