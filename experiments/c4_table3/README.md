@@ -20,6 +20,8 @@
 
 `--emit-mjcf`는 source unit을 독립적으로 검증한 뒤에만 `--unit-scale`과 함께 사용한다. wrapper에는 질량·마찰을 넣지 않는다. 모래 충전 real-world mass와 Table 5 friction은 시뮬레이터 입력으로 주입할 수 없고, calibration split에서 정한 별도 파라미터로만 관리한다. YCB 파일명이 같아도 EV-RealPhys 이미지와 동일한 실물 인스턴스라는 증거가 아니므로, 해당 결과는 `SIM-PROXY`로 별도 보고한다. Tuna Fish Can(007)은 항상 제외한다.
 
+YCB-V/BOP의 공개 `models_info.json`과 mesh bounding box를 비교할 때는 `compare_ycb_scale.py`를 사용한다. 이 비교는 축 순서를 정렬한 geometry 점검이며, 자동 rescale이나 GT 주입을 수행하지 않는다.
+
 정적 RGB-D 입력을 simulator 좌표계로 옮길 때는 `estimate_static_sim_pose.py`를 사용한다. 이 도구는 잠긴 QC bounding box 안의 depth centroid와 `scene_camera.json`의 intrinsics만 계산하고, 물체 회전·테이블 평면·metric scale은 `UNRESOLVED`/`NEEDS_CALIBRATION`으로 남긴다.
 
 ```powershell
@@ -47,6 +49,8 @@
   --plane output\c4_table3\<plane>\table_plane_estimates.csv `
   --output output\c4_table3\<UTC>_static_sim_scene_manifest
 ```
+
+EV 정적 crop과 YCB shape를 직접 비교하려면 `render_ycb_ev_contact_sheet.py`를 사용한다. 렌더는 고정 preview pose이므로 이미지와 mesh의 instance/회전 일치를 자동 판정하지 않는다.
 
 ```powershell
 Set-Location C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal
