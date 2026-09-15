@@ -64,6 +64,23 @@ Set-Location C:\Users\SAMSUNG\Downloads\EE\Tool-Use-Journal
 
 `scoring.py`는 Real-5에서 **시퀀스 예측 중앙값→객체 GT 오차→5개 객체 동일 가중 macro**를 주 점수로 구현한다. 객체별 평균 예측은 `sensitivity_object_mean_prediction`이라는 별도 이름으로만 산출한다. 연속량의 조건별 예측 누락은 오차를 대입하거나 complete-case 분모를 줄이지 않고 `INCOMPLETE`와 coverage로 기록한다. accuracy는 고정 단위의 누락 예측을 오답으로 센다. Suction PF는 같은 객체의 두 pose가 모두 맞아야 1이고, DA는 독립 허용 EE 집합의 복수 정답을 인정한다. Clearance의 5 mm 분모 바닥값과 Crit의 vac 0.50±0.05 kg 범위는 기존 규약을 그대로 사용한다. run 간 표본 std(ddof=1), 객체 간 표본 std(ddof=1), 시퀀스 예측 std(ddof=1)를 별도 필드로 둔다.
 
+## YCB mesh SIM_PROXY 실행
+
+uniform-scaled YCB mesh를 사용하는 simulator-only proxy는 `sim_d/generate_ycb_proxy.py`로 준비한다. 이 생성기는 Real-5 GT를 읽지 않고 고정된 proxy density/occupancy 정책으로 evaluator-only `sim_gt.yaml`을 만든다. 기존 D_SIM adapter/runner를 그대로 재사용할 수 있으며, 결과는 `SIM_PROXY`로만 보고한다.
+
+```powershell
+.venv\Scripts\python.exe experiments\c4_table3\sim_d\generate_ycb_proxy.py `
+  --ycb-root output\c4_table3\<uniform_scaled_run> `
+  --output output\c4_table3\<proxy_prep_run>
+.venv\Scripts\python.exe experiments\c4_table3\sim_d\run_inference.py `
+  --prep output\c4_table3\<proxy_prep_run> `
+  --output output\c4_table3\<proxy_inference_run> --repeats 3
+.venv\Scripts\python.exe experiments\c4_table3\sim_d\score_repeats.py `
+  --gt output\c4_table3\<proxy_prep_run>\sim_gt.yaml `
+  --predictions output\c4_table3\<proxy_inference_run>\parsed_predictions.jsonl `
+  --output output\c4_table3\<proxy_eval_run>\per_repeat_summary.json
+```
+
 향후 입력/GT가 준비되더라도 **matrix만 READY로 수정해 실행할 수는 없다**. 정확한 조건별 어댑터와 공통 M3/M4 downstream 연결, `SiPhyBackend`의 전체 raw VLM response 보존, frame-15 mass와 활주 마찰의 분리 실행, oracle 숫자 채널 격리를 구현·검증해야 한다. 기존 `experiments/c4_real5/run_inference.py`는 마찰 추적 실패 시 질량도 건너뛰고 raw response를 기록하지 않으므로 그대로 Table 3 READY 실행기로 사용할 수 없다. 어댑터가 아직 없는데 READY가 나타나면 `run.py`는 `READY_ADAPTER_NOT_IMPLEMENTED`로 중단한다. 이는 불완전한 점수를 내지 않기 위한 명시적 보호다.
 
 검증: focused test 14개 통과. config를 바꾼 재개는 `RESUME_CONFIG_OR_MANIFEST_HASH_MISMATCH`로 거부됐고, 동일 config의 재개는 `UNCHANGED`·예측 0개를 반환했다. [`independent_arithmetic.py`](independent_arithmetic.py)는 보존된 과거 24개 prediction의 숫자만 독립 재집계해 Mass MnRE `0.9227010043238545`, Friction MAE `0.0241`을 확인한다. 과거 `result.json`은 다른 run 디렉터리에 있고 prediction hash가 없어, 이 일치는 실행 계보나 어느 Table 3 조건의 결과도 증명하지 않는다. 새 run은 이를 재사용하거나 재채점하지 않았다.
