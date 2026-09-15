@@ -1,0 +1,87 @@
+{
+  "robocasa_repo": "C:\\Users\\SAMSUNG\\Downloads\\EE\\Tool-Use-Journal\\external\\robocasa",
+  "robocasa_commit": "4f8a2980def75a55dff96b990745b83540425f09",
+  "dataset_assets_downloaded": false,
+  "scope": "source/docs audit only; no episode-specific mapping claimed",
+  "targets": {
+    "003_cracker_box": {
+      "aliases": {
+        "cracker_box": false,
+        "cracker": false,
+        "boxed_food": true
+      },
+      "exact_asset_verified": false
+    },
+    "006_mustard_bottle": {
+      "aliases": {
+        "mustard": true,
+        "mustard_bottle": false
+      },
+      "exact_asset_verified": false
+    },
+    "019_pitcher_base": {
+      "aliases": {
+        "pitcher": true
+      },
+      "exact_asset_verified": false
+    },
+    "021_bleach_cleanser": {
+      "aliases": {
+        "bleach": false,
+        "bleach_cleanser": false,
+        "cleaner": true
+      },
+      "exact_asset_verified": false
+    },
+    "025_mug": {
+      "aliases": {
+        "mug": true
+      },
+      "exact_asset_verified": false
+    }
+  },
+  "capabilities": {
+    "object_scale": {
+      "status": "SUPPORTED_IN_SOURCE",
+      "evidence": [
+        "kitchen.py object_scale",
+        "kitchen_object_utils.py scale"
+      ]
+    },
+    "object_world_pose": {
+      "status": "AVAILABLE_AT_REPLAY",
+      "evidence": [
+        "states.npz described in dataset docs",
+        "MuJoCo body state"
+      ]
+    },
+    "camera_pose": {
+      "status": "SUPPORTED_IN_SOURCE",
+      "evidence": [
+        "utils/camera_utils.py",
+        "kitchen.py CamUtils.set_cameras"
+      ]
+    },
+    "table_plane_contact": {
+      "status": "SUPPORTED_BY_MUJOCO",
+      "evidence": [
+        "object_utils.check_obj_fixture_contact",
+        "fixture geometry"
+      ]
+    },
+    "scene_replay": {
+      "status": "SUPPORTED_IN_DATASET",
+      "evidence": [
+        "extras/model.xml.gz",
+        "extras/states.npz",
+        "extras/ep_meta.json"
+      ]
+    },
+    "vacuum_suction_pressure": {
+      "status": "UNVERIFIED",
+      "evidence": [
+        "no vacuum/suction implementation found in audited source"
+      ]
+    }
+  }
+}
