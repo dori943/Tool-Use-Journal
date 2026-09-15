@@ -81,6 +81,11 @@ uniform-scaled YCB mesh를 사용하는 simulator-only proxy는 `sim_d/generate_
   --output output\c4_table3\<proxy_eval_run>\per_repeat_summary.json
 ```
 
+Suction Acc/PF를 채점하려면 adapter가 반환한 `suction_pose_predictions.pose_A/pose_B`를
+두 pose unit으로 확장한다. `--conditions ours_full`과
+`--shared-predictions <SiPhy parsed_predictions.jsonl>`를 사용하면 Ours의 Mass_Acc가
+동일 repeat의 SiPhy 결과를 provenance와 함께 공유하며 추가 SiPhy 호출을 만들지 않는다.
+
 향후 입력/GT가 준비되더라도 **matrix만 READY로 수정해 실행할 수는 없다**. 정확한 조건별 어댑터와 공통 M3/M4 downstream 연결, `SiPhyBackend`의 전체 raw VLM response 보존, frame-15 mass와 활주 마찰의 분리 실행, oracle 숫자 채널 격리를 구현·검증해야 한다. 기존 `experiments/c4_real5/run_inference.py`는 마찰 추적 실패 시 질량도 건너뛰고 raw response를 기록하지 않으므로 그대로 Table 3 READY 실행기로 사용할 수 없다. 어댑터가 아직 없는데 READY가 나타나면 `run.py`는 `READY_ADAPTER_NOT_IMPLEMENTED`로 중단한다. 이는 불완전한 점수를 내지 않기 위한 명시적 보호다.
 
 검증: focused test 14개 통과. config를 바꾼 재개는 `RESUME_CONFIG_OR_MANIFEST_HASH_MISMATCH`로 거부됐고, 동일 config의 재개는 `UNCHANGED`·예측 0개를 반환했다. [`independent_arithmetic.py`](independent_arithmetic.py)는 보존된 과거 24개 prediction의 숫자만 독립 재집계해 Mass MnRE `0.9227010043238545`, Friction MAE `0.0241`을 확인한다. 과거 `result.json`은 다른 run 디렉터리에 있고 prediction hash가 없어, 이 일치는 실행 계보나 어느 Table 3 조건의 결과도 증명하지 않는다. 새 run은 이를 재사용하거나 재채점하지 않았다.

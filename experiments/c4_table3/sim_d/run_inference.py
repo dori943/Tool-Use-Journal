@@ -173,14 +173,19 @@ def _siphy_rows(obs, repeat_id: int, cfg: dict[str, Any], manifest_sha256: str, 
     return [mass, crit]
 
 
-def run(prep: Path, run_dir: Path, repeats: int = 3) -> dict[str, Any]:
+def run(prep: Path, run_dir: Path, repeats: int = 3, conditions: tuple[str, ...] = CONDITION_ORDER,
+        shared_predictions: Path | None = None) -> dict[str, Any]:
     run_dir.mkdir(parents=True, exist_ok=True)
     manifest, inputs = _load_manifest(prep)
     _write_snapshot(run_dir, prep, manifest)
     cfg = provider_config()
+    unknown = sorted(set(conditions) - set(CONDITION_ORDER))
+    if unknown:
+        raise RuntimeError(f"UNKNOWN_CONDITION:{','.join(unknown)}")
     config_snapshot = {"panel": "D_SIM", "prep_dir": str(prep), "manifest_sha256": sha256_file(prep / "sim_manifest.yaml"),
-                       "conditions": list(CONDITION_ORDER), "metrics": METRICS, "repeats": repeats,
+                       "conditions": list(conditions), "metrics": {k: METRICS[k] for k in conditions}, "repeats": repeats,
                        "provider": {k: v for k, v in cfg.items() if k != "configured"},
+                       "shared_predictions": str(shared_predictions) if shared_predictions else None,
                        "gt_access": {"sim_gt_read": False, "evaluator_imported": False}}
     (run_dir / "config_snapshot.yaml").write_text(yaml.safe_dump(config_snapshot, allow_unicode=True, sort_keys=False), encoding="utf-8")
     (run_dir / "manifest_hash.txt").write_text(config_snapshot["manifest_sha256"] + "\n", encoding="utf-8")
@@ -201,16 +206,24 @@ def run(prep: Path, run_dir: Path, repeats: int = 3) -> dict[str, Any]:
         log_lines += ["status=BLOCKED_PROVIDER_NOT_CONFIGURED", "model_calls=0"]
         (run_dir / "run.log").write_text("\n".join(log_lines) + "\n", encoding="utf-8")
         (run_dir / "reproduce_inference.bat").write_text(
-            f"@echo off\nsetlocal\nset PREP={prep}\n.venv\\Scripts\\python.exe experiments\\c4_table3\\sim_d\\run_inference.py --prep %PREP% --output {run_dir} --repeats {repeats}\n",
+            f"@echo off\nsetlocal\nset PREP={prep}\n.venv\\Scripts\\python.exe experiments\\c4_table3\\sim_d\\run_inference.py --prep %PREP% --output {run_dir} --repeats {repeats} --conditions {' '.join(conditions)}\n",
             encoding="utf-8")
         failure["model_calls"] = 0
         return failure
     provider = OpenAIJsonProvider(cfg)
-    cache = SharedPredictionCache()
+    cached_rows: list[dict[str, Any]] = []
+    if shared_predictions:
+        cached_rows = [json.loads(line) for line in shared_predictions.read_text(encoding="utf-8").splitlines() if line]
     counts = {"provider_calls": 0, "prediction_rows": 0, "failures": 0}
     raw_path, parsed_path, metadata_path, checkpoint_path = [run_dir / name for name in ("raw_predictions.jsonl", "parsed_predictions.jsonl", "request_metadata.jsonl", "checkpoint.jsonl")]
     for repeat_id in range(repeats):
-        for condition_id in CONDITION_ORDER:
+        # A repeat-local cache allows Ours/Geo to reuse exactly the matching
+        # SiPhy repeat without duplicating its provider call.
+        cache = SharedPredictionCache()
+        for cached in cached_rows:
+            if (cached.get("condition") or cached.get("condition_id")) == "siphy_adopted" and cached.get("metric") == "Mass_Acc" and int(cached.get("repeat_id", -1)) == repeat_id and cached.get("parse_status") == "OK":
+                cache.put(cached)
+        for condition_id in conditions:
             adapter = ConditionAdapter(condition_id, provider, shared_cache=cache)
             for item in inputs:
                 obs = item["observation"]
@@ -260,7 +273,7 @@ def run(prep: Path, run_dir: Path, repeats: int = 3) -> dict[str, Any]:
             writer.writeheader()
             writer.writerows({field: row.get(field) for field in fields} for row in failure_rows)
     (run_dir / "reproduce_inference.bat").write_text(
-        f"@echo off\nsetlocal\nset PREP={prep}\n.venv\\Scripts\\python.exe experiments\\c4_table3\\sim_d\\run_inference.py --prep %PREP% --output {run_dir} --repeats {repeats}\n",
+        f"@echo off\nsetlocal\nset PREP={prep}\n.venv\\Scripts\\python.exe experiments\\c4_table3\\sim_d\\run_inference.py --prep %PREP% --output {run_dir} --repeats {repeats} --conditions {' '.join(conditions)}\n",
         encoding="utf-8")
     return {"status": "COMPLETE", **counts, "model_calls": counts["provider_calls"]}
 
@@ -270,8 +283,11 @@ def main() -> None:
     parser.add_argument("--prep", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--repeats", type=int, default=3)
+    parser.add_argument("--conditions", nargs="+", choices=CONDITION_ORDER, default=list(CONDITION_ORDER))
+    parser.add_argument("--shared-predictions", type=Path,
+                        help="existing parsed JSONL containing repeat-matched SiPhy Mass_Acc rows")
     args = parser.parse_args()
-    result = run(args.prep, args.output, args.repeats)
+    result = run(args.prep, args.output, args.repeats, tuple(args.conditions), args.shared_predictions)
     print(json.dumps(result, ensure_ascii=False, indent=2))
     if result.get("status", "").startswith("BLOCKED"):
         raise SystemExit(2)

@@ -349,7 +349,7 @@ class ConditionAdapter:
         if "Clearance_RelErr" in metrics:
             fields.append('"clearance_mm": finite number')
         if "Suction_Acc" in metrics or "Suction_PF" in metrics:
-            fields.append('"suction_feasible": boolean')
+            fields.append('"suction_pose_predictions": {"pose_A": boolean, "pose_B": boolean}')
         if "Feasibility_Acc" in metrics:
             fields.append('"feasible_by_ee": {"2F": boolean, "3F": boolean, "vac": boolean}')
         if "DA" in metrics:
@@ -396,7 +396,10 @@ class ConditionAdapter:
         if metric == "Clearance_RelErr":
             return _finite(raw.get("clearance_mm"))
         if metric in {"Suction_Acc", "Suction_PF"}:
-            return _bool(raw.get("suction_feasible"))
+            poses = raw.get("suction_pose_predictions")
+            if not isinstance(poses, dict) or set(poses) != {"pose_A", "pose_B"}:
+                raise AdapterError("POSE_LEVEL_PREDICTION_MISSING")
+            return {key: _bool(poses[key]) for key in ("pose_A", "pose_B")}
         if metric == "Feasibility_Acc":
             values = raw.get("feasible_by_ee")
             if not isinstance(values, dict) or set(values) != {"2F", "3F", "vac"}:

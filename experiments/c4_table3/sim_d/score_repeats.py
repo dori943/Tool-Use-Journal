@@ -1,8 +1,8 @@
 """Evaluate cached D_SIM predictions per condition/repeat.
 
 This is a simulator-only report.  It loads ``sim_gt.yaml`` here (evaluator
-process), normalizes sample-level downstream outputs to the registered unit
-IDs, and never modifies raw predictions or the Real-5 table.
+process), normalizes downstream outputs (including pose-pair predictions) to
+the registered unit IDs, and never modifies raw predictions or the Real-5 table.
 """
 from __future__ import annotations
 
@@ -33,9 +33,14 @@ def _normalize(rows: list[dict]) -> list[dict]:
     for row in rows:
         metric = row.get("metric")
         if metric in {"Suction_Acc", "Suction_PF"}:
-            # The current adapter emits one sample-level boolean; PF/Acc
-            # require two pose IDs, so retain the raw row but exclude it from
-            # this scorer input and report the metric as incomplete.
+            # Adapters return a pose pair keyed as pose_A/pose_B. Expand it to
+            # the frozen pose IDs required by the registered scorers.
+            value = row.get("value")
+            if not isinstance(value, dict) or set(value) != {"pose_A", "pose_B"}:
+                continue
+            for suffix in ("pose_A", "pose_B"):
+                out.append({**row, "input_id": f'{row["sample_id"]}_{suffix}',
+                            "value": value[suffix], "pose_id": f'{row["sample_id"]}_{suffix}'})
             continue
         if metric == "Clearance_RelErr":
             out.append({**row, "input_id": f"{row['sample_id']}::clearance"})
@@ -68,12 +73,9 @@ def main() -> None:
                                        "metric": metric, "status": "INCOMPLETE", "score": None,
                                        "reason": "CONDITION_PREDICTION_MISSING"})
                 continue
-            # Pose-level suction labels are not present in the adapter output.
             result = score(root, _write_temp(args.output.parent, condition, repeat_id, selected))
             for metric in metrics:
                 item = result[metric]
-                if metric in {"Suction_Acc", "Suction_PF"}:
-                    item = {"status": "INCOMPLETE", "score": None, "reason": "POSE_LEVEL_PREDICTION_MISSING"}
                 per_repeat.append({"condition": condition, "repeat_id": repeat_id, "metric": metric, **item})
     args.output.write_text(json.dumps(per_repeat, ensure_ascii=False, indent=2), encoding="utf-8")
     summary = []
