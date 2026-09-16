@@ -64,6 +64,15 @@ def _planning_rejections(error):
     return report
 
 
+def _mujoco_simulation_time_s(runtime) -> float:
+    """MuJoCo physics clock in seconds (preserved across EE env swaps)."""
+    data = runtime.env.sim.data
+    raw = getattr(data, "time", None)
+    if raw is None:
+        raw = getattr(getattr(data, "_data", None), "time", None)
+    return float(raw or 0.0)
+
+
 def execute_selected_plan_live(args, selected, initial_world, constraints, options,
                                repository, output, artifact_id, planner_options):
     from tuj.m5_motion.generic_runner import (
@@ -73,6 +82,7 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
     from tuj.m5_motion.tool_use_journal_runtime import ToolUseJournalEERuntime
 
     runtime = recorder = session = None
+    sim_start_time_s = None
     summary = {"mode": "SCRIPTED_GRASP_LIVE", "status": "FAILED",
                "task_goal_status": "NOT_EVALUATED"}
     try:
@@ -136,15 +146,22 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
         )
         session = ScriptedGraspSession(runtime, repository, run_dir, **planner_options)
         session.world = snapshot(runtime, initial_world)
+        # Table-2 Execution Time: MuJoCo physics elapsed over the full live task.
+        # EE swaps rebuild env but restore data.time, so end-start is valid.
+        sim_start_time_s = _mujoco_simulation_time_s(runtime)
         manifest = session.execute_selected_plan(selected, constraints=constraints,
             options=options, selected_plan_artifact_id=artifact_id)
+        simulation_execution_time_s = (
+            _mujoco_simulation_time_s(runtime) - sim_start_time_s
+        )
         # Stable pointer for tools that still look at live/live-execution-manifest.json.
         latest = live_root / "live-execution-manifest.json"
         latest.write_text(manifest.read_text(encoding="utf-8"), encoding="utf-8")
         summary.update(status="SUCCESS", manifest=str(manifest.resolve()),
             live_run_dir=str(run_dir.resolve()),
             scripted_grasp_count=sum(r["route"] == "SCRIPTED_GRASP" for r in session.records),
-            motion_plan_count=sum(r["route"] == "M5_MOTION_PLAN" for r in session.records))
+            motion_plan_count=sum(r["route"] == "M5_MOTION_PLAN" for r in session.records),
+            simulation_execution_time_s=simulation_execution_time_s)
         try:
             payload = json.loads(manifest.read_text(encoding="utf-8"))
             metrics = payload.get("executed_ee_metrics") or {}
@@ -171,6 +188,10 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
             path.write_text(json.dumps(rejections, ensure_ascii=False, indent=2),
                             encoding="utf-8")
             summary["failure_detail"] = str(path.resolve())
+        if runtime is not None and sim_start_time_s is not None:
+            summary["simulation_execution_time_s"] = (
+                _mujoco_simulation_time_s(runtime) - sim_start_time_s
+            )
         if session:
             session.failure = summary["detail"]
             manifest = session.save_manifest()
