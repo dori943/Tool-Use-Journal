@@ -22,7 +22,7 @@ from environments.c1_1_lego_sweep import EE_RACK_LAYOUT, ROBOT_BASE_X
 from environments.c1_2_dough_flatten import PEDESTAL_HALF_XY, PEDESTAL_TOP_Z
 from environments.ee_rack import add_ee_rack
 from environments.kitchen_base import KitchenBase
-from environments.objects import CuttingBoardObject, KnifeObject, SpatulaObject
+from environments.objects import CuttingBoardObject, SpatulaObject
 from environments.robot_pedestal import add_robot_pedestal, remove_robot_pedestal
 from environments.task_camera import add_standard_task_camera
 
@@ -61,7 +61,7 @@ _CLEARANCE_ROOF_THICKNESS = 0.012
 # ---------------------------------------------------------------------
 
 _TOOL_GEOMETRY = {
-    "tool_1_knife": (0.002, 0.015, 0.220),
+    # "tool_1_knife": (0.002, 0.015, 0.220),  # C4-1: knife disabled
     "tool_2_spatula_a": (0.004, 0.036, 0.140),
     "tool_3_spatula_b": (0.007, 0.040, 0.220),
     "tool_4_spatula_c": (0.011, 0.056, 0.220),
@@ -80,7 +80,10 @@ def _tool_geometry_meta():
     }
 _TOOL_ROW_X = -0.21
 _TOOL_SPACING = 0.105
-_TOOL_Y_OFFSETS = (0.21, 0.105, 0.0, -0.105, -0.21)
+_TOOL_Y_OFFSETS = (
+    # 0.21,  # tool_1_knife (disabled); keep remaining tools in place
+    0.105, 0.0, -0.105, -0.21,
+)
 _TOOL_YAW = -np.pi / 2
 
 
@@ -534,9 +537,9 @@ class C4_1_IntervalFitExtraction(KitchenBase):
                 specular=_PLASTIC_SPECULAR,
                 shininess=_PLASTIC_SHININESS,
             ),
-            "tool_1_knife": lambda n: KnifeObject(
-                name=n
-            ),
+            # "tool_1_knife": lambda n: KnifeObject(
+            #     name=n
+            # ),
             "tool_2_spatula_a": lambda n: SpatulaObject(
                 name=n
             ),
@@ -1226,7 +1229,7 @@ class C4_1_IntervalFitExtraction(KitchenBase):
             "appliance_left",
             "appliance_right",
             "card",
-            "tool_1_knife",
+            # "tool_1_knife",  # disabled, not present in self.objects
             "tool_2_spatula_a",
             "tool_3_spatula_b",
             "tool_4_spatula_c",
