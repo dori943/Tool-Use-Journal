@@ -56,15 +56,59 @@ def open_joint_positions(context):
     if passive:
         lower = np.where(model.jnt_limited[passive], model.jnt_range[passive, 0], -np.inf)
         upper = np.where(model.jnt_limited[passive], model.jnt_range[passive, 1], np.inf)
+        observed_passive = probe.qpos[addresses].copy()
         initial = np.clip(probe.qpos[addresses], lower, upper)
         if not len(residual(initial)):
             raise ValueError('OPEN_GEOMETRY_PASSIVE_CONSTRAINT_REQUIRED')
         # At a joint bound, the scaled gradient can vanish before the linkage
         # residual meets our geometric tolerance. Keep the residual gate below.
-        solved = least_squares(residual, initial, bounds=(lower, upper), max_nfev=100,
+        solved = least_squares(residual, initial, bounds=(lower, upper), max_nfev=1000,
                                ftol=1e-12, xtol=1e-12, gtol=None)
-        if not solved.success or np.max(np.abs(residual(solved.x))) > 1e-8:
-            raise ValueError('OPEN_GEOMETRY_LINKAGE_NOT_SOLVED')
+        residual_max = float(np.max(np.abs(residual(solved.x))))
+        if not solved.success or residual_max > 1e-8:
+            observed_violation = np.maximum(
+                np.maximum(lower - observed_passive, observed_passive - upper), 0.0
+            )
+            if np.any(observed_violation > 1e-8):
+                # The live MuJoCo state can already be outside a nominal joint
+                # range when an equality tendon pulls against its hard stop.
+                # Preserve that observed physical branch and solve the tendon
+                # equations without bounds, but never increase its range
+                # violation. This handles Jaco 3F's calibrated endpoint while
+                # keeping an impossible in-range linkage fail-closed.
+                fallback = least_squares(
+                    residual,
+                    observed_passive,
+                    max_nfev=1000,
+                    ftol=1e-12,
+                    xtol=1e-12,
+                    gtol=None,
+                )
+                fallback_residual = float(
+                    np.max(np.abs(residual(fallback.x)))
+                )
+                fallback_violation = np.maximum(
+                    np.maximum(lower - fallback.x, fallback.x - upper), 0.0
+                )
+                if (
+                    fallback.success
+                    and fallback_residual <= 1e-8
+                    and np.all(fallback_violation <= observed_violation + 1e-8)
+                ):
+                    solved = fallback
+                    residual_max = fallback_residual
+                else:
+                    raise ValueError(
+                        'OPEN_GEOMETRY_LINKAGE_NOT_SOLVED: '
+                        f'status={solved.status} nfev={solved.nfev} '
+                        f'max_residual={residual_max:.3e} message={solved.message}'
+                    )
+            else:
+                raise ValueError(
+                    'OPEN_GEOMETRY_LINKAGE_NOT_SOLVED: '
+                    f'status={solved.status} nfev={solved.nfev} '
+                    f'max_residual={residual_max:.3e} message={solved.message}'
+                )
     result = {name: float(probe.qpos[model.jnt_qposadr[model.joint(name).id]])
               for name in c.gripper.joints}
     c._resolved_open_joint_positions = result

@@ -127,7 +127,12 @@ def surface_report_result(request, report, world):
     target, region = request.task.goal.target_object_id, request.task.goal.target_region_id
     geometry = cover_geometry(world.objects, target, region,
         request.constraints.position_tolerance_m, request.constraints.orientation_tolerance_rad)
-    required = packable_ids(request.world.objects)
+    # Validate the contents already assigned to this container at the start of
+    # the cover-placement request. Other packable objects in the scene may be
+    # unrelated task distractors and should not become implicit placement goals.
+    required = [name for name in packable_ids(request.world.objects)
+        if target_fully_inside_region(request.world, target_id=name,
+            region_id=region, include_vertical=True)]
     outside = [name for name in required if not target_fully_inside_region(
         world, target_id=name, region_id=region, include_vertical=True)]
     tracking = report.metadata.get('segment_tracking', [])

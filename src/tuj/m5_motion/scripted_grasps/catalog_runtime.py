@@ -489,7 +489,8 @@ class CatalogContext(SpoonContext):
             breakaway={'applied':False}
             kinematic_carry = (
                 recipe.ee_id=='vac'
-                or getattr(self.runtime,'attachment',None) is not None
+                or (recipe.ee_id=='3F'
+                    and getattr(self.runtime,'attachment',None) is not None)
             )
             if kinematic_carry:
                 from tuj.m5_motion.scripted_grasps.catalog_vacuum import (

@@ -27,8 +27,8 @@ def configure_container_settle(request, plan):
     surface = is_container_surface_task(request.task, request.world.objects)
     for name,record in request.world.objects.items():
         if (record.get('packing_metadata', {}).get('kind') == 'PACKABLE_OBJECT'
-                and (surface or target_fully_inside_region(request.world,target_id=name,
-                     region_id=region_id,include_vertical=True))):
+                and target_fully_inside_region(request.world,target_id=name,
+                     region_id=region_id,include_vertical=True)):
             targets.add(name)
     segment=plan.segments[-1]
     tracking=dict(segment.metadata.get('tracking_settle', {}))
