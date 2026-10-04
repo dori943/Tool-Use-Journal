@@ -53,6 +53,14 @@ def ingredient_vac_recipe(environment='C2_2_SandwichAssembly', object_id='turkey
         close_duration_s=.2,
         # 평평한 면에 평평한 컵 하나는 MuJoCo 접촉점이 하나다.
         minimum_vacuum_contact_count=1,
+        # Full native adhesion pulls the 4 mm cheese slice ~22 mm in the first
+        # CLOSE tick before the contact gate can attach it; the gripper mount
+        # then collides with the lifted slice.  Half command satisfies the
+        # catalog's attach contract; cap the native adhesion gain as well so
+        # the first-contact impulse stays below the amount that lifts a slice
+        # into the mount before the contact gate can lock it.
+        suction_command=.5,
+        vacuum_actuator_gain=.8,
         # 슬라이스 충돌 geom 은 solimp 가 없어 기본값(.9 .95)으로 떨어진다.
         # MuJoCo 소프트 접촉은 질량 정규화라 관통이 흡착력/질량에 비례하고,
         # 14 g 토마토는 4.4 mm 끌려들어가 attach 관통 게이트(2 mm)에 걸렸다.

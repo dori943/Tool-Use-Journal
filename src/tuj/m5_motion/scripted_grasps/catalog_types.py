@@ -64,6 +64,7 @@ class CatalogRecipe:
     maximum_support_separation_penetration_m: float = .002
     maximum_joint_limit_error_rad: float = .01
     suction_command: float = 1.
+    vacuum_actuator_gain: float | None = None
     # Thin utensil handles: accept thumb+index/pinky pinch instead of full 3F.
     thin_handle_pinch: bool = False
     hold_finger_positions: bool = False
@@ -122,6 +123,9 @@ class CatalogRecipe:
         if self.post_grasp_arm_kp is not None and not 0 < self.post_grasp_arm_kp <= 300:
             raise ValueError('Invalid post-grasp arm gain')
         if not 0<=self.suction_command<=1: raise ValueError('Invalid suction command')
+        if self.vacuum_actuator_gain is not None:
+            if self.ee_id!='vac' or not np.isfinite(self.vacuum_actuator_gain) or self.vacuum_actuator_gain<=0:
+                raise ValueError('Invalid vacuum actuator gain')
         if self.ee_id=='vac' and self.suction_command<.5: raise ValueError('Vacuum attachment requires suction command >= .5')
         if self.thin_handle_pinch and self.ee_id!='3F':
             raise ValueError('thin_handle_pinch requires 3F')
