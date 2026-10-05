@@ -981,12 +981,13 @@ def _seat_held_place_at(g, desired_xy):
     ):
         # In C3_1, the 2F spoon's release TCP sits low enough that its inner
         # finger collides with the robot pedestal while opening over blue_tray
-        # (live execution: -11.2 mm, then -3.6 mm with 35 mm clearance). Add
-        # 10 mm beyond the finger reach and planner margin; the released spoon
+        # (live execution: -11.2 mm at 5 mm release, -3.6 mm at 35 mm, and
+        # +1.0 mm at 45 mm). Add 20 mm beyond finger reach and planner margin;
+        # the released spoon
         # then settles onto the tray under gravity.
         release_clearance = max(
             release_clearance,
-            float(multi_finger_finger_below_tcp_m()) + 0.010
+            float(multi_finger_finger_below_tcp_m()) + 0.020
             + float(request.constraints.collision_margin_m),
         )
     if _request_uses_vacuum(request):
