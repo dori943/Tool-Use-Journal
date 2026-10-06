@@ -448,9 +448,10 @@ def _contact_spec(
     action = _action_type(assignment, execution)
     mode = str(assignment.mode or "").strip()
     normalized = f"{action}:{mode}".lower()
-    if not any(token in normalized for token in ("push", "pull", "sweep", "flatten")):
+    if not any(token in normalized for token in ("push", "pull", "sweep", "flatten", "extract")):
         return None
     surface = parameters.get("contact_surface", ContactSurfaceType.AUTO.value)
+    spec_metadata = parameters.get("contact_metadata")
     return ContactManipulationSpec(
         primitive=mode or action,
         contact_surface=surface,
@@ -459,6 +460,7 @@ def _contact_spec(
         target_grouping=str(parameters.get("target_grouping", "SINGLE")),
         maintain_contact=bool(parameters.get("maintain_contact", False)),
         max_contact_force_n=parameters.get("max_contact_force_n"),
+        metadata=dict(spec_metadata) if isinstance(spec_metadata, Mapping) else {},
     )
 def _source_value(
     source: Any,
@@ -601,6 +603,25 @@ class SelectedPlanMotionRequestAdapter:
                 for target_id in target_ids:
                     if target_id not in allowed_touch:
                         allowed_touch.append(target_id)
+                if str(contact.primitive).lower() == "extract" and target_ids:
+                    from tuj.m5_motion.extract_contact import gap_flank_ids
+
+                    flanks = gap_flank_ids(
+                        world,
+                        target_ids[0],
+                        exclude={assignment.tool, *target_ids},
+                    )
+                    for flank_id in flanks:
+                        if flank_id not in allowed_touch:
+                            allowed_touch.append(flank_id)
+                    selectors = world.metadata.get("extract_contact_selectors") or []
+                    if isinstance(selectors, list):
+                        for selector in selectors:
+                            if isinstance(selector, str) and selector and selector not in allowed_touch:
+                                allowed_touch.append(selector)
+                    contact = contact.model_copy(update={
+                        "metadata": {**contact.metadata, "flank_ids": flanks},
+                    })
             if not isinstance(allowed_touch, list):
                 raise SelectedPlanAdapterError(
                     "allowed_touch_objects must be a list when supplied"

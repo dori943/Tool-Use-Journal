@@ -966,8 +966,28 @@ class ToolUseJournalEnvironmentAdapter:
                     if attached_object_transform is not None
                     else {}
                 ),
+                **_extract_contact_metadata_from_env(self.env),
             },
         )
+
+
+def _extract_contact_metadata_from_env(env: object) -> dict[str, list[str]]:
+    """Scene-owned selectors the extract motion is allowed to graze.
+
+    Absent on environments that do not declare an extraction clearance, so
+    other tasks keep an empty touch list.
+    """
+
+    provider = getattr(env, "extract_contact_selectors", None)
+    if not callable(provider):
+        return {}
+    selectors = provider()
+    if not isinstance(selectors, (list, tuple)):
+        return {}
+    names = [item for item in selectors if isinstance(item, str) and item]
+    if not names:
+        return {}
+    return {"extract_contact_selectors": names}
 
 
 def apply_world_snapshot_state(env: object, world: WorldSnapshot) -> None:

@@ -59,6 +59,17 @@ class CatalogRecipe:
     maximum_slip_m: float = .005
     maximum_slip_deg: float = 5.
     contact_ticks: int = 5
+    # 2F contact gate. 1.0 means the finger normals point at each other.
+    # Default 0.5 suits chunky objects. A thin flat tool can roll slightly
+    # under a firm squeeze and drop opposition while both pads still hold it.
+    minimum_normal_opposition: float = .5
+    # Optional (sliding, torsional, rolling) pad friction. None leaves the
+    # model's pad friction unchanged.
+    fingerpad_friction: tuple | None = None
+    # Optional finger/gripper vs support penetration tolerated during GRASP
+    # and CLOSE. None keeps the shared collision gate unchanged.
+    fingertip_support_clearance_tol_m: float | None = None
+    gripper_support_clearance_tol_m: float | None = None
     minimum_vacuum_contact_count: int = 3
     maximum_vacuum_attach_penetration_m: float = .002
     maximum_support_separation_penetration_m: float = .002
@@ -136,6 +147,16 @@ class CatalogRecipe:
         if self.physics_timestep_s not in (.0005,.001,.002): raise ValueError('Invalid timestep')
         if self.physics_integrator!='implicitfast': raise ValueError('Invalid integrator')
         if not isinstance(self.contact_ticks,int) or self.contact_ticks<1: raise ValueError('Invalid contact ticks')
+        if not 0 < self.minimum_normal_opposition <= 1:
+            raise ValueError('Invalid minimum normal opposition')
+        if self.fingerpad_friction is not None:
+            friction = np.asarray(self.fingerpad_friction, dtype=float)
+            if friction.shape != (3,) or not np.isfinite(friction).all() or np.any(friction < 0):
+                raise ValueError('Invalid fingerpad friction')
+        for name in ('fingertip_support_clearance_tol_m', 'gripper_support_clearance_tol_m'):
+            value = getattr(self, name)
+            if value is not None and (not np.isfinite(value) or value < 0):
+                raise ValueError(f'Invalid {name}')
         if not isinstance(self.thin_handle_pinch,bool) or not isinstance(self.hold_finger_positions,bool):
             raise ValueError('Invalid boolean recipe flag')
         if not isinstance(self.thin_handle_close_retries,int) or self.thin_handle_close_retries<0:

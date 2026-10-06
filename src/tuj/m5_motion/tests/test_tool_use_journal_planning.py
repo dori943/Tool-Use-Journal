@@ -1343,3 +1343,40 @@ def test_runtime_attachment_state_converts_to_contract_quaternion() -> None:
     assert transform.object_id == "bottle"
     assert transform.reference_kind == "site"
     assert transform.orientation_in_reference_xyzw == (0.0, 0.0, 0.0, 1.0)
+
+
+def test_distal_jointed_ancestors_are_the_links_behind_the_hand() -> None:
+    import mujoco
+
+    from tuj.m5_motion.tool_use_journal_planning import (
+        distal_jointed_ancestor_selectors,
+    )
+
+    model = mujoco.MjModel.from_xml_string(
+        """
+        <mujoco>
+          <worldbody>
+            <body name="base">
+              <joint name="j0" type="hinge"/>
+              <geom name="base_col" type="sphere" size="0.01"/>
+              <body name="link1">
+                <joint name="j1" type="hinge"/>
+                <geom name="link1_col" type="sphere" size="0.01"/>
+                <body name="link2">
+                  <joint name="j2" type="hinge"/>
+                  <geom name="link2_col" type="sphere" size="0.01"/>
+                  <body name="hand_mount">
+                    <geom name="hand_col" type="sphere" size="0.01"/>
+                  </body>
+                </body>
+              </body>
+            </body>
+          </worldbody>
+        </mujoco>
+        """
+    )
+
+    assert distal_jointed_ancestor_selectors(model, "hand_mount") == (
+        "link2*",
+        "link1*",
+    )

@@ -38,7 +38,10 @@ ENTRANCE_GAP = 0.009
 INTERNAL_WIDTH = 0.052
 SIDE_MARGIN = 0.008
 WIDTH_REQUIREMENT = 0.034
-REQUIRED_REACH = 0.21
+# Card far-edge depth from the entrance. Shallower than 0.21 so the tool
+# stops short of levering the appliance blocks apart, while card-centre
+# depth stays above spatula_a's reach and below spatula_b's.
+REQUIRED_REACH = 0.185
 
 _APPLIANCE_DEPTH = 0.25
 _APPLIANCE_WIDTH = 0.20
@@ -272,6 +275,19 @@ class C4_1_IntervalFitExtraction(KitchenBase):
         ep_meta["tool_geometry_m"] = _tool_geometry_meta()
 
         return ep_meta
+
+    def extract_contact_selectors(self):
+        """Bodies the extracting tool and hand are meant to graze.
+
+        The island top is the slide surface. The clearance roof is the static
+        body that closes the entrance gap. Names belong to this scene; the
+        motion layer only forwards them on an extract request.
+        """
+
+        return (
+            "island_island_group_top*",
+            "tool_thickness_clearance*",
+        )
 
     # ------------------------------------------------------------------
     # Island geometry
@@ -645,6 +661,11 @@ class C4_1_IntervalFitExtraction(KitchenBase):
         for geom in obj.worldbody.findall(
             ".//geom"
         ):
+            # Tool-card friction must exceed card-counter friction so the
+            # blade drags the card instead of sliding over it. MuJoCo uses
+            # the element-wise max of the two geoms.
+            geom.set("friction", "3 0.1 0.01")
+
             if (
                 geom.get("type") == "box"
                 and geom.get("size")

@@ -984,6 +984,11 @@ class MotionPlanBuilder:
                     else {}
                 ),
                 **(
+                    {"contact_primitive": request.task.contact.primitive}
+                    if request.task.contact is not None
+                    else {}
+                ),
+                **(
                     {
                         "grasp_execution_mode": "CONTACT_FRICTION",
                         "planned_contact_friction_transform": (

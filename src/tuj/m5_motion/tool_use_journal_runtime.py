@@ -151,6 +151,43 @@ def _joint_qpos_width(joint_type: int) -> int:
     return 1
 
 
+def _geom_frame_points(model: mujoco.MjModel, geom_id: int) -> np.ndarray | None:
+    """Geom-frame sample points for a collision primitive, including mesh verts."""
+
+    geom_type = int(model.geom_type[geom_id])
+    size = np.asarray(model.geom_size[geom_id], dtype=float)
+    if geom_type == int(mujoco.mjtGeom.mjGEOM_MESH):
+        mesh_id = int(model.geom_dataid[geom_id])
+        if mesh_id < 0:
+            return None
+        start = int(model.mesh_vertadr[mesh_id])
+        count = int(model.mesh_vertnum[mesh_id])
+        if count <= 0:
+            return None
+        return np.asarray(model.mesh_vert[start : start + count], dtype=float)
+    if geom_type == int(mujoco.mjtGeom.mjGEOM_BOX):
+        extents = size[:3]
+    elif geom_type == int(mujoco.mjtGeom.mjGEOM_SPHERE):
+        extents = np.array([size[0], size[0], size[0]], dtype=float)
+    elif geom_type == int(mujoco.mjtGeom.mjGEOM_ELLIPSOID):
+        extents = size[:3]
+    elif geom_type == int(mujoco.mjtGeom.mjGEOM_CYLINDER):
+        extents = np.array([size[0], size[0], size[1]], dtype=float)
+    elif geom_type == int(mujoco.mjtGeom.mjGEOM_CAPSULE):
+        extents = np.array([size[0], size[0], size[1] + size[0]], dtype=float)
+    else:
+        return None
+    return np.asarray(
+        [
+            (sx * extents[0], sy * extents[1], sz * extents[2])
+            for sx in (-1.0, 1.0)
+            for sy in (-1.0, 1.0)
+            for sz in (-1.0, 1.0)
+        ],
+        dtype=float,
+    )
+
+
 def _joint_dof_width(joint_type: int) -> int:
     if joint_type == int(mujoco.mjtJoint.mjJNT_FREE):
         return 6
@@ -611,6 +648,11 @@ class ToolUseJournalEERuntime:
         self._held_tool_push_partner_ids: frozenset[str] = frozenset()
         # Optional goal region for clamping pushed partners fully inside.
         self._held_tool_push_region_id: str | None = None
+        # Extract drags targets under the tool collision bounds. It does not
+        # grow a paddle or pack them into the goal region.
+        self._held_tool_contact_drag: bool = False
+        # World-XY offset from the held tool body to a latched extract target.
+        self._held_tool_drag_offsets: dict[str, np.ndarray] = {}
         # Prior contype/conaffinity for vac cup geoms disabled while a tool is held.
         self._vac_cup_collision_backup: dict[int, tuple[int, int]] = {}
         # Last synchronized attached-object pose for finite-difference qvel.
@@ -2519,7 +2561,14 @@ class ToolUseJournalEERuntime:
                 else np.zeros(2, dtype=float)
             )
             has_xy = float(np.linalg.norm(assist_delta)) >= 1e-9
-            if has_xy or self._held_tool_fill_geom_backup:
+            # Contact drag reasserts a latched target after every physics
+            # substep. The post-step sync has no planar delta, and without
+            # that reassertion the solver puts the target back.
+            if (
+                has_xy
+                or self._held_tool_fill_geom_backup
+                or self._held_tool_contact_drag
+            ):
                 self._apply_held_tool_kinematic_push_assist(
                     delta_xy=assist_delta,
                     tool_position=object_position,
@@ -2737,12 +2786,37 @@ class ToolUseJournalEERuntime:
             )
         return enabled
 
+    def enable_held_tool_contact_drag(
+        self, partner_ids: Sequence[str]
+    ) -> bool:
+        """Carry extract targets that overlap the held tool, without a paddle.
+
+        A kinematically attached tool does not transmit enough friction to pull
+        a trapped object out. Targets under the tool's own collision bounds
+        inherit its planar motion. They are not pushed down and not packed into
+        the goal region.
+        """
+
+        self.disable_held_tool_collision_fill()
+        ids = [str(item).strip() for item in partner_ids if str(item).strip()]
+        if not ids:
+            return False
+        self._held_tool_push_partner_ids = frozenset(ids)
+        self._held_tool_contact_drag = True
+        print(
+            f"[M5][EXTRACT_DRAG] carrying {sorted(self._held_tool_push_partner_ids)} "
+            f"with the held tool while their collision bounds overlap"
+        )
+        return True
+
     def disable_held_tool_collision_fill(self) -> None:
         """Restore fill paddle, rim meshes, and vac-cup collision state."""
 
         self.restore_vac_cup_free_body_collisions()
         self._held_tool_push_partner_ids = frozenset()
         self._held_tool_push_region_id = None
+        self._held_tool_contact_drag = False
+        self._held_tool_drag_offsets = {}
         if not (
             self._held_tool_fill_geom_backup or self._held_tool_rim_collision_backup
         ):
@@ -2766,6 +2840,149 @@ class ToolUseJournalEERuntime:
         self._held_tool_rim_collision_backup.clear()
         mujoco.mj_forward(model, data)
 
+    def _collision_world_bounds(
+        self, body_id: int
+    ) -> tuple[np.ndarray, np.ndarray] | None:
+        """World AABB of a body's collision geoms, including mesh vertices."""
+
+        model, data = _raw_model_data(self.env)
+        model_key = id(model)
+        cache: dict[int, tuple[np.ndarray, np.ndarray] | None] = getattr(
+            self, "_collision_local_bounds", {}
+        )
+        if getattr(self, "_collision_bounds_model_id", None) != model_key:
+            cache = {}
+            self._collision_bounds_model_id = model_key
+        self._collision_local_bounds = cache
+        key = int(body_id)
+        if key not in cache:
+            root_position = np.asarray(data.xpos[key], dtype=float)
+            root_rotation = np.asarray(data.xmat[key], dtype=float).reshape(3, 3)
+            points: list[np.ndarray] = []
+            for geom_id in self._subtree_geom_ids(model, key):
+                if not (
+                    int(model.geom_contype[geom_id])
+                    or int(model.geom_conaffinity[geom_id])
+                ):
+                    continue
+                local = _geom_frame_points(model, geom_id)
+                if local is None or local.size == 0:
+                    continue
+                geom_position = np.asarray(data.geom_xpos[geom_id], dtype=float)
+                geom_rotation = np.asarray(
+                    data.geom_xmat[geom_id], dtype=float
+                ).reshape(3, 3)
+                world = local @ geom_rotation.T + geom_position
+                points.append((world - root_position) @ root_rotation)
+            if points:
+                combined = np.concatenate(points, axis=0)
+                cache[key] = (
+                    np.min(combined, axis=0),
+                    np.max(combined, axis=0),
+                )
+            else:
+                cache[key] = None
+        bounds = cache[key]
+        if bounds is None:
+            return None
+        local_min, local_max = bounds
+        corners = np.asarray(
+            [
+                (
+                    local_min[0] if sx < 0 else local_max[0],
+                    local_min[1] if sy < 0 else local_max[1],
+                    local_min[2] if sz < 0 else local_max[2],
+                )
+                for sx in (-1.0, 1.0)
+                for sy in (-1.0, 1.0)
+                for sz in (-1.0, 1.0)
+            ],
+            dtype=float,
+        )
+        rotation = np.asarray(data.xmat[key], dtype=float).reshape(3, 3)
+        position = np.asarray(data.xpos[key], dtype=float)
+        world_corners = corners @ rotation.T + position
+        return np.min(world_corners, axis=0), np.max(world_corners, axis=0)
+
+    def _drag_targets_under_tool(self, delta_xy: np.ndarray) -> None:
+        """Hold extract targets on the held tool once their bounds overlap.
+
+        A one-step XY copy is undone by the physics substep that follows.
+        The first overlap latches the target's planar offset from the tool,
+        and every later sync, including the zero-delta post-step sync, writes
+        that pose again. The latch releases when the tool lifts clear.
+        Targets keep their height and are not packed into a goal region.
+        """
+
+        if not self._held_tool_push_partner_ids:
+            return
+        tool_id = self._held_tool_id or (
+            self._attachment.object_id if self._attachment is not None else None
+        )
+        if tool_id is None:
+            return
+        try:
+            tool_body, _, _ = self._object_free_joint(self.env, tool_id)
+        except ToolUseJournalRuntimeError:
+            return
+        tool_bounds = self._collision_world_bounds(tool_body)
+        if tool_bounds is None:
+            return
+        tool_lo, tool_hi = tool_bounds
+        model, data = _raw_model_data(self.env)
+        tool_xy = np.asarray(data.xpos[tool_body][:2], dtype=float)
+        delta = np.asarray(delta_xy, dtype=float).reshape(2)
+        margin = 0.005
+        moved = False
+        for object_id in self._held_tool_push_partner_ids:
+            try:
+                body_id, joint_id, _ = self._object_free_joint(
+                    self.env, object_id
+                )
+            except ToolUseJournalRuntimeError:
+                continue
+            partner_bounds = self._collision_world_bounds(body_id)
+            if partner_bounds is None:
+                continue
+            partner_lo, partner_hi = partner_bounds
+            lifted = float(tool_lo[2] - partner_hi[2]) > 0.02 or float(
+                tool_hi[2]
+            ) < float(partner_lo[2]) - 0.02
+            qpos_start = int(model.jnt_qposadr[joint_id])
+            qvel_start = int(model.jnt_dofadr[joint_id])
+            if object_id in self._held_tool_drag_offsets:
+                if lifted:
+                    self._held_tool_drag_offsets.pop(object_id, None)
+                    continue
+                data.qpos[qpos_start : qpos_start + 2] = (
+                    tool_xy + self._held_tool_drag_offsets[object_id]
+                )
+                data.qvel[qvel_start : qvel_start + 6] = 0.0
+                moved = True
+                continue
+            separated = bool(
+                partner_hi[0] < tool_lo[0] - margin
+                or partner_lo[0] > tool_hi[0] + margin
+                or partner_hi[1] < tool_lo[1] - margin
+                or partner_lo[1] > tool_hi[1] + margin
+            )
+            if separated or lifted:
+                continue
+            partner_xy = np.asarray(
+                data.qpos[qpos_start : qpos_start + 2], dtype=float
+            )
+            self._held_tool_drag_offsets[object_id] = partner_xy + delta - tool_xy
+            data.qpos[qpos_start : qpos_start + 2] = (
+                tool_xy + self._held_tool_drag_offsets[object_id]
+            )
+            data.qvel[qvel_start : qvel_start + 6] = 0.0
+            moved = True
+            print(
+                f"[M5][EXTRACT_DRAG] latched {object_id!r} to the held tool"
+            )
+        if moved:
+            mujoco.mj_forward(model, data)
+
     def _apply_held_tool_kinematic_push_assist(
         self,
         *,
@@ -2785,6 +3002,9 @@ class ToolUseJournalEERuntime:
            the same planar displacement (optional goal-region AABB pack).
         """
 
+        if self._held_tool_contact_drag:
+            self._drag_targets_under_tool(delta_xy)
+            return
         if not self._held_tool_fill_geom_backup:
             return
         if not self._held_tool_push_partner_ids:
@@ -3337,14 +3557,30 @@ def _tabletop_held_tool_push_partners(plan: MotionPlan) -> list[str]:
 
 
 def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
-    """True when the plan allows the held tool to touch free tabletop objects."""
+    """True when the plan allows the held tool to touch free tabletop objects.
 
+    Extraction carries a trapped target with the held tool. The underside
+    paddle herds objects into a goal region and pushes them down, so extract
+    plans do not arm it.
+    """
+
+    primitive = str(plan.metadata.get("contact_primitive") or "").strip().lower()
+    if primitive == "extract":
+        return False
     return bool(_tabletop_held_tool_push_partners(plan))
 
 
 def _maybe_enable_held_tool_fill_for_plan(
     runtime: ToolUseJournalEERuntime, plan: MotionPlan
 ) -> bool:
+    primitive = str(plan.metadata.get("contact_primitive") or "").strip().lower()
+    if primitive == "extract":
+        targets = plan.metadata.get("target_ids") or []
+        if not isinstance(targets, (list, tuple)):
+            return False
+        return bool(runtime.enable_held_tool_contact_drag(targets))
+    if not _plan_requests_tabletop_held_tool_push(plan):
+        return False
     partners = _tabletop_held_tool_push_partners(plan)
     if not partners:
         return False

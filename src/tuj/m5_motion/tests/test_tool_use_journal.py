@@ -2090,3 +2090,30 @@ def test_acquire_contact_settle_fails_when_orientation_out_of_tolerance() -> Non
     assert result["succeeded"] is False
     assert result["orientation_ok"] is False
     assert result["intended_target_contact"] is True
+
+
+def test_extract_plan_does_not_arm_tabletop_push_paddle() -> None:
+    from tuj.m5_motion.tool_use_journal_runtime import (
+        _maybe_enable_held_tool_fill_for_plan,
+    )
+
+    calls: list[tuple[str, object]] = []
+
+    def fail_if_paddle(**_kwargs):
+        calls.append(("paddle", _kwargs))
+        raise AssertionError("extract plan armed the push paddle")
+
+    def record_drag(partner_ids):
+        calls.append(("drag", list(partner_ids)))
+        return True
+
+    runtime = SimpleNamespace(
+        enable_held_tool_collision_fill=fail_if_paddle,
+        enable_held_tool_contact_drag=record_drag,
+    )
+    plan = SimpleNamespace(
+        metadata={"contact_primitive": "extract", "target_ids": ["card"]}
+    )
+
+    assert _maybe_enable_held_tool_fill_for_plan(runtime, plan) is True
+    assert calls == [("drag", ["card"])]

@@ -546,6 +546,69 @@ def gap_width_mm(m1: dict | None, target_id: str, exclude: set[str] | None = Non
     return round(best, 1) if best is not None else None
 
 
+def gap_extraction_geometry(m1: dict | None, target_id: str,
+                            exclude: set[str] | None = None) -> dict:
+    """틈에 낀 대상을 열린 끝에서 수평으로 빼낼 때의 접근 기하.
+
+    대상을 양쪽에서 끼는 두 물체가 이루는 틈은 한 축으로 좁고 직교 축으로 길며
+    양끝이 열려 있다. 위→아래 수직 삽입보다, 도구가 놓인 쪽에 가까운 열린 끝에서
+    채널을 따라 넣는 편이 진입 거리가 짧다. 구성 실패 시 값들은 None.
+    """
+    none = {"gap_width_mm": None, "insertion_depth_mm": None, "approach": None,
+            "gap_axis": None, "channel_axis": None, "flank_ids": None}
+    if not m1:
+        return dict(none)
+    nodes = {n["id"]: n for n in m1.get("nodes", [])}
+    t = nodes.get(target_id)
+    if not t:
+        return dict(none)
+    exclude = set(exclude or ()) | {target_id}
+    tc = t["center_mm"]
+    best = None  # (gap_width, ax, other, [lo_node, hi_node])
+    for ax, other in ((0, 1), (1, 0)):
+        lo, hi = [], []
+        for n in nodes.values():
+            if n["id"] in exclude:
+                continue
+            c, s = n["center_mm"], n["bbox_mm"]
+            if abs(c[other] - tc[other]) > s[other] / 2:
+                continue
+            if c[ax] + s[ax] / 2 <= tc[ax]:
+                lo.append((c[ax] + s[ax] / 2, n))
+            elif c[ax] - s[ax] / 2 >= tc[ax]:
+                hi.append((c[ax] - s[ax] / 2, n))
+        if lo and hi:
+            w = min(h for h, _ in hi) - max(l for l, _ in lo)
+            if w > 0 and (best is None or w < best[0]):
+                lo_node = max(lo, key=lambda p: p[0])[1]
+                hi_node = min(hi, key=lambda p: p[0])[1]
+                best = (w, ax, other, [lo_node, hi_node])
+    if best is None:
+        return dict(none)
+    w, ax, other, flankers = best
+    edges = []
+    for n in flankers:
+        c, s = n["center_mm"], n["bbox_mm"]
+        edges += [c[other] - s[other] / 2, c[other] + s[other] / 2]
+    lo_end, hi_end = min(edges), max(edges)
+    # 접근단은 대상·양벽을 뺀 나머지 노드(보통 도구)의 채널축 평균에 가까운 끝.
+    # 기하학적으로 가장 가까운 끝은 로봇이 닿지 않는 반대편일 수 있다.
+    flank_ids = {n["id"] for n in flankers}
+    others = [n for nid, n in nodes.items()
+              if nid not in exclude and nid not in flank_ids and "center_mm" in n]
+    if others:
+        agent = sum(n["center_mm"][other] for n in others) / len(others)
+        access_end = lo_end if abs(lo_end - agent) <= abs(hi_end - agent) else hi_end
+    else:
+        access_end = lo_end
+    insertion = abs(tc[other] - access_end)
+    return {"gap_width_mm": round(float(w), 1),
+            "insertion_depth_mm": round(float(insertion), 1),
+            "approach": "HORIZONTAL_SLIDE_FROM_OPEN_END",
+            "gap_axis": ax, "channel_axis": other,
+            "flank_ids": [n["id"] for n in flankers]}
+
+
 # 0911: 집어서 쓸 수 없는 장면 설비. 노드 id 는 obj_<class>_<instance> 꼴이다.
 FIXTURE_CLASSES = ("rack", "zone")
 
@@ -676,13 +739,21 @@ def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None)
                 # 0908: (?tool, ?o) 쌍마다 발행 + 틈 폭 동봉. 이전엔 M2가 발행하지 않아
                 # run_m3 컴파일 보충이 틈 폭 없이 질의했고, 응답은 apply_m3 게이팅에 걸렸음.
                 targets = _set_members(b.get("?o"))
-                excl = set(tool_ids) | set(targets) | {subgoal.get("container_id")}
+                # 틈은 대상을 양쪽에서 끼는 환경 물체로 이뤄진다. container_id 가
+                # 그 중 하나일 수 있으므로, 조작 대상(도구+타깃)만 제외한다.
+                excl = set(tool_ids) | set(targets)
                 for o in targets:
-                    w = gap_width_mm(m1, o, excl)
+                    geom = gap_extraction_geometry(m1, o, excl)
                     for t in tool_ids:
                         call = {"kind": "gap_accessible", "tool_id": t, "target_id": o}
-                        if w is not None:
-                            call["gap_width_mm"] = w
+                        if geom.get("gap_width_mm") is not None:
+                            call["gap_width_mm"] = geom["gap_width_mm"]
+                        if geom.get("insertion_depth_mm") is not None:
+                            call["insertion_depth_mm"] = geom["insertion_depth_mm"]
+                        if geom.get("approach") is not None:
+                            call["approach"] = geom["approach"]
+                        if geom.get("flank_ids"):
+                            call["flank_ids"] = list(geom["flank_ids"])
                         q.append({"subgoal_id": subgoal["subgoal_id"], "queried_by": p["id"],
                                   "call": call})
             elif head == "clear":

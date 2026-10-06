@@ -134,6 +134,11 @@ class MuJoCoCollisionValidator:
     """
 
     _DISTANCE_TOLERANCE_M = 1e-9
+    # The robot is bolted to its mount, so that fixture is not a scene obstacle.
+    # Its collision shape is a coarse stand proxy, and a fingertip can sit a
+    # few millimetres inside it at a normal place pose. Scene obstacles keep
+    # ``collision_margin_m``. Penetration deeper than this still fails.
+    _ROBOT_MOUNT_PENETRATION_TOLERANCE_M = 0.01
 
     def __init__(
         self,
@@ -207,6 +212,9 @@ class MuJoCoCollisionValidator:
             raise MuJoCoCollisionConfigurationError(
                 f"robot subtree {robot_root_body_name!r} has no collision-enabled geoms"
             )
+        self._fixture_geom_ids = self._robot_fixture_geom_ids(
+            root_id, robot_bodies
+        )
 
         if baseline_qpos is None:
             self._baseline_qpos = np.zeros(model.nq, dtype=float)
@@ -612,6 +620,58 @@ class MuJoCoCollisionValidator:
         node = int(self.model.flex_vertbodyid[start])
         return int(self.model.body_parentid[node])
 
+    def _robot_fixture_geom_ids(
+        self,
+        robot_root_id: int,
+        robot_bodies: frozenset[int],
+    ) -> frozenset[int]:
+        """Collision geoms of the robot's own unmoving mount.
+
+        The mount may sit on an ancestor of the arm, or be merged inside the
+        robot root with no joint of its own. World-level bodies such as the
+        floor stay outside this set. Articulated arm and gripper geoms stay
+        outside it too.
+        """
+
+        fixture_bodies: set[int] = set()
+        body_id = int(self.model.body_parentid[robot_root_id])
+        while body_id > 0:
+            fixture_bodies.add(body_id)
+            body_id = int(self.model.body_parentid[body_id])
+        if int(self.model.body_jntnum[robot_root_id]) == 0:
+            rigid = {robot_root_id}
+            growing = True
+            while growing:
+                growing = False
+                for candidate in robot_bodies:
+                    if candidate in rigid:
+                        continue
+                    parent = int(self.model.body_parentid[candidate])
+                    if parent not in rigid:
+                        continue
+                    if int(self.model.body_jntnum[candidate]) > 0:
+                        continue
+                    rigid.add(candidate)
+                    growing = True
+            fixture_bodies.update(rigid)
+        return frozenset(
+            geom_id
+            for geom_id in range(self.model.ngeom)
+            if int(self.model.geom_bodyid[geom_id]) in fixture_bodies
+            and _collision_enabled(self.model, geom_id)
+        )
+
+    def _is_robot_fixture_pair(self, geom_a: int, geom_b: int) -> bool:
+        if geom_a < 0 or geom_b < 0:
+            return False
+        fixture_a = geom_a in self._fixture_geom_ids
+        fixture_b = geom_b in self._fixture_geom_ids
+        robot_a = geom_a in self._robot_geom_ids or fixture_a
+        robot_b = geom_b in self._robot_geom_ids or fixture_b
+        return (fixture_a and robot_b and not fixture_b) or (
+            fixture_b and robot_a and not fixture_a
+        )
+
     def _is_adjacent_robot_pair(self, geom_a: int, geom_b: int) -> bool:
         if geom_a not in self._robot_geom_ids or geom_b not in self._robot_geom_ids:
             return False
@@ -886,6 +946,16 @@ class MuJoCoCollisionValidator:
                 # interface, so exclude that pair from safety clearance too.
                 if self._is_adjacent_robot_pair(geom_a, geom_b):
                     continue
+                # Own-mount contact uses a penetration limit, not the scene
+                # clearance. A graze stays valid; driving into the mount does not.
+                fixture_pair = self._is_robot_fixture_pair(geom_a, geom_b)
+                if (
+                    fixture_pair
+                    and float(contact.dist)
+                    >= -self._ROBOT_MOUNT_PENETRATION_TOLERANCE_M
+                    - self._DISTANCE_TOLERANCE_M
+                ):
+                    continue
                 allowed = self._is_allowed(
                     geom_a, geom_b, selected_context
                 )
@@ -924,6 +994,14 @@ class MuJoCoCollisionValidator:
                             record,
                             float(bounded_minimum),
                             "BOUNDED_COLLISION_VIOLATION",
+                        )
+                    )
+                elif fixture_pair:
+                    violations.append(
+                        (
+                            record,
+                            -self._ROBOT_MOUNT_PENETRATION_TOLERANCE_M,
+                            "COLLISION_MARGIN_VIOLATION",
                         )
                     )
                 elif (

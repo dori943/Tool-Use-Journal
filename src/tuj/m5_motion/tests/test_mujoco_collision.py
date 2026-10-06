@@ -120,6 +120,65 @@ def test_endpoint_validator_checks_clearance_and_joint_limits() -> None:
     assert outside_limit.failure_code == "JOINT_LIMIT_VIOLATION"
 
 
+_MOUNT_SCENE = """
+<mujoco model="mount-contact">
+  <compiler autolimits="true"/>
+  <option gravity="0 0 0"/>
+  <worldbody>
+    <body name="robot_root">
+      <body name="pedestal">
+        <geom name="mount_col" type="sphere" size="0.05"
+              contype="1" conaffinity="1"/>
+      </body>
+      <body name="shoulder">
+        <inertial pos="0 0 0" mass="1" diaginertia="0.01 0.01 0.01"/>
+        <joint name="shoulder" type="hinge" axis="0 0 1" range="-3 3"/>
+        <body name="link" pos="0.12 0 0">
+          <inertial pos="0 0 0" mass="1" diaginertia="0.01 0.01 0.01"/>
+          <joint name="slide" type="slide" axis="1 0 0" range="-1 1"/>
+          <geom name="robot_col" type="sphere" size="0.05"
+                contype="1" conaffinity="1"/>
+        </body>
+      </body>
+    </body>
+    <body name="obstacle">
+      <geom name="wall_col" type="sphere" pos="0.40 0 0" size="0.05"
+            contype="1" conaffinity="1"/>
+    </body>
+  </worldbody>
+</mujoco>
+"""
+
+
+def test_robot_mount_graze_keeps_scene_clearance() -> None:
+    model = mujoco.MjModel.from_xml_string(_MOUNT_SCENE)
+    validator = MuJoCoCollisionValidator(
+        model,
+        joint_names=("slide",),
+        robot_root_body_name="robot_root",
+        collision_margin_m=0.05,
+    )
+
+    graze = validator.check((-0.02006,))
+    proxy_overlap = validator.check((-0.024,))
+    buried = validator.check((-0.032,))
+    wall = validator.check((0.14,))
+
+    assert graze.valid
+    assert proxy_overlap.valid
+    assert not buried.valid
+    assert buried.failure_code == "COLLISION_MARGIN_VIOLATION"
+    assert {buried.contacts[0].geom_a, buried.contacts[0].geom_b} == {
+        "mount_col",
+        "robot_col",
+    }
+    assert not wall.valid
+    assert {wall.contacts[0].geom_a, wall.contacts[0].geom_b} == {
+        "robot_col",
+        "wall_col",
+    }
+
+
 def test_context_acm_allows_only_the_declared_pair() -> None:
     touch = CollisionContext(
         context_id="touch",

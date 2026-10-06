@@ -115,6 +115,20 @@ class CatalogContext(SpoonContext):
             EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
         )
         bad=super().bad_contacts(data,stage)
+        if stage in {'GRASP','CLOSE'}:
+            tip_tol=getattr(self.recipe,'fingertip_support_clearance_tol_m',None)
+            if tip_tol is not None:
+                grip_tol=getattr(self.recipe,'gripper_support_clearance_tol_m',None)
+                support_names={self.model.geom(g).name for g in self.support_gids}
+                gripper_names={self.model.geom(g).name for g in self.gripper_geoms}
+                finger_names={self.model.geom(g).name for g in self.finger_geoms}
+                def support_ok(c):
+                    if not any(n in support_names for n in c['geoms']):return False
+                    if any(n in finger_names for n in c['geoms']):return c['penetration_m']<=float(tip_tol)
+                    if grip_tol is not None and any(n in gripper_names for n in c['geoms']):
+                        return c['penetration_m']<=float(grip_tol)
+                    return False
+                bad=[c for c in bad if not support_ok(c)]
         if stage in {'BREAKAWAY','LEVEL'}:
             # Spoon exemptions cover GRASP/CLOSE/LIFT/... but not BREAKAWAY /
             # LEVEL. Vac cup↔held-object contact is expected while attached.
@@ -242,7 +256,7 @@ class CatalogContext(SpoonContext):
                         or row['suction_alignment_mean']<.9
                         or row['suction_aligned_fraction']<.8
                         or min(row['gripper_ctrl'])<.5):return False
-            elif row['normal_opposition']<.5 or row['contact_span_m']<.0035 or min(row['finger_force_n'].values())<1.:
+            elif row['normal_opposition']<float(getattr(self.recipe,'minimum_normal_opposition',.5)) or row['contact_span_m']<.0035 or min(row['finger_force_n'].values())<1.:
                 return False
         return True
 
@@ -408,6 +422,8 @@ class CatalogContext(SpoonContext):
             np.savez_compressed(self.output/'grasp_state.npz',qpos=self.data.qpos,qvel=self.data.qvel,ctrl=self.data.ctrl,time=self.data.time,
                 grasp_T_GB=self.grasp_T_GB,grasp_object_pose=self.grasp_object_pose,grasp_grip_pose=self.grasp_grip_pose)
             if recipe.ee_id=='2F':self.runtime.set_finger_gripper_actuator_gains(kp=recipe.closure_kp)
+            if getattr(recipe,'fingerpad_friction',None) is not None and recipe.ee_id in ('2F','3F'):
+                self.runtime.set_finger_gripper_contact_friction(recipe.fingerpad_friction)
             close_attempts=[]
             acquired,hold_opening,q=self._close_fingers_until_ready(q,opening,recipe)
             close_attempts.append({

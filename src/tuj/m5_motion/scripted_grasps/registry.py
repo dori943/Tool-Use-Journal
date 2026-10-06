@@ -147,6 +147,12 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
     ("fruit", "C3_2_BreakfastTrayPreparation", "3F", "catalog"),
     ("spoon", "C3_2_BreakfastTrayPreparation", "3F", "spoon"),
     ("mug", "C3_2_BreakfastTrayPreparation", "3F", "catalog", "mug_c3_2"),
+    # C4_1 picks a thin tool lying flush on the island. The generic pick drives
+    # the fingertips into that support; these catalog recipes treat it as the
+    # support surface. Each entry is scoped to this environment and EE.
+    ("tool_1_knife", "C4_1_IntervalFitExtraction", "2F", "catalog", "knife_c4_1"),
+    ("tool_2_spatula_a", "C4_1_IntervalFitExtraction", "2F", "catalog", "spatula_c4_1"),
+    ("tool_3_spatula_b", "C4_1_IntervalFitExtraction", "2F", "catalog", "spatula_b_c4_1"),
 ))
 
 # C1_1 plate+vac is a primary ENTRIES row (flat zero-immersion seating) so M4's

@@ -100,6 +100,41 @@ _MAX_SUPPORT_PENETRATION_TOLERANCE_M = 0.001
 _DEFAULT_SUPPORT_MIN_HORIZONTAL_OVERLAP_RATIO = 0.5
 
 
+def distal_jointed_ancestor_selectors(
+    model: object,
+    root_body_name: str,
+    *,
+    joint_links: int = 2,
+) -> tuple[str, ...]:
+    """Selectors for the jointed links immediately behind a mounted hand.
+
+    The hand itself is already an end-effector entity. A tight insertion also
+    crowds the next arm links against the gap walls. Those bodies are the
+    jointed ancestors of the hand in the compiled model, not a named wrist list.
+    """
+
+    import mujoco
+
+    if joint_links < 1 or not root_body_name:
+        return ()
+    body_id = int(mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_BODY, root_body_name
+    ))
+    if body_id < 0:
+        return ()
+    names: list[str] = []
+    while body_id > 0 and len(names) < joint_links:
+        body_id = int(model.body_parentid[body_id])
+        if body_id <= 0:
+            break
+        if int(model.body_jntnum[body_id]) <= 0:
+            continue
+        name = mujoco.mj_id2name(model, mujoco.mjtObj.mjOBJ_BODY, body_id)
+        if isinstance(name, str) and name:
+            names.append(f"{name}*")
+    return tuple(names)
+
+
 class ToolUseJournalCollisionBindingError(RuntimeError):
     """A request cannot be bound to one unambiguous physical collision scene."""
 
@@ -948,6 +983,26 @@ class ToolUseJournalCollisionContextFactory:
         ee = active_ee or base.active_ee
         if ee:
             pairs.update(self._contact_pairs(ee, touch))
+        contact = request.task.contact
+        if (
+            ee
+            and contact is not None
+            and str(contact.primitive).lower() == "extract"
+        ):
+            raw_flanks = contact.metadata.get("flank_ids")
+            flanks = [
+                item
+                for item in raw_flanks
+                if isinstance(item, str) and item
+            ] if isinstance(raw_flanks, list) else []
+            if flanks:
+                compiled = self.compiler.compile(ee)
+                roots = dict(compiled.entity_selectors).get(ee) or ()
+                root_name = roots[0] if roots else ""
+                for selector in distal_jointed_ancestor_selectors(
+                    compiled.model, root_name
+                ):
+                    pairs.update(self._contact_pairs(selector, flanks))
         return base.model_copy(update={"allowed_collision_pairs": sorted(pairs)})
 
     @staticmethod
