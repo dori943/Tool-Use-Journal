@@ -1,4 +1,3 @@
-# -*- coding: utf-8 -*-
 """통합 실행기 — 한 번의 실행으로 M1 → M2 → G_k → M4 → M5를 순서대로 돌린다.
 
 현재 M1은 기존 Scene Abstraction과 Metric & Physical Grounding 기능을 통합한다.
@@ -48,7 +47,6 @@ import sys
 import time
 from pathlib import Path
 
-
 ROOT = Path(__file__).resolve().parents[1]
 SCRIPTS = ROOT / "scripts"
 
@@ -68,8 +66,7 @@ TIMING_STAGES = ("m1", "m2", "gk", "m4", "m5")
 
 
 # 태스크 id <-> 환경 이름 단일 출처
-from task_registry import TASK_ENVS as TASK_ENV  # noqa: E402
-
+from task_registry import TASK_ENVS as TASK_ENV
 
 # ══════════════════════════════════════════════════════════════════════
 # Timing / token summary (inlined so ours does not require tuj.ablations)
@@ -1004,7 +1001,7 @@ def run_m5_runner(
             label,
         )
 
-    except Exception as exc:  # noqa: BLE001
+    except Exception as exc:
         if (
             type(exc).__name__
             != "MotionPlanningPipelineError"
@@ -1752,7 +1749,10 @@ def main():
     )
 
     if (out / "ablation_manifest.json").exists():
-        sys.exit("[err] This output directory belongs to an ablation; choose a separate full output.")
+        sys.exit(
+            "[err] This output directory belongs to an ablation; "
+            "choose a separate full output."
+        )
 
     start = (
         STAGES.index(args.start_from)

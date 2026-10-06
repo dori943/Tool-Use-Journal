@@ -59,6 +59,11 @@ _TABLETOP_ENCLOSURE_LIFT_REACH_FALLBACKS_M = (0.15, 0.12, 0.10, 0.08, 0.06)
 # multi-finger region PLACE raise. Offline HOLDING poses measure tip≈22 mm and
 # distal≈21–28 mm; 30 mm keeps a small pad without per-request MuJoCo probes.
 _TABLETOP_ENCLOSURE_FINGER_BELOW_TCP_M = 0.030
+# The inner finger of a parallel jaw hangs below that distal-pad model.
+# 22 mm is the remainder measured when the jaw opens beside a thin payload
+# and meets the robot mount (35 mm release still penetrated 3.6 mm; 57 mm
+# cleared it by 4.5 mm).
+_PARALLEL_JAW_INNER_FINGER_EXTRA_BELOW_TCP_M = 0.022
 _TABLETOP_ENCLOSURE_ANCHORS = frozenset(
     {"center", "top", "top_center"}
 )
@@ -68,6 +73,12 @@ def multi_finger_finger_below_tcp_m() -> float:
     """Downward finger extent below grip TCP used for support clearance."""
 
     return float(_TABLETOP_ENCLOSURE_FINGER_BELOW_TCP_M)
+
+
+def parallel_jaw_inner_finger_extra_below_tcp_m() -> float:
+    """Extra inner-finger drop below the distal-pad model."""
+
+    return float(_PARALLEL_JAW_INNER_FINGER_EXTRA_BELOW_TCP_M)
 
 
 def multi_finger_tabletop_standoff_candidates(

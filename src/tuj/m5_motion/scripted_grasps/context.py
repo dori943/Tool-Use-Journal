@@ -40,6 +40,11 @@ def bind_context(runtime, entry, output, *, seed=0, request=None):
     c.model, c.data = c.adapter.model, c.adapter.data
     c.robot = env.robots[0]
     c.gripper = c.robot.gripper["right"]
+    vacuum_actuator_gain = getattr(recipe, "vacuum_actuator_gain", None)
+    if vacuum_actuator_gain is not None:
+        for actuator_name in c.gripper.actuators:
+            actuator_id = c.model.actuator(actuator_name).id
+            c.model.actuator_gainprm[actuator_id, 0] = vacuum_actuator_gain
     if type(c.gripper).__name__ != recipe.model_class:
         raise GraspFailure("UNSUPPORTED_EE_MODEL")
     c.arm_ids = np.asarray(c.robot._ref_joint_pos_indexes)

@@ -302,7 +302,13 @@ def run_search(problem: SearchProblem) -> SearchOutcome:
     all_subgoal_ids = sorted(problem.subgoals)
 
     heap: list[
-        tuple[tuple[int, ...], tuple[str, ...], int, SearchState]
+        tuple[
+            tuple[int, ...],
+            tuple[int, ...],
+            tuple[str, ...],
+            int,
+            SearchState,
+        ]
     ] = []
     seq = 0
     initial = problem.initial_state
@@ -311,7 +317,13 @@ def run_search(problem: SearchProblem) -> SearchOutcome:
     outcome.best_priority[initial] = initial_priority
     heapq.heappush(
         heap,
-        (initial_priority.as_tuple(), ("", "", ""), seq, initial),
+        (
+            initial_priority.as_tuple(),
+            initial_priority.as_tuple(),
+            ("", "", ""),
+            seq,
+            initial,
+        ),
     )
 
     while heap:
@@ -322,7 +334,7 @@ def run_search(problem: SearchProblem) -> SearchOutcome:
             outcome.limit_reached = True
             break
 
-        priority_tuple, _tie, _seq, state = heapq.heappop(heap)
+        _queue_priority, priority_tuple, _tie, _seq, state = heapq.heappop(heap)
         stats.states_popped += 1
         priority = outcome.best_priority.get(state)
         if priority is None or priority_tuple > priority.as_tuple():
@@ -561,7 +573,15 @@ def run_search(problem: SearchProblem) -> SearchOutcome:
 def _relax(
     problem: SearchProblem,
     outcome: SearchOutcome,
-    heap: list[tuple[tuple[int, ...], tuple[str, ...], int, SearchState]],
+    heap: list[
+        tuple[
+            tuple[int, ...],
+            tuple[int, ...],
+            tuple[str, ...],
+            int,
+            SearchState,
+        ]
+    ],
     stats: SearchStats,
     state: SearchState,
     next_state: SearchState,
@@ -582,7 +602,16 @@ def _relax(
     outcome.best_priority[next_state] = new_priority
     outcome.parent[next_state] = edge
     seq += 1
-    heapq.heappush(heap, (new_priority.as_tuple(), tie, seq, next_state))
+    if problem.policy.search_mode == "greedy":
+        # Prefer the locally cheapest next transition. Suitability is kept as
+        # the final local tie-breaker, matching the optimal mode semantics.
+        queue_priority = edge_cost.as_tuple() + (edge_suitability_penalty,)
+    else:
+        queue_priority = new_priority.as_tuple()
+    heapq.heappush(
+        heap,
+        (queue_priority, new_priority.as_tuple(), tie, seq, next_state),
+    )
     return seq
 
 

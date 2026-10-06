@@ -953,7 +953,71 @@ def ground_held_place(request, retention=None):
     g = _grounding_for(request, retention, _is_region_place)
     if g is None:
         return
-    _seat_held_place_at(g, g.free_destination_xy())
+    _seat_held_place_at(g, _clear_finger_overhang(g, g.free_destination_xy()))
+
+
+def _grip_beside_payload(g) -> bool:
+    """True when the grip site sits at the payload silhouette, not over its center."""
+
+    from tuj.m5_motion.grasp_geometry import multi_finger_finger_below_tcp_m
+
+    offset = np.asarray(g.T_WE[:2, 3], dtype=float) - np.asarray(g.center[:2], dtype=float)
+    silhouette_gap = float(np.max(np.abs(offset) - np.asarray(g.half[:2], dtype=float)))
+    return silhouette_gap > -float(multi_finger_finger_below_tcp_m())
+
+
+def _clear_finger_overhang(g, desired_xy):
+    """Move a side grasp off a neighbor that the fingertips would still enter.
+
+    The object footprint can clear an occupant while the jaws, parked beside
+    the payload, still reach that occupant. Shift away by the shortfall and
+    stay inside the region.
+    """
+
+    from tuj.m5_motion.grasp_geometry import multi_finger_finger_below_tcp_m
+
+    if not _grip_beside_payload(g):
+        return desired_xy
+    occupants = g._occupants()
+    if not occupants:
+        return desired_xy
+    mine = np.asarray(g.half[:2], dtype=float)
+    seat = np.asarray(desired_xy, dtype=float).reshape(2)
+    nearest = None
+    nearest_gap = None
+    for center, half, _top, _soft in occupants:
+        gap = float(np.max(np.abs(seat - center) - (np.asarray(half, dtype=float) + mine)))
+        if nearest_gap is None or gap < nearest_gap:
+            nearest_gap = gap
+            nearest = np.asarray(center, dtype=float).reshape(2)
+    reach = float(multi_finger_finger_below_tcp_m())
+    margin = float(g.request.constraints.collision_margin_m)
+    if nearest is None or nearest_gap is None or nearest_gap >= reach + margin:
+        return desired_xy
+    shortfall = reach + margin - nearest_gap
+    shifted = g.place_xy_away_from(
+        nearest,
+        min_shift_m=shortfall,
+        current_xy=seat,
+    )
+    if shifted is not None:
+        return shifted
+    away = seat - nearest
+    norm = float(np.linalg.norm(away))
+    if norm <= 1e-9:
+        return desired_xy
+    away /= norm
+    limit = g.usable_half_xy() - mine
+    for direction in (
+        away,
+        np.array([0.0, math.copysign(1.0, away[1])]),
+        np.array([math.copysign(1.0, away[0]), 0.0]),
+    ):
+        candidate = seat + direction * shortfall
+        offset = candidate - g.region_world[:2]
+        if np.all(np.abs(offset) <= limit + 1e-9):
+            return candidate
+    return desired_xy
 
 
 def _seat_held_place_at(g, desired_xy):
@@ -971,6 +1035,24 @@ def _seat_held_place_at(g, desired_xy):
         release_clearance = max(
             release_clearance,
             float(multi_finger_finger_below_tcp_m())
+            + float(request.constraints.collision_margin_m),
+        )
+    elif (
+        not _request_uses_vacuum(request)
+        and _grip_beside_payload(g)
+        and float(np.min(g.local_size)) < float(multi_finger_finger_below_tcp_m())
+    ):
+        # A parallel jaw around a thin payload leaves the inner finger below
+        # the distal-pad model. Raise the release by that remainder so the
+        # finger clears the robot mount; the object then settles.
+        from tuj.m5_motion.grasp_geometry import (
+            parallel_jaw_inner_finger_extra_below_tcp_m,
+        )
+
+        release_clearance = max(
+            release_clearance,
+            float(multi_finger_finger_below_tcp_m())
+            + float(parallel_jaw_inner_finger_extra_below_tcp_m())
             + float(request.constraints.collision_margin_m),
         )
     if _request_uses_vacuum(request):
