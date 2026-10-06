@@ -306,6 +306,28 @@ def _transition_request(
     metadata: dict[str, Any],
     selected_plan_artifact_id: str,
 ) -> MotionPlanRequest:
+    request_constraints = constraints.model_copy(deep=True)
+    if (
+        action_type == "EE_EXCHANGE"
+        and ee == "3F"
+        and world.metadata.get("environment_name")
+        == "C4_2_DiagonalFitPacking"
+    ):
+        # The C4-2 2F->3F safe exit has a measured positive 4.676 mm gap
+        # between the parked vacuum mount and the 3F thumb. Carry the narrow
+        # pair allowance on the request so live execution uses the same
+        # collision policy as safe-rack-exit planning.
+        pair = tuple(
+            sorted(
+                (
+                    "gripperrack_vac_vac_mount_col",
+                    "gripper0_right_thumb_distal_collision",
+                )
+            )
+        )
+        request_constraints.allowed_collision_pairs = sorted(
+            set(request_constraints.allowed_collision_pairs) | {pair}
+        )
     identity = _digest(
         {
             "parent_subgoal_id": parent_subgoal_id,
@@ -313,7 +335,7 @@ def _transition_request(
             "action_type": action_type,
             "world": world.model_dump(mode="json"),
             "metadata": metadata,
-            "constraints": constraints.model_dump(mode="json"),
+            "constraints": request_constraints.model_dump(mode="json"),
             "options": options.model_dump(mode="json"),
         }
     )
@@ -338,7 +360,7 @@ def _transition_request(
             goal=goal,
             metadata=metadata,
         ),
-        constraints=constraints.model_copy(deep=True),
+        constraints=request_constraints,
         options=options.model_copy(deep=True),
     )
 

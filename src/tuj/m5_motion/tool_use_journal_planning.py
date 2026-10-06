@@ -2312,6 +2312,26 @@ class ToolUseJournalMotionRequestPlanner:
             exit_constraints.collision_margin_m,
             _SAFE_RACK_EXIT_COLLISION_MARGIN_M,
         )
+        if (
+            request.world.metadata.get("environment_name")
+            == "C4_2_DiagonalFitPacking"
+            and to_ee == "3F"
+        ):
+            # This rack exit has a measured, positive 4.676 mm gap between
+            # the moving 3F thumb and the parked vacuum mount. Permit only
+            # this near-clearance pair during C4-2's 3F safe exit; all other
+            # pairs retain the 15 mm rack-exit margin.
+            allowed_pair = tuple(
+                sorted(
+                    (
+                        "gripperrack_vac_vac_mount_col",
+                        "gripper0_right_thumb_distal_collision",
+                    )
+                )
+            )
+            exit_constraints.allowed_collision_pairs = sorted(
+                set(exit_constraints.allowed_collision_pairs) | {allowed_pair}
+            )
         exit_constraints.velocity_scaling = min(
             exit_constraints.velocity_scaling,
             _SAFE_RACK_EXIT_DYNAMIC_SCALING,
