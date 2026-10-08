@@ -52,6 +52,7 @@ class CollisionCheckResult:
     min_clearance_m: float | None = None
     clearance_is_lower_bound: bool = False
     contacts: tuple[CollisionContact, ...] = ()
+    required_clearance_m: float | None = None
 
 
 @dataclass(frozen=True, slots=True)
@@ -135,8 +136,8 @@ class MuJoCoCollisionValidator:
 
     _DISTANCE_TOLERANCE_M = 1e-9
     # The robot is bolted to its mount, so that fixture is not a scene obstacle.
-    # Its collision shape is a coarse stand proxy, and a fingertip can sit a
-    # few millimetres inside it at a normal place pose. Scene obstacles keep
+    # Its collision shape is a coarse stand proxy: a fingertip or a resting
+    # object can sit a few millimetres inside it. Other scene pairs keep
     # ``collision_margin_m``. Penetration deeper than this still fails.
     _ROBOT_MOUNT_PENETRATION_TOLERANCE_M = 0.01
 
@@ -666,11 +667,7 @@ class MuJoCoCollisionValidator:
             return False
         fixture_a = geom_a in self._fixture_geom_ids
         fixture_b = geom_b in self._fixture_geom_ids
-        robot_a = geom_a in self._robot_geom_ids or fixture_a
-        robot_b = geom_b in self._robot_geom_ids or fixture_b
-        return (fixture_a and robot_b and not fixture_b) or (
-            fixture_b and robot_a and not fixture_a
-        )
+        return fixture_a != fixture_b
 
     def _is_adjacent_robot_pair(self, geom_a: int, geom_b: int) -> bool:
         if geom_a not in self._robot_geom_ids or geom_b not in self._robot_geom_ids:
@@ -873,9 +870,14 @@ class MuJoCoCollisionValidator:
         context: CollisionContext | None = None,
         context_id: str | None = None,
         runtime_state: tuple[mujoco.MjModel, mujoco.MjData] | None = None,
+        extra_clearance_m: float = 0.0,
     ) -> CollisionCheckResult:
         """Check one arm state, failing closed on incomplete scene bindings."""
 
+        if extra_clearance_m < 0.0 or not math.isfinite(extra_clearance_m):
+            raise MuJoCoCollisionConfigurationError(
+                "extra_clearance_m must be finite and non-negative"
+            )
         limit_failure = self._joint_limit_failure(joint_config)
         if limit_failure is not None:
             return limit_failure
@@ -915,12 +917,15 @@ class MuJoCoCollisionValidator:
             moving_geom_indices = sorted(g for g in moving_geoms if g >= 0)
             original_margins = self.model.geom_margin[moving_geom_indices].copy()
             original_flex_margins = self.model.flex_margin.copy()
+            detection_margin = self.collision_margin_m + extra_clearance_m
             try:
-                self.model.flex_margin[:] = np.maximum(self.model.flex_margin, self.collision_margin_m)
+                self.model.flex_margin[:] = np.maximum(
+                    self.model.flex_margin, detection_margin
+                )
                 for geom_id in moving_geom_indices:
                     self.model.geom_margin[geom_id] = max(
                         float(self.model.geom_margin[geom_id]),
-                        self.collision_margin_m,
+                        detection_margin,
                     )
                 mujoco.mj_forward(self.model, self.data)
             finally:
@@ -1006,12 +1011,14 @@ class MuJoCoCollisionValidator:
                     )
                 elif (
                     record.distance_m
-                    < self.collision_margin_m - self._DISTANCE_TOLERANCE_M
+                    < self.collision_margin_m
+                    + extra_clearance_m
+                    - self._DISTANCE_TOLERANCE_M
                 ):
                     violations.append(
                         (
                             record,
-                            self.collision_margin_m,
+                            self.collision_margin_m + extra_clearance_m,
                             "COLLISION_MARGIN_VIOLATION",
                         )
                     )
@@ -1020,7 +1027,7 @@ class MuJoCoCollisionValidator:
                 min_clearance = min(disallowed_distances)
                 lower_bound = False
             else:
-                min_clearance = self.collision_margin_m
+                min_clearance = detection_margin
                 lower_bound = True
             if violations:
                 first, required_distance, failure_code = min(
@@ -1037,6 +1044,7 @@ class MuJoCoCollisionValidator:
                     min_clearance_m=min_clearance,
                     clearance_is_lower_bound=False,
                     contacts=tuple(contacts),
+                    required_clearance_m=required_distance,
                 )
             return CollisionCheckResult(
                 valid=True,
@@ -1056,12 +1064,18 @@ class MuJoCoCollisionValidator:
         self,
         waypoints: Sequence[TrajectoryWaypoint],
         context: CollisionContext,
+        *,
+        extra_clearance_m: float = 0.0,
     ) -> PathCollisionCheckResult:
         """Final collision check for time-parameterized segment waypoints."""
 
         minimum: float | None = None
         for index, waypoint in enumerate(waypoints):
-            result = self.check(waypoint.joint_positions_rad, context=context)
+            result = self.check(
+                waypoint.joint_positions_rad,
+                context=context,
+                extra_clearance_m=extra_clearance_m,
+            )
             if result.min_clearance_m is not None:
                 minimum = (
                     result.min_clearance_m
@@ -1100,6 +1114,7 @@ class MuJoCoCollisionValidator:
             endpoint = self.check(
                 waypoints[-1].joint_positions_rad,
                 context_id=post_context_id,
+                extra_clearance_m=extra_clearance_m,
             )
             if endpoint.min_clearance_m is not None:
                 minimum = (
@@ -1216,6 +1231,7 @@ class MuJoCoCollisionModelRegistry:
         context: CollisionContext | None = None,
         context_id: str | None = None,
         runtime_state: tuple[mujoco.MjModel, mujoco.MjData] | None = None,
+        extra_clearance_m: float = 0.0,
     ) -> CollisionCheckResult:
         selected, failure = self._select_context(keyframe, context, context_id)
         if failure is not None:
@@ -1232,7 +1248,12 @@ class MuJoCoCollisionModelRegistry:
                 failure_code="COLLISION_MODEL_UNAVAILABLE",
                 detail=f"compiled collision model {version!r} is not registered",
             )
-        return validator.check(joint_config, context=selected, runtime_state=runtime_state)
+        return validator.check(
+            joint_config,
+            context=selected,
+            runtime_state=runtime_state,
+            extra_clearance_m=extra_clearance_m,
+        )
 
     def __call__(
         self, joint_config: JointConfig, keyframe: RelativeKeyframeSpec
@@ -1243,10 +1264,16 @@ class MuJoCoCollisionModelRegistry:
         self,
         waypoints: Sequence[TrajectoryWaypoint],
         context: CollisionContext,
+        *,
+        extra_clearance_m: float = 0.0,
     ) -> PathCollisionCheckResult:
         minimum: float | None = None
         for index, waypoint in enumerate(waypoints):
-            result = self.check(waypoint.joint_positions_rad, context=context)
+            result = self.check(
+                waypoint.joint_positions_rad,
+                context=context,
+                extra_clearance_m=extra_clearance_m,
+            )
             if result.min_clearance_m is not None:
                 minimum = (
                     result.min_clearance_m
@@ -1285,6 +1312,7 @@ class MuJoCoCollisionModelRegistry:
             endpoint = self.check(
                 waypoints[-1].joint_positions_rad,
                 context_id=post_context_id,
+                extra_clearance_m=extra_clearance_m,
             )
             if endpoint.min_clearance_m is not None:
                 minimum = (
@@ -1316,9 +1344,11 @@ class MuJoCoCollisionModelRegistry:
         self,
         waypoints: tuple[TrajectoryWaypoint, ...],
         context: CollisionContext,
+        *,
+        extra_clearance_m: float = 0.0,
     ) -> bool:
         self.last_path_collision_check = self.check_waypoints(
-            waypoints, context
+            waypoints, context, extra_clearance_m=extra_clearance_m
         )
         return self.last_path_collision_check.valid
 

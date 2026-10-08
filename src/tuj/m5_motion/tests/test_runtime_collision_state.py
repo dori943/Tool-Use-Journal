@@ -95,3 +95,29 @@ def test_reordered_joint_ids_are_mapped_by_name_and_invalid_values_rejected():
     with pytest.raises(ValueError, match="non-finite"):
         copy_runtime_configuration(source, live, target, isolated)
     np.testing.assert_array_equal(isolated.qpos, [.4, .2])
+
+
+def test_controller_tracking_band_keeps_a_micrometre_shortfall_and_rejects_a_graze():
+    from types import SimpleNamespace
+    from tuj.m5_motion.tool_use_journal_runtime import (
+        controller_clearance_within_tracking_band,
+    )
+
+    near = SimpleNamespace(
+        failure_code="COLLISION_MARGIN_VIOLATION",
+        min_clearance_m=0.004985957716771684,
+        required_clearance_m=0.005,
+    )
+    graze = SimpleNamespace(
+        failure_code="COLLISION_MARGIN_VIOLATION",
+        min_clearance_m=0.004,
+        required_clearance_m=0.005,
+    )
+    penetration = SimpleNamespace(
+        failure_code="COLLISION_MARGIN_VIOLATION",
+        min_clearance_m=-0.001,
+        required_clearance_m=0.005,
+    )
+    assert controller_clearance_within_tracking_band(near)
+    assert not controller_clearance_within_tracking_band(graze)
+    assert not controller_clearance_within_tracking_band(penetration)

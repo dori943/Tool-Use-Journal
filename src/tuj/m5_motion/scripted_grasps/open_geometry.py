@@ -6,6 +6,42 @@ from scipy.optimize import least_squares
 from tuj.m5_motion.gripper_release import open_action_endpoint
 
 
+def _linkage_equality_ids(model, passive):
+    """Equality rows the passive joints can actually satisfy.
+
+    A scene weld or an unrelated joint constraint stays in ``efc_pos`` and does
+    not move when the finger linkage does. Including it makes the open-pose
+    solve stop on a residual the hand cannot change.
+    """
+
+    passive_ids = {int(jid) for jid in passive}
+    tendon_joints = []
+    for tendon_id in range(int(model.ntendon)):
+        start = int(model.tendon_adr[tendon_id])
+        count = int(model.tendon_num[tendon_id])
+        joints = []
+        for wrap in range(start, start + count):
+            if int(model.wrap_type[wrap]) == int(mujoco.mjtWrap.mjWRAP_JOINT):
+                joints.append(int(model.wrap_objid[wrap]))
+        tendon_joints.append(joints)
+    selected = []
+    for equality_id in range(int(model.neq)):
+        kind = int(model.eq_type[equality_id])
+        objects = [int(model.eq_obj1id[equality_id]), int(model.eq_obj2id[equality_id])]
+        objects = [item for item in objects if item >= 0]
+        if kind == int(mujoco.mjtEq.mjEQ_JOINT):
+            involved = passive_ids.intersection(objects)
+        elif kind == int(mujoco.mjtEq.mjEQ_TENDON):
+            involved = passive_ids.intersection(
+                joint for tendon_id in objects for joint in tendon_joints[tendon_id]
+            )
+        else:
+            involved = False
+        if involved:
+            selected.append(equality_id)
+    return np.asarray(selected, dtype=int)
+
+
 def open_joint_positions(context):
     c = context
     cached = getattr(c, '_resolved_open_joint_positions', None)
@@ -47,11 +83,15 @@ def open_joint_positions(context):
         driven.append(jid)
     passive = [jid for jid in joint_ids if jid not in driven]
     addresses = model.jnt_qposadr[passive]
+    linkage_ids = _linkage_equality_ids(model, passive)
 
     def residual(q):
         probe.qpos[addresses] = q
         mujoco.mj_forward(model, probe)
-        return probe.efc_pos[np.asarray(probe.efc_type) == mujoco.mjtConstraint.mjCNSTR_EQUALITY].copy()
+        equality = np.asarray(probe.efc_type) == mujoco.mjtConstraint.mjCNSTR_EQUALITY
+        if linkage_ids.size:
+            equality &= np.isin(np.asarray(probe.efc_id), linkage_ids)
+        return probe.efc_pos[equality].copy()
 
     if passive:
         lower = np.where(model.jnt_limited[passive], model.jnt_range[passive, 0], -np.inf)
@@ -69,13 +109,17 @@ def open_joint_positions(context):
             observed_violation = np.maximum(
                 np.maximum(lower - observed_passive, observed_passive - upper), 0.0
             )
-            if np.any(observed_violation > 1e-8):
-                # The live MuJoCo state can already be outside a nominal joint
-                # range when an equality tendon pulls against its hard stop.
-                # Preserve that observed physical branch and solve the tendon
-                # equations without bounds, but never increase its range
-                # violation. This handles Jaco 3F's calibrated endpoint while
-                # keeping an impossible in-range linkage fail-closed.
+            reference = np.asarray(model.qpos0[addresses], dtype=float)
+            reference_violation = np.maximum(
+                np.maximum(lower - reference, reference - upper), 0.0
+            )
+            # A tendon equality is written about the stored reference pose.
+            # That pose can already sit outside the joint range, so the open
+            # linkage may have to stop between the range and the reference.
+            # Do not go farther out than either of those, and do not accept a
+            # coupling whose only solution lies beyond both.
+            allowed_violation = np.maximum(observed_violation, reference_violation)
+            if np.any(allowed_violation > 1e-8):
                 fallback = least_squares(
                     residual,
                     observed_passive,
@@ -93,7 +137,7 @@ def open_joint_positions(context):
                 if (
                     fallback.success
                     and fallback_residual <= 1e-8
-                    and np.all(fallback_violation <= observed_violation + 1e-8)
+                    and np.all(fallback_violation <= allowed_violation + 1e-8)
                 ):
                     solved = fallback
                     residual_max = fallback_residual

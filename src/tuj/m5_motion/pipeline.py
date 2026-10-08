@@ -236,8 +236,8 @@ _MAX_COLLISION_REPAIR_BATCHES = 2
 _MAX_COLLISION_STRATEGIES_PER_BATCH = 4
 _MAX_COLLISION_HISTORY_STRATEGIES = 8
 _COLLISION_OBSERVATION = re.compile(
-    r"COLLISION_MARGIN_VIOLATION:\s*"
-    r"(?P<geometry_a>.+?)\s*<->\s*(?P<geometry_b>.+?)\s*"
+    r"(?:COLLISION_MARGIN_VIOLATION:\s*)?"
+    r"(?P<geometry_a>[\w.:-]+)\s*<->\s*(?P<geometry_b>[\w.:-]+)\s*"
     r"clearance\s+(?P<clearance>[-+0-9.eE]+)\s*m\s*"
     r"is below required\s+(?P<required>[-+0-9.eE]+)\s*m"
 )
@@ -294,18 +294,35 @@ def _is_collision_terminal(attempt: StrategyAttempt) -> bool:
     )
 
 
-def _structured_collision_observations(
-    attempt: StrategyAttempt,
-) -> list[dict[str, object]]:
-    """Extract only bounded numeric observations owned by the validator."""
+def _attempt_collision_details(attempt: StrategyAttempt) -> list[str]:
+    """Validator text from the attempt, its IK notes, and discarded edges."""
 
-    if not _is_collision_terminal(attempt):
-        return []
     details = [attempt.detail]
     details.extend(
         diagnostic.validity_detail
         for diagnostic in attempt.ik_diagnostics[:12]
     )
+    selection = attempt.selection
+    if selection is not None:
+        for edge in selection.rejected_edges[:12]:
+            if edge.detail:
+                details.append(edge.detail)
+    return details
+
+
+def _structured_collision_observations(
+    attempt: StrategyAttempt,
+) -> list[dict[str, object]]:
+    """Extract only bounded numeric observations owned by the validator.
+
+    A path that dies on a singularity can still have discarded edges that put
+    the hand or the held body past the mount tolerance. Those negative
+    requirements stay visible so the place seat can move off the mount. Other
+    discarded scene grazes stay out unless the attempt itself ended on collision.
+    """
+
+    details = _attempt_collision_details(attempt)
+    keep_scene_pairs = _is_collision_terminal(attempt)
     observations: list[dict[str, object]] = []
     observed: set[tuple[str, str, float, float]] = set()
     for detail in details:
@@ -315,11 +332,7 @@ def _structured_collision_observations(
                 required = float(match.group("required"))
             except ValueError:
                 continue
-            if (
-                not math.isfinite(clearance)
-                or not math.isfinite(required)
-                or required < 0.0
-            ):
+            if not math.isfinite(clearance) or not math.isfinite(required):
                 continue
             item = (
                 _safe_collision_label(match.group("geometry_a")),
@@ -328,6 +341,8 @@ def _structured_collision_observations(
                 required,
             )
             if item in observed:
+                continue
+            if not keep_scene_pairs and item[3] >= 0.0:
                 continue
             observed.add(item)
             observations.append(
@@ -398,11 +413,7 @@ def _bounded_prior_collision_strategy(
                 required = float(observation.get("required_clearance_m"))
             except (TypeError, ValueError):
                 continue
-            if (
-                not math.isfinite(clearance)
-                or not math.isfinite(required)
-                or required < 0.0
-            ):
+            if not math.isfinite(clearance) or not math.isfinite(required):
                 continue
             observations.append(
                 {

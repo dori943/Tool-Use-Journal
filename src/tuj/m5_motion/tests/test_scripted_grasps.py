@@ -538,6 +538,27 @@ def test_breakaway_vacuum_reports_stuck_when_clearance_does_not_improve(tmp_path
         breakaway_vacuum_from_support(context, np.zeros(6), opening=-1.0)
 
 
+def test_support_breakaway_ignores_catalog_overhang_when_mesh_is_clear():
+    """A taller catalog box must not demand a climb the collision mesh is not in."""
+    from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
+        EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
+        MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M,
+        vacuum_support_breakaway_lift_m,
+    )
+
+    # Live whisk: AABB bottom 29.86 mm below support, mesh not in the surface.
+    # Enclosure pad is 8 mm, so the old box-only climb was 37.86 mm > 30 mm.
+    lift = vacuum_support_breakaway_lift_m(
+        -0.029860,
+        mesh_penetration_m=0.0,
+        pad_m=EARLY_LIFT_OBJECT_SUPPORT_PENETRATION_M,
+        dip_margin_m=0.0,
+        max_breakaway_m=MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M,
+        mesh_measured=True,
+    )
+    assert lift == 0.0
+
+
 def test_vacuum_support_breakaway_lift_uses_mesh_penetration_when_worse():
     from tuj.m5_motion.scripted_grasps.catalog_vacuum import (
         VACUUM_POST_BREAKAWAY_LIFT_DIP_MARGIN_M,

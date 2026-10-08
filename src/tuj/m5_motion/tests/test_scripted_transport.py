@@ -785,6 +785,105 @@ def test_packed_region_place_ignores_enclosing_container_as_occupant():
         np.linalg.norm(failing - fork)) + 0.04
 
 
+def test_reground_held_place_raises_release_for_mount_penetration():
+    from tuj.m5_motion.scripted_grasps.transport import (
+        ground_held_place, reground_held_place_from_collision_feedback,
+    )
+    request = _tray_request(.005)
+    request.task.action_type = 'place'
+    request.world.objects['tray']['collision_points_m'] = _tray_collision_points()
+    _generic_held(request, ENTRIES[4].object_id)
+    ground_held_place(request)
+    hint = request.task.metadata['held_place_goal']
+    first_xy = list(hint['destination_center_xy_m'])
+    first_clearance = float(hint['release_clearance_m'])
+    feedback = {
+        'failed_strategies': [{
+            'collision_observations': [{
+                'geometry_a': 'fixed_mount0_pedestal_col',
+                'geometry_b': 'gripper0_right_right_outer_finger_collision',
+                'measured_clearance_m': -0.011537,
+                'required_clearance_m': -0.010,
+            }],
+        }],
+    }
+    assert reground_held_place_from_collision_feedback(request, feedback) is True
+    raised = request.task.metadata['held_place_goal']
+    assert raised['destination_center_xy_m'] == pytest.approx(first_xy)
+    assert raised['release_clearance_m'] == pytest.approx(first_clearance + 0.052)
+    assert reground_held_place_from_collision_feedback(request, feedback) is True
+    again = request.task.metadata['held_place_goal']
+    assert again['release_clearance_m'] == pytest.approx(first_clearance + 0.104)
+
+
+def test_reground_held_place_shifts_off_the_robot_mount_without_raising():
+    from tuj.m5_motion.scripted_grasps.transport import (
+        ground_held_place, reground_held_place_from_collision_feedback,
+    )
+    request = _tray_request(.005)
+    request.task.action_type = 'place'
+    request.world.objects['tray']['collision_points_m'] = _tray_collision_points()
+    _generic_held(request, ENTRIES[4].object_id)
+    ground_held_place(request)
+    hint = request.task.metadata['held_place_goal']
+    first_xy = np.asarray(hint['destination_center_xy_m'], dtype=float)
+    first_clearance = float(hint['release_clearance_m'])
+    request.world.metadata['robot_base_world_m'] = [
+        float(first_xy[0] - 0.05), float(first_xy[1]), 0.4,
+    ]
+    feedback = {
+        'failed_strategies': [{
+            'collision_observations': [{
+                'geometry_a': 'fixed_mount0_pedestal_col',
+                'geometry_b': 'gripper0_right_right_inner_finger_collision',
+                'measured_clearance_m': -0.012049,
+                'required_clearance_m': -0.010,
+            }],
+        }],
+    }
+    assert reground_held_place_from_collision_feedback(request, feedback) is True
+    moved = request.task.metadata['held_place_goal']
+    moved_xy = np.asarray(moved['destination_center_xy_m'], dtype=float)
+    base_xy = np.asarray(request.world.metadata['robot_base_world_m'][:2], dtype=float)
+    assert np.linalg.norm(moved_xy - first_xy) > 1e-6
+    assert np.linalg.norm(moved_xy - base_xy) >= np.linalg.norm(first_xy - base_xy) + 0.052 - 1e-6
+    assert moved['release_clearance_m'] == pytest.approx(first_clearance)
+    assert 'held_place_mount_release_lift_m' not in request.task.metadata
+
+
+def test_reground_held_place_shifts_when_the_payload_hits_the_mount():
+    from tuj.m5_motion.scripted_grasps.transport import (
+        ground_held_place, reground_held_place_from_collision_feedback,
+    )
+    request = _tray_request(.005)
+    request.task.action_type = 'place'
+    request.world.objects['tray']['collision_points_m'] = _tray_collision_points()
+    _generic_held(request, ENTRIES[4].object_id)
+    ground_held_place(request)
+    hint = request.task.metadata['held_place_goal']
+    first_xy = np.asarray(hint['destination_center_xy_m'], dtype=float)
+    first_clearance = float(hint['release_clearance_m'])
+    request.world.metadata['robot_base_world_m'] = [
+        float(first_xy[0] - 0.05), float(first_xy[1]), 0.4,
+    ]
+    feedback = {
+        'failed_strategies': [{
+            'collision_observations': [{
+                'geometry_a': 'fixed_mount0_pedestal_col',
+                'geometry_b': f'{ENTRIES[4].object_id}_g14',
+                'measured_clearance_m': -0.010432,
+                'required_clearance_m': -0.010,
+            }],
+        }],
+    }
+    assert reground_held_place_from_collision_feedback(request, feedback) is True
+    moved = request.task.metadata['held_place_goal']
+    moved_xy = np.asarray(moved['destination_center_xy_m'], dtype=float)
+    base_xy = np.asarray(request.world.metadata['robot_base_world_m'][:2], dtype=float)
+    assert np.linalg.norm(moved_xy - base_xy) >= np.linalg.norm(first_xy - base_xy) + 0.052 - 1e-6
+    assert moved['release_clearance_m'] == pytest.approx(first_clearance)
+
+
 def test_non_vacuum_held_place_ignores_vacuum_ee_clearance_branch():
     """Existing 2F spoon place seating must not gain vacuum cup lift."""
     from tuj.m5_motion.scripted_grasps.transport import ground_held_place

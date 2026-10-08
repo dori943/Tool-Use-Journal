@@ -98,7 +98,6 @@ _BOUNDED_COLLISION_ALLOWANCES_KEY = "bounded_collision_allowances"
 _POST_SEGMENT_VALIDATION_CONTEXT_KEY = "post_segment_validation_context_id"
 _MAX_SUPPORT_PENETRATION_TOLERANCE_M = 0.001
 _DEFAULT_SUPPORT_MIN_HORIZONTAL_OVERLAP_RATIO = 0.5
-_SAFE_RACK_EXIT_COLLISION_MARGIN_M = 0.015
 _SAFE_RACK_EXIT_DYNAMIC_SCALING = 0.25
 
 
@@ -2405,15 +2404,10 @@ class ToolUseJournalMotionRequestPlanner:
         world.metadata["physical_active_ee"] = to_ee
         world.metadata["declared_active_ee"] = to_ee
         exit_constraints = request.constraints.model_copy(deep=True)
-        # Reserve clearance for controller tracking near rack supports and
-        # reduce the exit speed so the mounted EE follows that route closely.
-        exit_constraints.collision_margin_m = max(
-            exit_constraints.collision_margin_m,
-            _SAFE_RACK_EXIT_COLLISION_MARGIN_M,
-        )
-        # The mounted hand may pass a parked rack gripper closer than the
-        # raised exit margin. Allow the active end effector against every
-        # parked end effector and rack support; other pairs keep that margin.
+        # Slow the exit so the mounted hand tracks the corridor. The scene
+        # clearance stays on the request margin. A parked gripper can still
+        # sit inside that margin, so allow the active end effector against
+        # every parked end effector and rack support.
         rack_ees = sorted(TOOL_USE_JOURNAL_EE_GRIPPER_TYPES)
         parked_pairs = [
             *((to_ee, f"rack_support:{ee}") for ee in rack_ees),

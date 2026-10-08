@@ -44,6 +44,18 @@ def update_three_finger_commands(commands,measured_forces,recipe):
     return np.clip(np.asarray(commands,dtype=float)+delta,-1.,1.)
 
 
+def position_hold_three_finger_commands(commands,measured_forces,recipe):
+    """Close a finger that falls under target; never open one during a position hold.
+
+    Freezing the command lets pad force bleed off until the handle breaks away.
+    Opening an over-target finger does the same thing. A position hold therefore
+    keeps the more-closed command of the current pose and the force step.
+    """
+    current=np.asarray(commands,dtype=float)
+    proposed=update_three_finger_commands(current,measured_forces,recipe)
+    return np.minimum(current,proposed)
+
+
 def approach_spatula(context, targets, opening=1.):
     """Use an elevated entry if the nominal pre-grasp cannot be reached safely."""
     try:
@@ -175,7 +187,10 @@ class SpatulaContext(GraspMotionContext):
             if self.three_finger_force_hold and self.trace:
                 measured=np.array([self.trace[-1]['finger_force_n'][name]
                     for name in ('thumb','index','pinky')])
-                if not (self.recipe.hold_finger_positions and self.stage in {'SETTLE','HOLD'}):
+                if self.recipe.hold_finger_positions and self.stage in {'SETTLE','HOLD'}:
+                    self.three_finger_commands=position_hold_three_finger_commands(
+                        self.three_finger_commands,measured,self.recipe)
+                else:
                     self.three_finger_commands=update_three_finger_commands(
                         self.three_finger_commands,measured,self.recipe)
                 command=self.three_finger_commands

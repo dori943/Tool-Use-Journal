@@ -59,10 +59,9 @@ _TABLETOP_ENCLOSURE_LIFT_REACH_FALLBACKS_M = (0.15, 0.12, 0.10, 0.08, 0.06)
 # multi-finger region PLACE raise. Offline HOLDING poses measure tip≈22 mm and
 # distal≈21–28 mm; 30 mm keeps a small pad without per-request MuJoCo probes.
 _TABLETOP_ENCLOSURE_FINGER_BELOW_TCP_M = 0.030
-# The inner finger of a parallel jaw hangs below that distal-pad model.
-# 22 mm is the remainder measured when the jaw opens beside a thin payload
-# and meets the robot mount (35 mm release still penetrated 3.6 mm; 57 mm
-# cleared it by 4.5 mm).
+# Parallel-jaw inner finger below that distal-pad model. A 35 mm place still
+# left this geom in the robot mount; 22 mm more cleared it. Used only after a
+# measured mount-depth failure, not on the first seat.
 _PARALLEL_JAW_INNER_FINGER_EXTRA_BELOW_TCP_M = 0.022
 _TABLETOP_ENCLOSURE_ANCHORS = frozenset(
     {"center", "top", "top_center"}

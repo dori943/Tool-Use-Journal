@@ -248,6 +248,40 @@ def test_commissioned_reverse_prefers_staging_side_duplicate() -> None:
     assert all(sample[0] != pytest.approx(3.0) for sample in path)
 
 
+def test_rack_exit_plans_beyond_the_execution_margin() -> None:
+    seen: list[float] = []
+
+    class _Seeing(_Checker):
+        def check(self, joints, keyframe=None, **kwargs):  # noqa: ANN001
+            seen.append(float(kwargs.get("extra_clearance_m", 0.0)))
+            return super().check(joints, keyframe)
+
+        def final_segment_validator(self, waypoints, context, **kwargs):  # noqa: ANN001
+            seen.append(float(kwargs.get("extra_clearance_m", 0.0)))
+            return super().final_segment_validator(waypoints, context)
+
+    template = _template()
+    request = _request(joints=_q(2.0), z=1.2)
+    context = CollisionContext(
+        context_id="ee-attached:vac",
+        active_ee="vac",
+        collision_model_version="v1",
+    )
+    planner = MoveToWorkspacePlanner(
+        registry=SimpleNamespace(),
+        joint_position_limits_rad=[(-3.14, 3.14)] * 6,
+        log=lambda *_a, **_k: None,
+    )
+    planner.plan(
+        request,
+        collision_contexts={"ee-attached:vac": context},
+        collision_checker=_Seeing(),
+        template=template,
+    )
+    assert seen
+    assert min(seen) == pytest.approx(0.002)
+
+
 def test_planner_uses_commissioned_reverse_not_bare_start() -> None:
     template = _template()
     request = _request(joints=_q(2.0), z=1.2)
@@ -273,7 +307,7 @@ def test_planner_uses_commissioned_reverse_not_bare_start() -> None:
     assert plan.expected_final_state.joint_positions_rad[0] != pytest.approx(0.0)
 
 
-def test_attached_safe_exit_prefers_free_space_route() -> None:
+def test_attached_safe_exit_keeps_reaching_corridor() -> None:
     template = _template()
     request = _request(joints=_q(2.0), z=1.2)
     request.task.metadata["safe_rack_exit"] = True
@@ -293,8 +327,79 @@ def test_attached_safe_exit_prefers_free_space_route() -> None:
         collision_checker=_Checker(),
         template=template,
     )
-    assert plan.segments[0].metadata["planner"] == "DIRECT_JOINT"
+    assert plan.segments[0].metadata["planner"] == "COMMISSIONED_REVERSE"
     assert plan.expected_final_state.joint_positions_rad[0] == pytest.approx(1.0)
+
+
+def test_timed_margin_graze_is_lifted_without_lowering_the_margin() -> None:
+    """A timed sample between coarse knots must clear the same 5 mm margin."""
+
+    class _Graze:
+        def check(self, joints, keyframe) -> _Report:  # noqa: ANN001
+            del keyframe
+            shoulder = float(joints[0])
+            lift = float(joints[1])
+            if abs(shoulder - 1.5) < 0.02 and lift < -1.0 + 5e-4:
+                return _Report(
+                    valid=False,
+                    detail=(
+                        "gripper cup clearance 0.004940 m is below required "
+                        "0.005000 m"
+                    ),
+                    min_clearance_m=0.00494,
+                    failure_code="COLLISION_MARGIN_VIOLATION",
+                )
+            return _Report(valid=True, min_clearance_m=0.01)
+
+        def final_segment_validator(self, waypoints, context) -> bool:  # noqa: ANN001
+            del context
+            self.last_path_collision_check = SimpleNamespace(
+                valid=True,
+                failure_code=None,
+                detail="",
+                failed_state_index=None,
+                min_clearance_m=0.01,
+            )
+            for index, waypoint in enumerate(waypoints):
+                result = self.check(waypoint.joint_positions_rad, None)
+                if result.valid:
+                    continue
+                self.last_path_collision_check = SimpleNamespace(
+                    valid=False,
+                    failure_code=result.failure_code,
+                    detail=f"waypoint {index}: {result.detail}",
+                    failed_state_index=index,
+                    min_clearance_m=result.min_clearance_m,
+                )
+                return False
+            return True
+
+    template = _template()
+    request = _request(joints=_q(2.0), z=1.2)
+    request.constraints.max_joint_path_step_rad = 1.1
+    checker = _Graze()
+    context = CollisionContext(
+        context_id="ee-attached:vac",
+        active_ee="vac",
+        collision_model_version="v1",
+    )
+    planner = MoveToWorkspacePlanner(
+        registry=SimpleNamespace(),
+        joint_position_limits_rad=[(-3.14, 3.14)] * 6,
+        log=lambda *_a, **_k: None,
+    )
+    plan = planner.plan(
+        request,
+        collision_contexts={"ee-attached:vac": context},
+        collision_checker=checker,
+        template=template,
+    )
+    sampled = [
+        waypoint.joint_positions_rad
+        for waypoint in plan.segments[0].waypoints
+    ]
+    assert all(checker.check(joints, None).valid for joints in sampled)
+    assert any(joints[1] > -1.0 + 5e-4 for joints in sampled)
 
 
 def test_short_reverse_continues_to_mounted_workspace_target() -> None:

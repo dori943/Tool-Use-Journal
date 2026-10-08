@@ -860,6 +860,23 @@ def test_kinematic_push_assist_packs_partner_when_tool_over_region() -> None:
     runtime.close()
 
 
+def test_push_release_shift_clears_a_rim_overlap() -> None:
+    from tuj.m5_motion.tool_use_journal_runtime import _aabb_xy_release_shift
+
+    tool = (np.array([-0.09, -0.09, 0.90]), np.array([0.09, 0.09, 0.92]))
+    # Partner AABB overlaps the tool by 1.7 mm in +x and is clear in y.
+    partner = (np.array([0.0883, 0.02, 0.90]), np.array([0.1183, 0.05, 0.93]))
+    shift = _aabb_xy_release_shift(tool, partner, 0.005)
+    assert shift is not None
+    assert shift[0] == pytest.approx(0.005 - (0.0883 - 0.09))
+    assert shift[1] == 0.0
+    moved = (
+        partner[0] + np.array([shift[0], shift[1], 0.0]),
+        partner[1] + np.array([shift[0], shift[1], 0.0]),
+    )
+    assert _aabb_xy_release_shift(tool, moved, 0.005) is None
+
+
 def test_tabletop_push_partners_intersect_plan_target_ids() -> None:
     from tuj.m5_motion.tool_use_journal_runtime import (
         _tabletop_held_tool_push_partners,

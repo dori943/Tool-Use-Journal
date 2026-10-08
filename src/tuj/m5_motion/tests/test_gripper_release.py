@@ -28,6 +28,16 @@ def test_open_endpoint_uses_hand_sign_without_mutating_live_hand(direction):
     assert ticks == 201
 
 
+def test_open_command_releases_the_arm_while_contact_remains():
+    from tuj.m5_motion.gripper_release import release_wait_holds_arm
+
+    gate = GripperReleaseWait(np.ones(3), 0., 5., 3, 'bread')
+    assert release_wait_holds_arm(None) is False
+    assert release_wait_holds_arm(gate) is True
+    assert gate.update(0.02, np.ones(3), 1) is False
+    assert release_wait_holds_arm(gate) is False
+
+
 def test_release_wait_requires_endpoint_and_fresh_contact_free_window():
     gate = GripperReleaseWait(np.ones(3), 0., 5., 3, 'tool')
     assert not gate.update(1., np.zeros(3), 0)

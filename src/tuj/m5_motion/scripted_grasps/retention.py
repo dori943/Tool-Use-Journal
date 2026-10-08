@@ -117,19 +117,28 @@ class GraspRetention:
         action = np.asarray(action).copy()
         if c.three_finger_force_hold:
             measured = np.array([self.forces[n] for n in ("thumb", "index", "pinky")])
-            from .spatula_runtime import update_three_finger_commands
+            from .spatula_runtime import (
+                position_hold_three_finger_commands, update_three_finger_commands)
             attachment = c.runtime.attachment
+            held_id = getattr(self.entry, "scene_object_id", None) or self.entry.object_id
             constrained = (attachment is not None
-                and attachment.object_id == self.entry.object_id
+                and attachment.object_id == held_id
                 and attachment.mode == "KINEMATIC")
             # A kinematically carried body cannot respond to force redistribution.
             # Freeze valid contacts, but recover a missing finger within the
             # unchanged loss timer. Never open another finger to redistribute load.
-            if not getattr(recipe, 'hold_finger_positions', False):
+            # A friction position-hold still closes a finger that falls under
+            # target; opening one, or driving into a kinematic weld, stays off.
+            if getattr(recipe, 'hold_finger_positions', False):
+                if not constrained:
+                    self.commands = position_hold_three_finger_commands(
+                        self.commands, measured, recipe)
+            else:
                 proposed = update_three_finger_commands(self.commands, measured, recipe)
                 self.commands = (np.where(measured <= MIN_CONTACT_FORCE_N,
                     np.minimum(self.commands, proposed), self.commands)
                     if constrained else proposed)
+            if not (getattr(recipe, 'hold_finger_positions', False) and constrained):
                 command_min=getattr(c,'three_finger_hold_command_min',None)
                 if command_min is not None:
                     self.commands=np.clip(self.commands,command_min,
@@ -144,7 +153,43 @@ class GraspRetention:
         action[lo:hi] = 0.
         return action
 
+    def _project_hand_inside_joint_limits(self):
+        """Drop a one-step solver spike that is already past the audit allowance.
+
+        A validated hold may sit on the finger stop. The limit solver can then
+        step past that stop by more than the grasp residual while the arm
+        moves. Pull only that excess back onto the stop. A residual inside
+        the recipe allowance stays as the physics step left it.
+        """
+
+        c = self.context
+        ids = getattr(c, "hand_joint_ids", None)
+        if ids is None or len(ids) == 0:
+            return
+        model, data = c.model, c.data
+        ids = np.asarray(ids, dtype=int)
+        limited = np.asarray(model.jnt_limited[ids], dtype=bool)
+        if not np.any(limited):
+            return
+        addresses = np.asarray(model.jnt_qposadr[ids], dtype=int)
+        q = np.asarray(data.qpos[addresses], dtype=float).copy()
+        limits = np.asarray(model.jnt_range[ids], dtype=float)
+        low = np.where(limited, limits[:, 0], -np.inf)
+        high = np.where(limited, limits[:, 1], np.inf)
+        allowance = float(getattr(c.recipe, "maximum_joint_limit_error_rad", 0.0))
+        excess = np.maximum(np.maximum(low - q, q - high) - allowance, 0.0)
+        spike = excess > 0.0
+        if not np.any(spike):
+            return
+        q[spike] = np.clip(q[spike], low[spike], high[spike])
+        data.qpos[addresses] = q
+        dof = np.asarray(model.jnt_dofadr[ids], dtype=int)
+        vel = np.asarray(data.qvel[dof], dtype=float).copy()
+        vel[spike & ((q <= low) | (q >= high))] = 0.0
+        data.qvel[dof] = vel
+
     def audit_substep(self):
+        self._project_hand_inside_joint_limits()
         audit = getattr(self.context, "audit_hand_range", None)
         if audit is not None:
             audit()

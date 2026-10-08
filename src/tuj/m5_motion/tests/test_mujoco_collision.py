@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import mujoco
+import pytest
 
 from tuj.m5_motion.mujoco_collision import (
     MuJoCoCollisionModelRegistry,
@@ -120,6 +121,20 @@ def test_endpoint_validator_checks_clearance_and_joint_limits() -> None:
     assert outside_limit.failure_code == "JOINT_LIMIT_VIOLATION"
 
 
+def test_extra_clearance_rejects_a_gap_that_meets_the_scene_margin() -> None:
+    validator = _validator()
+
+    at_margin = validator.check((0.0,), _keyframe())
+    padded = validator.check((0.0,), _keyframe(), extra_clearance_m=1.0)
+
+    assert at_margin.valid
+    assert not padded.valid
+    assert padded.failure_code == "COLLISION_MARGIN_VIOLATION"
+    assert padded.required_clearance_m == pytest.approx(1.05)
+    assert padded.min_clearance_m is not None
+    assert padded.min_clearance_m > 0.05
+
+
 _MOUNT_SCENE = """
 <mujoco model="mount-contact">
   <compiler autolimits="true"/>
@@ -176,6 +191,42 @@ def test_robot_mount_graze_keeps_scene_clearance() -> None:
     assert {wall.contacts[0].geom_a, wall.contacts[0].geom_b} == {
         "robot_col",
         "wall_col",
+    }
+
+
+def test_resting_object_uses_mount_tolerance_not_scene_margin() -> None:
+    def scene(payload_x: str) -> str:
+        return _MOUNT_SCENE.replace(
+            "</worldbody>",
+            f"""
+    <body name="payload" pos="{payload_x} 0 0">
+      <freejoint/>
+      <inertial pos="0 0 0" mass="0.1" diaginertia="0.0001 0.0001 0.0001"/>
+      <geom name="payload_col" type="sphere" size="0.02"
+            contype="1" conaffinity="1"/>
+    </body>
+  </worldbody>""",
+        )
+
+    def validator(xml: str) -> MuJoCoCollisionValidator:
+        model = mujoco.MjModel.from_xml_string(xml)
+        return MuJoCoCollisionValidator(
+            model,
+            joint_names=("slide",),
+            robot_root_body_name="robot_root",
+            baseline_qpos=model.qpos0,
+            collision_margin_m=0.005,
+        )
+
+    graze = validator(scene("-0.067")).check((0.0,))
+    deep = validator(scene("-0.055")).check((0.0,))
+
+    assert graze.valid
+    assert not deep.valid
+    assert deep.failure_code == "COLLISION_MARGIN_VIOLATION"
+    assert {deep.contacts[0].geom_a, deep.contacts[0].geom_b} == {
+        "mount_col",
+        "payload_col",
     }
 
 

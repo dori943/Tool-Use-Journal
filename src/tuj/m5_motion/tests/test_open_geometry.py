@@ -90,3 +90,53 @@ def test_open_linkage_converges_at_joint_boundary_from_grasped_state(boundary):
     assert result['passive']==pytest.approx(expected,abs=1e-8)
     assert result['passive']==pytest.approx(.5*result['active'],abs=1e-8)
     np.testing.assert_array_equal(c.data.qpos,before)
+
+
+def test_unrelated_equality_does_not_block_the_finger_linkage():
+    model = mujoco.MjModel.from_xml_string('''<mujoco><worldbody>
+    <body><joint name="active" range="0 1" limited="true"/>
+      <geom type="sphere" size=".01"/><body pos=".1 0 0">
+      <joint name="passive" range="0 1" limited="true"/>
+      <geom type="sphere" size=".01"/></body></body>
+    <body><joint name="other" range="-1 1" limited="true"/>
+      <geom type="sphere" size=".01" pos="1 0 0"/></body></worldbody>
+    <compiler angle="radian"/>
+    <equality>
+      <joint joint1="passive" joint2="active" polycoef="0 .5 0 0 0"/>
+      <joint joint1="other" polycoef="0.036 0 0 0 0"/>
+    </equality>
+    <actuator><position joint="active" kp="10" ctrlrange="0 1"/></actuator></mujoco>''')
+    data = mujoco.MjData(model)
+    data.qpos[:] = [.2, .1, 0.]
+    c = SimpleNamespace(model=model, data=data, gripper=Hand(), gripper_actuator_ids=[0])
+    result = open_joint_positions(c)
+    assert result['passive'] == pytest.approx(.5, abs=1e-8)
+    assert float(data.qpos[2]) == pytest.approx(0.)
+
+
+def test_tendon_reference_outside_the_joint_range_still_solves():
+    model = mujoco.MjModel.from_xml_string('''<mujoco>
+    <compiler angle="radian"/>
+    <worldbody><body>
+      <joint name="active" range="0 1.51" limited="true" ref="1.1"/>
+      <geom type="sphere" size=".01"/>
+      <body pos=".1 0 0">
+        <joint name="passive" range="0 2" limited="true" ref="-0.5"/>
+        <geom type="sphere" size=".01"/>
+      </body>
+    </body></worldbody>
+    <tendon><fixed name="cpl">
+      <joint joint="active" coef="0.4"/>
+      <joint joint="passive" coef="-0.4"/>
+    </fixed></tendon>
+    <equality><tendon tendon1="cpl"/></equality>
+    <actuator><position joint="active" kp="10" ctrlrange="0 1.51"/></actuator>
+    </mujoco>''')
+    data = mujoco.MjData(model)
+    data.qpos[:] = [1.28, 0.38]
+    before = data.qpos.copy()
+    c = SimpleNamespace(model=model, data=data, gripper=Hand(), gripper_actuator_ids=[0])
+    result = open_joint_positions(c)
+    assert result['active'] == pytest.approx(1.51)
+    assert result['passive'] == pytest.approx(1.51 - 1.6, abs=1e-8)
+    np.testing.assert_array_equal(data.qpos, before)

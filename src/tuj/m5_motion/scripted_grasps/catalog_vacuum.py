@@ -71,6 +71,7 @@ def vacuum_support_breakaway_lift_m(
     pad_m=None,
     dip_margin_m=None,
     max_breakaway_m=None,
+    mesh_measured=False,
 ):
     """Bounded lift so a kinematically held object clears known support.
 
@@ -82,6 +83,8 @@ def vacuum_support_breakaway_lift_m(
     (live mug_b: need 0.0229 m). Enclosure callers use
     ``MAX_ENCLOSURE_SUPPORT_BREAKAWAY_M`` for deeper CLOSE crush
     (live mug_b: need 0.027787 m).
+    When ``mesh_measured`` is set and the collision mesh is already clear, a
+    catalog box that hangs below that mesh does not raise the safety bound.
     Returns 0 when already at/above that target. Raises when required lift
     exceeds the safety bound (deep/invalid immersion, not soft resting contact).
     """
@@ -106,6 +109,13 @@ def vacuum_support_breakaway_lift_m(
     if mesh_pen > VACUUM_SUPPORT_CONTACT_EPS_M:
         lift = max(lift, mesh_pen + desired_clearance)
     if lift <= VACUUM_SUPPORT_CONTACT_EPS_M:
+        return 0.0
+    mesh_supported = mesh_pen + desired_clearance
+    if (
+        mesh_measured
+        and lift > max_lift + 1e-12
+        and mesh_supported <= max_lift + 1e-12
+    ):
         return 0.0
     if lift > max_lift + 1e-12:
         raise GraspFailure(
@@ -472,6 +482,7 @@ def breakaway_vacuum_from_support(
             pad_m=pad,
             dip_margin_m=dip,
             max_breakaway_m=max_lift,
+            mesh_measured=bool(getattr(context, 'object_geoms', ())),
         )
         if chunk <= 0.0:
             break

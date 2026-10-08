@@ -4,7 +4,8 @@ from types import SimpleNamespace
 from tuj.m5_motion import UR5eKinematics
 from tuj.m5_motion.scripted_grasps.ik_continuity import ContinuousIK
 from tuj.m5_motion.scripted_grasps.objects.spatula import SpatulaRecipe
-from tuj.m5_motion.scripted_grasps.spatula_runtime import update_three_finger_commands
+from tuj.m5_motion.scripted_grasps.spatula_runtime import (
+    position_hold_three_finger_commands, update_three_finger_commands)
 
 
 def test_held_pose_ik_preserves_negative_wrist_turn_and_residual_budget():
@@ -31,6 +32,16 @@ def test_small_balanced_contact_errors_do_not_walk_fingers_open():
     next_commands=update_three_finger_commands(commands,[0.,0.,0.],recipe)
     assert np.all(next_commands<commands)
     assert np.max(commands-next_commands)<=.01
+
+
+def test_position_hold_closes_an_under_target_finger_without_opening():
+    recipe = SpatulaRecipe()
+    commands = np.array([-.70, -.49, -.63])
+    # Index is above its 1.5 N target; pinky is below 1.5 N.
+    held = position_hold_three_finger_commands(commands, [2.94, 1.73, 1.20], recipe)
+    assert held[0] <= commands[0]
+    assert held[1] == pytest.approx(commands[1])
+    assert held[2] < commands[2]
 
 
 def test_reused_planner_reads_current_joint_reference_before_each_generation():

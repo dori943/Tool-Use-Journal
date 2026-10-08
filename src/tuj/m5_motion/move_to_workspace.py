@@ -9,10 +9,10 @@ The commissioned ``bare_to_{ee}`` attach trajectory records a bare-flange
 workspace start as ``start_joint_positions_rad``, but that q is not guaranteed
 collision-free once the EE is mounted.  This planner therefore:
 
-1. For an attached SAFE RACK EXIT, try a direct or RRT route to a mounted-valid
-   workspace target before retracing the rack corridor.
-2. For standalone workspace moves, prefer a collision-checked reverse of the
-   commissioned attach trajectory. If it stops short, connect to the target.
+1. Prefer a collision-checked reverse of the commissioned attach trajectory
+   when that reverse already reaches a mounted-valid workspace target.
+2. If the reverse stops inside the rack corridor, try a direct or RRT route
+   to that target before stitching the partial reverse to a free-space suffix.
 3. Never accept a short reverse that remains in the rack corridor as SAFE EXIT.
 """
 
@@ -23,6 +23,8 @@ import hashlib
 import math
 from collections.abc import Mapping, Sequence
 from typing import Any, Protocol
+
+import numpy as np
 
 from tuj.m5_motion.path_planning import RRTConnectEdgePlanner, validate_joint_segment
 from tuj.m5_motion.precomputed_ee_attach import (
@@ -60,6 +62,48 @@ from tuj.m5_motion.trajectory_processing import (
 )
 
 _JOINT_MATCH_TOL_RAD = 1e-6
+# A timed sample can sit between the coarser geometric samples and miss the
+# required clearance by a fraction of a millimetre. Repair that sample locally
+# instead of treating the whole exit as blocked. Keep the shift small so the
+# commissioned corridor is not replaced by a new route.
+_CLEARANCE_REPAIR_ATTEMPTS = 4
+_CLEARANCE_REPAIR_PROBE_RAD = 1e-3
+_CLEARANCE_REPAIR_MAX_SHIFT_RAD = 0.02
+# A path that only just meets the scene margin is inside it once the torque
+# controller tracks it. Plan the exit this much further out. Execution still
+# uses the requested margin.
+_RACK_EXIT_CLEARANCE_PAD_M = 0.002
+
+
+class _PaddedClearanceChecker:
+    """Ask the exit checker for the scene margin plus a tracking pad."""
+
+    def __init__(self, inner: CollisionChecker, pad_m: float) -> None:
+        self._inner = inner
+        self._pad = float(pad_m)
+
+    def check(self, joint_config, keyframe=None, **kwargs):  # noqa: ANN001
+        pad = float(kwargs.pop("extra_clearance_m", 0.0)) + self._pad
+        try:
+            return self._inner.check(
+                joint_config, keyframe, extra_clearance_m=pad, **kwargs
+            )
+        except TypeError:
+            return self._inner.check(joint_config, keyframe, **kwargs)
+
+    def final_segment_validator(self, waypoints, context, **kwargs):  # noqa: ANN001
+        inner = getattr(self._inner, "final_segment_validator", None)
+        if not callable(inner):
+            return True
+        pad = float(kwargs.pop("extra_clearance_m", 0.0)) + self._pad
+        try:
+            return inner(waypoints, context, extra_clearance_m=pad, **kwargs)
+        except TypeError:
+            return inner(waypoints, context, **kwargs)
+
+    @property
+    def last_path_collision_check(self):
+        return getattr(self._inner, "last_path_collision_check", None)
 
 
 def safe_rack_exit_context_id(active_ee: str) -> str:
@@ -135,6 +179,160 @@ def _joint_l2_distance(left: Sequence[float], right: Sequence[float]) -> float:
     return math.sqrt(
         sum((float(a) - float(b)) ** 2 for a, b in zip(left, right))
     )
+
+
+def _blend_on_segment(
+    point: Sequence[float],
+    source: Sequence[float],
+    target: Sequence[float],
+) -> float | None:
+    """Blend in (0, 1) when ``point`` lies on the open joint segment."""
+
+    start = np.asarray(source, dtype=float)
+    finish = np.asarray(target, dtype=float)
+    sample = np.asarray(point, dtype=float)
+    delta = finish - start
+    length_sq = float(np.dot(delta, delta))
+    if length_sq <= 1e-18:
+        return None
+    blend = float(np.dot(sample - start, delta) / length_sq)
+    if not 1e-4 < blend < 1.0 - 1e-4:
+        return None
+    if float(np.max(np.abs(start + delta * blend - sample))) > 1e-5:
+        return None
+    return blend
+
+
+def _insert_between(
+    path: Sequence[Sequence[float]],
+    failing: Sequence[float],
+    repaired: Sequence[float],
+) -> tuple[tuple[float, ...], ...] | None:
+    points = [tuple(float(value) for value in item) for item in path]
+    for index, (source, target) in enumerate(zip(points, points[1:])):
+        if _blend_on_segment(failing, source, target) is None:
+            continue
+        if _joint_max_abs_delta(source, repaired) <= _JOINT_MATCH_TOL_RAD:
+            return None
+        if _joint_max_abs_delta(target, repaired) <= _JOINT_MATCH_TOL_RAD:
+            return None
+        points.insert(index + 1, tuple(float(value) for value in repaired))
+        return tuple(points)
+    return None
+
+
+def _nudge_to_clearance(
+    failing: Sequence[float],
+    keyframe: RelativeKeyframeSpec,
+    collision_checker: CollisionChecker,
+    limits: Sequence[tuple[float, float]],
+) -> tuple[float, ...] | None:
+    """Step one grazing sample along the clearance gradient until it clears."""
+
+    origin = np.asarray(failing, dtype=float)
+    current = origin.copy()
+    lower = np.asarray([bound[0] for bound in limits], dtype=float)
+    upper = np.asarray([bound[1] for bound in limits], dtype=float)
+    if current.shape != lower.shape:
+        return None
+
+    def report_at(config: np.ndarray) -> Any:
+        return collision_checker.check(
+            tuple(float(value) for value in config), keyframe
+        )
+
+    for _ in range(_CLEARANCE_REPAIR_ATTEMPTS):
+        report = report_at(current)
+        if bool(getattr(report, "valid", False)):
+            if float(np.max(np.abs(current - origin))) <= (
+                _CLEARANCE_REPAIR_MAX_SHIFT_RAD + 1e-9
+            ):
+                return tuple(float(value) for value in current)
+            return None
+        clearance = getattr(report, "min_clearance_m", None)
+        if (
+            clearance is None
+            or not math.isfinite(float(clearance))
+            or float(clearance) <= 0.0
+        ):
+            return None
+        gradient = np.zeros(current.shape, dtype=float)
+        for index in range(current.size):
+            trial = current.copy()
+            trial[index] = min(float(upper[index]), float(trial[index]) + _CLEARANCE_REPAIR_PROBE_RAD)
+            sign = 1.0
+            if trial[index] <= current[index] + 1e-12:
+                trial[index] = max(
+                    float(lower[index]),
+                    float(current[index]) - _CLEARANCE_REPAIR_PROBE_RAD,
+                )
+                sign = -1.0
+            moved = abs(float(trial[index] - current[index]))
+            if moved <= 1e-12:
+                continue
+            probed = report_at(trial)
+            if bool(getattr(probed, "valid", False)):
+                if float(np.max(np.abs(trial - origin))) <= (
+                    _CLEARANCE_REPAIR_MAX_SHIFT_RAD + 1e-9
+                ):
+                    return tuple(float(value) for value in trial)
+                probed_clearance = float(clearance) + moved
+            else:
+                probed_clearance = getattr(probed, "min_clearance_m", None)
+                if probed_clearance is None or not math.isfinite(float(probed_clearance)):
+                    continue
+                probed_clearance = float(probed_clearance)
+            gradient[index] = sign * (probed_clearance - float(clearance)) / moved
+        scale = float(np.linalg.norm(gradient))
+        if scale <= 1e-12:
+            return None
+        remaining = _CLEARANCE_REPAIR_MAX_SHIFT_RAD - float(
+            np.max(np.abs(current - origin))
+        )
+        if remaining <= 1e-6:
+            return None
+        current = np.clip(
+            current + gradient / scale * min(remaining, _CLEARANCE_REPAIR_PROBE_RAD),
+            lower,
+            upper,
+        )
+    report = report_at(current)
+    if bool(getattr(report, "valid", False)) and float(
+        np.max(np.abs(current - origin))
+    ) <= _CLEARANCE_REPAIR_MAX_SHIFT_RAD + 1e-9:
+        return tuple(float(value) for value in current)
+    return None
+
+
+def _repair_timed_margin_graze(
+    path: Sequence[Sequence[float]],
+    timed_waypoints: Sequence[Any],
+    report: Any,
+    keyframe: RelativeKeyframeSpec,
+    collision_checker: CollisionChecker,
+    limits: Sequence[tuple[float, float]],
+) -> tuple[tuple[float, ...], ...] | None:
+    if getattr(report, "failure_code", None) != "COLLISION_MARGIN_VIOLATION":
+        return None
+    index = getattr(report, "failed_state_index", None)
+    if not isinstance(index, int) or not 0 <= index < len(timed_waypoints):
+        return None
+    failing = tuple(
+        float(value) for value in timed_waypoints[index].joint_positions_rad
+    )
+    state = collision_checker.check(failing, keyframe)
+    clearance = getattr(state, "min_clearance_m", None)
+    if (
+        bool(getattr(state, "valid", False))
+        or clearance is None
+        or not math.isfinite(float(clearance))
+        or float(clearance) <= 0.0
+    ):
+        return None
+    nudged = _nudge_to_clearance(failing, keyframe, collision_checker, limits)
+    if nudged is None:
+        return None
+    return _insert_between(path, failing, nudged)
 
 
 def _flatten_attach_waypoints(
@@ -358,6 +556,9 @@ class MoveToWorkspacePlanner:
     ) -> MotionPlan:
         selected = template or self.load_workspace_template(request)
         active = self._validate_request(request, selected)
+        collision_checker = _PaddedClearanceChecker(
+            collision_checker, _RACK_EXIT_CLEARANCE_PAD_M
+        )
         preferred_ids = (
             (safe_rack_exit_context_id(active), f"ee-attached:{active}")
             if bool(request.task.metadata.get("safe_rack_exit"))
@@ -511,9 +712,16 @@ class MoveToWorkspacePlanner:
         if direct.valid:
             free_space_attempts.append(("DIRECT_JOINT", lambda: (start, target)))
         free_space_attempts.append(("RRT_CONNECT", lambda: _connect(start)))
+        # A reverse that already reaches the workspace stays in the commissioned
+        # corridor. A free-space shortcut is only preferred when that corridor
+        # stops short, so the exit is not sent across the rest of the scene.
+        corridor_blocked = (
+            request.task.metadata.get("safe_rack_exit") is True
+            and not reverse_reaches_workspace
+        )
         attempts = (
             free_space_attempts + reverse_attempts
-            if request.task.metadata.get("safe_rack_exit") is True
+            if corridor_blocked
             else reverse_attempts + free_space_attempts
         )
 
@@ -521,45 +729,70 @@ class MoveToWorkspacePlanner:
         planner_name = "RRT_CONNECT"
         timed = None
         minimum_clearance: float | None = None
+
+        def _time(path: Sequence[Sequence[float]]) -> Any:
+            return QuinticTimeParameterizer(
+                sample_dt_s=request.options.interpolation_dt_s
+            ).parameterize(
+                selected.joint_names,
+                path,
+                request.constraints.joint_limits,
+                velocity_scaling=request.constraints.velocity_scaling,
+                acceleration_scaling=request.constraints.acceleration_scaling,
+                jerk_scaling=request.constraints.jerk_scaling,
+            )
+
         for planner_name, build_path in attempts:
             try:
                 geometric_path = build_path()
             except MoveToWorkspacePlanningError as error:
                 final_detail = str(error)
                 continue
-            minimum_clearance = _minimum_clearance(
-                geometric_path,
-                keyframe,
-                collision_checker,
-                request.constraints.max_joint_path_step_rad,
-            )
             try:
-                timed = QuinticTimeParameterizer(
-                    sample_dt_s=request.options.interpolation_dt_s
-                ).parameterize(
-                    selected.joint_names,
-                    geometric_path,
-                    request.constraints.joint_limits,
-                    velocity_scaling=request.constraints.velocity_scaling,
-                    acceleration_scaling=request.constraints.acceleration_scaling,
-                    jerk_scaling=request.constraints.jerk_scaling,
-                )
+                timed = None
+                for repair_index in range(_CLEARANCE_REPAIR_ATTEMPTS + 1):
+                    minimum_clearance = _minimum_clearance(
+                        geometric_path,
+                        keyframe,
+                        collision_checker,
+                        request.constraints.max_joint_path_step_rad,
+                    )
+                    timed = _time(geometric_path)
+                    final_validator = getattr(
+                        collision_checker, "final_segment_validator", None
+                    )
+                    if not callable(final_validator) or final_validator(
+                        timed.waypoints, context
+                    ):
+                        break
+                    report = getattr(
+                        collision_checker, "last_path_collision_check", None
+                    )
+                    if report is not None:
+                        final_detail = f"{report.failure_code}: {report.detail}"
+                    if repair_index == _CLEARANCE_REPAIR_ATTEMPTS:
+                        timed = None
+                        break
+                    repaired = _repair_timed_margin_graze(
+                        geometric_path,
+                        timed.waypoints,
+                        report,
+                        keyframe,
+                        collision_checker,
+                        self.joint_position_limits_rad,
+                    )
+                    if repaired is None:
+                        timed = None
+                        break
+                    geometric_path = repaired
             except TrajectoryProcessingError as error:
                 raise MoveToWorkspacePlanningError(
                     MoveToWorkspaceFailureCode.DYNAMICS_INVALID,
                     str(error),
                     trajectory_id=selected.trajectory_id,
                 ) from error
-            final_validator = getattr(
-                collision_checker, "final_segment_validator", None
-            )
-            if not callable(final_validator) or final_validator(
-                timed.waypoints, context
-            ):
+            if timed is not None:
                 break
-            report = getattr(collision_checker, "last_path_collision_check", None)
-            if report is not None:
-                final_detail = f"{report.failure_code}: {report.detail}"
         else:
             raise MoveToWorkspacePlanningError(
                 MoveToWorkspaceFailureCode.FINAL_COLLISION_CHECK_FAILED,

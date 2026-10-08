@@ -59,3 +59,16 @@ class GripperReleaseWait:
         if time_s - self.started_at_s >= self.max_wait_s:
             raise TimeoutError('GRIPPER_RELEASE_NOT_SETTLED')
         return False
+
+
+def release_wait_holds_arm(wait: GripperReleaseWait | None) -> bool:
+    """Hold the arm only until the open command is reached.
+
+    A pinch tighter than the full stroke can stay in contact after the
+    command saturates. The planned retreat separates that hand; freezing
+    until the contact count is zero never starts the retreat.
+    """
+
+    if wait is None:
+        return False
+    return wait.observation.get("target_reached") is not True

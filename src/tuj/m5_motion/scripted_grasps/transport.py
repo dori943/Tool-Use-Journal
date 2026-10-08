@@ -31,6 +31,9 @@ from .frames import inverse, transform
 HELD_TRANSPORT_GOAL_ANCHOR = 'held_transport_goal'
 HELD_TRANSPORT_START_ANCHOR = 'held_transport_start'
 HELD_PLACE_GOAL_ANCHOR = 'held_place_goal'
+# Extra place height accumulated when a repair measured the hand inside the
+# robot mount deeper than the fixture tolerance. Not applied on the first seat.
+_HELD_PLACE_MOUNT_RELEASE_LIFT_KEY = 'held_place_mount_release_lift_m'
 HELD_PLACE_START_ANCHOR = 'held_place_start'
 # Rim/wall allowance when searching the region interior for a free spot and the
 # fallback floor thickness when the region has no usable collision points.
@@ -1037,24 +1040,13 @@ def _seat_held_place_at(g, desired_xy):
             float(multi_finger_finger_below_tcp_m())
             + float(request.constraints.collision_margin_m),
         )
-    elif (
-        not _request_uses_vacuum(request)
-        and _grip_beside_payload(g)
-        and float(np.min(g.local_size)) < float(multi_finger_finger_below_tcp_m())
-    ):
-        # A parallel jaw around a thin payload leaves the inner finger below
-        # the distal-pad model. Raise the release by that remainder so the
-        # finger clears the robot mount; the object then settles.
-        from tuj.m5_motion.grasp_geometry import (
-            parallel_jaw_inner_finger_extra_below_tcp_m,
-        )
-
-        release_clearance = max(
-            release_clearance,
-            float(multi_finger_finger_below_tcp_m())
-            + float(parallel_jaw_inner_finger_extra_below_tcp_m())
-            + float(request.constraints.collision_margin_m),
-        )
+    # A thin parallel jaw is not raised on the first seat. Releasing it by the
+    # inner-finger remainder lets the payload fall into the robot mount after
+    # the fingers open. A later repair adds height only after the hand is
+    # measured deeper than the fixture tolerance.
+    mount_lift = request.task.metadata.get(_HELD_PLACE_MOUNT_RELEASE_LIFT_KEY)
+    if isinstance(mount_lift, (int, float)) and math.isfinite(mount_lift) and mount_lift > 0.0:
+        release_clearance += float(mount_lift)
     if _request_uses_vacuum(request):
         release_clearance = _vacuum_place_release_clearance_m(
             g, request.constraints.collision_margin_m, release_clearance)
@@ -1123,6 +1115,15 @@ def _label_matches_object_id(label: str, object_id: str) -> bool:
         or label.startswith(f"{object_id}_")
         or label.startswith(f"{object_id}.")
     )
+
+
+def _place_body_hits_mount(label: str, request) -> bool:
+    """Hand or held payload: both travel with the place seat."""
+
+    if _is_robot_motion_collision_label(label, request):
+        return True
+    held_id = held_pose_subject(request)
+    return bool(held_id and _label_matches_object_id(str(label), held_id))
 
 
 def _is_robot_motion_collision_label(label: str, request) -> bool:
@@ -1246,15 +1247,178 @@ def _place_margin_partner_from_feedback(request, feedback):
     }
 
 
+def _mount_penetration_shortfall_m(request, feedback) -> float | None:
+    """How far a hand/mount pair sits past the negative fixture tolerance.
+
+    Scene-margin violations keep a positive required clearance and are seated
+    in XY. A negative required clearance is the robot-mount penetration limit.
+    """
+
+    if not isinstance(feedback, dict):
+        return None
+    strategies = feedback.get("failed_strategies")
+    if not isinstance(strategies, list):
+        return None
+    shortfall = 0.0
+    found = False
+    for strategy in strategies:
+        if not isinstance(strategy, dict):
+            continue
+        observations = strategy.get("collision_observations")
+        if not isinstance(observations, list):
+            continue
+        for observation in observations:
+            if not isinstance(observation, dict):
+                continue
+            try:
+                measured = float(observation.get("measured_clearance_m"))
+                required = float(observation.get("required_clearance_m"))
+            except (TypeError, ValueError):
+                continue
+            if (
+                not math.isfinite(measured)
+                or not math.isfinite(required)
+                or required >= 0.0
+                or measured >= required
+            ):
+                continue
+            labels = (
+                str(observation.get("geometry_a", "")),
+                str(observation.get("geometry_b", "")),
+            )
+            if not any(
+                _place_body_hits_mount(label, request) for label in labels
+            ):
+                continue
+            found = True
+            shortfall = max(shortfall, required - measured)
+    if not found:
+        return None
+    return float(shortfall)
+
+
+def _robot_base_xy(request) -> np.ndarray | None:
+    """World XY of the robot base the mount stands on, when the scene recorded it."""
+
+    raw = request.world.metadata.get("robot_base_world_m")
+    if not isinstance(raw, (list, tuple)) or len(raw) < 2:
+        return None
+    xy = np.asarray(raw[:2], dtype=float)
+    if xy.shape != (2,) or not np.all(np.isfinite(xy)):
+        return None
+    return xy
+
+
+def _shift_held_place_off_mount(request, feedback, shortfall_m: float) -> bool:
+    """Move the place seat away from the robot base, keeping the low release.
+
+    A same-XY lift clears the mount by dropping the payload from the finger
+    depth. That fall leaves a tall grasp outside a region that the low seat
+    still contained. Sliding off the mount keeps the original release height.
+    """
+
+    base_xy = _robot_base_xy(request)
+    if base_xy is None:
+        return False
+    g = _grounding_for(request, None, _is_region_place)
+    if g is None:
+        return False
+    current = _held_place_center_xy(request)
+    if current is None:
+        return False
+    rejected = []
+    raw_rejected = feedback.get("rejected_place_xy_m") if isinstance(feedback, dict) else None
+    if isinstance(raw_rejected, list):
+        for item in raw_rejected:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                rejected.append([float(item[0]), float(item[1])])
+    rejected.append([float(current[0]), float(current[1])])
+    from tuj.m5_motion.grasp_geometry import (
+        multi_finger_finger_below_tcp_m,
+        parallel_jaw_inner_finger_extra_below_tcp_m,
+    )
+
+    margin = float(request.constraints.collision_margin_m)
+    # One step has to clear the inner finger that still overlaps the mount
+    # after the distal pad has moved past it.
+    min_shift = max(
+        float(shortfall_m) + margin,
+        float(multi_finger_finger_below_tcp_m())
+        + float(parallel_jaw_inner_finger_extra_below_tcp_m()),
+    )
+    next_xy = g.place_xy_away_from(
+        base_xy,
+        rejected_xys=rejected,
+        min_shift_m=min_shift,
+        current_xy=current,
+    )
+    if next_xy is None:
+        return False
+    request.task.metadata.pop(_HELD_PLACE_MOUNT_RELEASE_LIFT_KEY, None)
+    _clear_held_place_grounding(request)
+    seated = _seat_held_place_at(g, next_xy)
+    if isinstance(feedback, dict):
+        feedback["rejected_place_xy_m"] = rejected
+        feedback["reground_place_partner_id"] = "robot_base"
+        feedback["reground_place_xy_m"] = [float(seated[0]), float(seated[1])]
+    return True
+
+
+def _raise_held_place_for_mount(request, feedback, shortfall_m: float) -> bool:
+    """Republish the same place XY high enough to leave the mount tolerance."""
+
+    g = _grounding_for(request, None, _is_region_place)
+    if g is None:
+        return False
+    current = _held_place_center_xy(request)
+    if current is None:
+        return False
+    previous = request.task.metadata.get(_HELD_PLACE_MOUNT_RELEASE_LIFT_KEY, 0.0)
+    try:
+        previous = float(previous)
+    except (TypeError, ValueError):
+        previous = 0.0
+    if not math.isfinite(previous) or previous < 0.0:
+        previous = 0.0
+    from tuj.m5_motion.grasp_geometry import (
+        multi_finger_finger_below_tcp_m,
+        parallel_jaw_inner_finger_extra_below_tcp_m,
+    )
+
+    margin = float(request.constraints.collision_margin_m)
+    # The leftover past the mount tolerance is only the last millimetre. The
+    # inner finger hangs below the distal pad, so the repair covers both.
+    step = max(
+        float(shortfall_m) + margin,
+        float(multi_finger_finger_below_tcp_m())
+        + float(parallel_jaw_inner_finger_extra_below_tcp_m()),
+    )
+    lift = previous + step
+    request.task.metadata[_HELD_PLACE_MOUNT_RELEASE_LIFT_KEY] = lift
+    _clear_held_place_grounding(request)
+    _seat_held_place_at(g, current)
+    if isinstance(feedback, dict):
+        feedback["reground_mount_release_lift_m"] = lift
+    return True
+
+
 def reground_held_place_from_collision_feedback(request, feedback) -> bool:
     """Rewrite ``held_place_goal`` away from a colliding partner for repair.
 
     Returns True when a distinct in-region place seat was published. Real
     penetration still fails later validation; this only diversifies the PLACE
-    XY that collision-feedback retries would otherwise freeze.
+    XY that collision-feedback retries would otherwise freeze. A hand that is
+    already past the robot-mount tolerance moves away from the robot base at
+    the same release height. The same XY is raised only when that seat does
+    not fit in the region.
     """
     if not _is_region_place(request.task):
         return False
+    shortfall = _mount_penetration_shortfall_m(request, feedback)
+    if shortfall is not None:
+        if _shift_held_place_off_mount(request, feedback, shortfall):
+            return True
+        return _raise_held_place_for_mount(request, feedback, shortfall)
     partner = _place_margin_partner_from_feedback(request, feedback)
     if partner is None:
         return False

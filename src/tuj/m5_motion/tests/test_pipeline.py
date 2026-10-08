@@ -837,3 +837,78 @@ def test_pipeline_accepts_one_artifact_aware_collision_factory() -> None:
             collision_context_factory=Factory(),
             state_validator=lambda q, keyframe: True,
         )
+
+
+def test_mount_penetration_observation_is_kept_for_repair() -> None:
+    from tuj.m5_motion.compiler import StrategyAttempt
+    from tuj.m5_motion.pipeline import _structured_collision_observations
+
+    attempt = StrategyAttempt(
+        strategy_id="place",
+        failure_code="COLLISION_FILTERED_ALL",
+        detail=(
+            "COLLISION_MARGIN_VIOLATION: fixed_mount0_pedestal_col <-> "
+            "gripper0_right_right_outer_finger_collision "
+            "clearance -0.011537 m is below required -0.010000 m"
+        ),
+    )
+    observations = _structured_collision_observations(attempt)
+    assert observations == [{
+        "geometry_a": "fixed_mount0_pedestal_col",
+        "geometry_b": "gripper0_right_right_outer_finger_collision",
+        "measured_clearance_m": pytest.approx(-0.011537),
+        "required_clearance_m": pytest.approx(-0.010),
+    }]
+
+
+def test_singular_path_keeps_a_discarded_mount_penetration() -> None:
+    from tuj.m5_motion.compiler import StrategyAttempt
+    from tuj.m5_motion.pipeline import _structured_collision_observations
+    from tuj.m5_motion.strategy import BranchSelectionResult, RejectedEdge
+
+    attempt = StrategyAttempt(
+        strategy_id="place",
+        failure_code="FINAL_VALIDATION_FAILED",
+        detail=(
+            "MotionPlanBuildError: KINEMATIC_SINGULARITY: waypoint 763: "
+            "Jacobian min singular value=0.000175497, condition=11747.3"
+        ),
+        selection=BranchSelectionResult(
+            connected=None,
+            failure_code="NO_CONNECTED_SEQUENCE",
+            detail="evaluated 4 branch edges",
+            rejected_edges=(
+                RejectedEdge(
+                    source_keyframe_id="pre",
+                    target_keyframe_id="place",
+                    source_branch_id="S-_E-_W+",
+                    target_branch_id="S-_E-_W-",
+                    failure_code="COLLISION_MARGIN_VIOLATION",
+                    detail=(
+                        "Cartesian sample 6/13: invalid swept sample 5/158: "
+                        "fixed_mount0_pedestal_col <-> mug_g14 "
+                        "clearance -0.010432 m is below required -0.010000 m"
+                    ),
+                ),
+                RejectedEdge(
+                    source_keyframe_id="start",
+                    target_keyframe_id="pre",
+                    source_branch_id="CURRENT",
+                    target_branch_id="S-_E+_W-",
+                    failure_code="COLLISION_MARGIN_VIOLATION",
+                    detail=(
+                        "Cartesian sample 1/1: invalid swept sample 109/271: "
+                        "robot0_forearm_col <-> gripper0_right_right_outer_finger_collision "
+                        "clearance 0.004482 m is below required 0.005000 m"
+                    ),
+                ),
+            ),
+        ),
+    )
+    observations = _structured_collision_observations(attempt)
+    assert observations == [{
+        "geometry_a": "fixed_mount0_pedestal_col",
+        "geometry_b": "mug_g14",
+        "measured_clearance_m": pytest.approx(-0.010432),
+        "required_clearance_m": pytest.approx(-0.010),
+    }]
