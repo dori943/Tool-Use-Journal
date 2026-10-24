@@ -1,0 +1,82 @@
+# 2026-10-24T15:13:59
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c4_2 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c4_2\seed_0 --grounding-mode without_grounding --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[run] LLM provider=openai model=gpt-4o-mini
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[env] RoboCasa Kitchen: camera_segmentations unsupported; using task-object visual geom segmentation
+[env] robocasa task objects: ['baguette', 'cereal', 'lid', 'milk', 'rolling_pin', 'whisk']
+[cam] RoboCasa scene camera [수동 pos=[ 2.496 -3.138  1.607]]: lookat=[ 2.435 -3.137  0.871] dist=0.74 az=179° el=-85° fovy=60.0°
+[env] tracked: ['baguette', 'cereal', 'lid', 'milk', 'rolling_pin', 'whisk', 'packing_box']
+[env] robot base offset (mm): (np.float64(1844.9921209993395), np.float64(-3219.9896231893763))
+[cam] common scene: fovy=60.0° fovx=60.0° (H512×W512) pos=[ 2.496 -3.138  1.607] f=443.4px
+[M1] detected 7/7 tracked instances
+     baguette                 points=4480
+     cereal                   points=6194
+     lid                      points=24739
+     milk                     points=2934
+     rolling_pin              points=3655
+     whisk                    points=1014
+     packing_box              points=52470
+[M1] 컨테이너 내부치수 실음: packing_box inner=[240.0, 180.0, 230.0]mm wall=10.0mm floor=10.0mm (노드 1개)
+  [siphy] tokens: total=9083 (prompt=8786 completion=297)
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_baguette_baguette', 'mu_stage': 0, 'full_m3_tokens': 9083}
+  [siphy] tokens: total=9091 (prompt=8786 completion=305)
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_cereal_cereal', 'mu_stage': 0, 'full_m3_tokens': 9091}
+  [siphy] tokens: total=9090 (prompt=8786 completion=304)
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_lid_lid', 'mu_stage': 0, 'full_m3_tokens': 9090}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_milk_milk', 'lookup_type': 'cross_task', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [siphy] tokens: total=9058 (prompt=8786 completion=272)
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_rolling_pin_rolling_pin', 'mu_stage': 0, 'full_m3_tokens': 9058}
+  [siphy] tokens: total=9083 (prompt=8786 completion=297)
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_whisk_whisk', 'mu_stage': 0, 'full_m3_tokens': 9083}
+  [siphy] tokens: total=9072 (prompt=8786 completion=286)
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_box_packing_box', 'mu_stage': 0, 'full_m3_tokens': 9072}
+[M1] grounding: nodes=7 grounded=6 memory_hits=1 refreshed=1
+[M1] memory update: new=7 upgraded=0 kept=0 -> C:\Users\user\Tool-Use-Journal\output\memory.json
+[M1] m0_retrieval -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c4_2\seed_0\execution\m0_retrieval.json
+[M1] phys tokens: c3=17781 (calls=2) full_siphy=54477 (calls=6) total=72258
+[M1] nodes=7 edges=9 crops=7
+     near      obj_baguette_baguette -> obj_rolling_pin_rolling_pin
+     near      obj_baguette_baguette -> obj_whisk_whisk
+     near      obj_baguette_baguette -> obj_box_packing_box
+     near      obj_cereal_cereal -> obj_milk_milk
+     near      obj_cereal_cereal -> obj_whisk_whisk
+     near      obj_lid_lid -> obj_whisk_whisk
+     near      obj_box_packing_box -> obj_lid_lid
+     near      obj_box_packing_box -> obj_rolling_pin_rolling_pin
+     near      obj_box_packing_box -> obj_whisk_whisk
+[c4_2] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c4_2\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c4_2\seed_0\execution/m1_points.npz
+[timing] LLM prompt=0 completion=0 total=0 (0.00s)
+  [m1] 45.31s (prepared)
+  [m2] n/a (failed)
+  [m4] n/a (not_run)
+  [m5] n/a (not_run)
+  [total] 45.31s
+[timing] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c4_2\seed_0\timing_summary.json
+Traceback (most recent call last):
+  File "C:\Users\user\Tool-Use-Journal\scripts\run.py", line 1949, in <module>
+    main()
+  File "C:\Users\user\Tool-Use-Journal\scripts\run.py", line 1887, in main
+    return run(args, sys.modules[__name__])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\scripts\run_without_grounding.py", line 292, in run
+    m2 = build_m2(task_instruction(args.task), read(out / "m1.json"), rough)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\ablations\without_grounding.py", line 265, in build_m2
+    out = run_m2(task, scene, rough=rough)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m2_subgoal\pipeline.py", line 40, in run_m2
+    subgoals = rough.generate(task, m1_serialized)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\ablations\without_grounding.py", line 223, in generate
+    decisions = self._call(
+                ^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\ablations\without_grounding.py", line 201, in _call
+    raise ValueError(f"{stage}: invalid model response after 2 attempts: {error}")
+ValueError: visual_selection: invalid model response after 2 attempts: SG1: select a scene tool distinct from targets/destination

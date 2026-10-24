@@ -1,0 +1,1252 @@
+# 2026-10-24T16:25:24
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c3_2 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_2\seed_0 --grounding-mode without_reasoner --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[run] LLM provider=openai model=gpt-4o-mini
+[run] method=without_reasoner task=c3_2 seed=0 out=C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_2\seed_0
+[without_reasoner] Reasoner measurements: REPLACED by VLM prior; M2/G_k/M4/M5: full code
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[env] RoboCasa Kitchen: camera_segmentations unsupported; using task-object visual geom segmentation
+[env] robocasa task objects: ['bread_a', 'bread_b', 'fork_a', 'fork_b', 'fruit_a', 'fruit_b', 'mug_a', 'mug_b', 'plate_a', 'plate_b', 'spoon_a', 'spoon_b', 'tray_a', 'tray_b']
+[cam] RoboCasa scene camera [auto-fit]: lookat=[ 2.46  -3.13   0.943] dist=0.95 az=180° el=-55° fovy=60.0°
+[env] tracked: ['bread_a', 'bread_b', 'fork_a', 'fork_b', 'fruit_a', 'fruit_b', 'mug_a', 'mug_b', 'plate_a', 'plate_b', 'spoon_a', 'spoon_b', 'tray_a', 'tray_b']
+[env] robot base offset (mm): (np.float64(1869.9921209993392), np.float64(-3219.9896231893763))
+[cam] common scene: fovy=60.0° fovx=60.0° (H512×W512) pos=[ 3.003 -3.13   1.719] f=443.4px
+[M1] detected 14/14 tracked instances
+     bread_a                  points=904
+     bread_b                  points=910
+     fork_a                   points=121
+     fork_b                   points=129
+     fruit_a                  points=1193
+     fruit_b                  points=1160
+     mug_a                    points=2515
+     mug_b                    points=2384
+     plate_a                  points=5118
+     plate_b                  points=5115
+     spoon_a                  points=386
+     spoon_b                  points=388
+     tray_a                   points=10153
+     tray_b                   points=10168
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_bread_a_bread_a', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_bread_b_bread_b', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_fork_a_fork_a', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_fork_b_fork_b', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_fruit_a_fruit_a', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_fruit_b_fruit_b', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_mug_a_mug_a', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_mug_b_mug_b', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_plate_a_plate_a', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_plate_b_plate_b', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_spoon_a_spoon_a', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_spoon_b_spoon_b', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_tray_a_tray_a', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_tray_b_tray_b', 'mu_stage': 0, 'full_m3_tokens': None}
+[M1] grounding: nodes=14 grounded=14 memory_hits=0 refreshed=0
+[M1] nodes=14 edges=38 crops=14
+     near      obj_bread_a_bread_a -> obj_bread_b_bread_b
+     near      obj_bread_a_bread_a -> obj_fruit_b_fruit_b
+     near      obj_bread_a_bread_a -> obj_mug_b_mug_b
+     near      obj_bread_a_bread_a -> obj_plate_a_plate_a
+     near      obj_bread_a_bread_a -> obj_plate_b_plate_b
+     near      obj_bread_a_bread_a -> obj_tray_a_tray_a
+     near      obj_bread_a_bread_a -> obj_tray_b_tray_b
+     near      obj_bread_b_bread_b -> obj_fork_a_fork_a
+     near      obj_bread_b_bread_b -> obj_plate_a_plate_a
+     near      obj_bread_b_bread_b -> obj_plate_b_plate_b
+     near      obj_bread_b_bread_b -> obj_tray_a_tray_a
+     near      obj_bread_b_bread_b -> obj_tray_b_tray_b
+     near      obj_fork_a_fork_a -> obj_fork_b_fork_b
+     near      obj_fork_a_fork_a -> obj_plate_a_plate_a
+     near      obj_fork_a_fork_a -> obj_spoon_a_spoon_a
+     near      obj_fork_a_fork_a -> obj_spoon_b_spoon_b
+     near      obj_fork_a_fork_a -> obj_tray_a_tray_a
+     near      obj_fork_b_fork_b -> obj_plate_a_plate_a
+     near      obj_fork_b_fork_b -> obj_spoon_a_spoon_a
+     near      obj_fork_b_fork_b -> obj_spoon_b_spoon_b
+     near      obj_fork_b_fork_b -> obj_tray_a_tray_a
+     near      obj_fruit_a_fruit_a -> obj_fruit_b_fruit_b
+     near      obj_fruit_a_fruit_a -> obj_mug_a_mug_a
+     near      obj_fruit_a_fruit_a -> obj_mug_b_mug_b
+     near      obj_fruit_a_fruit_a -> obj_plate_b_plate_b
+     near      obj_fruit_b_fruit_b -> obj_mug_a_mug_a
+     near      obj_fruit_b_fruit_b -> obj_mug_b_mug_b
+     near      obj_fruit_b_fruit_b -> obj_plate_b_plate_b
+     near      obj_mug_a_mug_a -> obj_mug_b_mug_b
+     near      obj_mug_a_mug_a -> obj_plate_b_plate_b
+     near      obj_mug_a_mug_a -> obj_tray_b_tray_b
+     near      obj_mug_b_mug_b -> obj_plate_b_plate_b
+     near      obj_mug_b_mug_b -> obj_tray_b_tray_b
+     near      obj_plate_a_plate_a -> obj_plate_b_plate_b
+     near      obj_plate_a_plate_a -> obj_spoon_a_spoon_a
+     near      obj_plate_a_plate_a -> obj_spoon_b_spoon_b
+     near      obj_spoon_a_spoon_a -> obj_spoon_b_spoon_b
+     near      obj_tray_a_tray_a -> obj_tray_b_tray_b
+[c3_2] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_2\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_2\seed_0\execution/m1_points.npz
+[without_reasoner] feasible_ee (VLM prior → ee_rules):
+    obj_bread_a_bread_a: ['2F', '3F']
+    obj_bread_b_bread_b: ['2F', '3F']
+    obj_fork_a_fork_a: ['2F', '3F']
+    obj_fork_b_fork_b: ['2F', '3F']
+    obj_fruit_a_fruit_a: ['2F', '3F']
+    obj_fruit_b_fruit_b: ['2F', '3F']
+    obj_mug_a_mug_a: ['3F']
+    obj_mug_b_mug_b: ['3F']
+    obj_plate_a_plate_a: ['vac']  (fallback=vac)
+    obj_plate_b_plate_b: ['vac']  (fallback=vac)
+    obj_spoon_a_spoon_a: ['2F', '3F']
+    obj_spoon_b_spoon_b: ['2F', '3F']
+    obj_tray_a_tray_a: ['vac']  (fallback=vac)
+    obj_tray_b_tray_b: ['vac']  (fallback=vac)
+[M2] 지시문: 두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.
+[M1] C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_2\seed_0\m1.json 사용
+  [도구 후보] SG1: 제외 태스크 대상물 ['obj_bread_a_bread_a', 'obj_bread_b_bread_b', 'obj_fruit_a_fruit_a', 'obj_fruit_b_fruit_b', 'obj_tray_a_tray_a', 'obj_tray_b_tray_b'] (남은 후보 0개)
+  [도구 후보] SG2: 제외 태스크 대상물 ['obj_bread_a_bread_a', 'obj_bread_b_bread_b', 'obj_fruit_a_fruit_a', 'obj_fruit_b_fruit_b', 'obj_tray_a_tray_a', 'obj_tray_b_tray_b'] (남은 후보 0개)
+  [도구 후보] SG3: 제외 태스크 대상물 ['obj_mug_a_mug_a', 'obj_fork_a_fork_a', 'obj_spoon_a_spoon_a', 'obj_tray_a_tray_a', 'obj_plate_b_plate_b', 'obj_mug_b_mug_b', 'obj_fork_b_fork_b', 'obj_spoon_b_spoon_b', 'obj_bread_b_bread_b', 'obj_fruit_b_fruit_b', 'obj_tray_b_tray_b'] (남은 후보 0개)
+  [도구 후보] SG4: 제외 태스크 대상물 ['obj_mug_a_mug_a', 'obj_fork_a_fork_a', 'obj_spoon_a_spoon_a', 'obj_tray_a_tray_a', 'obj_plate_a_plate_a', 'obj_mug_b_mug_b', 'obj_fork_b_fork_b', 'obj_spoon_b_spoon_b', 'obj_bread_a_bread_a', 'obj_fruit_a_fruit_a', 'obj_tray_b_tray_b'] (남은 후보 0개)
+[판정] 접지값 68건으로 m3 술어 28건 판정: sat 24 / unsat 4 / unknown 0 / 판정대상아님 0
+  SG1_d1_p0      reachable({obj_plate_a_plate_a,obj_mug_a_mug_a,obj_f -> sat
+  SG1_d1_p1      top_exposed({obj_plate_a_plate_a,obj_mug_a_mug_a,obj -> sat
+  SG1_d1_p2      ee_usable(?EE, {obj_plate_a_plate_a,obj_mug_a_mug_a, -> sat
+  SG1_d1_p3      graspable_on_support(?EE, {obj_plate_a_plate_a,obj_m -> sat
+  SG1_d1_p4      batch_feasible(?EE, {obj_plate_a_plate_a,obj_mug_a_m -> unsat
+  SG1_d3_p2      fits({obj_plate_a_plate_a,obj_mug_a_mug_a,obj_fork_a -> sat
+  SG1_d3_p3      clear(obj_tray_a_tray_a)                             -> sat
+  SG2_d1_p0      reachable({obj_plate_b_plate_b,obj_mug_b_mug_b,obj_f -> sat
+  SG2_d1_p1      top_exposed({obj_plate_b_plate_b,obj_mug_b_mug_b,obj -> sat
+  SG2_d1_p2      ee_usable(?EE, {obj_plate_b_plate_b,obj_mug_b_mug_b, -> sat
+  SG2_d1_p3      graspable_on_support(?EE, {obj_plate_b_plate_b,obj_m -> sat
+  SG2_d1_p4      batch_feasible(?EE, {obj_plate_b_plate_b,obj_mug_b_m -> unsat
+  SG2_d3_p2      fits({obj_plate_b_plate_b,obj_mug_b_mug_b,obj_fork_b -> sat
+  SG2_d3_p3      clear(obj_tray_b_tray_b)                             -> sat
+  SG3_d1_p0      reachable({obj_bread_a_bread_a,obj_fruit_a_fruit_a}) -> sat
+  SG3_d1_p1      top_exposed({obj_bread_a_bread_a,obj_fruit_a_fruit_a -> sat
+  SG3_d1_p2      ee_usable(?EE, {obj_bread_a_bread_a,obj_fruit_a_frui -> sat
+  SG3_d1_p3      graspable_on_support(?EE, {obj_bread_a_bread_a,obj_f -> sat
+  SG3_d1_p4      batch_feasible(?EE, {obj_bread_a_bread_a,obj_fruit_a -> unsat
+  SG3_d3_p2      fits({obj_bread_a_bread_a,obj_fruit_a_fruit_a}, obj_ -> sat
+  SG3_d3_p3      clear(obj_plate_a_plate_a)                           -> sat
+  SG4_d1_p0      reachable({obj_bread_b_bread_b,obj_fruit_b_fruit_b}) -> sat
+  SG4_d1_p1      top_exposed({obj_bread_b_bread_b,obj_fruit_b_fruit_b -> sat
+  SG4_d1_p2      ee_usable(?EE, {obj_bread_b_bread_b,obj_fruit_b_frui -> sat
+  SG4_d1_p3      graspable_on_support(?EE, {obj_bread_b_bread_b,obj_f -> sat
+  SG4_d1_p4      batch_feasible(?EE, {obj_bread_b_bread_b,obj_fruit_b -> unsat
+  SG4_d3_p2      fits({obj_bread_b_bread_b,obj_fruit_b_fruit_b}, obj_ -> sat
+  SG4_d3_p3      clear(obj_plate_b_plate_b)                           -> sat
+  [분할 계획] SG1: 그룹 4개 (접지 partition)
+  [분할 계획] SG2: 그룹 4개 (접지 partition)
+  [분할 계획] SG3: 그룹 2개 (접지 partition)
+  [분할 계획] SG4: 그룹 2개 (접지 partition)
+  [신뢰도 갱신] SG1: 분해 0.7 → 0.7 (+0.00), 객체 선택 0.9 → 0.9 (+0.00)
+  [신뢰도 갱신] SG2: 분해 0.7 → 0.7 (+0.00), 객체 선택 0.9 → 0.9 (+0.00)
+      남은 불확실 요소: ['batch_feasible(?EE, {obj_plate_b_plate_b,obj_mug_b_mug_b,obj_fork_b_fork_b})']
+  [신뢰도 갱신] SG3: 분해 0.7 → 0.7 (+0.00), 객체 선택 0.9 → 0.9 (+0.00)
+      남은 불확실 요소: ['batch_feasible(?EE, {obj_bread_a_bread_a,obj_fruit_a_fruit_a})']
+  [신뢰도 갱신] SG4: 분해 0.7 → 0.7 (+0.00), 객체 선택 0.9 → 0.9 (+0.00)
+      남은 불확실 요소: ['batch_feasible(?EE, {obj_bread_b_bread_b,obj_fruit_b_fruit_b})']
+  [분할] SG1: 그룹 4개 → SG1_s1(1개), SG1_s2(1개), SG1_s3(1개), SG1_s4(1개)
+  [분할] SG2: 그룹 4개 → SG2_s1(1개), SG2_s2(1개), SG2_s3(1개), SG2_s4(1개)
+  [분할] SG3: 그룹 2개 → SG3_s1(1개), SG3_s2(1개)
+  [분할] SG4: 그룹 2개 → SG4_s1(1개), SG4_s2(1개)
+  [순서] SG3_s1(obj_plate_a_plate_a 에 담기)는 ['SG1_s1'](obj_plate_a_plate_a 옮기기) 뒤에 — 사전조건 1건 부착
+  [순서] SG3_s2(obj_plate_a_plate_a 에 담기)는 ['SG1_s1'](obj_plate_a_plate_a 옮기기) 뒤에 — 사전조건 1건 부착
+  [순서] SG4_s1(obj_plate_b_plate_b 에 담기)는 ['SG2_s1'](obj_plate_b_plate_b 옮기기) 뒤에 — 사전조건 1건 부착
+  [순서] SG4_s2(obj_plate_b_plate_b 에 담기)는 ['SG2_s1'](obj_plate_b_plate_b 옮기기) 뒤에 — 사전조건 1건 부착
+  [분할] 재계산: 서브골 12 / 상세 36 / 엣지 40 / mutex 66 / 사이클 없음
+[판정] 접지값 84건으로 m3 술어 84건 판정: sat 84 / unsat 0 / unknown 0 / 판정대상아님 0
+  SG1_s1_d1_p0   reachable(obj_plate_a_plate_a)                       -> sat
+  SG1_s1_d1_p1   top_exposed(obj_plate_a_plate_a)                     -> sat
+  SG1_s1_d1_p2   ee_usable(?EE, obj_plate_a_plate_a)                  -> sat
+  SG1_s1_d1_p3   graspable_on_support(?EE, obj_plate_a_plate_a)       -> sat
+  SG1_s1_d1_p4   batch_feasible(?EE, obj_plate_a_plate_a)             -> sat
+  SG1_s1_d3_p2   fits(obj_plate_a_plate_a, obj_tray_a_tray_a)         -> sat
+  SG1_s1_d3_p3   clear(obj_tray_a_tray_a)                             -> sat
+  SG1_s2_d1_p0   reachable(obj_mug_a_mug_a)                           -> sat
+  SG1_s2_d1_p1   top_exposed(obj_mug_a_mug_a)                         -> sat
+  SG1_s2_d1_p2   ee_usable(?EE, obj_mug_a_mug_a)                      -> sat
+  SG1_s2_d1_p3   graspable_on_support(?EE, obj_mug_a_mug_a)           -> sat
+  SG1_s2_d1_p4   batch_feasible(?EE, obj_mug_a_mug_a)                 -> sat
+  SG1_s2_d3_p2   fits(obj_mug_a_mug_a, obj_tray_a_tray_a)             -> sat
+  SG1_s2_d3_p3   clear(obj_tray_a_tray_a)                             -> sat
+  SG1_s3_d1_p0   reachable(obj_fork_a_fork_a)                         -> sat
+  SG1_s3_d1_p1   top_exposed(obj_fork_a_fork_a)                       -> sat
+  SG1_s3_d1_p2   ee_usable(?EE, obj_fork_a_fork_a)                    -> sat
+  SG1_s3_d1_p3   graspable_on_support(?EE, obj_fork_a_fork_a)         -> sat
+  SG1_s3_d1_p4   batch_feasible(?EE, obj_fork_a_fork_a)               -> sat
+  SG1_s3_d3_p2   fits(obj_fork_a_fork_a, obj_tray_a_tray_a)           -> sat
+  SG1_s3_d3_p3   clear(obj_tray_a_tray_a)                             -> sat
+  SG1_s4_d1_p0   reachable(obj_spoon_a_spoon_a)                       -> sat
+  SG1_s4_d1_p1   top_exposed(obj_spoon_a_spoon_a)                     -> sat
+  SG1_s4_d1_p2   ee_usable(?EE, obj_spoon_a_spoon_a)                  -> sat
+  SG1_s4_d1_p3   graspable_on_support(?EE, obj_spoon_a_spoon_a)       -> sat
+  SG1_s4_d1_p4   batch_feasible(?EE, obj_spoon_a_spoon_a)             -> sat
+  SG1_s4_d3_p2   fits(obj_spoon_a_spoon_a, obj_tray_a_tray_a)         -> sat
+  SG1_s4_d3_p3   clear(obj_tray_a_tray_a)                             -> sat
+  SG2_s1_d1_p0   reachable(obj_plate_b_plate_b)                       -> sat
+  SG2_s1_d1_p1   top_exposed(obj_plate_b_plate_b)                     -> sat
+  SG2_s1_d1_p2   ee_usable(?EE, obj_plate_b_plate_b)                  -> sat
+  SG2_s1_d1_p3   graspable_on_support(?EE, obj_plate_b_plate_b)       -> sat
+  SG2_s1_d1_p4   batch_feasible(?EE, obj_plate_b_plate_b)             -> sat
+  SG2_s1_d3_p2   fits(obj_plate_b_plate_b, obj_tray_b_tray_b)         -> sat
+  SG2_s1_d3_p3   clear(obj_tray_b_tray_b)                             -> sat
+  SG2_s2_d1_p0   reachable(obj_mug_b_mug_b)                           -> sat
+  SG2_s2_d1_p1   top_exposed(obj_mug_b_mug_b)                         -> sat
+  SG2_s2_d1_p2   ee_usable(?EE, obj_mug_b_mug_b)                      -> sat
+  SG2_s2_d1_p3   graspable_on_support(?EE, obj_mug_b_mug_b)           -> sat
+  SG2_s2_d1_p4   batch_feasible(?EE, obj_mug_b_mug_b)                 -> sat
+  SG2_s2_d3_p2   fits(obj_mug_b_mug_b, obj_tray_b_tray_b)             -> sat
+  SG2_s2_d3_p3   clear(obj_tray_b_tray_b)                             -> sat
+  SG2_s3_d1_p0   reachable(obj_fork_b_fork_b)                         -> sat
+  SG2_s3_d1_p1   top_exposed(obj_fork_b_fork_b)                       -> sat
+  SG2_s3_d1_p2   ee_usable(?EE, obj_fork_b_fork_b)                    -> sat
+  SG2_s3_d1_p3   graspable_on_support(?EE, obj_fork_b_fork_b)         -> sat
+  SG2_s3_d1_p4   batch_feasible(?EE, obj_fork_b_fork_b)               -> sat
+  SG2_s3_d3_p2   fits(obj_fork_b_fork_b, obj_tray_b_tray_b)           -> sat
+  SG2_s3_d3_p3   clear(obj_tray_b_tray_b)                             -> sat
+  SG2_s4_d1_p0   reachable(obj_spoon_b_spoon_b)                       -> sat
+  SG2_s4_d1_p1   top_exposed(obj_spoon_b_spoon_b)                     -> sat
+  SG2_s4_d1_p2   ee_usable(?EE, obj_spoon_b_spoon_b)                  -> sat
+  SG2_s4_d1_p3   graspable_on_support(?EE, obj_spoon_b_spoon_b)       -> sat
+  SG2_s4_d1_p4   batch_feasible(?EE, obj_spoon_b_spoon_b)             -> sat
+  SG2_s4_d3_p2   fits(obj_spoon_b_spoon_b, obj_tray_b_tray_b)         -> sat
+  SG2_s4_d3_p3   clear(obj_tray_b_tray_b)                             -> sat
+  SG3_s1_d1_p0   reachable(obj_bread_a_bread_a)                       -> sat[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+
+  SG3_s1_d1_p1   top_exposed(obj_bread_a_bread_a)                     -> sat
+  SG3_s1_d1_p2   ee_usable(?EE, obj_bread_a_bread_a)                  -> sat
+  SG3_s1_d1_p3   graspable_on_support(?EE, obj_bread_a_bread_a)       -> sat
+  SG3_s1_d1_p4   batch_feasible(?EE, obj_bread_a_bread_a)             -> sat
+  SG3_s1_d3_p2   fits(obj_bread_a_bread_a, obj_plate_a_plate_a)       -> sat
+  SG3_s1_d3_p3   clear(obj_plate_a_plate_a)                           -> sat
+  SG3_s2_d1_p0   reachable(obj_fruit_a_fruit_a)                       -> sat
+  SG3_s2_d1_p1   top_exposed(obj_fruit_a_fruit_a)                     -> sat
+  SG3_s2_d1_p2   ee_usable(?EE, obj_fruit_a_fruit_a)                  -> sat
+  SG3_s2_d1_p3   graspable_on_support(?EE, obj_fruit_a_fruit_a)       -> sat
+  SG3_s2_d1_p4   batch_feasible(?EE, obj_fruit_a_fruit_a)             -> sat
+  SG3_s2_d3_p2   fits(obj_fruit_a_fruit_a, obj_plate_a_plate_a)       -> sat
+  SG3_s2_d3_p3   clear(obj_plate_a_plate_a)                           -> sat
+  SG4_s1_d1_p0   reachable(obj_bread_b_bread_b)                       -> sat
+  SG4_s1_d1_p1   top_exposed(obj_bread_b_bread_b)                     -> sat
+  SG4_s1_d1_p2   ee_usable(?EE, obj_bread_b_bread_b)                  -> sat
+  SG4_s1_d1_p3   graspable_on_support(?EE, obj_bread_b_bread_b)       -> sat
+  SG4_s1_d1_p4   batch_feasible(?EE, obj_bread_b_bread_b)             -> sat
+  SG4_s1_d3_p2   fits(obj_bread_b_bread_b, obj_plate_b_plate_b)       -> sat
+  SG4_s1_d3_p3   clear(obj_plate_b_plate_b)                           -> sat
+  SG4_s2_d1_p0   reachable(obj_fruit_b_fruit_b)                       -> sat
+  SG4_s2_d1_p1   top_exposed(obj_fruit_b_fruit_b)                     -> sat
+  SG4_s2_d1_p2   ee_usable(?EE, obj_fruit_b_fruit_b)                  -> sat
+  SG4_s2_d1_p3   graspable_on_support(?EE, obj_fruit_b_fruit_b)       -> sat
+  SG4_s2_d1_p4   batch_feasible(?EE, obj_fruit_b_fruit_b)             -> sat
+  SG4_s2_d3_p2   fits(obj_fruit_b_fruit_b, obj_plate_b_plate_b)       -> sat
+  SG4_s2_d3_p3   clear(obj_plate_b_plate_b)                           -> sat
+  [배치] SG1 -> obj_tray_a_tray_a: 4자리 / 3줄, 상세 8건에 부여, 한 층 초과 ['obj_mug_a_mug_a', 'obj_spoon_a_spoon_a', 'obj_fork_a_fork_a']
+  [배치] SG2 -> obj_tray_b_tray_b: 4자리 / 3줄, 상세 8건에 부여, 한 층 초과 ['obj_mug_b_mug_b', 'obj_spoon_b_spoon_b', 'obj_fork_b_fork_b']
+  [배치] SG3 -> obj_plate_a_plate_a: 2자리 / 1줄, 상세 4건에 부여
+  [배치] SG4 -> obj_plate_b_plate_b: 2자리 / 1줄, 상세 4건에 부여
+  [M2 tokens] 서브골 분해 3527tok(2회, 8.5s) / 객체 선택 2033tok(1회, 7.0s) / confidence_update 4029tok(4회, 5.3s) | 합계 9589tok, 20.8s
+[c3_2] 서브골 12 → 상세 36 | DAG 엣지 40 | mutex 66 | 술어 판정 84
+  SG1_s1_d1 -> SG1_s1_d2   (causal_link: holding(obj_plate_a_plate_a))
+  SG1_s1_d1 -> SG1_s1_d3   (causal_link: holding(obj_plate_a_plate_a))
+  SG1_s1_d2 -> SG1_s1_d3   (causal_link: above(obj_plate_a_plate_a, obj_tray_a_tray_a))
+  SG1_s2_d1 -> SG1_s2_d2   (causal_link: holding(obj_mug_a_mug_a))
+  SG1_s2_d1 -> SG1_s2_d3   (causal_link: holding(obj_mug_a_mug_a))
+  SG1_s2_d2 -> SG1_s2_d3   (causal_link: above(obj_mug_a_mug_a, obj_tray_a_tray_a))
+  SG1_s3_d1 -> SG1_s3_d2   (causal_link: holding(obj_fork_a_fork_a))
+  SG1_s3_d1 -> SG1_s3_d3   (causal_link: holding(obj_fork_a_fork_a))
+  SG1_s3_d2 -> SG1_s3_d3   (causal_link: above(obj_fork_a_fork_a, obj_tray_a_tray_a))
+  SG1_s4_d1 -> SG1_s4_d2   (causal_link: holding(obj_spoon_a_spoon_a))
+  SG1_s4_d1 -> SG1_s4_d3   (causal_link: holding(obj_spoon_a_spoon_a))
+  SG1_s4_d2 -> SG1_s4_d3   (causal_link: above(obj_spoon_a_spoon_a, obj_tray_a_tray_a))
+  SG2_s1_d1 -> SG2_s1_d2   (causal_link: holding(obj_plate_b_plate_b))
+  SG2_s1_d1 -> SG2_s1_d3   (causal_link: holding(obj_plate_b_plate_b))
+  SG2_s1_d2 -> SG2_s1_d3   (causal_link: above(obj_plate_b_plate_b, obj_tray_b_tray_b))
+  SG2_s2_d1 -> SG2_s2_d2   (causal_link: holding(obj_mug_b_mug_b))
+  SG2_s2_d1 -> SG2_s2_d3   (causal_link: holding(obj_mug_b_mug_b))
+  SG2_s2_d2 -> SG2_s2_d3   (causal_link: above(obj_mug_b_mug_b, obj_tray_b_tray_b))
+  SG2_s3_d1 -> SG2_s3_d2   (causal_link: holding(obj_fork_b_fork_b))
+  SG2_s3_d1 -> SG2_s3_d3   (causal_link: holding(obj_fork_b_fork_b))
+  SG2_s3_d2 -> SG2_s3_d3   (causal_link: above(obj_fork_b_fork_b, obj_tray_b_tray_b))
+  SG2_s4_d1 -> SG2_s4_d2   (causal_link: holding(obj_spoon_b_spoon_b))
+  SG2_s4_d1 -> SG2_s4_d3   (causal_link: holding(obj_spoon_b_spoon_b))
+  SG2_s4_d2 -> SG2_s4_d3   (causal_link: above(obj_spoon_b_spoon_b, obj_tray_b_tray_b))
+  SG1_s1_d3 -> SG3_s1_d1   (causal_link: in(obj_plate_a_plate_a, obj_tray_a_tray_a))
+  SG3_s1_d1 -> SG3_s1_d2   (causal_link: holding(obj_bread_a_bread_a))
+  SG3_s1_d1 -> SG3_s1_d3   (causal_link: holding(obj_bread_a_bread_a))
+  SG3_s1_d2 -> SG3_s1_d3   (causal_link: above(obj_bread_a_bread_a, obj_plate_a_plate_a))
+  SG1_s1_d3 -> SG3_s2_d1   (causal_link: in(obj_plate_a_plate_a, obj_tray_a_tray_a))
+  SG3_s2_d1 -> SG3_s2_d2   (causal_link: holding(obj_fruit_a_fruit_a))
+  SG3_s2_d1 -> SG3_s2_d3   (causal_link: holding(obj_fruit_a_fruit_a))
+  SG3_s2_d2 -> SG3_s2_d3   (causal_link: above(obj_fruit_a_fruit_a, obj_plate_a_plate_a))
+  SG2_s1_d3 -> SG4_s1_d1   (causal_link: in(obj_plate_b_plate_b, obj_tray_b_tray_b))
+  SG4_s1_d1 -> SG4_s1_d2   (causal_link: holding(obj_bread_b_bread_b))
+  SG4_s1_d1 -> SG4_s1_d3   (causal_link: holding(obj_bread_b_bread_b))
+  SG4_s1_d2 -> SG4_s1_d3   (causal_link: above(obj_bread_b_bread_b, obj_plate_b_plate_b))
+  SG2_s1_d3 -> SG4_s2_d1   (causal_link: in(obj_plate_b_plate_b, obj_tray_b_tray_b))
+  SG4_s2_d1 -> SG4_s2_d2   (causal_link: holding(obj_fruit_b_fruit_b))
+  SG4_s2_d1 -> SG4_s2_d3   (causal_link: holding(obj_fruit_b_fruit_b))
+  SG4_s2_d2 -> SG4_s2_d3   (causal_link: above(obj_fruit_b_fruit_b, obj_plate_b_plate_b))
+-> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_2\seed_0/m2.json
+[gk] c3_2: 서브골 12개 -> gk_SG1_s1.json, gk_SG1_s2.json, gk_SG1_s3.json, gk_SG1_s4.json, gk_SG2_s1.json, gk_SG2_s2.json, gk_SG2_s3.json, gk_SG2_s4.json, gk_SG3_s1.json, gk_SG3_s2.json, gk_SG4_s1.json, gk_SG4_s2.json
+     SG1_s1: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s2: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s3: nodes=2 edges=1 selected_tool=None feasible_ee=None
+     SG1_s4: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG2_s1: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG2_s2: nodes=2 edges=1 selected_tool=None feasible_ee=None
+     SG2_s3: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG2_s4: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG3_s1: nodes=2 edges=1 selected_tool=None feasible_ee=None
+     SG3_s2: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG4_s1: nodes=2 edges=1 selected_tool=None feasible_ee=None
+     SG4_s2: nodes=2 edges=1 selected_tool=None feasible_ee=None
+[M4] gk_bundle.json 생성: 서브골 ['SG1_s1', 'SG1_s2', 'SG1_s3', 'SG1_s4', 'SG2_s1', 'SG2_s2', 'SG2_s3', 'SG2_s4', 'SG3_s1', 'SG3_s2', 'SG4_s1', 'SG4_s2'] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_2\seed_0\gk_bundle.json
+[M4] Task Planner input: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_2\seed_0\gk_bundle.json
+[M4] SUCCESS: EE=vac, tool=none, EE=3F, tool=none
+[M4] output: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_2\seed_0\m4.json
+{
+  "status": "VALID",
+  "subgoal_count": 36,
+  "request_count": 36,
+  "subgoal_order": [
+    "SG2_s1_d1",
+    "SG2_s1_d2",
+    "SG2_s1_d3",
+    "SG1_s1_d1",
+    "SG1_s1_d2",
+    "SG1_s1_d3",
+    "SG2_s4_d1",
+    "SG2_s4_d2",
+    "SG2_s4_d3",
+    "SG1_s4_d1",
+    "SG1_s4_d2",
+    "SG1_s4_d3",
+    "SG2_s3_d1",
+    "SG2_s3_d2",
+    "SG2_s3_d3",
+    "SG1_s3_d1",
+    "SG1_s3_d2",
+    "SG1_s3_d3",
+    "SG4_s2_d1",
+    "SG4_s2_d2",
+    "SG4_s2_d3",
+    "SG3_s2_d1",
+    "SG3_s2_d2",
+    "SG3_s2_d3",
+    "SG4_s1_d1",
+    "SG4_s1_d2",
+    "SG4_s1_d3",
+    "SG3_s1_d1",
+    "SG3_s1_d2",
+    "SG3_s1_d3",
+    "SG2_s2_d1",
+    "SG2_s2_d2",
+    "SG2_s2_d3",
+    "SG1_s2_d1",
+    "SG1_s2_d2",
+    "SG1_s2_d3"
+  ],
+  "resources": [
+    {
+      "subgoal_id": "SG2_s1_d1",
+      "ee": "vac",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "plate_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s1_d2",
+      "ee": "vac",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "plate_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s1_d3",
+      "ee": "vac",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "plate_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s1_d1",
+      "ee": "vac",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "plate_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s1_d2",
+      "ee": "vac",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "plate_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s1_d3",
+      "ee": "vac",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "plate_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s4_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "spoon_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s4_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "spoon_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s4_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "spoon_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s4_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "spoon_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s4_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "spoon_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s4_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "spoon_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s3_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "fork_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s3_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "fork_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s3_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "fork_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "fork_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "fork_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "fork_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s2_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "fruit_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s2_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "fruit_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s2_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "fruit_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s2_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "fruit_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s2_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "fruit_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s2_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "fruit_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s1_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "bread_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s1_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "bread_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s1_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "bread_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s1_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "bread_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s1_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "bread_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s1_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "bread_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s2_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "mug_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s2_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "mug_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s2_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "mug_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s2_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "mug_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s2_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "mug_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s2_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "mug_a"
+      ]
+    }
+  ],
+  "transition_actions": [
+    "MOVE_TO_EE_RACK",
+    "ATTACH_EE",
+    "VERIFY_ATTACHMENT",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "MOVE_TO_EE_RACK",
+    "DETACH_EE",
+    "ATTACH_EE",
+    "VERIFY_ATTACHMENT",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE"
+  ],
+  "environment_name": "C3_2_BreakfastTrayPreparation",
+  "initial_active_ee": null,
+  "initial_world": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-reasoner\\c3_2\\seed_0\\m5\\initial_world.json",
+  "grasp_execution_mode": "AUTO"
+}[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+
+[M5] validation: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_2\seed_0\m5\m5_input_validation.json
+[VIDEO_DIAG] ENV-CHANGE frame#1 env=1971790436560 ee=None sim_time=2.0000 frame_mean=171.65 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=0 cam_pos=[3.209992121, -3.21998962319, 1.91] ncam=3 nlight=1 cameras=['agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=171.65
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[M5][EE_PATH] cache_dir=ee_rack/sig_aec0168a03a7 mode=portable
+[M5][EE_PATH] hit: ur5e-bare-to-vac-v1
+[M5][EE_PATH] start_state=PASS
+[M5][EE_PATH] workcell_signature=PASS
+[M5][EE_PATH] collision_validation=PASS
+[M5][EE_PATH] source=precomputed
+[M5][WORKSPACE] ee=vac planner=RRT_CONNECT target=nearest-mounted-valid-attach-waypoint template=ur5e-bare-to-vac-v1
+[M5][SAFE_EXIT] ok: ee=vac planner=RRT_CONNECT
+[VIDEO_DIAG] sample frame#30 env=1971790436560 ee=None sim_time=3.4400 frame_mean=171.58 black=no
+[VIDEO_DIAG] sample frame#60 env=1971790436560 ee=None sim_time=4.9200 frame_mean=171.02 black=no
+[VIDEO_DIAG] sample frame#90 env=1971790436560 ee=None sim_time=6.4200 frame_mean=171.06 black=no
+[VIDEO_DIAG] sample frame#120 env=1971790436560 ee=None sim_time=7.9200 frame_mean=171.15 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[VIDEO_DIAG] ENV-CHANGE frame#142 env=1973369944144 ee=vac sim_time=9.0200 frame_mean=171.31 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=0 cam_pos=[3.209992121, -3.21998962319, 1.91] ncam=3 nlight=1 cameras=['agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=171.31
+[VIDEO_DIAG] sample frame#150 env=1973369944144 ee=vac sim_time=9.4200 frame_mean=171.28 black=no
+[VIDEO_DIAG] sample frame#180 env=1973369944144 ee=vac sim_time=10.9400 frame_mean=171.06 black=no
+[VIDEO_DIAG] sample frame#210 env=1973369944144 ee=vac sim_time=12.4400 frame_mean=170.90 black=no
+[VIDEO_DIAG] sample frame#240 env=1973369944144 ee=vac sim_time=13.9400 frame_mean=170.91 black=no
+[VIDEO_DIAG] sample frame#270 env=1973369944144 ee=vac sim_time=15.4400 frame_mean=171.03 black=no
+[VIDEO_DIAG] sample frame#300 env=1973369944144 ee=vac sim_time=16.9400 frame_mean=171.20 black=no
+[VIDEO_DIAG] sample frame#330 env=1973369944144 ee=vac sim_time=18.4400 frame_mean=171.33 black=no
+[VIDEO_DIAG] sample frame#360 env=1973369944144 ee=vac sim_time=19.9200 frame_mean=171.56 black=no
+[plan] PRE_GRASP 13 points {'position_error_m': 6.338581385974268e-06, 'orientation_error_deg': 6.79795172862628e-05}
+[VIDEO_DIAG] sample frame#390 env=1973369944144 ee=vac sim_time=21.4200 frame_mean=171.56 black=no
+[VIDEO_DIAG] sample frame#420 env=1973369944144 ee=vac sim_time=22.9200 frame_mean=171.44 black=no
+[VIDEO_DIAG] sample frame#450 env=1973369944144 ee=vac sim_time=24.4200 frame_mean=171.38 black=no
+[catalog] plate_b PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#480 env=1973369944144 ee=vac sim_time=25.9200 frame_mean=171.46 black=no
+[VIDEO_DIAG] sample frame#510 env=1973369944144 ee=vac sim_time=27.4200 frame_mean=171.63 black=no
+[VIDEO_DIAG] sample frame#540 env=1973369944144 ee=vac sim_time=28.9200 frame_mean=171.53 black=no
+[catalog] plate_b PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#570 env=1973369944144 ee=vac sim_time=30.4200 frame_mean=171.50 black=no
+[plan] GRASP 25 points {'position_error_m': 1.2672150410278726e-06, 'orientation_error_deg': 1.7406266763235307e-05}
+[VIDEO_DIAG] sample frame#600 env=1973369944144 ee=vac sim_time=31.9200 frame_mean=171.49 black=no
+[VIDEO_DIAG] sample frame#630 env=1973369944144 ee=vac sim_time=33.4200 frame_mean=171.34 black=no
+[catalog] plate_b GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#660 env=1973369944144 ee=vac sim_time=34.9200 frame_mean=171.28 black=no
+[VIDEO_DIAG] sample frame#690 env=1973369944144 ee=vac sim_time=36.4200 frame_mean=171.25 black=no
+[M5][VAC_ATTACH] intended_target='plate_b' current_attached_body='plate_b' candidate_body='plate_b' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.001076
+[M5][VAC_ATTACH] intended_target='plate_b' current_attached_body='plate_b' candidate_body='island_island_group_main' candidate_geom='island_island_group_top_2' action=REJECT reason=attachment_locked_native_adhesion_suppressed;penetration_m=0.000000
+[M5][VAC_ATTACH] intended_target='plate_b' current_attached_body='plate_b' candidate_body='plate_b' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[VIDEO_DIAG] sample frame#720 env=1973369944144 ee=vac sim_time=37.9200 frame_mean=171.26 black=no
+[plan] BREAKAWAY 5 points {'position_error_m': 2.2147512032249127e-06, 'orientation_error_deg': 2.5803393661937368e-05}
+[plan] LIFT 34 points {'position_error_m': 2.207969354525819e-06, 'orientation_error_deg': 2.2520315684173302e-05}
+[catalog] plate_b LIFT lift=0.094 []
+[VIDEO_DIAG] sample frame#750 env=1973369944144 ee=vac sim_time=39.4400 frame_mean=171.78 black=no
+[plan] LIFT 2 points {'position_error_m': 2.2009732279304366e-06, 'orientation_error_deg': 2.348724360103629e-05}
+[VIDEO_DIAG] sample frame#780 env=1973369944144 ee=vac sim_time=40.9400 frame_mean=171.78 black=no
+[VIDEO_DIAG] sample frame#810 env=1973369944144 ee=vac sim_time=42.4400 frame_mean=171.78 black=no
+[catalog] plate_b HOLD lift=0.164 []
+[VIDEO_DIAG] sample frame#840 env=1973369944144 ee=vac sim_time=43.9400 frame_mean=171.78 black=no
+[VIDEO_DIAG] sample frame#870 env=1973369944144 ee=vac sim_time=45.4400 frame_mean=171.78 black=no
+[VIDEO_DIAG] sample frame#900 env=1973369944144 ee=vac sim_time=46.9400 frame_mean=171.78 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[M5][REGION_GOAL] held_transport_goal object=plate_b region=tray_b source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#930 env=1973369944144 ee=vac sim_time=48.4400 frame_mean=171.82 black=no
+[VIDEO_DIAG] sample frame#960 env=1973369944144 ee=vac sim_time=49.9400 frame_mean=171.39 black=no
+[M5][REGION_GOAL] held_place_goal object=plate_b region=tray_b source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#990 env=1973369944144 ee=vac sim_time=51.4400 frame_mean=171.28 black=no
+[VIDEO_DIAG] sample frame#1020 env=1973369944144 ee=vac sim_time=52.9400 frame_mean=171.62 black=no
+[M5][VAC_ATTACH] intended_target='plate_b' current_attached_body='plate_b' candidate_body='tray_b_main' candidate_geom='tray_b_g15' action=REJECT reason=attachment_locked_native_adhesion_suppressed;penetration_m=0.000000
+[VIDEO_DIAG] sample frame#1050 env=1973369944144 ee=vac sim_time=54.4400 frame_mean=171.61 black=no
+[VIDEO_DIAG] sample frame#1080 env=1973369944144 ee=vac sim_time=55.9400 frame_mean=171.59 black=no
+[plan] PRE_GRASP 45 points {'position_error_m': 1.7087054710589608e-06, 'orientation_error_deg': 1.9202522715356554e-05}
+[VIDEO_DIAG] sample frame#1110 env=1973369944144 ee=vac sim_time=57.4400 frame_mean=171.58 black=no
+[VIDEO_DIAG] sample frame#1140 env=1973369944144 ee=vac sim_time=58.9400 frame_mean=171.72 black=no
+[catalog] plate_a PRE_GRASP lift=-0.000 []
+[VIDEO_DIAG] sample frame#1170 env=1973369944144 ee=vac sim_time=60.4400 frame_mean=171.97 black=no
+[VIDEO_DIAG] sample frame#1200 env=1973369944144 ee=vac sim_time=61.9400 frame_mean=172.07 black=no
+[plan] GRASP 25 points {'position_error_m': 9.274626323993091e-07, 'orientation_error_deg': 1.4132641966696444e-05}
+[VIDEO_DIAG] sample frame#1230 env=1973369944144 ee=vac sim_time=63.4400 frame_mean=172.07 black=no
+[catalog] plate_a GRASP lift=-0.000 []
+[VIDEO_DIAG] sample frame#1260 env=1973369944144 ee=vac sim_time=64.9400 frame_mean=171.88 black=no
+[VIDEO_DIAG] sample frame#1290 env=1973369944144 ee=vac sim_time=66.4400 frame_mean=171.77 black=no
+[M5][VAC_ATTACH] intended_target='plate_a' current_attached_body='plate_a' candidate_body='plate_a' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.001077
+[M5][VAC_ATTACH] intended_target='plate_a' current_attached_body='plate_a' candidate_body='island_island_group_main' candidate_geom='island_island_group_top_2' action=REJECT reason=attachment_locked_native_adhesion_suppressed;penetration_m=0.000000
+[M5][VAC_ATTACH] intended_target='plate_a' current_attached_body='plate_a' candidate_body='plate_a' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[VIDEO_DIAG] sample frame#1320 env=1973369944144 ee=vac sim_time=67.9400 frame_mean=171.78 black=no
+[plan] BREAKAWAY 5 points {'position_error_m': 1.7489681767584704e-06, 'orientation_error_deg': 2.139351294172975e-05}
+[plan] LIFT 34 points {'position_error_m': 8.945609268352881e-07, 'orientation_error_deg': 9.618843113498435e-06}
+[catalog] plate_a LIFT lift=0.030 []
+[VIDEO_DIAG] sample frame#1350 env=1973369944144 ee=vac sim_time=69.4400 frame_mean=171.99 black=no
+[plan] LIFT 2 points {'position_error_m': 8.869742973716266e-07, 'orientation_error_deg': 1.058725396740967e-05}
+[VIDEO_DIAG] sample frame#1380 env=1973369944144 ee=vac sim_time=70.9400 frame_mean=172.14 black=no
+[VIDEO_DIAG] sample frame#1410 env=1973369944144 ee=vac sim_time=72.4400 frame_mean=172.14 black=no
+[catalog] plate_a HOLD lift=0.164 []
+[VIDEO_DIAG] sample frame#1440 env=1973369944144 ee=vac sim_time=73.9400 frame_mean=172.14 black=no
+[VIDEO_DIAG] sample frame#1470 env=1973369944144 ee=vac sim_time=75.4400 frame_mean=172.14 black=no
+[VIDEO_DIAG] sample frame#1500 env=1973369944144 ee=vac sim_time=76.9200 frame_mean=172.14 black=no
+[M5][REGION_GOAL] held_transport_goal object=plate_a region=tray_a source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#1530 env=1973369944144 ee=vac sim_time=78.4200 frame_mean=172.14 black=no
+[VIDEO_DIAG] sample frame#1560 env=1973369944144 ee=vac sim_time=79.9200 frame_mean=172.26 black=no
+[VIDEO_DIAG] sample frame#1590 env=1973369944144 ee=vac sim_time=81.4200 frame_mean=172.48 black=no
+[VIDEO_DIAG] sample frame#1620 env=1973369944144 ee=vac sim_time=82.9200 frame_mean=172.48 black=no
+[VIDEO_DIAG] sample frame#1650 env=1973369944144 ee=vac sim_time=84.4200 frame_mean=172.53 black=no
+[M5][REGION_GOAL] held_place_goal object=plate_a region=tray_a source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#1680 env=1973369944144 ee=vac sim_time=85.9200 frame_mean=172.62 black=no
+[M5][VAC_ATTACH] intended_target='plate_a' current_attached_body='plate_a' candidate_body='tray_a_main' candidate_geom='tray_a_g15' action=REJECT reason=attachment_locked_native_adhesion_suppressed;penetration_m=0.000000
+[VIDEO_DIAG] sample frame#1710 env=1973369944144 ee=vac sim_time=87.4200 frame_mean=172.66 black=no
+[VIDEO_DIAG] sample frame#1740 env=1973369944144 ee=vac sim_time=88.9200 frame_mean=172.67 black=no
+[VIDEO_DIAG] sample frame#1770 env=1973369944144 ee=vac sim_time=90.4200 frame_mean=172.63 black=no
+[M5][EE_ENTRY] hit: vac trajectory=ur5e-vac-to-bare-v1
+[M5][EE_ENTRY] planner=DIRECT_JOINT
+[M5][EE_ENTRY] workcell_signature=PASS
+[M5][EE_ENTRY] collision_validation=PASS
+[M5][EE_ENTRY] dynamic_planner_invoked=true
+[VIDEO_DIAG] sample frame#1800 env=1973369944144 ee=vac sim_time=91.9200 frame_mean=172.49 black=no
+[VIDEO_DIAG] sample frame#1830 env=1973369944144 ee=vac sim_time=93.4200 frame_mean=171.95 black=no
+[VIDEO_DIAG] sample frame#1860 env=1973369944144 ee=vac sim_time=94.9200 frame_mean=172.17 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[M5][EE_PATH] cache_dir=ee_rack_kitchen mode=portable
+[M5][EE_PATH] cache_dir=ee_rack_kitchen mode=portable
+[M5][EE_PATH] hit: ur5e-bare-to-3F-v1
+[M5][EE_PATH] start_state=PASS
+[M5][EE_PATH] workcell_signature=PASS
+[M5][EE_PATH] collision_validation=PASS
+[M5][EE_PATH] source=precomputed
+[M5][EE_PATH] hit: ur5e-vac-to-bare-v1 + ur5e-bare-to-3F-v1
+[M5][EE_PATH] return_start_state=PASS
+[M5][EE_PATH] transition_seam=PASS
+[M5][EE_PATH] collision_validation=PASS
+[M5][EE_PATH] source=precomputed
+[M5][WORKSPACE] ee=3F planner=COMMISSIONED_REVERSE target=commissioned-reverse template=ur5e-bare-to-3F-v1
+[M5][SAFE_EXIT] ok: ee=3F planner=COMMISSIONED_REVERSE
+[VIDEO_DIAG] ENV-CHANGE frame#1885 env=1971735207056 ee=None sim_time=96.1800 frame_mean=172.41 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=0 cam_pos=[3.209992121, -3.21998962319, 1.91] ncam=3 nlight=1 cameras=['agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=172.41
+[VIDEO_DIAG] sample frame#1890 env=1971735207056 ee=None sim_time=96.4200 frame_mean=172.41 black=no
+[VIDEO_DIAG] sample frame#1920 env=1971735207056 ee=None sim_time=97.9200 frame_mean=172.18 black=no
+[VIDEO_DIAG] sample frame#1950 env=1971735207056 ee=None sim_time=99.4200 frame_mean=172.10 black=no
+[VIDEO_DIAG] sample frame#1980 env=1971735207056 ee=None sim_time=100.9200 frame_mean=172.32 black=no
+[VIDEO_DIAG] sample frame#2010 env=1971735207056 ee=None sim_time=102.4200 frame_mean=172.72 black=no
+[VIDEO_DIAG] sample frame#2040 env=1971735207056 ee=None sim_time=103.9200 frame_mean=172.74 black=no
+[VIDEO_DIAG] sample frame#2070 env=1971735207056 ee=None sim_time=105.4200 frame_mean=172.38 black=no
+[VIDEO_DIAG] sample frame#2100 env=1971735207056 ee=None sim_time=106.9200 frame_mean=172.31 black=no
+[VIDEO_DIAG] sample frame#2130 env=1971735207056 ee=None sim_time=108.4200 frame_mean=172.47 black=no
+[VIDEO_DIAG] sample frame#2160 env=1971735207056 ee=None sim_time=109.9200 frame_mean=172.42 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[VIDEO_DIAG] ENV-CHANGE frame#2176 env=1977286178832 ee=3F sim_time=110.7200 frame_mean=172.50 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=0 cam_pos=[3.209992121, -3.21998962319, 1.91] ncam=3 nlight=1 cameras=['agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=172.50
+[VIDEO_DIAG] sample frame#2190 env=1977286178832 ee=3F sim_time=111.4200 frame_mean=172.48 black=no
+[VIDEO_DIAG] sample frame#2220 env=1977286178832 ee=3F sim_time=112.9200 frame_mean=172.47 black=no
+[VIDEO_DIAG] sample frame#2250 env=1977286178832 ee=3F sim_time=114.4200 frame_mean=172.47 black=no
+[VIDEO_DIAG] sample frame#2280 env=1977286178832 ee=3F sim_time=115.9200 frame_mean=172.46 black=no
+[VIDEO_DIAG] sample frame#2310 env=1977286178832 ee=3F sim_time=117.4200 frame_mean=172.47 black=no
+[VIDEO_DIAG] sample frame#2340 env=1977286178832 ee=3F sim_time=118.9200 frame_mean=172.47 black=no
+[VIDEO_DIAG] sample frame#2370 env=1977286178832 ee=3F sim_time=120.4200 frame_mean=172.46 black=no
+[VIDEO_DIAG] sample frame#2400 env=1977286178832 ee=3F sim_time=121.9200 frame_mean=172.43 black=no
+[VIDEO_DIAG] sample frame#2430 env=1977286178832 ee=3F sim_time=123.4200 frame_mean=172.38 black=no
+[VIDEO_DIAG] sample frame#2460 env=1977286178832 ee=3F sim_time=124.9200 frame_mean=172.34 black=no
+[VIDEO_DIAG] sample frame#2490 env=1977286178832 ee=3F sim_time=126.4200 frame_mean=172.35 black=no
+[VIDEO_DIAG] sample frame#2520 env=1977286178832 ee=3F sim_time=127.9200 frame_mean=172.34 black=no
+[VIDEO_DIAG] sample frame#2550 env=1977286178832 ee=3F sim_time=129.4200 frame_mean=172.36 black=no
+[VIDEO_DIAG] sample frame#2580 env=1977286178832 ee=3F sim_time=130.9200 frame_mean=172.35 black=no
+[VIDEO_DIAG] sample frame#2610 env=1977286178832 ee=3F sim_time=132.4200 frame_mean=172.33 black=no
+[VIDEO_DIAG] sample frame#2640 env=1977286178832 ee=3F sim_time=133.9200 frame_mean=172.32 black=no
+[VIDEO_DIAG] sample frame#2670 env=1977286178832 ee=3F sim_time=135.4200 frame_mean=172.31 black=no
+[VIDEO_DIAG] sample frame#2700 env=1977286178832 ee=3F sim_time=136.9200 frame_mean=172.32 black=no
+[VIDEO_DIAG] sample frame#2730 env=1977286178832 ee=3F sim_time=138.4200 frame_mean=172.33 black=no
+[VIDEO_DIAG] sample frame#2760 env=1977286178832 ee=3F sim_time=139.9200 frame_mean=172.34 black=no
+[VIDEO_DIAG] sample frame#2790 env=1977286178832 ee=3F sim_time=141.4200 frame_mean=172.36 black=no
+[VIDEO_DIAG] sample frame#2820 env=1977286178832 ee=3F sim_time=142.9200 frame_mean=172.37 black=no
+[preshape-3f] opening 1.0
+[plan] PRE_GRASP 58 points {'position_error_m': 5.610458123954666e-06, 'orientation_error_deg': 6.715196520552717e-05}
+[VIDEO_DIAG] sample frame#2850 env=1977286178832 ee=3F sim_time=144.4200 frame_mean=172.33 black=no
+[VIDEO_DIAG] sample frame#2880 env=1977286178832 ee=3F sim_time=145.9200 frame_mean=172.25 black=no
+[spoon] PRE_GRASP: lift=0.000m fingers=[]
+[VIDEO_DIAG] sample frame#2910 env=1977286178832 ee=3F sim_time=147.4200 frame_mean=172.22 black=no
+[VIDEO_DIAG] sample frame#2940 env=1977286178832 ee=3F sim_time=148.9200 frame_mean=171.99 black=no
+[plan] GRASP 25 points {'position_error_m': 7.169830682606844e-07, 'orientation_error_deg': 1.275114035630097e-05}
+[VIDEO_DIAG] sample frame#2970 env=1977286178832 ee=3F sim_time=150.4200 frame_mean=171.98 black=no
+[spoon] GRASP: lift=0.000m fingers=[]
+[VIDEO_DIAG] sample frame#3000 env=1977286178832 ee=3F sim_time=151.9200 frame_mean=172.05 black=no
+[VIDEO_DIAG] sample frame#3030 env=1977286178832 ee=3F sim_time=153.4200 frame_mean=172.16 black=no
+[VIDEO_DIAG] sample frame#3060 env=1977286178832 ee=3F sim_time=154.9200 frame_mean=172.24 black=no
+[VIDEO_DIAG] sample frame#3090 env=1977286178832 ee=3F sim_time=156.4200 frame_mean=172.23 black=no
+[spoon] CLOSE: lift=-0.000m fingers=['thumb']
+[M5][VAC_ATTACH] intended_target='spoon_b' current_attached_body='spoon_b' candidate_body='spoon_b' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.000436
+[M5][VAC_ATTACH] intended_target='spoon_b' current_attached_body='spoon_b' candidate_body='spoon_b' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[plan] LIFT 30 points {'position_error_m': 7.183200216252538e-06, 'orientation_error_deg': 8.317772196545933e-05}
+[VIDEO_DIAG] sample frame#3120 env=1977286178832 ee=3F sim_time=157.9200 frame_mean=172.21 black=no
+[VIDEO_DIAG] sample frame#3150 env=1977286178832 ee=3F sim_time=159.4200 frame_mean=172.14 black=no
+[VIDEO_DIAG] sample frame#3180 env=1977286178832 ee=3F sim_time=160.9200 frame_mean=172.02 black=no
+[spoon] LIFT: lift=0.115m fingers=['thumb', 'index']
+[VIDEO_DIAG] sample frame#3210 env=1977286178832 ee=3F sim_time=162.4200 frame_mean=171.91 black=no
+[VIDEO_DIAG] sample frame#3240 env=1977286178832 ee=3F sim_time=163.9200 frame_mean=171.91 black=no
+[VIDEO_DIAG] sample frame#3270 env=1977286178832 ee=3F sim_time=165.4200 frame_mean=171.91 black=no
+[spoon] HOLD: lift=0.143m fingers=['thumb', 'index']
+[VIDEO_DIAG] sample frame#3300 env=1977286178832 ee=3F sim_time=166.9200 frame_mean=171.91 black=no
+[VIDEO_DIAG] sample frame#3330 env=1977286178832 ee=3F sim_time=168.4200 frame_mean=171.91 black=no
+[VIDEO_DIAG] sample frame#3360 env=1977286178832 ee=3F sim_time=169.9200 frame_mean=171.91 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[M5][REGION_GOAL] held_transport_goal object=spoon_b region=tray_b source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#3390 env=1977286178832 ee=3F sim_time=171.4200 frame_mean=172.33 black=no
+[VIDEO_DIAG] sample frame#3420 env=1977286178832 ee=3F sim_time=172.9200 frame_mean=172.42 black=no
+[M5][REGION_GOAL] held_place_goal object=spoon_b region=tray_b source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#3450 env=1977286178832 ee=3F sim_time=174.4200 frame_mean=172.48 black=no
+[VIDEO_DIAG] sample frame#3480 env=1977286178832 ee=3F sim_time=175.9200 frame_mean=172.56 black=no
+[VIDEO_DIAG] sample frame#3510 env=1977286178832 ee=3F sim_time=177.4200 frame_mean=172.56 black=no
+[VIDEO_DIAG] sample frame#3540 env=1977286178832 ee=3F sim_time=178.9200 frame_mean=172.54 black=no
+[preshape-3f] opening 1.0
+[plan] PRE_GRASP 51 points {'position_error_m': 7.556504304670832e-06, 'orientation_error_deg': 9.226561854395476e-05}
+[VIDEO_DIAG] sample frame#3570 env=1977286178832 ee=3F sim_time=180.4200 frame_mean=172.53 black=no
+[VIDEO_DIAG] sample frame#3600 env=1977286178832 ee=3F sim_time=181.9200 frame_mean=172.51 black=no
+[VIDEO_DIAG] sample frame#3630 env=1977286178832 ee=3F sim_time=183.4200 frame_mean=172.64 black=no
+[spoon] PRE_GRASP: lift=0.000m fingers=[]
+[VIDEO_DIAG] sample frame#3660 env=1977286178832 ee=3F sim_time=184.9200 frame_mean=172.58 black=no
+[VIDEO_DIAG] sample frame#3690 env=1977286178832 ee=3F sim_time=186.4200 frame_mean=172.43 black=no
+[VIDEO_DIAG] sample frame#3720 env=1977286178832 ee=3F sim_time=187.9200 frame_mean=172.29 black=no
+[plan] GRASP 25 points {'position_error_m': 6.038469946778696e-07, 'orientation_error_deg': 1.1678384882875825e-05}
+[spoon] GRASP: lift=0.000m fingers=[]
+[VIDEO_DIAG] sample frame#3750 env=1977286178832 ee=3F sim_time=189.4200 frame_mean=172.29 black=no
+[VIDEO_DIAG] sample frame#3780 env=1977286178832 ee=3F sim_time=190.9200 frame_mean=172.31 black=no
+[VIDEO_DIAG] sample frame#3810 env=1977286178832 ee=3F sim_time=192.4200 frame_mean=172.35 black=no
+[spoon] GRASP: lift=0.000m fingers=[]
+[VIDEO_DIAG] sample frame#3840 env=1977286178832 ee=3F sim_time=193.9200 frame_mean=172.37 black=no
+[M5][VAC_ATTACH] intended_target='spoon_a' current_attached_body='spoon_a' candidate_body='spoon_a' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.000463
+[M5][VAC_ATTACH] intended_target='spoon_a' current_attached_body='spoon_a' candidate_body='spoon_a' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[VIDEO_DIAG] sample frame#3870 env=1977286178832 ee=3F sim_time=195.4200 frame_mean=172.34 black=no
+[plan] LIFT 30 points {'position_error_m': 5.46085108382397e-06, 'orientation_error_deg': 6.546009651077082e-05}
+[VIDEO_DIAG] sample frame#3900 env=1977286178832 ee=3F sim_time=196.9200 frame_mean=172.31 black=no
+[VIDEO_DIAG] sample frame#3930 env=1977286178832 ee=3F sim_time=198.4200 frame_mean=172.27 black=no
+[spoon] LIFT: lift=0.083m fingers=['thumb', 'index']
+[VIDEO_DIAG] sample frame#3960 env=1977286178832 ee=3F sim_time=199.9200 frame_mean=172.26 black=no
+[VIDEO_DIAG] sample frame#3990 env=1977286178832 ee=3F sim_time=201.4200 frame_mean=172.25 black=no
+[VIDEO_DIAG] sample frame#4020 env=1977286178832 ee=3F sim_time=202.9200 frame_mean=172.25 black=no
+[spoon] HOLD: lift=0.144m fingers=['thumb', 'index']
+[VIDEO_DIAG] sample frame#4050 env=1977286178832 ee=3F sim_time=204.4200 frame_mean=172.25 black=no
+[VIDEO_DIAG] sample frame#4080 env=1977286178832 ee=3F sim_time=205.9200 frame_mean=172.25 black=no
+[VIDEO_DIAG] sample frame#4110 env=1977286178832 ee=3F sim_time=207.4200 frame_mean=172.25 black=no
+[M5][REGION_GOAL] held_transport_goal object=spoon_a region=tray_a source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#4140 env=1977286178832 ee=3F sim_time=208.9200 frame_mean=172.24 black=no
+[VIDEO_DIAG] sample frame#4170 env=1977286178832 ee=3F sim_time=210.4200 frame_mean=172.13 black=no
+[VIDEO_DIAG] sample frame#4200 env=1977286178832 ee=3F sim_time=211.9200 frame_mean=172.20 black=no
+[VIDEO_DIAG] sample frame#4230 env=1977286178832 ee=3F sim_time=213.4200 frame_mean=172.36 black=no
+[VIDEO_DIAG] sample frame#4260 env=1977286178832 ee=3F sim_time=214.9200 frame_mean=172.48 black=no
+[M5][REGION_GOAL] held_place_goal object=spoon_a region=tray_a source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#4290 env=1977286178832 ee=3F sim_time=216.4200 frame_mean=172.51 black=no
+[VIDEO_DIAG] sample frame#4320 env=1977286178832 ee=3F sim_time=217.9200 frame_mean=172.67 black=no
+[VIDEO_DIAG] sample frame#4350 env=1977286178832 ee=3F sim_time=219.4200 frame_mean=172.65 black=no
+[VIDEO_DIAG] sample frame#4380 env=1977286178832 ee=3F sim_time=220.9200 frame_mean=172.59 black=no
+[VIDEO_DIAG] sample frame#4410 env=1977286178832 ee=3F sim_time=222.4200 frame_mean=172.58 black=no
+[plan] PRE_GRASP 98 points {'position_error_m': 7.588496922426458e-07, 'orientation_error_deg': 1.077275878310301e-05}
+[VIDEO_DIAG] sample frame#4440 env=1977286178832 ee=3F sim_time=223.9200 frame_mean=172.53 black=no
+[VIDEO_DIAG] sample frame#4470 env=1977286178832 ee=3F sim_time=225.4200 frame_mean=172.39 black=no
+[catalog] fork_b PRE_GRASP lift=-0.000 []
+[VIDEO_DIAG] sample frame#4500 env=1977286178832 ee=3F sim_time=226.9200 frame_mean=172.29 black=no
+[VIDEO_DIAG] sample frame#4530 env=1977286178832 ee=3F sim_time=228.4200 frame_mean=172.28 black=no
+[VIDEO_DIAG] sample frame#4560 env=1977286178832 ee=3F sim_time=229.9200 frame_mean=172.24 black=no
+[plan] GRASP 25 points {'position_error_m': 6.423538935124558e-07, 'orientation_error_deg': 1.4042718860326683e-05}
+[catalog] fork_b GRASP lift=-0.000 []
+[VIDEO_DIAG] sample frame#4590 env=1977286178832 ee=3F sim_time=231.4200 frame_mean=172.26 black=no
+[VIDEO_DIAG] sample frame#4620 env=1977286178832 ee=3F sim_time=232.9200 frame_mean=172.43 black=no
+[VIDEO_DIAG] sample frame#4650 env=1977286178832 ee=3F sim_time=234.4200 frame_mean=172.51 black=no
+[VIDEO_DIAG] sample frame#4680 env=1977286178832 ee=3F sim_time=235.9200 frame_mean=172.50 black=no
+[catalog] fork_b CLOSE lift=-0.000 []
+[VIDEO_DIAG] sample frame#4710 env=1977286178832 ee=3F sim_time=237.4200 frame_mean=172.48 black=no
+[M5][VAC_ATTACH] intended_target='fork_b' current_attached_body='fork_b' candidate_body='fork_b' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.001303
+[M5][VAC_ATTACH] intended_target='fork_b' current_attached_body='fork_b' candidate_body='fork_b' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[VIDEO_DIAG] sample frame#4740 env=1977286178832 ee=3F sim_time=238.9200 frame_mean=172.49 black=no
+[plan] BREAKAWAY 4 points {'position_error_m': 9.080838459081312e-07, 'orientation_error_deg': 1.4557036193225872e-05}
+[plan] LIFT 31 points {'position_error_m': 2.41059443172028e-06, 'orientation_error_deg': 3.280691382147669e-05}
+[VIDEO_DIAG] sample frame#4770 env=1977286178832 ee=3F sim_time=240.4200 frame_mean=172.46 black=no
+[catalog] fork_b LIFT lift=0.040 ['index']
+[VIDEO_DIAG] sample frame#4800 env=1977286178832 ee=3F sim_time=241.9200 frame_mean=172.33 black=no
+[VIDEO_DIAG] sample frame#4830 env=1977286178832 ee=3F sim_time=243.4200 frame_mean=172.22 black=no
+[plan] LEVEL 5 points {'position_error_m': 3.1410822807669925e-06, 'orientation_error_deg': 5.643624556825728e-05}
+[VIDEO_DIAG] sample frame#4860 env=1977286178832 ee=3F sim_time=244.9200 frame_mean=172.21 black=no
+[catalog] fork_b LEVEL lift=0.147 []
+[VIDEO_DIAG] sample frame#4890 env=1977286178832 ee=3F sim_time=246.4200 frame_mean=172.24 black=no
+[VIDEO_DIAG] sample frame#4920 env=1977286178832 ee=3F sim_time=247.9200 frame_mean=172.24 black=no
+[VIDEO_DIAG] sample frame#4950 env=1977286178832 ee=3F sim_time=249.4200 frame_mean=172.24 black=no
+[catalog] fork_b HOLD lift=0.147 []
+[VIDEO_DIAG] sample frame#4980 env=1977286178832 ee=3F sim_time=250.9200 frame_mean=172.24 black=no
+[VIDEO_DIAG] sample frame#5010 env=1977286178832 ee=3F sim_time=252.4200 frame_mean=172.24 black=no
+[M5][REGION_GOAL] held_transport_goal object=fork_b region=tray_b source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#5040 env=1977286178832 ee=3F sim_time=253.9200 frame_mean=172.55 black=no
+[VIDEO_DIAG] sample frame#5070 env=1977286178832 ee=3F sim_time=255.4200 frame_mean=172.36 black=no
+[M5][REGION_GOAL] held_place_goal object=fork_b region=tray_b source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#5100 env=1977286178832 ee=3F sim_time=256.9200 frame_mean=172.34 black=no
+[VIDEO_DIAG] sample frame#5130 env=1977286178832 ee=3F sim_time=258.4200 frame_mean=172.45 black=no
+[VIDEO_DIAG] sample frame#5160 env=1977286178832 ee=3F sim_time=259.9200 frame_mean=172.51 black=no
+[VIDEO_DIAG] sample frame#5190 env=1977286178832 ee=3F sim_time=261.4200 frame_mean=172.51 black=no
+[VIDEO_DIAG] sample frame#5220 env=1977286178832 ee=3F sim_time=262.9200 frame_mean=172.52 black=no
+[VIDEO_DIAG] sample frame#5250 env=1977286178832 ee=3F sim_time=264.4200 frame_mean=172.49 black=no
+[plan] PRE_GRASP 43 points {'position_error_m': 1.4842541774427984e-06, 'orientation_error_deg': 2.0873104714118234e-05}
+[VIDEO_DIAG] sample frame#5280 env=1977286178832 ee=3F sim_time=265.9200 frame_mean=172.49 black=no
+[VIDEO_DIAG] sample frame#5310 env=1977286178832 ee=3F sim_time=267.4200 frame_mean=172.55 black=no
+[VIDEO_DIAG] sample frame#5340 env=1977286178832 ee=3F sim_time=268.9200 frame_mean=172.75 black=no
+[catalog] fork_a PRE_GRASP lift=-0.000 []
+[VIDEO_DIAG] sample frame#5370 env=1977286178832 ee=3F sim_time=270.4200 frame_mean=172.54 black=no
+[plan] GRASP 25 points {'position_error_m': 6.426297954245546e-07, 'orientation_error_deg': 1.411482475206074e-05}
+[VIDEO_DIAG] sample frame#5400 env=1977286178832 ee=3F sim_time=271.9200 frame_mean=172.54 black=no
+[VIDEO_DIAG] sample frame#5430 env=1977286178832 ee=3F sim_time=273.4200 frame_mean=172.73 black=no
+[catalog] fork_a GRASP lift=-0.000 []
+[VIDEO_DIAG] sample frame#5460 env=1977286178832 ee=3F sim_time=274.9200 frame_mean=172.79 black=no
+[VIDEO_DIAG] sample frame#5490 env=1977286178832 ee=3F sim_time=276.4200 frame_mean=172.79 black=no
+[VIDEO_DIAG] sample frame#5520 env=1977286178832 ee=3F sim_time=277.9200 frame_mean=172.77 black=no
+[M5][VAC_ATTACH] intended_target='fork_a' current_attached_body='fork_a' candidate_body='fork_a' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.001333
+[M5][VAC_ATTACH] intended_target='fork_a' current_attached_body='fork_a' candidate_body='fork_a' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[catalog] fork_a CLOSE lift=-0.001 ['thumb', 'index']
+[VIDEO_DIAG] sample frame#5550 env=1977286178832 ee=3F sim_time=279.4200 frame_mean=172.78 black=no
+[plan] BREAKAWAY 4 points {'position_error_m': 8.492076938588441e-07, 'orientation_error_deg': 1.3994568149312009e-05}
+[plan] LIFT 31 points {'position_error_m': 2.1285417377568317e-06, 'orientation_error_deg': 2.9502467891600067e-05}
+[VIDEO_DIAG] sample frame#5580 env=1977286178832 ee=3F sim_time=280.9200 frame_mean=172.77 black=no
+[VIDEO_DIAG] sample frame#5610 env=1977286178832 ee=3F sim_time=282.4200 frame_mean=172.64 black=no
+[VIDEO_DIAG] sample frame#5640 env=1977286178832 ee=3F sim_time=283.9200 frame_mean=172.49 black=no
+[catalog] fork_a LIFT lift=0.146 []
+[plan] LEVEL 5 points {'position_error_m': 3.297268938483308e-06, 'orientation_error_deg': 5.799070625971627e-05}
+[VIDEO_DIAG] sample frame#5670 env=1977286178832 ee=3F sim_time=285.4200 frame_mean=172.48 black=no
+[VIDEO_DIAG] sample frame#5700 env=1977286178832 ee=3F sim_time=286.9200 frame_mean=172.52 black=no
+[VIDEO_DIAG] sample frame#5730 env=1977286178832 ee=3F sim_time=288.4200 frame_mean=172.52 black=no
+[catalog] fork_a HOLD lift=0.147 []
+[VIDEO_DIAG] sample frame#5760 env=1977286178832 ee=3F sim_time=289.9200 frame_mean=172.52 black=no
+[VIDEO_DIAG] sample frame#5790 env=1977286178832 ee=3F sim_time=291.4200 frame_mean=172.52 black=no
+[VIDEO_DIAG] sample frame#5820 env=1977286178832 ee=3F sim_time=292.9400 frame_mean=172.52 black=no
+[M5][REGION_GOAL] held_transport_goal object=fork_a region=tray_a source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#5850 env=1977286178832 ee=3F sim_time=294.4400 frame_mean=172.52 black=no
+[VIDEO_DIAG] sample frame#5880 env=1977286178832 ee=3F sim_time=295.9400 frame_mean=172.51 black=no
+[VIDEO_DIAG] sample frame#5910 env=1977286178832 ee=3F sim_time=297.4400 frame_mean=172.60 black=no
+[VIDEO_DIAG] sample frame#5940 env=1977286178832 ee=3F sim_time=298.9400 frame_mean=172.68 black=no
+[M5][REGION_GOAL] held_place_goal object=fork_a region=tray_a source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#5970 env=1977286178832 ee=3F sim_time=300.4400 frame_mean=172.66 black=no
+[VIDEO_DIAG] sample frame#6000 env=1977286178832 ee=3F sim_time=301.9400 frame_mean=172.63 black=no
+[VIDEO_DIAG] sample frame#6030 env=1977286178832 ee=3F sim_time=303.4400 frame_mean=172.70 black=no
+[VIDEO_DIAG] sample frame#6060 env=1977286178832 ee=3F sim_time=304.9400 frame_mean=172.70 black=no
+[VIDEO_DIAG] sample frame#6090 env=1977286178832 ee=3F sim_time=306.4400 frame_mean=172.72 black=no
+[VIDEO_DIAG] sample frame#6120 env=1977286178832 ee=3F sim_time=307.9400 frame_mean=172.64 black=no
+[VIDEO_DIAG] sample frame#6150 env=1977286178832 ee=3F sim_time=309.4400 frame_mean=172.64 black=no
+[plan] PRE_GRASP 125 points {'position_error_m': 1.974770644795857e-06, 'orientation_error_deg': 2.2480796053264917e-05}
+[VIDEO_DIAG] sample frame#6180 env=1977286178832 ee=3F sim_time=310.9400 frame_mean=172.64 black=no
+[catalog] fruit_b PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#6210 env=1977286178832 ee=3F sim_time=312.4400 frame_mean=172.62 black=no
+[VIDEO_DIAG] sample frame#6240 env=1977286178832 ee=3F sim_time=313.9400 frame_mean=172.59 black=no
+[VIDEO_DIAG] sample frame#6270 env=1977286178832 ee=3F sim_time=315.4400 frame_mean=172.57 black=no
+[VIDEO_DIAG] sample frame#6300 env=1977286178832 ee=3F sim_time=316.9400 frame_mean=172.77 black=no
+[catalog] fruit_b PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#6330 env=1977286178832 ee=3F sim_time=318.4400 frame_mean=172.67 black=no
+[VIDEO_DIAG] sample frame#6360 env=1977286178832 ee=3F sim_time=319.9400 frame_mean=172.40 black=no
+[VIDEO_DIAG] sample frame#6390 env=1977286178832 ee=3F sim_time=321.4400 frame_mean=172.36 black=no
+[plan] GRASP 15 points {'position_error_m': 2.8734778052857592e-06, 'orientation_error_deg': 3.864529211552898e-05}
+[catalog] fruit_b GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#6420 env=1977286178832 ee=3F sim_time=322.9400 frame_mean=172.51 black=no
+[VIDEO_DIAG] sample frame#6450 env=1977286178832 ee=3F sim_time=324.4400 frame_mean=172.69 black=no
+[M5][VAC_ATTACH] intended_target='fruit_b' current_attached_body='fruit_b' candidate_body='fruit_b' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.000104
+[M5][VAC_ATTACH] intended_target='fruit_b' current_attached_body='fruit_b' candidate_body='fruit_b' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[plan] BREAKAWAY 4 points {'position_error_m': 5.100953654303038e-06, 'orientation_error_deg': 6.122992849369711e-05}
+[VIDEO_DIAG] sample frame#6480 env=1977286178832 ee=3F sim_time=325.9400 frame_mean=172.63 black=no
+[plan] BREAKAWAY 2 points {'position_error_m': 2.446544041493756e-06, 'orientation_error_deg': 3.713551869091851e-05}
+[plan] LIFT 22 points {'position_error_m': 1.5276834773259867e-06, 'orientation_error_deg': 1.6636276404248317e-05}
+[catalog] fruit_b LIFT lift=0.033 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#6510 env=1977286178832 ee=3F sim_time=327.4400 frame_mean=172.47 black=no
+[VIDEO_DIAG] sample frame#6540 env=1977286178832 ee=3F sim_time=328.9400 frame_mean=172.24 black=no
+[plan] LEVEL 10 points {'position_error_m': 4.180192138824945e-06, 'orientation_error_deg': 4.8425070309402395e-05}
+[VIDEO_DIAG] sample frame#6570 env=1977286178832 ee=3F sim_time=330.4400 frame_mean=172.25 black=no
+[VIDEO_DIAG] sample frame#6600 env=1977286178832 ee=3F sim_time=331.9400 frame_mean=172.29 black=no
+[plan] LEVEL 2 points {'position_error_m': 3.179774482984896e-06, 'orientation_error_deg': 3.74485829465407e-05}
+[catalog] fruit_b LEVEL lift=0.097 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#6630 env=1977286178832 ee=3F sim_time=333.4400 frame_mean=172.29 black=no
+[VIDEO_DIAG] sample frame#6660 env=1977286178832 ee=3F sim_time=334.9400 frame_mean=172.29 black=no
+[VIDEO_DIAG] sample frame#6690 env=1977286178832 ee=3F sim_time=336.4400 frame_mean=172.29 black=no
+[catalog] fruit_b HOLD lift=0.098 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#6720 env=1977286178832 ee=3F sim_time=337.9400 frame_mean=172.29 black=no
+[VIDEO_DIAG] sample frame#6750 env=1977286178832 ee=3F sim_time=339.4400 frame_mean=172.29 black=no
+[M5][REGION_GOAL] held_transport_goal object=fruit_b region=plate_b source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#6780 env=1977286178832 ee=3F sim_time=340.9400 frame_mean=172.28 black=no
+[VIDEO_DIAG] sample frame#6810 env=1977286178832 ee=3F sim_time=342.4400 frame_mean=172.29 black=no
+[VIDEO_DIAG] sample frame#6840 env=1977286178832 ee=3F sim_time=343.9400 frame_mean=172.45 black=no
+[M5][REGION_GOAL] held_place_goal object=fruit_b region=plate_b source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#6870 env=1977286178832 ee=3F sim_time=345.4400 frame_mean=172.51 black=no
+[VIDEO_DIAG] sample frame#6900 env=1977286178832 ee=3F sim_time=346.9400 frame_mean=172.51 black=no
+[VIDEO_DIAG] sample frame#6930 env=1977286178832 ee=3F sim_time=348.4400 frame_mean=172.44 black=no
+[VIDEO_DIAG] sample frame#6960 env=1977286178832 ee=3F sim_time=349.9400 frame_mean=172.45 black=no
+[plan] PRE_GRASP 68 points {'position_error_m': 1.4719202492045596e-06, 'orientation_error_deg': 1.4878864411848284e-05}
+[VIDEO_DIAG] sample frame#6990 env=1977286178832 ee=3F sim_time=351.4400 frame_mean=172.45 black=no
+[catalog] fruit_a PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#7020 env=1977286178832 ee=3F sim_time=352.9400 frame_mean=172.38 black=no
+[VIDEO_DIAG] sample frame#7050 env=1977286178832 ee=3F sim_time=354.4400 frame_mean=172.15 black=no
+[VIDEO_DIAG] sample frame#7080 env=1977286178832 ee=3F sim_time=355.9400 frame_mean=171.86 black=no
+[VIDEO_DIAG] sample frame#7110 env=1977286178832 ee=3F sim_time=357.4400 frame_mean=171.87 black=no
+[catalog] fruit_a PRE_GRASP lift=0.000 []
+[plan] GRASP 16 points {'position_error_m': 6.997698535667402e-06, 'orientation_error_deg': 8.18998345263217e-05}
+[VIDEO_DIAG] sample frame#7140 env=1977286178832 ee=3F sim_time=358.9400 frame_mean=171.88 black=no
+[VIDEO_DIAG] sample frame#7170 env=1977286178832 ee=3F sim_time=360.4400 frame_mean=172.08 black=no
+[VIDEO_DIAG] sample frame#7200 env=1977286178832 ee=3F sim_time=361.9400 frame_mean=172.18 black=no
+[M5][VAC_ATTACH] intended_target='fruit_a' current_attached_body='fruit_a' candidate_body='fruit_a' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.000104
+[M5][VAC_ATTACH] intended_target='fruit_a' current_attached_body='fruit_a' candidate_body='fruit_a' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[catalog] fruit_a CLOSE lift=0.000 ['thumb', 'index', 'pinky']
+[plan] BREAKAWAY 4 points {'position_error_m': 8.349687434296514e-07, 'orientation_error_deg': 9.171099506176537e-06}
+[plan] BREAKAWAY 2 points {'position_error_m': 3.6826616478687685e-06, 'orientation_error_deg': 4.793029257005742e-05}
+[plan] LIFT 28 points {'position_error_m': 7.5016924704940935e-06, 'orientation_error_deg': 6.91179241283752e-05}
+[VIDEO_DIAG] sample frame#7230 env=1977286178832 ee=3F sim_time=363.4400 frame_mean=172.08 black=no
+[VIDEO_DIAG] sample frame#7260 env=1977286178832 ee=3F sim_time=364.9400 frame_mean=171.94 black=no
+[VIDEO_DIAG] sample frame#7290 env=1977286178832 ee=3F sim_time=366.4400 frame_mean=171.91 black=no
+[plan] LEVEL 15 points {'position_error_m': 5.214655772551707e-06, 'orientation_error_deg': 5.542312670183637e-05}
+[catalog] fruit_a LEVEL lift=0.099 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#7320 env=1977286178832 ee=3F sim_time=367.9400 frame_mean=171.91 black=no
+[VIDEO_DIAG] sample frame#7350 env=1977286178832 ee=3F sim_time=369.4400 frame_mean=172.00 black=no
+[plan] LEVEL 2 points {'position_error_m': 9.082099464810941e-07, 'orientation_error_deg': 9.58083400506489e-06}
+[VIDEO_DIAG] sample frame#7380 env=1977286178832 ee=3F sim_time=370.9400 frame_mean=172.00 black=no
+[VIDEO_DIAG] sample frame#7410 env=1977286178832 ee=3F sim_time=372.4400 frame_mean=172.00 black=no
+[catalog] fruit_a HOLD lift=0.098 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#7440 env=1977286178832 ee=3F sim_time=373.9400 frame_mean=172.00 black=no
+[VIDEO_DIAG] sample frame#7470 env=1977286178832 ee=3F sim_time=375.4400 frame_mean=172.00 black=no
+[VIDEO_DIAG] sample frame#7500 env=1977286178832 ee=3F sim_time=376.9400 frame_mean=172.00 black=no
+[M5][REGION_GOAL] held_transport_goal object=fruit_a region=plate_a source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#7530 env=1977286178832 ee=3F sim_time=378.4400 frame_mean=172.02 black=no
+[VIDEO_DIAG] sample frame#7560 env=1977286178832 ee=3F sim_time=379.9400 frame_mean=172.37 black=no
+[VIDEO_DIAG] sample frame#7590 env=1977286178832 ee=3F sim_time=381.4400 frame_mean=172.85 black=no
+[VIDEO_DIAG] sample frame#7620 env=1977286178832 ee=3F sim_time=382.9400 frame_mean=173.08 black=no
+[VIDEO_DIAG] sample frame#7650 env=1977286178832 ee=3F sim_time=384.4400 frame_mean=173.18 black=no
+[VIDEO_DIAG] sample frame#7680 env=1977286178832 ee=3F sim_time=385.9400 frame_mean=173.22 black=no
+[M5][REGION_GOAL] held_place_goal object=fruit_a region=plate_a source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#7710 env=1977286178832 ee=3F sim_time=387.4400 frame_mean=173.26 black=no
+[VIDEO_DIAG] sample frame#7740 env=1977286178832 ee=3F sim_time=388.9400 frame_mean=173.23 black=no
+[VIDEO_DIAG] sample frame#7770 env=1977286178832 ee=3F sim_time=390.4400 frame_mean=173.19 black=no
+[plan] PRE_GRASP 21 points {'position_error_m': 6.885386574449399e-07, 'orientation_error_deg': 1.1815510357662974e-05}
+[VIDEO_DIAG] sample frame#7800 env=1977286178832 ee=3F sim_time=391.9400 frame_mean=173.13 black=no
+[VIDEO_DIAG] sample frame#7830 env=1977286178832 ee=3F sim_time=393.4400 frame_mean=173.03 black=no
+[plan] GRASP 15 points {'position_error_m': 7.482723046447781e-07, 'orientation_error_deg': 1.404990352688766e-05}
+[catalog] bread_b GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#7860 env=1977286178832 ee=3F sim_time=394.9400 frame_mean=173.10 black=no
+[VIDEO_DIAG] sample frame#7890 env=1977286178832 ee=3F sim_time=396.4400 frame_mean=173.18 black=no
+[VIDEO_DIAG] sample frame#7920 env=1977286178832 ee=3F sim_time=397.9400 frame_mean=173.17 black=no
+[plan] LIFT 25 points {'position_error_m': 1.2160078761578798e-06, 'orientation_error_deg': 1.915401050507663e-05}
+[catalog] bread_b LIFT lift=0.015 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#7950 env=1977286178832 ee=3F sim_time=399.4400 frame_mean=173.13 black=no
+[VIDEO_DIAG] sample frame#7980 env=1977286178832 ee=3F sim_time=400.9400 frame_mean=173.11 black=no
+[VIDEO_DIAG] sample frame#8010 env=1977286178832 ee=3F sim_time=402.4400 frame_mean=173.09 black=no
+[VIDEO_DIAG] sample frame#8040 env=1977286178832 ee=3F sim_time=403.9400 frame_mean=173.09 black=no
+[catalog] bread_b HOLD lift=0.111 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#8070 env=1977286178832 ee=3F sim_time=405.4400 frame_mean=173.09 black=no
+[VIDEO_DIAG] sample frame#8100 env=1977286178832 ee=3F sim_time=406.9400 frame_mean=173.09 black=no
+[VIDEO_DIAG] sample frame#8130 env=1977286178832 ee=3F sim_time=408.4400 frame_mean=173.09 black=no
+[M5][VAC_ATTACH] intended_target='bread_b' current_attached_body='bread_b' candidate_body='bread_b' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.000095
+[M5][VAC_ATTACH] intended_target='bread_b' current_attached_body='bread_b' candidate_body='bread_b' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[M5][REGION_GOAL] held_transport_goal object=bread_b region=plate_b source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#8160 env=1977286178832 ee=3F sim_time=409.9400 frame_mean=173.14 black=no
+[VIDEO_DIAG] sample frame#8190 env=1977286178832 ee=3F sim_time=411.4400 frame_mean=172.72 black=no
+[M5][REGION_GOAL] held_place_goal object=bread_b region=plate_b source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#8220 env=1977286178832 ee=3F sim_time=412.9400 frame_mean=172.76 black=no
+[VIDEO_DIAG] sample frame#8250 env=1977286178832 ee=3F sim_time=414.4400 frame_mean=172.81 black=no
+[VIDEO_DIAG] sample frame#8280 env=1977286178832 ee=3F sim_time=415.9400 frame_mean=172.72 black=no
+[plan] PRE_GRASP 31 points {'position_error_m': 1.1274231703773091e-06, 'orientation_error_deg': 1.5817169616470766e-05}
+[VIDEO_DIAG] sample frame#8310 env=1977286178832 ee=3F sim_time=417.4400 frame_mean=172.73 black=no
+[VIDEO_DIAG] sample frame#8340 env=1977286178832 ee=3F sim_time=418.9400 frame_mean=173.02 black=no
+[VIDEO_DIAG] sample frame#8370 env=1977286178832 ee=3F sim_time=420.4400 frame_mean=173.18 black=no
+[catalog] bread_a PRE_GRASP lift=0.000 []
+[plan] GRASP 16 points {'position_error_m': 6.196136977824603e-07, 'orientation_error_deg': 1.2368012525862033e-05}
+[VIDEO_DIAG] sample frame#8400 env=1977286178832 ee=3F sim_time=421.9400 frame_mean=173.23 black=no
+[VIDEO_DIAG] sample frame#8430 env=1977286178832 ee=3F sim_time=423.4400 frame_mean=173.25 black=no
+[VIDEO_DIAG] sample frame#8460 env=1977286178832 ee=3F sim_time=424.9400 frame_mean=173.23 black=no
+[catalog] bread_a CLOSE lift=0.000 ['thumb', 'index', 'pinky']
+[plan] LIFT 25 points {'position_error_m': 1.2654263850244916e-06, 'orientation_error_deg': 1.962925253839688e-05}
+[VIDEO_DIAG] sample frame#8490 env=1977286178832 ee=3F sim_time=426.4400 frame_mean=173.23 black=no
+[VIDEO_DIAG] sample frame#8520 env=1977286178832 ee=3F sim_time=427.9400 frame_mean=173.14 black=no
+[VIDEO_DIAG] sample frame#8550 env=1977286178832 ee=3F sim_time=429.4400 frame_mean=173.14 black=no
+[catalog] bread_a SETTLE lift=0.112 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#8580 env=1977286178832 ee=3F sim_time=430.9400 frame_mean=173.14 black=no
+[VIDEO_DIAG] sample frame#8610 env=1977286178832 ee=3F sim_time=432.4400 frame_mean=173.13 black=no
+[VIDEO_DIAG] sample frame#8640 env=1977286178832 ee=3F sim_time=433.9400 frame_mean=173.13 black=no
+[catalog] bread_a HOLD lift=0.110 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#8670 env=1977286178832 ee=3F sim_time=435.4400 frame_mean=173.13 black=no
+
+[batch] TIMEOUT after 90 min — killed

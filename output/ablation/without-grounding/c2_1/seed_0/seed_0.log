@@ -1,0 +1,79 @@
+# 2026-10-24T15:04:31
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c2_1 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c2_1\seed_0 --grounding-mode without_grounding --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[run] LLM provider=openai model=gpt-4o-mini
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[cam] fovy 70.0° -> 60.0°
+[cam] agentview 수동 pos=[-0.265  0.16   1.55 ] lookat=[-0.285  0.16   0.878]
+[env] instances: ['apple', 'bread', 'mug', 'plate', 'spoon', 'blue_tray', 'UR5e0', 'RethinkMount0', 'NullGripper0_right', 'gripperrack_3F_right_gripper', 'gripperrack_vac_vacuum_base', 'gripperrack_2F_robotiq_85_adapter_link', 'ee_rack']
+[env] tracked: ['apple', 'bread', 'mug', 'plate', 'spoon', 'blue_tray', 'gripperrack_3F_right_gripper', 'gripperrack_vac_vacuum_base', 'gripperrack_2F_robotiq_85_adapter_link', 'ee_rack']
+[env] robot base offset (mm): (np.float64(-680.0), np.float64(0.0))
+[cam] agentview: fovy=60.0° fovx=60.0° (H512×W512) pos=[-0.265  0.16   1.55 ] f=443.4px
+[cam] 2차 뷰(사선/크롭) agentview: pos=[0.265 0.148 1.498] lookat=[-0.285  0.16   0.878] fovy=60.0°
+     apple                    points: 1차 1766 + 2차 1781 = 3547
+     bread                    points: 1차 3302 + 2차 3343 = 6645
+     mug                      points: 1차 2976 + 2차 3083 = 6059
+     plate                    points: 1차 9903 + 2차 9917 = 19820
+     spoon                    points: 1차 1039 + 2차 1178 = 2217
+     blue_tray                points: 1차 36271 + 2차 15967 = 52238
+     ee_rack                  points: 1차 0 + 2차 3333 = 3333
+[M1] detected 7/10 tracked instances
+     apple                    points=3547
+     bread                    points=6645
+     mug                      points=6059
+     plate                    points=19820
+     spoon                    points=2217
+     blue_tray                points=52238
+     ee_rack                  points=3333
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_apple_apple', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_bread_bread', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_mug_mug', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_plate_plate', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_spoon_spoon', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_tray_blue_tray', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_rack_ee_rack', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+[M1] grounding: nodes=7 grounded=0 memory_hits=7 refreshed=7
+[M1] memory update: new=0 upgraded=0 kept=7 -> C:\Users\user\Tool-Use-Journal\output\memory.json
+[M1] m0_retrieval -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c2_1\seed_0\execution\m0_retrieval.json
+[M1] phys tokens: c3=0 (calls=0) full_siphy=0 (calls=0) total=0
+[M1] nodes=7 edges=5 crops=7
+     near      obj_apple_apple -> obj_bread_bread
+     near      obj_apple_apple -> obj_mug_mug
+     near      obj_bread_bread -> obj_plate_plate
+     near      obj_plate_plate -> obj_spoon_spoon
+     near      obj_rack_ee_rack -> obj_spoon_spoon
+[c2_1] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c2_1\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c2_1\seed_0\execution/m1_points.npz
+[timing] LLM prompt=0 completion=0 total=0 (0.00s)
+  [m1] 11.80s (prepared)
+  [m2] n/a (failed)
+  [m4] n/a (not_run)
+  [m5] n/a (not_run)
+  [total] 11.80s
+[timing] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c2_1\seed_0\timing_summary.json
+Traceback (most recent call last):
+  File "C:\Users\user\Tool-Use-Journal\scripts\run.py", line 1949, in <module>
+    main()
+  File "C:\Users\user\Tool-Use-Journal\scripts\run.py", line 1887, in main
+    return run(args, sys.modules[__name__])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\scripts\run_without_grounding.py", line 292, in run
+    m2 = build_m2(task_instruction(args.task), read(out / "m1.json"), rough)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\ablations\without_grounding.py", line 265, in build_m2
+    out = run_m2(task, scene, rough=rough)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m2_subgoal\pipeline.py", line 40, in run_m2
+    subgoals = rough.generate(task, m1_serialized)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\ablations\without_grounding.py", line 223, in generate
+    decisions = self._call(
+                ^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\ablations\without_grounding.py", line 201, in _call
+    raise ValueError(f"{stage}: invalid model response after 2 attempts: {error}")
+ValueError: visual_selection: invalid model response after 2 attempts: SG1: select a scene tool distinct from targets/destination

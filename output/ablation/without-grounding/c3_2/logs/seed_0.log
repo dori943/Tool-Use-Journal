@@ -1,0 +1,940 @@
+# 2026-10-24T15:06:08
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c3_2 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c3_2\seed_0 --grounding-mode without_grounding --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[run] LLM provider=openai model=gpt-4o-mini
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[env] RoboCasa Kitchen: camera_segmentations unsupported; using task-object visual geom segmentation
+[env] robocasa task objects: ['bread_a', 'bread_b', 'fork_a', 'fork_b', 'fruit_a', 'fruit_b', 'mug_a', 'mug_b', 'plate_a', 'plate_b', 'spoon_a', 'spoon_b', 'tray_a', 'tray_b']
+[cam] RoboCasa scene camera [auto-fit]: lookat=[ 2.46  -3.13   0.943] dist=0.95 az=180° el=-55° fovy=60.0°
+[env] tracked: ['bread_a', 'bread_b', 'fork_a', 'fork_b', 'fruit_a', 'fruit_b', 'mug_a', 'mug_b', 'plate_a', 'plate_b', 'spoon_a', 'spoon_b', 'tray_a', 'tray_b']
+[env] robot base offset (mm): (np.float64(1869.9921209993392), np.float64(-3219.9896231893763))
+[cam] common scene: fovy=60.0° fovx=60.0° (H512×W512) pos=[ 3.003 -3.13   1.719] f=443.4px
+[M1] detected 14/14 tracked instances
+     bread_a                  points=904
+     bread_b                  points=910
+     fork_a                   points=121
+     fork_b                   points=129
+     fruit_a                  points=1193
+     fruit_b                  points=1160
+     mug_a                    points=2515
+     mug_b                    points=2384
+     plate_a                  points=5118
+     plate_b                  points=5115
+     spoon_a                  points=386
+     spoon_b                  points=388
+     tray_a                   points=10153
+     tray_b                   points=10168
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_bread_a_bread_a', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_bread_b_bread_b', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_fork_a_fork_a', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_fork_b_fork_b', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_fruit_a_fruit_a', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_fruit_b_fruit_b', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_mug_a_mug_a', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_mug_b_mug_b', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_plate_a_plate_a', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_plate_b_plate_b', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_spoon_a_spoon_a', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_spoon_b_spoon_b', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_tray_a_tray_a', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_tray_b_tray_b', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+[M1] grounding: nodes=14 grounded=0 memory_hits=14 refreshed=14
+[M1] memory update: new=0 upgraded=0 kept=14 -> C:\Users\user\Tool-Use-Journal\output\memory.json
+[M1] m0_retrieval -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c3_2\seed_0\execution\m0_retrieval.json
+[M1] phys tokens: c3=0 (calls=0) full_siphy=0 (calls=0) total=0
+[M1] nodes=14 edges=38 crops=14
+     near      obj_bread_a_bread_a -> obj_bread_b_bread_b
+     near      obj_bread_a_bread_a -> obj_fruit_b_fruit_b
+     near      obj_bread_a_bread_a -> obj_mug_b_mug_b
+     near      obj_bread_a_bread_a -> obj_plate_a_plate_a
+     near      obj_bread_a_bread_a -> obj_plate_b_plate_b
+     near      obj_bread_a_bread_a -> obj_tray_a_tray_a
+     near      obj_bread_a_bread_a -> obj_tray_b_tray_b
+     near      obj_bread_b_bread_b -> obj_fork_a_fork_a
+     near      obj_bread_b_bread_b -> obj_plate_a_plate_a
+     near      obj_bread_b_bread_b -> obj_plate_b_plate_b
+     near      obj_bread_b_bread_b -> obj_tray_a_tray_a
+     near      obj_bread_b_bread_b -> obj_tray_b_tray_b
+     near      obj_fork_a_fork_a -> obj_fork_b_fork_b
+     near      obj_fork_a_fork_a -> obj_plate_a_plate_a
+     near      obj_fork_a_fork_a -> obj_spoon_a_spoon_a
+     near      obj_fork_a_fork_a -> obj_spoon_b_spoon_b
+     near      obj_fork_a_fork_a -> obj_tray_a_tray_a
+     near      obj_fork_b_fork_b -> obj_plate_a_plate_a
+     near      obj_fork_b_fork_b -> obj_spoon_a_spoon_a
+     near      obj_fork_b_fork_b -> obj_spoon_b_spoon_b
+     near      obj_fork_b_fork_b -> obj_tray_a_tray_a
+     near      obj_fruit_a_fruit_a -> obj_fruit_b_fruit_b
+     near      obj_fruit_a_fruit_a -> obj_mug_a_mug_a
+     near      obj_fruit_a_fruit_a -> obj_mug_b_mug_b
+     near      obj_fruit_a_fruit_a -> obj_plate_b_plate_b
+     near      obj_fruit_b_fruit_b -> obj_mug_a_mug_a
+     near      obj_fruit_b_fruit_b -> obj_mug_b_mug_b
+     near      obj_fruit_b_fruit_b -> obj_plate_b_plate_b
+     near      obj_mug_a_mug_a -> obj_mug_b_mug_b
+     near      obj_mug_a_mug_a -> obj_plate_b_plate_b
+     near      obj_mug_a_mug_a -> obj_tray_b_tray_b
+     near      obj_mug_b_mug_b -> obj_plate_b_plate_b
+     near      obj_mug_b_mug_b -> obj_tray_b_tray_b
+     near      obj_plate_a_plate_a -> obj_plate_b_plate_b
+     near      obj_plate_a_plate_a -> obj_spoon_a_spoon_a
+     near      obj_plate_a_plate_a -> obj_spoon_b_spoon_b
+     near      obj_spoon_a_spoon_a -> obj_spoon_b_spoon_b
+     near      obj_tray_a_tray_a -> obj_tray_b_tray_b
+[c3_2] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c3_2\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c3_2\seed_0\execution/m1_points.npz
+  [분할] SG1: 그룹 6개 → SG1_s1(1개), SG1_s2(1개), SG1_s3(1개), SG1_s4(1개), SG1_s5(1개), SG1_s6(1개)
+  [분할] SG2: 그룹 6개 → SG2_s1(1개), SG2_s2(1개), SG2_s3(1개), SG2_s4(1개), SG2_s5(1개), SG2_s6(1개)
+  [분할] SG3: 그룹 4개 → SG3_s1(1개), SG3_s2(1개), SG3_s3(1개), SG3_s4(1개)
+  [분할] SG4: 그룹 4개 → SG4_s1(1개), SG4_s2(1개), SG4_s3(1개), SG4_s4(1개)
+  [순서] 지시문 순서(VLM) 체인: SG3_s1 -> SG3_s2 -> SG3_s3 -> SG3_s4 -> SG4_s1 -> SG4_s2 -> SG4_s3 -> SG4_s4
+  [순서] SG3_s1(obj_tray_a_tray_a 덮기)는 ['SG1_s1', 'SG1_s2', 'SG1_s3', 'SG1_s4', 'SG1_s5', 'SG1_s6'](담기) 뒤에 — 사전조건 6건 부착
+  [순서] SG3_s2(obj_tray_a_tray_a 덮기)는 ['SG1_s1', 'SG1_s2', 'SG1_s3', 'SG1_s4', 'SG1_s5', 'SG1_s6'](담기) 뒤에 — 사전조건 6건 부착
+  [순서] SG3_s3(obj_tray_a_tray_a 덮기)는 ['SG1_s1', 'SG1_s2', 'SG1_s3', 'SG1_s4', 'SG1_s5', 'SG1_s6'](담기) 뒤에 — 사전조건 6건 부착
+  [순서] SG3_s4(obj_tray_a_tray_a 덮기)는 ['SG1_s1', 'SG1_s2', 'SG1_s3', 'SG1_s4', 'SG1_s5', 'SG1_s6'](담기) 뒤에 — 사전조건 6건 부착
+  [순서] SG4_s1(obj_tray_b_tray_b 덮기)는 ['SG2_s1', 'SG2_s2', 'SG2_s3', 'SG2_s4', 'SG2_s5', 'SG2_s6'](담기) 뒤에 — 사전조건 6건 부착
+  [순서] SG4_s2(obj_tray_b_tray_b 덮기)는 ['SG2_s1', 'SG2_s2', 'SG2_s3', 'SG2_s4', 'SG2_s5', 'SG2_s6'](담기) 뒤에 — 사전조건 6건 부착[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+
+  [순서] SG4_s3(obj_tray_b_tray_b 덮기)는 ['SG2_s1', 'SG2_s2', 'SG2_s3', 'SG2_s4', 'SG2_s5', 'SG2_s6'](담기) 뒤에 — 사전조건 6건 부착
+  [순서] SG4_s4(obj_tray_b_tray_b 덮기)는 ['SG2_s1', 'SG2_s2', 'SG2_s3', 'SG2_s4', 'SG2_s5', 'SG2_s6'](담기) 뒤에 — 사전조건 6건 부착
+  [분할] 재계산: 서브골 20 / 상세 60 / 엣지 108 / mutex 206 / 사이클 없음
+{
+  "status": "VALID",
+  "subgoal_count": 60,
+  "request_count": 60,
+  "subgoal_order": [
+    "SG2_s6_d1",
+    "SG2_s6_d2",
+    "SG2_s6_d3",
+    "SG2_s5_d1",
+    "SG2_s5_d2",
+    "SG2_s5_d3",
+    "SG2_s4_d1",
+    "SG2_s4_d2",
+    "SG2_s4_d3",
+    "SG2_s3_d1",
+    "SG2_s3_d2",
+    "SG2_s3_d3",
+    "SG2_s2_d1",
+    "SG2_s2_d2",
+    "SG2_s2_d3",
+    "SG2_s1_d1",
+    "SG2_s1_d2",
+    "SG2_s1_d3",
+    "SG4_s4_s1a",
+    "SG4_s4_s1b",
+    "SG4_s4_s1c",
+    "SG4_s3_s1a",
+    "SG4_s3_s1b",
+    "SG4_s3_s1c",
+    "SG4_s2_s1a",
+    "SG4_s2_s1b",
+    "SG4_s2_s1c",
+    "SG4_s1_s1a",
+    "SG4_s1_s1b",
+    "SG4_s1_s1c",
+    "SG1_s6_d1",
+    "SG1_s6_d2",
+    "SG1_s6_d3",
+    "SG1_s5_d1",
+    "SG1_s5_d2",
+    "SG1_s5_d3",
+    "SG1_s4_d1",
+    "SG1_s4_d2",
+    "SG1_s4_d3",
+    "SG1_s3_d1",
+    "SG1_s3_d2",
+    "SG1_s3_d3",
+    "SG1_s2_d1",
+    "SG1_s2_d2",
+    "SG1_s2_d3",
+    "SG1_s1_d1",
+    "SG1_s1_d2",
+    "SG1_s1_d3",
+    "SG3_s4_s1a",
+    "SG3_s4_s1b",
+    "SG3_s4_s1c",
+    "SG3_s3_s1a",
+    "SG3_s3_s1b",
+    "SG3_s3_s1c",
+    "SG3_s2_s1a",
+    "SG3_s2_s1b",
+    "SG3_s2_s1c",
+    "SG3_s1_s1a",
+    "SG3_s1_s1b",
+    "SG3_s1_s1c"
+  ],
+  "resources": [
+    {
+      "subgoal_id": "SG2_s6_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "fruit_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s6_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "fruit_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s6_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "fruit_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s5_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "bread_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s5_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "bread_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s5_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "bread_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s4_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "mug_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s4_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "mug_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s4_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "mug_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s3_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "spoon_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s3_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "spoon_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s3_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "spoon_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s2_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "fork_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s2_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "fork_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s2_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "fork_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s1_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "plate_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s1_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "plate_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_s1_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "plate_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s4_s1a",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "mug_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s4_s1b",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "mug_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s4_s1c",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place_on",
+      "target_ids": [
+        "mug_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s3_s1a",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "spoon_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s3_s1b",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "spoon_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s3_s1c",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place_on",
+      "target_ids": [
+        "spoon_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s2_s1a",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "fork_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s2_s1b",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "fork_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s2_s1c",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place_on",
+      "target_ids": [
+        "fork_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s1_s1a",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "plate_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s1_s1b",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "plate_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG4_s1_s1c",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place_on",
+      "target_ids": [
+        "plate_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s6_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "fruit_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s6_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "fruit_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s6_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "fruit_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s5_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "bread_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s5_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "bread_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s5_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "bread_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s4_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "mug_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s4_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "mug_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s4_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "mug_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "spoon_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "spoon_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "spoon_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s2_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "fork_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s2_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "fork_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s2_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "fork_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s1_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "plate_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s1_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "plate_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s1_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "plate_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s4_s1a",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "mug_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s4_s1b",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "mug_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s4_s1c",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place_on",
+      "target_ids": [
+        "mug_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s3_s1a",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "spoon_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s3_s1b",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "spoon_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s3_s1c",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place_on",
+      "target_ids": [
+        "spoon_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s2_s1a",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "fork_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s2_s1b",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "fork_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s2_s1c",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place_on",
+      "target_ids": [
+        "fork_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s1_s1a",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "plate_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s1_s1b",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "plate_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG3_s1_s1c",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place_on",
+      "target_ids": [
+        "plate_a"
+      ]
+    }
+  ],
+  "transition_actions": [
+    "MOVE_TO_EE_RACK",
+    "ATTACH_EE",
+    "VERIFY_ATTACHMENT",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE"
+  ],
+  "environment_name": "C3_2_BreakfastTrayPreparation",
+  "initial_active_ee": null,
+  "initial_world": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-grounding\\c3_2\\seed_0\\motion_attempt_001\\m5\\initial_world.json",
+  "grasp_execution_mode": "AUTO"
+}[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+
+[M5] validation: C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c3_2\seed_0\motion_attempt_001\m5\m5_input_validation.json
+[VIDEO_DIAG] ENV-CHANGE frame#1 env=1891588103696 ee=None sim_time=2.0000 frame_mean=171.65 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=0 cam_pos=[3.209992121, -3.21998962319, 1.91] ncam=3 nlight=1 cameras=['agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=171.65
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[M5][EE_PATH] cache_dir=ee_rack_kitchen mode=portable
+[M5][EE_PATH] hit: ur5e-bare-to-2F-v1
+[M5][EE_PATH] start_state=PASS
+[M5][EE_PATH] workcell_signature=PASS
+[M5][EE_PATH] collision_validation=PASS
+[M5][EE_PATH] source=precomputed
+[M5][WORKSPACE] ee=2F planner=RRT_CONNECT target=nearest-mounted-valid-attach-waypoint template=ur5e-bare-to-2F-v1
+[M5][SAFE_EXIT] ok: ee=2F planner=RRT_CONNECT
+[VIDEO_DIAG] sample frame#30 env=1891588103696 ee=None sim_time=3.4400 frame_mean=171.59 black=no
+[VIDEO_DIAG] sample frame#60 env=1891588103696 ee=None sim_time=4.9200 frame_mean=171.13 black=no
+[VIDEO_DIAG] sample frame#90 env=1891588103696 ee=None sim_time=6.4200 frame_mean=170.80 black=no
+[VIDEO_DIAG] sample frame#120 env=1891588103696 ee=None sim_time=7.9200 frame_mean=170.85 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[VIDEO_DIAG] ENV-CHANGE frame#150 env=1891212156880 ee=2F sim_time=9.4200 frame_mean=171.11 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=0 cam_pos=[3.209992121, -3.21998962319, 1.91] ncam=3 nlight=1 cameras=['agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=171.11
+[VIDEO_DIAG] sample frame#180 env=1891212156880 ee=2F sim_time=10.9400 frame_mean=170.83 black=no
+[VIDEO_DIAG] sample frame#210 env=1891212156880 ee=2F sim_time=12.4400 frame_mean=170.81 black=no
+[VIDEO_DIAG] sample frame#240 env=1891212156880 ee=2F sim_time=13.9400 frame_mean=170.89 black=no
+[VIDEO_DIAG] sample frame#270 env=1891212156880 ee=2F sim_time=15.4400 frame_mean=170.99 black=no
+[VIDEO_DIAG] sample frame#300 env=1891212156880 ee=2F sim_time=16.9400 frame_mean=171.06 black=no
+[M5][SCRIPTED_GRASP] EE mismatch for fruit_b: recipe expects 3F, M4 mounted 2F; falling back to the M5 grasp path for this object.
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+{
+  "mode": "SCRIPTED_GRASP_LIVE",
+  "status": "FAILED",
+  "task_goal_status": "NOT_EVALUATED",
+  "detail": "MotionPlanningPipelineError: no generated keyframe strategy produced a finalizable path: SG2_s6_d1:S1=IK_SEARCH_EXHAUSTED (SG2_s6_d1:S1:3:KF3: 0/0 IK branches passed state validity; solver: no full-pose IK solution converged from deterministic seeds; attempted eef position_m=[2.575985, -2.909425, 1.297421] frame_ref=object:fruit_b anchor=top); SG2_s6_d1:S2=IK_SEARCH_EXHAUSTED (SG2_s6_d1:S2:1:KF4: 0/0 IK branches passed state validity; solver: no full-pose IK solution converged from deterministic seeds; attempted eef position_m=[2.566509, -2.913529, 1.197956] frame_ref=object:fruit_b anchor=top); SG2_s6_d1:S3=IK_SEARCH_EXHAUSTED (SG2_s6_d1:S3:3:KF9: 0/0 IK branches passed state validity; solver: no full-pose IK solution converged from deterministic seeds; attempted eef position_m=[2.571247, -2.911477, 1.247688] frame_ref=object:fruit_b anchor=top); SG2_s6_d1:S4=IK_SEARCH_EXHAUSTED (SG2_s6_d1:S4:1:KF10: 0/0 IK branches passed state validity; solver: no full-pose IK solution converged from deterministic seeds; attempted eef position_m=[2.566509, -2.913529, 1.197956] frame_ref=object:fruit_b anchor=top)",
+  "failure_type": "MotionPlanningPipelineError",
+  "failure_stage": "planning",
+  "failure_code": "IK_SEARCH_EXHAUSTED",
+  "physics_related": false,
+  "failure_codes": [
+    "IK_SEARCH_EXHAUSTED"
+  ],
+  "failure_basis": "error_type",
+  "failed_step": {
+    "index": 1,
+    "subgoal_id": "SG2_s6_d1",
+    "action_type": "acquire",
+    "route": "M5_MOTION_PLAN",
+    "object_id": null,
+    "execution_status": null
+  },
+  "failure_detail": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-grounding\\c3_2\\seed_0\\motion_attempt_001\\m5\\m5_failure.json",
+  "simulation_execution_time_s": 16.23999999999942,
+  "manifest": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-grounding\\c3_2\\seed_0\\motion_attempt_001\\m5\\live\\run-20261024-150856-ad020056\\live-execution-manifest.json",
+  "live_run_dir": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-grounding\\c3_2\\seed_0\\motion_attempt_001\\m5\\live\\run-20261024-150856-ad020056",
+  "executed_ee_switches": 0,
+  "executed_ee_metrics": {
+    "executed_ee_switches": 0,
+    "executed_n_ee_attaches": 1,
+    "executed_n_ee_detaches": 0,
+    "executed_ee_exchange_entry": 0,
+    "executed_ee_other_actions": 1,
+    "executed_ee_events": [
+      {
+        "index": 0,
+        "subgoal_id": "SG2_s6_d1:transition:0",
+        "action_type": "EE_ATTACH",
+        "status": "SUCCESS",
+        "counted": true
+      }
+    ],
+    "definition": "executed_ee_switches counts successful EE_EXCHANGE only (matches M4 cost_vector.ee_switches; initial EE_ATTACH excluded)"
+  }
+}
+[result] success=False exec=False goal=NOT_EVALUATED stage=planning code=IK_SEARCH_EXHAUSTED attempts=1 -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c3_2\seed_0\motion_attempt_001\run_result.json
+[timing] LLM prompt=19596 completion=1074 total=20670 (10.86s)
+  [visual_decomposition] 9438+470=9908tok 5.53s
+  [visual_selection] 10158+604=10762tok 5.33s
+  [m1] 16.91s (prepared)
+  [m2] 10.91s (completed)
+  [m4] 57.02s (SUCCESS)
+  [m5] n/a (failed)
+  [m2_through_m4_seconds] 67.93s
+  [total] 84.84s
+[timing] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c3_2\seed_0\timing_summary.json
+
+[중단] run_m5 단계가 exit=2 로 끝났습니다.

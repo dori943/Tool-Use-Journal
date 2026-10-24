@@ -1,0 +1,422 @@
+# 2026-10-24T17:55:25
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c4_1 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0 --grounding-mode without_reasoner --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[run] LLM provider=openai model=gpt-4o-mini
+[run] method=without_reasoner task=c4_1 seed=0 out=C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0
+[without_reasoner] Reasoner measurements: REPLACED by VLM prior; M2/G_k/M4/M5: full code
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[env] RoboCasa Kitchen: camera_segmentations unsupported; using task-object visual geom segmentation
+[env] robocasa task objects: ['appliance_left', 'appliance_right', 'card', 'tool_2_spatula_a', 'tool_3_spatula_b', 'tool_4_spatula_c', 'tool_5_cutting_board']
+[cam] RoboCasa scene camera [수동 pos=[ 2.655 -3.221  1.634]]: lookat=[ 2.591 -3.221  1.025] dist=0.61 az=180° el=-84° fovy=60.0°
+[env] tracked: ['appliance_left', 'appliance_right', 'card', 'tool_2_spatula_a', 'tool_3_spatula_b', 'tool_4_spatula_c', 'tool_5_cutting_board']
+[env] robot base offset (mm): (np.float64(1844.9921209993395), np.float64(-3219.9896231893763))
+[cam] common scene: fovy=60.0° fovx=60.0° (H512×W512) pos=[ 2.655 -3.221  1.634] f=443.4px
+[M1] detected 7/7 tracked instances
+     appliance_left           points=42735
+     appliance_right          points=42605
+     card                     points=570
+     tool_2_spatula_a         points=714
+     tool_3_spatula_b         points=1238
+     tool_4_spatula_c         points=1982
+     tool_5_cutting_board     points=5851
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_appliance_left_appliance_left', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_appliance_right_appliance_right', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_card_card', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_tool_2_spatula_a_tool_2_spatula_a', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_tool_3_spatula_b_tool_3_spatula_b', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_tool_4_spatula_c_tool_4_spatula_c', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_tool_5_cutting_board_tool_5_cutting_board', 'mu_stage': 0, 'full_m3_tokens': None}
+[M1] grounding: nodes=7 grounded=7 memory_hits=0 refreshed=0
+[M1] nodes=7 edges=11 crops=7
+     near      obj_appliance_left_appliance_left -> obj_appliance_right_appliance_right
+     near      obj_appliance_left_appliance_left -> obj_card_card
+     near      obj_appliance_left_appliance_left -> obj_tool_3_spatula_b_tool_3_spatula_b
+     near      obj_appliance_left_appliance_left -> obj_tool_4_spatula_c_tool_4_spatula_c
+     near      obj_appliance_right_appliance_right -> obj_card_card
+     near      obj_appliance_right_appliance_right -> obj_tool_3_spatula_b_tool_3_spatula_b
+     near      obj_appliance_right_appliance_right -> obj_tool_4_spatula_c_tool_4_spatula_c
+     near      obj_appliance_right_appliance_right -> obj_tool_5_cutting_board_tool_5_cutting_board
+     near      obj_tool_2_spatula_a_tool_2_spatula_a -> obj_tool_3_spatula_b_tool_3_spatula_b
+     near      obj_tool_3_spatula_b_tool_3_spatula_b -> obj_tool_4_spatula_c_tool_4_spatula_c
+     near      obj_tool_4_spatula_c_tool_4_spatula_c -> obj_tool_5_cutting_board_tool_5_cutting_board
+[c4_1] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0\execution/m1_points.npz
+[without_reasoner] feasible_ee (VLM prior → ee_rules):
+    obj_appliance_left_appliance_left: ['vac']  (fallback=vac)
+    obj_appliance_right_appliance_right: ['vac']  (fallback=vac)
+    obj_card_card: ['2F', '3F', 'vac']
+    obj_tool_2_spatula_a_tool_2_spatula_a: ['2F', '3F', 'vac']
+    obj_tool_3_spatula_b_tool_3_spatula_b: ['2F', '3F', 'vac']
+    obj_tool_4_spatula_c_tool_4_spatula_c: ['2F', '3F', 'vac']
+    obj_tool_5_cutting_board_tool_5_cutting_board: ['vac']  (fallback=vac)
+[M2] 지시문: 가전 사이 틈에 떨어진 카드를 꺼내라
+[M1] C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0\m1.json 사용
+  [도구 후보] SG1: 제외 태스크 대상물 ['obj_tool_2_spatula_a_tool_2_spatula_a'] (남은 후보 2개)
+  [도구 후보] SG2: 제외 태스크 대상물 ['obj_tool_2_spatula_a_tool_2_spatula_a'] (남은 후보 2개)
+[판정] 접지값 20건으로 m3 술어 15건 판정: sat 11 / unsat 0 / unknown 0 / 판정대상아님 4
+  SG1_d1_p0      reachable(?tool)                                     -> sat
+  SG1_d1_p1      top_exposed(?tool)                                   -> sat
+  SG1_d1_p2      ee_usable(?EE, ?tool)                                -> sat
+  SG1_d1_p3      graspable_on_support(?EE, ?tool)                     -> sat
+  SG1_d1_p4      batch_feasible(?EE, ?tool)                           -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG1_d2_p1      gap_accessible(?tool, obj_card_card)                 -> sat
+  SG1_d3_p2      fits(?tool, tool_rest)                               -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG1_d3_p3      clear(tool_rest)                                     -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG2_d1_p0      reachable(obj_tool_2_spatula_a_tool_2_spatula_a)     -> sat
+  SG2_d1_p1      top_exposed(obj_tool_2_spatula_a_tool_2_spatula_a)   -> sat
+  SG2_d1_p2      ee_usable(?EE, obj_tool_2_spatula_a_tool_2_spatula_a -> sat
+  SG2_d1_p3      graspable_on_support(?EE, obj_tool_2_spatula_a_tool_ -> sat
+  SG2_d1_p4      batch_feasible(?EE, obj_tool_2_spatula_a_tool_2_spat -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG2_d3_p2      fits(obj_tool_2_spatula_a_tool_2_spatula_a, obj_tool -> sat
+  SG2_d3_p3      clear(obj_tool_5_cutting_board_tool_5_cutting_board) -> sat
+  [도구 확정] SG1: obj_tool_3_spatula_b_tool_3_spatula_b 선택 (규칙) — 사용 가능 EE 3종, 리치 여유 375.5mm
+  [도구 확정] SG2: obj_tool_3_spatula_b_tool_3_spatula_b 선택 (규칙) — 사용 가능 EE 3종, 리치 여유 375.5mm
+  [도구 판정] SG1: LLM이 규칙 선택 obj_tool_3_spatula_b_tool_3_spatula_b 동의 (gap_accessible 조건이 충족되어 카드를 꺼내기에 적합하다.)
+  [신뢰도 갱신] SG1: 분해 0.7 → 0.9 (+0.20), 객체 선택 0.7 → 0.9 (+0.20)
+  [도구 판정] SG2: 도구 필요 신호 obj_tool_3_spatula_b_tool_3_spatula_b (리치 여유가 더 크고, 잡을 수 있는 EE가 동일하여 이 도구가 더 적합합니다.) — 이 kind(relocate)에는 도구 액션이 없어 확정하지 않는다
+  [신뢰도 갱신] SG2: 분해 0.7 → 0.7 (+0.00), 객체 선택 0.7 → 0.7 (+0.00)
+  [M2 tokens] 서브골 분해 1462tok(1회, 2.2s) / 객체 선택 1295tok(1회, 3.6s) / confidence_update 3313tok(2회, 3.5s) | 합계 6070tok, 9.3s
+[c4_1] 서브골 2 → 상세 7 | DAG 엣지 9 | mutex 1 | 술어 판정 20
+  SG1_d1 -> SG1_d2   (causal_link: holding(?tool))
+  SG1_d1 -> SG1_d2b   (causal_link: holding(?tool))
+  SG1_d2 -> SG1_d2b   (causal_link: extracted(obj_card_card))
+  SG1_d1 -> SG1_d3   (causal_link: holding(?tool))
+  SG1_d2b -> SG1_d3   (causal_link: above(?tool, tool_rest))
+  SG2_d1 -> SG2_d2   (causal_link: holding(obj_tool_2_spatula_a_tool_2_spatula_a))
+  SG2_d1 -> SG2_d3   (causal_link: holding(obj_tool_2_spatula_a_tool_2_spatula_a))
+  SG2_d2 -> SG2_d3   (causal_link: above(obj_tool_2_spatula_a_tool_2_spatula_a, obj_tool_5_cutting_board_tool_5_cutting_board))
+  SG1_d2 -> SG1_d3   (threat: SG1_d3가 holding(?tool)를 파괴)
+-> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0/m2.json
+[gk] c4_1: 서브골 2개 -> gk_SG1.json, gk_SG2.json
+     SG1: nodes=4 edges=4 selected_tool=obj_tool_3_spatula_b_tool_3_spatula_b feasible_ee=['2F', '3F', 'vac']
+     SG2: nodes=4 edges=3 selected_tool=None feasible_ee=None
+[M4] gk_bundle.json 생성: 서브골 ['SG1', 'SG2'] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0\gk_bundle.json[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+
+[M4] Task Planner input: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0\gk_bundle.json
+[M4] SUCCESS: EE=2F, tool=none, EE=2F, tool=tool_3_spatula_b
+[M4] output: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0\m4.json
+{
+  "status": "VALID",
+  "subgoal_count": 7,
+  "request_count": 7,
+  "subgoal_order": [
+    "SG2_d1",
+    "SG2_d2",
+    "SG2_d3",
+    "SG1_d1",
+    "SG1_d2",
+    "SG1_d2b",
+    "SG1_d3"
+  ],
+  "resources": [
+    {
+      "subgoal_id": "SG2_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "tool_2_spatula_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "tool_2_spatula_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG2_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "tool_2_spatula_a"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_d1",
+      "ee": "2F",
+      "tool": "tool_3_spatula_b",
+      "action_type": "PICK_TOOL",
+      "target_ids": [
+        "tool_3_spatula_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_d2",
+      "ee": "2F",
+      "tool": "tool_3_spatula_b",
+      "action_type": "tool_act",
+      "target_ids": [
+        "card"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_d2b",
+      "ee": "2F",
+      "tool": "tool_3_spatula_b",
+      "action_type": "transport",
+      "target_ids": [
+        "tool_3_spatula_b"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_d3",
+      "ee": "2F",
+      "tool": "tool_3_spatula_b",
+      "action_type": "RETURN_TOOL",
+      "target_ids": [
+        "tool_3_spatula_b"
+      ]
+    }
+  ],
+  "transition_actions": [
+    "MOVE_TO_EE_RACK",
+    "ATTACH_EE",
+    "VERIFY_ATTACHMENT",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_TOOL_RACK",
+    "KEEP_EE",
+    "KEEP_TOOL",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "KEEP_TOOL",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "KEEP_TOOL",
+    "MOVE_TO_TOOL_RACK"
+  ],
+  "environment_name": "C4_1_IntervalFitExtraction",
+  "initial_active_ee": null,
+  "initial_world": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-reasoner\\c4_1\\seed_0\\m5\\initial_world.json",
+  "grasp_execution_mode": "AUTO"
+}
+[M5] validation: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0\m5\m5_input_validation.json
+[VIDEO_DIAG] ENV-CHANGE frame#1 env=2190467807376 ee=None sim_time=2.0800 frame_mean=166.49 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=0 cam_pos=[3.184992121, -3.21998962319, 1.91] ncam=3 nlight=1 cameras=['agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=166.49
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[M5][EE_PATH] cache_dir=ee_rack_kitchen mode=portable
+[M5][EE_PATH] hit: ur5e-bare-to-2F-v1
+[M5][EE_PATH] start_state=PASS
+[M5][EE_PATH] workcell_signature=PASS
+[M5][EE_PATH] collision_validation=PASS
+[M5][EE_PATH] source=precomputed
+[M5][WORKSPACE] ee=2F planner=COMMISSIONED_REVERSE target=commissioned-reverse template=ur5e-bare-to-2F-v1
+[M5][SAFE_EXIT] ok: ee=2F planner=COMMISSIONED_REVERSE
+[VIDEO_DIAG] sample frame#30 env=2190467807376 ee=None sim_time=3.5200 frame_mean=166.41 black=no
+[VIDEO_DIAG] sample frame#60 env=2190467807376 ee=None sim_time=5.0000 frame_mean=165.92 black=no
+[VIDEO_DIAG] sample frame#90 env=2190467807376 ee=None sim_time=6.5000 frame_mean=165.67 black=no
+[VIDEO_DIAG] sample frame#120 env=2190467807376 ee=None sim_time=8.0000 frame_mean=165.72 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[VIDEO_DIAG] ENV-CHANGE frame#150 env=2190466608848 ee=2F sim_time=9.5000 frame_mean=165.98 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=0 cam_pos=[3.184992121, -3.21998962319, 1.91] ncam=3 nlight=1 cameras=['agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=165.98
+[VIDEO_DIAG] sample frame#180 env=2190466608848 ee=2F sim_time=11.0200 frame_mean=165.69 black=no
+[VIDEO_DIAG] sample frame#210 env=2190466608848 ee=2F sim_time=12.5200 frame_mean=165.69 black=no
+[VIDEO_DIAG] sample frame#240 env=2190466608848 ee=2F sim_time=14.0200 frame_mean=165.70 black=no
+[VIDEO_DIAG] sample frame#270 env=2190466608848 ee=2F sim_time=15.5200 frame_mean=165.70 black=no
+[VIDEO_DIAG] sample frame#300 env=2190466608848 ee=2F sim_time=17.0200 frame_mean=165.71 black=no
+[VIDEO_DIAG] sample frame#330 env=2190466608848 ee=2F sim_time=18.5200 frame_mean=165.72 black=no
+[VIDEO_DIAG] sample frame#360 env=2190466608848 ee=2F sim_time=20.0000 frame_mean=165.73 black=no
+[VIDEO_DIAG] sample frame#390 env=2190466608848 ee=2F sim_time=21.5000 frame_mean=165.72 black=no
+[VIDEO_DIAG] sample frame#420 env=2190466608848 ee=2F sim_time=23.0000 frame_mean=165.73 black=no
+[VIDEO_DIAG] sample frame#450 env=2190466608848 ee=2F sim_time=24.5000 frame_mean=165.75 black=no
+[VIDEO_DIAG] sample frame#480 env=2190466608848 ee=2F sim_time=26.0000 frame_mean=165.78 black=no
+[VIDEO_DIAG] sample frame#510 env=2190466608848 ee=2F sim_time=27.5000 frame_mean=165.80 black=no
+[VIDEO_DIAG] sample frame#540 env=2190466608848 ee=2F sim_time=29.0000 frame_mean=165.82 black=no
+[VIDEO_DIAG] sample frame#570 env=2190466608848 ee=2F sim_time=30.5000 frame_mean=165.82 black=no
+[VIDEO_DIAG] sample frame#600 env=2190466608848 ee=2F sim_time=32.0000 frame_mean=165.81 black=no
+[VIDEO_DIAG] sample frame#630 env=2190466608848 ee=2F sim_time=33.5000 frame_mean=165.79 black=no
+[VIDEO_DIAG] sample frame#660 env=2190466608848 ee=2F sim_time=35.0000 frame_mean=165.79 black=no
+[VIDEO_DIAG] sample frame#690 env=2190466608848 ee=2F sim_time=36.5000 frame_mean=165.80 black=no
+[VIDEO_DIAG] sample frame#720 env=2190466608848 ee=2F sim_time=38.0000 frame_mean=165.81 black=no
+[VIDEO_DIAG] sample frame#750 env=2190466608848 ee=2F sim_time=39.5200 frame_mean=165.82 black=no
+[VIDEO_DIAG] sample frame#780 env=2190466608848 ee=2F sim_time=41.0200 frame_mean=165.83 black=no
+[VIDEO_DIAG] sample frame#810 env=2190466608848 ee=2F sim_time=42.5200 frame_mean=165.84 black=no
+[VIDEO_DIAG] sample frame#840 env=2190466608848 ee=2F sim_time=44.0200 frame_mean=165.87 black=no
+[VIDEO_DIAG] sample frame#870 env=2190466608848 ee=2F sim_time=45.5200 frame_mean=165.91 black=no
+[VIDEO_DIAG] sample frame#900 env=2190466608848 ee=2F sim_time=47.0200 frame_mean=165.98 black=no
+[VIDEO_DIAG] sample frame#930 env=2190466608848 ee=2F sim_time=48.5200 frame_mean=166.02 black=no
+[VIDEO_DIAG] sample frame#960 env=2190466608848 ee=2F sim_time=50.0200 frame_mean=166.04 black=no
+[VIDEO_DIAG] sample frame#990 env=2190466608848 ee=2F sim_time=51.5200 frame_mean=166.06 black=no
+[VIDEO_DIAG] sample frame#1020 env=2190466608848 ee=2F sim_time=53.0200 frame_mean=166.07 black=no
+[VIDEO_DIAG] sample frame#1050 env=2190466608848 ee=2F sim_time=54.5200 frame_mean=166.09 black=no
+[VIDEO_DIAG] sample frame#1080 env=2190466608848 ee=2F sim_time=56.0200 frame_mean=166.09 black=no
+[VIDEO_DIAG] sample frame#1110 env=2190466608848 ee=2F sim_time=57.5200 frame_mean=166.09 black=no
+[VIDEO_DIAG] sample frame#1140 env=2190466608848 ee=2F sim_time=59.0200 frame_mean=166.09 black=no
+[catalog] tool_2_spatula_a PRESHAPE lift=0.000 []
+[VIDEO_DIAG] sample frame#1170 env=2190466608848 ee=2F sim_time=60.5200 frame_mean=166.09 black=no
+[VIDEO_DIAG] sample frame#1200 env=2190466608848 ee=2F sim_time=62.0200 frame_mean=166.09 black=no
+[VIDEO_DIAG] sample frame#1230 env=2190466608848 ee=2F sim_time=63.5200 frame_mean=166.09 black=no
+[catalog] tool_2_spatula_a PRESHAPE lift=0.000 []
+[plan] PRE_GRASP 15 points {'position_error_m': 4.4931629867706114e-07, 'orientation_error_deg': 5.916172629033536e-06}
+[VIDEO_DIAG] sample frame#1260 env=2190466608848 ee=2F sim_time=65.0200 frame_mean=166.07 black=no
+[VIDEO_DIAG] sample frame#1290 env=2190466608848 ee=2F sim_time=66.5200 frame_mean=165.99 black=no
+[VIDEO_DIAG] sample frame#1320 env=2190466608848 ee=2F sim_time=68.0200 frame_mean=166.03 black=no
+[catalog] tool_2_spatula_a PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#1350 env=2190466608848 ee=2F sim_time=69.5200 frame_mean=166.08 black=no
+[VIDEO_DIAG] sample frame#1380 env=2190466608848 ee=2F sim_time=71.0200 frame_mean=166.25 black=no
+[VIDEO_DIAG] sample frame#1410 env=2190466608848 ee=2F sim_time=72.5200 frame_mean=166.17 black=no
+[VIDEO_DIAG] sample frame#1440 env=2190466608848 ee=2F sim_time=74.0200 frame_mean=166.18 black=no
+[catalog] tool_2_spatula_a PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#1470 env=2190466608848 ee=2F sim_time=75.5200 frame_mean=166.19 black=no
+[plan] GRASP 25 points {'position_error_m': 1.0205795650022238e-06, 'orientation_error_deg': 1.7408494551843484e-05}
+[VIDEO_DIAG] sample frame#1500 env=2190466608848 ee=2F sim_time=77.0000 frame_mean=166.18 black=no
+[VIDEO_DIAG] sample frame#1530 env=2190466608848 ee=2F sim_time=78.5000 frame_mean=166.24 black=no
+[catalog] tool_2_spatula_a GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#1560 env=2190466608848 ee=2F sim_time=80.0000 frame_mean=166.30 black=no
+[VIDEO_DIAG] sample frame#1590 env=2190466608848 ee=2F sim_time=81.5000 frame_mean=166.30 black=no
+[VIDEO_DIAG] sample frame#1620 env=2190466608848 ee=2F sim_time=83.0000 frame_mean=166.30 black=no
+[catalog] tool_2_spatula_a CLOSE lift=0.000 []
+[VIDEO_DIAG] sample frame#1650 env=2190466608848 ee=2F sim_time=84.5000 frame_mean=166.30 black=no
+[VIDEO_DIAG] sample frame#1680 env=2190466608848 ee=2F sim_time=86.0000 frame_mean=166.30 black=no
+[VIDEO_DIAG] sample frame#1710 env=2190466608848 ee=2F sim_time=87.5000 frame_mean=166.30 black=no
+[VIDEO_DIAG] sample frame#1740 env=2190466608848 ee=2F sim_time=89.0000 frame_mean=166.30 black=no
+[catalog] tool_2_spatula_a CLOSE lift=0.000 ['left', 'right']
+[plan] LIFT 34 points {'position_error_m': 1.3119837359441329e-06, 'orientation_error_deg': 2.0165057563757727e-05}
+[VIDEO_DIAG] sample frame#1770 env=2190466608848 ee=2F sim_time=90.5000 frame_mean=166.28 black=no
+[VIDEO_DIAG] sample frame#1800 env=2190466608848 ee=2F sim_time=92.0000 frame_mean=166.18 black=no
+[VIDEO_DIAG] sample frame#1830 env=2190466608848 ee=2F sim_time=93.5000 frame_mean=166.21 black=no
+[catalog] tool_2_spatula_a LIFT lift=0.160 ['left', 'right']
+[VIDEO_DIAG] sample frame#1860 env=2190466608848 ee=2F sim_time=95.0000 frame_mean=166.21 black=no
+[VIDEO_DIAG] sample frame#1890 env=2190466608848 ee=2F sim_time=96.5000 frame_mean=166.21 black=no
+[VIDEO_DIAG] sample frame#1920 env=2190466608848 ee=2F sim_time=98.0000 frame_mean=166.21 black=no
+[catalog] tool_2_spatula_a HOLD lift=0.164 ['left', 'right']
+[VIDEO_DIAG] sample frame#1950 env=2190466608848 ee=2F sim_time=99.5000 frame_mean=166.21 black=no
+[VIDEO_DIAG] sample frame#1980 env=2190466608848 ee=2F sim_time=101.0000 frame_mean=166.21 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[M5][VAC_ATTACH] intended_target='tool_2_spatula_a' current_attached_body='tool_2_spatula_a' candidate_body='tool_2_spatula_a' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.000426
+[M5][VAC_ATTACH] intended_target='tool_2_spatula_a' current_attached_body='tool_2_spatula_a' candidate_body='tool_2_spatula_a' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[M5][REGION_GOAL] held_transport_goal object=tool_2_spatula_a region=tool_5_cutting_board source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#2010 env=2190466608848 ee=2F sim_time=102.5000 frame_mean=166.10 black=no
+[M5][REGION_GOAL] held_place_goal object=tool_2_spatula_a region=tool_5_cutting_board source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#2040 env=2190466608848 ee=2F sim_time=104.0000 frame_mean=165.68 black=no
+[VIDEO_DIAG] sample frame#2070 env=2190466608848 ee=2F sim_time=105.5000 frame_mean=165.84 black=no
+[VIDEO_DIAG] sample frame#2100 env=2190466608848 ee=2F sim_time=107.0000 frame_mean=165.90 black=no
+[VIDEO_DIAG] sample frame#2130 env=2190466608848 ee=2F sim_time=108.5000 frame_mean=165.79 black=no
+[VIDEO_DIAG] sample frame#2160 env=2190466608848 ee=2F sim_time=110.0000 frame_mean=165.79 black=no
+[VIDEO_DIAG] sample frame#2190 env=2190466608848 ee=2F sim_time=111.5000 frame_mean=165.79 black=no
+[VIDEO_DIAG] sample frame#2220 env=2190466608848 ee=2F sim_time=113.0000 frame_mean=165.79 black=no
+[catalog] tool_3_spatula_b PRESHAPE lift=0.000 []
+[VIDEO_DIAG] sample frame#2250 env=2190466608848 ee=2F sim_time=114.5000 frame_mean=165.79 black=no
+[VIDEO_DIAG] sample frame#2280 env=2190466608848 ee=2F sim_time=116.0000 frame_mean=165.79 black=no
+[VIDEO_DIAG] sample frame#2310 env=2190466608848 ee=2F sim_time=117.5000 frame_mean=165.79 black=no
+[catalog] tool_3_spatula_b PRESHAPE lift=0.000 []
+[plan] PRE_GRASP 20 points {'position_error_m': 3.712732794047028e-06, 'orientation_error_deg': 5.0627319327644766e-05}
+[VIDEO_DIAG] sample frame#2340 env=2190466608848 ee=2F sim_time=119.0000 frame_mean=165.91 black=no
+[VIDEO_DIAG] sample frame#2370 env=2190466608848 ee=2F sim_time=120.5000 frame_mean=166.38 black=no
+[plan] GRASP 26 points {'position_error_m': 2.425960557191242e-06, 'orientation_error_deg': 2.9085850824198327e-05}
+[VIDEO_DIAG] sample frame#2400 env=2190466608848 ee=2F sim_time=122.0000 frame_mean=166.38 black=no
+[catalog] tool_3_spatula_b GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#2430 env=2190466608848 ee=2F sim_time=123.5000 frame_mean=166.38 black=no
+[VIDEO_DIAG] sample frame#2460 env=2190466608848 ee=2F sim_time=125.0000 frame_mean=166.34 black=no
+[VIDEO_DIAG] sample frame#2490 env=2190466608848 ee=2F sim_time=126.5000 frame_mean=166.34 black=no
+[VIDEO_DIAG] sample frame#2520 env=2190466608848 ee=2F sim_time=128.0000 frame_mean=166.34 black=no
+[catalog] tool_3_spatula_b CLOSE lift=0.000 []
+[VIDEO_DIAG] sample frame#2550 env=2190466608848 ee=2F sim_time=129.5000 frame_mean=166.34 black=no
+[VIDEO_DIAG] sample frame#2580 env=2190466608848 ee=2F sim_time=131.0000 frame_mean=166.34 black=no
+[VIDEO_DIAG] sample frame#2610 env=2190466608848 ee=2F sim_time=132.5000 frame_mean=166.34 black=no
+[catalog] tool_3_spatula_b CLOSE lift=0.000 []
+[VIDEO_DIAG] sample frame#2640 env=2190466608848 ee=2F sim_time=134.0000 frame_mean=166.34 black=no
+[plan] LIFT 35 points {'position_error_m': 1.042117384851252e-06, 'orientation_error_deg': 1.6595836871413655e-05}
+[VIDEO_DIAG] sample frame#2670 env=2190466608848 ee=2F sim_time=135.5000 frame_mean=166.33 black=no
+[VIDEO_DIAG] sample frame#2700 env=2190466608848 ee=2F sim_time=137.0000 frame_mean=166.37 black=no
+[catalog] tool_3_spatula_b LIFT lift=0.080 ['left', 'right']
+[VIDEO_DIAG] sample frame#2730 env=2190466608848 ee=2F sim_time=138.5000 frame_mean=166.38 black=no
+[VIDEO_DIAG] sample frame#2760 env=2190466608848 ee=2F sim_time=140.0000 frame_mean=166.32 black=no
+[VIDEO_DIAG] sample frame#2790 env=2190466608848 ee=2F sim_time=141.5000 frame_mean=166.31 black=no
+[VIDEO_DIAG] sample frame#2820 env=2190466608848 ee=2F sim_time=143.0000 frame_mean=166.31 black=no
+[catalog] tool_3_spatula_b HOLD lift=0.162 ['left', 'right']
+[VIDEO_DIAG] sample frame#2850 env=2190466608848 ee=2F sim_time=144.5000 frame_mean=166.31 black=no
+[VIDEO_DIAG] sample frame#2880 env=2190466608848 ee=2F sim_time=146.0000 frame_mean=166.31 black=no
+[M5][VAC_ATTACH] intended_target='tool_3_spatula_b' current_attached_body='tool_3_spatula_b' candidate_body='tool_3_spatula_b' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.000436
+[M5][VAC_ATTACH] intended_target='tool_3_spatula_b' current_attached_body='tool_3_spatula_b' candidate_body='tool_3_spatula_b' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[M5][EXTRACT_DRAG] carrying ['card'] with the held tool while their collision bounds overlap
+[VIDEO_DIAG] sample frame#2910 env=2190466608848 ee=2F sim_time=147.5000 frame_mean=166.31 black=no
+[VIDEO_DIAG] sample frame#2940 env=2190466608848 ee=2F sim_time=149.0000 frame_mean=166.20 black=no
+[VIDEO_DIAG] sample frame#2970 env=2190466608848 ee=2F sim_time=150.5000 frame_mean=166.19 black=no
+[VIDEO_DIAG] sample frame#3000 env=2190466608848 ee=2F sim_time=152.0000 frame_mean=166.21 black=no
+[VIDEO_DIAG] sample frame#3030 env=2190466608848 ee=2F sim_time=153.5000 frame_mean=166.10 black=no
+[VIDEO_DIAG] sample frame#3060 env=2190466608848 ee=2F sim_time=155.0000 frame_mean=165.97 black=no
+[M5][EXTRACT_DRAG] latched 'card' to the held tool
+[VIDEO_DIAG] sample frame#3090 env=2190466608848 ee=2F sim_time=156.5000 frame_mean=165.52 black=no
+[VIDEO_DIAG] sample frame#3120 env=2190466608848 ee=2F sim_time=158.0000 frame_mean=165.50 black=no
+[VIDEO_DIAG] sample frame#3150 env=2190466608848 ee=2F sim_time=159.5000 frame_mean=165.91 black=no
+[VIDEO_DIAG] sample frame#3180 env=2190466608848 ee=2F sim_time=161.0000 frame_mean=166.11 black=no
+[VIDEO_DIAG] sample frame#3210 env=2190466608848 ee=2F sim_time=162.5000 frame_mean=166.25 black=no
+[VIDEO_DIAG] sample frame#3240 env=2190466608848 ee=2F sim_time=164.0000 frame_mean=166.28 black=no
+[M5][REGION_GOAL] held_transport_goal object=tool_3_spatula_b region=tool_rest source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#3270 env=2190466608848 ee=2F sim_time=165.5000 frame_mean=166.34 black=no
+[M5][REGION_GOAL] held_place_goal object=tool_3_spatula_b region=tool_rest source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#3300 env=2190466608848 ee=2F sim_time=167.0000 frame_mean=166.43 black=no
+[VIDEO_DIAG] sample frame#3330 env=2190466608848 ee=2F sim_time=168.5000 frame_mean=166.38 black=no
+[VIDEO_DIAG] sample frame#3360 env=2190466608848 ee=2F sim_time=169.7600 frame_mean=166.23 black=no
+[VIDEO_DIAG] sample frame#3390 env=2190466608848 ee=2F sim_time=169.7600 frame_mean=166.23 black=no
+{
+  "mode": "SCRIPTED_GRASP_LIVE",
+  "status": "SUCCESS",
+  "task_goal_status": "NOT_EVALUATED",
+  "manifest": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-reasoner\\c4_1\\seed_0\\m5\\live\\run-20261024-175619-c2079a9f\\live-execution-manifest.json",
+  "live_run_dir": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-reasoner\\c4_1\\seed_0\\m5\\live\\run-20261024-175619-c2079a9f",
+  "scripted_grasp_count": 2,
+  "motion_plan_count": 6,
+  "simulation_execution_time_s": 167.68000000044665,
+  "executed_ee_switches": 0,
+  "executed_ee_metrics": {
+    "executed_ee_switches": 0,
+    "executed_n_ee_attaches": 1,
+    "executed_n_ee_detaches": 0,
+    "executed_ee_exchange_entry": 0,
+    "executed_ee_other_actions": 7,
+    "executed_ee_events": [
+      {
+        "index": 0,
+        "subgoal_id": "SG2_d1:transition:0",
+        "action_type": "EE_ATTACH",
+        "status": "SUCCESS",
+        "counted": true
+      }
+    ],
+    "definition": "executed_ee_switches counts successful EE_EXCHANGE only (matches M4 cost_vector.ee_switches; initial EE_ATTACH excluded)"
+  }
+}
+[M5] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0/m5.json (+ C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0\m5/)
+[result] success=True exec=True goal=NOT_EVALUATED stage=none code=None attempts=1 -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_1\seed_0\run_result.json
+[timing] LLM prompt=5312 completion=758 total=6070 (9.28s)
+  [서브골 분해] 1275+187=1462tok 2.20s
+  [객체 선택] 941+354=1295tok 3.58s
+  [confidence_update] 3096+217=3313tok 3.50s
+  [m1] 9.31s (prepared)
+  [vlm_prior] 21.73s (completed)
+  [m2] 9.28s (completed)
+  [gk] 0.02s (completed)
+  [m4] 0.05s (SUCCESS)
+  [m5] 2059.84s (SUCCESS)
+  [total] 2100.31s

@@ -1,0 +1,235 @@
+# 2026-10-24T16:24:09
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c2_2 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_2\seed_0 --grounding-mode without_reasoner --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[run] LLM provider=openai model=gpt-4o-mini
+[run] method=without_reasoner task=c2_2 seed=0 out=C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_2\seed_0
+[without_reasoner] Reasoner measurements: REPLACED by VLM prior; M2/G_k/M4/M5: full code
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[env] RoboCasa Kitchen: camera_segmentations unsupported; using task-object visual geom segmentation
+[env] robocasa task objects: ['bread_a', 'bread_b', 'bread_plate', 'cheese_1', 'cheese_plate', 'knife', 'ladle', 'serving_plate', 'spatula', 'spoon', 'tomato_plate', 'tomato_slice', 'turkey_1', 'turkey_plate']
+[cam] RoboCasa scene camera [수동 pos=[ 2.537 -3.02   1.658]]: lookat=[ 2.445 -3.02   0.932] dist=0.73 az=180° el=-83° fovy=60.0°
+[env] tracked: ['bread_a', 'bread_b', 'bread_plate', 'cheese_1', 'cheese_plate', 'knife', 'ladle', 'serving_plate', 'spatula', 'spoon', 'tomato_plate', 'tomato_slice', 'turkey_1', 'turkey_plate']
+[env] robot base offset (mm): (np.float64(1844.9921209993395), np.float64(-3219.9896231893763))
+[cam] common scene: fovy=60.0° fovx=60.0° (H512×W512) pos=[ 2.537 -3.02   1.658] f=443.4px
+[M1] detected 14/14 tracked instances
+     bread_a                  points=3834
+     bread_b                  points=3941
+     bread_plate              points=3947
+     cheese_1                 points=768
+     cheese_plate             points=4195
+     knife                    points=1059
+     ladle                    points=1149
+     serving_plate            points=8869
+     spatula                  points=1650
+     spoon                    points=926
+     tomato_plate             points=4003
+     tomato_slice             points=1025
+     turkey_1                 points=1166
+     turkey_plate             points=3741
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_bread_a_bread_a', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_bread_b_bread_b', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_bread_plate_bread_plate', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_cheese_cheese_1', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_cheese_plate_cheese_plate', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_knife_knife', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_ladle_ladle', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_serving_plate_serving_plate', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_spatula_spatula', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_spoon_spoon', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_tomato_plate_tomato_plate', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_tomato_slice_tomato_slice', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_turkey_turkey_1', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_turkey_plate_turkey_plate', 'mu_stage': 0, 'full_m3_tokens': None}
+[M1] grounding: nodes=14 grounded=14 memory_hits=0 refreshed=0
+[M1] nodes=14 edges=50 crops=14
+     on        obj_bread_a_bread_a -> obj_bread_plate_bread_plate
+     on        obj_bread_b_bread_b -> obj_bread_plate_bread_plate
+     on        obj_cheese_cheese_1 -> obj_cheese_plate_cheese_plate
+     on        obj_tomato_slice_tomato_slice -> obj_tomato_plate_tomato_plate
+     on        obj_turkey_turkey_1 -> obj_turkey_plate_turkey_plate
+     near      obj_bread_a_bread_a -> obj_bread_b_bread_b
+     near      obj_bread_a_bread_a -> obj_cheese_cheese_1
+     near      obj_bread_a_bread_a -> obj_cheese_plate_cheese_plate
+     near      obj_bread_a_bread_a -> obj_knife_knife
+     near      obj_bread_a_bread_a -> obj_serving_plate_serving_plate
+     near      obj_bread_a_bread_a -> obj_spatula_spatula
+     near      obj_bread_a_bread_a -> obj_turkey_turkey_1
+     near      obj_bread_a_bread_a -> obj_turkey_plate_turkey_plate
+     near      obj_bread_b_bread_b -> obj_serving_plate_serving_plate
+     near      obj_bread_b_bread_b -> obj_turkey_turkey_1
+     near      obj_bread_b_bread_b -> obj_turkey_plate_turkey_plate
+     near      obj_bread_plate_bread_plate -> obj_cheese_cheese_1
+     near      obj_bread_plate_bread_plate -> obj_cheese_plate_cheese_plate
+     near      obj_bread_plate_bread_plate -> obj_knife_knife
+     near      obj_bread_plate_bread_plate -> obj_serving_plate_serving_plate
+     near      obj_bread_plate_bread_plate -> obj_spatula_spatula
+     near      obj_bread_plate_bread_plate -> obj_turkey_turkey_1
+     near      obj_bread_plate_bread_plate -> obj_turkey_plate_turkey_plate
+     near      obj_cheese_cheese_1 -> obj_knife_knife
+     near      obj_cheese_cheese_1 -> obj_spatula_spatula
+     near      obj_cheese_cheese_1 -> obj_spoon_spoon
+     near      obj_cheese_cheese_1 -> obj_tomato_plate_tomato_plate
+     near      obj_cheese_cheese_1 -> obj_turkey_plate_turkey_plate
+     near      obj_cheese_plate_cheese_plate -> obj_knife_knife
+     near      obj_cheese_plate_cheese_plate -> obj_ladle_ladle
+     near      obj_cheese_plate_cheese_plate -> obj_spatula_spatula
+     near      obj_cheese_plate_cheese_plate -> obj_spoon_spoon
+     near      obj_cheese_plate_cheese_plate -> obj_tomato_plate_tomato_plate
+     near      obj_cheese_plate_cheese_plate -> obj_tomato_slice_tomato_slice
+     near      obj_cheese_plate_cheese_plate -> obj_turkey_turkey_1
+     near      obj_cheese_plate_cheese_plate -> obj_turkey_plate_turkey_plate
+     near      obj_knife_knife -> obj_spatula_spatula
+     near      obj_knife_knife -> obj_turkey_turkey_1
+     near      obj_knife_knife -> obj_turkey_plate_turkey_plate
+     near      obj_ladle_ladle -> obj_spatula_spatula
+     near      obj_ladle_ladle -> obj_spoon_spoon
+     near      obj_ladle_ladle -> obj_tomato_plate_tomato_plate
+     near      obj_ladle_ladle -> obj_tomato_slice_tomato_slice
+     near      obj_serving_plate_serving_plate -> obj_turkey_turkey_1
+     near      obj_serving_plate_serving_plate -> obj_turkey_plate_turkey_plate
+     near      obj_spatula_spatula -> obj_spoon_spoon
+     near      obj_spatula_spatula -> obj_tomato_plate_tomato_plate
+     near      obj_spatula_spatula -> obj_tomato_slice_tomato_slice
+     near      obj_spoon_spoon -> obj_tomato_plate_tomato_plate
+     near      obj_spoon_spoon -> obj_tomato_slice_tomato_slice
+[c2_2] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_2\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_2\seed_0\execution/m1_points.npz
+[without_reasoner] feasible_ee (VLM prior → ee_rules):
+    obj_bread_a_bread_a: ['2F', '3F', 'vac']
+    obj_bread_b_bread_b: ['2F', '3F', 'vac']
+    obj_bread_plate_bread_plate: ['vac']  (fallback=vac)
+    obj_cheese_cheese_1: ['3F']
+    obj_cheese_plate_cheese_plate: ['vac']  (fallback=vac)
+    obj_knife_knife: ['2F', '3F']
+    obj_ladle_ladle: ['3F']
+    obj_serving_plate_serving_plate: ['vac']  (fallback=vac)
+    obj_spatula_spatula: ['2F', '3F', 'vac']
+    obj_spoon_spoon: ['2F', '3F', 'vac']
+    obj_tomato_plate_tomato_plate: ['vac']  (fallback=vac)
+    obj_tomato_slice_tomato_slice: ['3F', 'vac']
+    obj_turkey_turkey_1: ['3F', 'vac']
+    obj_turkey_plate_turkey_plate: ['vac']  (fallback=vac)
+[M2] 지시문: 재료를 순서대로 쌓아 샌드위치를 만들어라
+[M1] C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_2\seed_0\m1.json 사용
+[판정] 접지값 63건으로 m3 술어 25건 판정: sat 17 / unsat 5 / unknown 0 / 판정대상아님 3
+  SG1_d1_p0      reachable({obj_bread_a_bread_a,obj_bread_b_bread_b}) -> sat
+  SG1_d1_p1      top_exposed({obj_bread_a_bread_a,obj_bread_b_bread_b -> sat
+  SG1_d1_p2      ee_usable(?EE, {obj_bread_a_bread_a,obj_bread_b_brea -> sat
+  SG1_d1_p3      graspable_on_support(?EE, {obj_bread_a_bread_a,obj_b -> sat
+  SG1_d1_p4      batch_feasible(?EE, {obj_bread_a_bread_a,obj_bread_b -> unsat
+  SG1_d3_p2      fits({obj_bread_a_bread_a,obj_bread_b_bread_b}, obj_ -> sat
+  SG1_d3_p3      clear(obj_bread_plate_bread_plate)                   -> unsat
+  SG2_s1a_p0     reachable(obj_cheese_cheese_1)                       -> sat
+  SG2_s1a_p1     top_exposed(obj_cheese_cheese_1)                     -> sat
+  SG2_s1a_p2     ee_usable(?EE, obj_cheese_cheese_1)                  -> sat
+  SG2_s1a_p3     graspable_on_support(?EE, obj_cheese_cheese_1)       -> sat
+  SG2_s1a_p4     batch_feasible(?EE, obj_cheese_cheese_1)             -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG2_s1c_p2     top_exposed(obj_cheese_plate_cheese_plate)           -> unsat
+  SG3_s1a_p0     reachable(obj_tomato_slice_tomato_slice)             -> sat
+  SG3_s1a_p1     top_exposed(obj_tomato_slice_tomato_slice)           -> sat
+  SG3_s1a_p2     ee_usable(?EE, obj_tomato_slice_tomato_slice)        -> sat
+  SG3_s1a_p3     graspable_on_support(?EE, obj_tomato_slice_tomato_sl -> sat
+  SG3_s1a_p4     batch_feasible(?EE, obj_tomato_slice_tomato_slice)   -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG3_s1c_p2     top_exposed(obj_tomato_plate_tomato_plate)           -> unsat
+  SG4_s1a_p0     reachable(obj_turkey_turkey_1)                       -> sat
+  SG4_s1a_p1     top_exposed(obj_turkey_turkey_1)                     -> sat
+  SG4_s1a_p2     ee_usable(?EE, obj_turkey_turkey_1)                  -> sat
+  SG4_s1a_p3     graspable_on_support(?EE, obj_turkey_turkey_1)       -> sat
+  SG4_s1a_p4     batch_feasible(?EE, obj_turkey_turkey_1)             -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG4_s1c_p2     top_exposed(obj_turkey_plate_turkey_plate)           -> unsat
+  [도구 확정] SG1: obj_spatula_spatula 선택 (규칙) — 사용 가능 EE 3종, 리치 여유 398.3mm, 필요 액션 2회
+  [도구 확정] SG2: obj_spatula_spatula 선택 (규칙) — 사용 가능 EE 3종, 리치 여유 398.3mm
+  [도구 확정] SG3: obj_spatula_spatula 선택 (규칙) — 사용 가능 EE 3종, 리치 여유 398.3mm
+  [도구 확정] SG4: obj_spatula_spatula 선택 (규칙) — 사용 가능 EE 3종, 리치 여유 398.3mm
+  [도구 판정] SG1: 도구 필요 신호 obj_spatula_spatula (넓고 평평한 면을 가진 주걱이 여러 개의 빵을 동시에 옮기기에 적합하다.) — 이 kind(relocate)에는 도구 액션이 없어 확정하지 않는다
+  [신뢰도 갱신] SG1: 분해 0.7 → 0.7 (+0.00), 객체 선택 0.8 → 0.8 (+0.00)
+      남은 불확실 요소: ['clear(obj_bread_plate_bread_plate)']
+  [도구 판정] SG2: 도구 필요 신호 obj_spatula_spatula (주걱은 넓고 평평한 면을 가지고 있어 여러 개의 치즈를 한 번에 쌓기에 적합하다.) — 이 kind(stack)에는 도구 액션이 없어 확정하지 않는다
+  [신뢰도 갱신] SG2: 분해 0.7 → 0.3 (-0.40), 객체 선택 0.8 → 0.9 (+0.10)
+      남은 불확실 요소: ['top_exposed(obj_cheese_plate_cheese_plate)']
+  [도구 판정] SG3: 도구 필요 신호 obj_spatula_spatula (주걱은 넓고 평평한 면을 가지고 있어 여러 개의 토마토 슬라이스를 쌓기에 적합하다.) — 이 kind(stack)에는 도구 액션이 없어 확정하지 않는다
+  [신뢰도 갱신] SG3: 분해 0.7 → 0.3 (-0.40), 객체 선택 0.8 → 0.8 (+0.00)
+      남은 불확실 요소: ['top_exposed(obj_tomato_plate_tomato_plate)']
+  [도구 판정] SG4: 도구 필요 신호 obj_spatula_spatula (주걱은 넓고 평평한 면을 가지고 있어 여러 개의 재료를 한 번에 쌓기에 적합합니다.) — 이 kind(stack)에는 도구 액션이 없어 확정하지 않는다
+  [신뢰도 갱신] SG4: 분해 0.7 → 0.3 (-0.40), 객체 선택 0.8 → 0.9 (+0.10)
+  [분할] SG1: 그룹 2개 → SG1_s1(1개), SG1_s2(1개)
+  [분할] 재계산: 서브골 5 / 상세 15 / 엣지 15 / mutex 10 / 사이클 없음
+[판정] 접지값 29건으로 m3 술어 32건 판정: sat 24 / unsat 5 / unknown 0 / 판정대상아님 3
+  SG1_s1_d1_p0   reachable(obj_bread_a_bread_a)                       -> sat
+  SG1_s1_d1_p1   top_exposed(obj_bread_a_bread_a)                     -> sat
+  SG1_s1_d1_p2   ee_usable(?EE, obj_bread_a_bread_a)                  -> sat
+  SG1_s1_d1_p3   graspable_on_support(?EE, obj_bread_a_bread_a)       -> sat
+  SG1_s1_d1_p4   batch_feasible(?EE, obj_bread_a_bread_a)             -> sat
+  SG1_s1_d3_p2   fits(obj_bread_a_bread_a, obj_bread_plate_bread_plat -> sat
+  SG1_s1_d3_p3   clear(obj_bread_plate_bread_plate)                   -> unsat
+  SG1_s2_d1_p0   reachable(obj_bread_b_bread_b)                       -> sat
+  SG1_s2_d1_p1   top_exposed(obj_bread_b_bread_b)                     -> sat
+  SG1_s2_d1_p2   ee_usable(?EE, obj_bread_b_bread_b)                  -> sat
+  SG1_s2_d1_p3   graspable_on_support(?EE, obj_bread_b_bread_b)       -> sat
+  SG1_s2_d1_p4   batch_feasible(?EE, obj_bread_b_bread_b)             -> sat
+  SG1_s2_d3_p2   fits(obj_bread_b_bread_b, obj_bread_plate_bread_plat -> sat
+  SG1_s2_d3_p3   clear(obj_bread_plate_bread_plate)                   -> unsat
+  SG2_s1a_p0     reachable(obj_cheese_cheese_1)                       -> sat
+  SG2_s1a_p1     top_exposed(obj_cheese_cheese_1)                     -> sat
+  SG2_s1a_p2     ee_usable(?EE, obj_cheese_cheese_1)                  -> sat
+  SG2_s1a_p3     graspable_on_support(?EE, obj_cheese_cheese_1)       -> sat
+  SG2_s1a_p4     batch_feasible(?EE, obj_cheese_cheese_1)             -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG2_s1c_p2     top_exposed(obj_cheese_plate_cheese_plate)           -> unsat
+  SG3_s1a_p0     reachable(obj_tomato_slice_tomato_slice)             -> sat
+  SG3_s1a_p1     top_exposed(obj_tomato_slice_tomato_slice)           -> sat
+  SG3_s1a_p2     ee_usable(?EE, obj_tomato_slice_tomato_slice)        -> sat
+  SG3_s1a_p3     graspable_on_support(?EE, obj_tomato_slice_tomato_sl -> sat
+  SG3_s1a_p4     batch_feasible(?EE, obj_tomato_slice_tomato_slice)   -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG3_s1c_p2     top_exposed(obj_tomato_plate_tomato_plate)           -> unsat
+  SG4_s1a_p0     reachable(obj_turkey_turkey_1)                       -> sat
+  SG4_s1a_p1     top_exposed(obj_turkey_turkey_1)                     -> sat
+  SG4_s1a_p2     ee_usable(?EE, obj_turkey_turkey_1)                  -> sat
+  SG4_s1a_p3     graspable_on_support(?EE, obj_turkey_turkey_1)       -> sat
+  SG4_s1a_p4     batch_feasible(?EE, obj_turkey_turkey_1)             -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG4_s1c_p2     top_exposed(obj_turkey_plate_turkey_plate)           -> unsat
+  [배치] SG1 -> obj_bread_plate_bread_plate: 2자리 / 2줄, 상세 4건에 부여
+  [M2 tokens] 서브골 분해 1761tok(1회, 3.9s) / 객체 선택 1774tok(1회, 5.4s) / confidence_update 7064tok(4회, 7.7s) | 합계 10599tok, 17.0s
+[c2_2] 서브골 5 → 상세 15 | DAG 엣지 15 | mutex 10 | 술어 판정 29
+  SG1_s1_d1 -> SG1_s1_d2   (causal_link: holding(obj_bread_a_bread_a))
+  SG1_s1_d1 -> SG1_s1_d3   (causal_link: holding(obj_bread_a_bread_a))
+  SG1_s1_d2 -> SG1_s1_d3   (causal_link: above(obj_bread_a_bread_a, obj_bread_plate_bread_plate))
+  SG1_s2_d1 -> SG1_s2_d2   (causal_link: holding(obj_bread_b_bread_b))
+  SG1_s2_d1 -> SG1_s2_d3   (causal_link: holding(obj_bread_b_bread_b))
+  SG1_s2_d2 -> SG1_s2_d3   (causal_link: above(obj_bread_b_bread_b, obj_bread_plate_bread_plate))
+  SG2_s1a -> SG2_s1b   (causal_link: holding(obj_cheese_cheese_1))
+  SG2_s1a -> SG2_s1c   (causal_link: holding(obj_cheese_cheese_1))
+  SG2_s1b -> SG2_s1c   (causal_link: above(obj_cheese_cheese_1, obj_cheese_plate_cheese_plate))
+  SG3_s1a -> SG3_s1b   (causal_link: holding(obj_tomato_slice_tomato_slice))
+  SG3_s1a -> SG3_s1c   (causal_link: holding(obj_tomato_slice_tomato_slice))
+  SG3_s1b -> SG3_s1c   (causal_link: above(obj_tomato_slice_tomato_slice, obj_tomato_plate_tomato_plate))task_planner: INFEASIBLE_NO_CANDIDATE (PAYLOAD_EXCEEDED: combined object/tool load exceeds EE payload; PAYLOAD_EXCEEDED: combined object/tool load exceeds EE payload; PAYLOAD_EXCEEDED: combined object/tool load exceeds EE payload; NO_CANDIDATES: no feasible candidate survived thresholding and static checks; NO_CANDIDATES: no feasible candidate survived thresholding and static checks)
+
+  SG4_s1a -> SG4_s1b   (causal_link: holding(obj_turkey_turkey_1))
+  SG4_s1a -> SG4_s1c   (causal_link: holding(obj_turkey_turkey_1))
+  SG4_s1b -> SG4_s1c   (causal_link: above(obj_turkey_turkey_1, obj_turkey_plate_turkey_plate))
+-> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_2\seed_0/m2.json
+[gk] c2_2: 서브골 5개 -> gk_SG1_s1.json, gk_SG1_s2.json, gk_SG2.json, gk_SG3.json, gk_SG4.json
+     SG1_s1: nodes=2 edges=1 selected_tool=None feasible_ee=None
+     SG1_s2: nodes=2 edges=1 selected_tool=None feasible_ee=None
+     SG2: nodes=6 edges=12 selected_tool=None feasible_ee=None
+     SG3: nodes=6 edges=11 selected_tool=None feasible_ee=None
+     SG4: nodes=6 edges=7 selected_tool=None feasible_ee=None
+[M4] gk_bundle.json 생성: 서브골 ['SG1_s1', 'SG1_s2', 'SG2', 'SG3', 'SG4'] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_2\seed_0\gk_bundle.json
+[M4] Task Planner input: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_2\seed_0\gk_bundle.json
+[timing] LLM prompt=9215 completion=1384 total=10599 (16.96s)
+  [서브골 분해] 1402+359=1761tok 3.91s
+  [객체 선택] 1226+548=1774tok 5.38s
+  [confidence_update] 6587+477=7064tok 7.67s
+  [m1] 20.38s (prepared)
+  [vlm_prior] 35.55s (completed)
+  [m2] 17.02s (completed)
+  [gk] 0.03s (completed)
+  [m4] n/a (failed)
+  [m5] n/a (not_run)
+  [total] 73.27s
+
+[중단] run_m4 단계가 exit=3 로 끝났습니다.

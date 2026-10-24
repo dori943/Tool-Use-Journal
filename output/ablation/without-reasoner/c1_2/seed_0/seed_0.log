@@ -1,0 +1,111 @@
+# 2026-10-24T16:23:20
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c1_2 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c1_2\seed_0 --grounding-mode without_reasoner --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+task_planner: INFEASIBLE_NO_CANDIDATE (PAYLOAD_EXCEEDED: combined object/tool load exceeds EE payload; PAYLOAD_EXCEEDED: combined object/tool load exceeds EE payload; PAYLOAD_EXCEEDED: combined object/tool load exceeds EE payload; NO_CANDIDATES: no feasible candidate survived thresholding and static checks; NO_CANDIDATES: no feasible candidate survived thresholding and static checks)
+[run] LLM provider=openai model=gpt-4o-mini
+[run] method=without_reasoner task=c1_2 seed=0 out=C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c1_2\seed_0
+[without_reasoner] Reasoner measurements: REPLACED by VLM prior; M2/G_k/M4/M5: full code
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[env] RoboCasa Kitchen: camera_segmentations unsupported; using task-object visual geom segmentation
+[env] robocasa task objects: ['bottle', 'cutting_board', 'dough', 'spatula', 'spoon', 'tongs']
+[cam] RoboCasa scene camera [수동 pos=[ 2.482 -3.188  1.398]]: lookat=[ 2.455 -3.188  0.941] dist=0.46 az=180° el=-87° fovy=60.0°
+[env] tracked: ['bottle', 'cutting_board', 'dough', 'spatula', 'spoon', 'tongs']
+[env] robot base offset (mm): (np.float64(1844.9921209993395), np.float64(-3219.9896231893763))
+[cam] common scene: fovy=60.0° fovx=60.0° (H512×W512) pos=[ 2.482 -3.188  1.398] f=443.4px
+[M1] detected 6/6 tracked instances
+     bottle                   points=4760
+     cutting_board            points=28884
+     dough                    points=2718
+     spatula                  points=4765
+     spoon                    points=2775
+     tongs                    points=4180
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_bottle_bottle', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_cutting_board_cutting_board', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_dough_dough', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_spatula_spatula', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_spoon_spoon', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_tongs_tongs', 'mu_stage': 0, 'full_m3_tokens': None}
+[M1] grounding: nodes=6 grounded=6 memory_hits=0 refreshed=0
+[M1] nodes=6 edges=8 crops=6
+     on        obj_dough_dough -> obj_cutting_board_cutting_board
+     near      obj_bottle_bottle -> obj_spatula_spatula
+     near      obj_cutting_board_cutting_board -> obj_spatula_spatula
+     near      obj_cutting_board_cutting_board -> obj_tongs_tongs
+     near      obj_dough_dough -> obj_spatula_spatula
+     near      obj_dough_dough -> obj_tongs_tongs
+     near      obj_spatula_spatula -> obj_spoon_spoon
+     near      obj_spoon_spoon -> obj_tongs_tongs
+[c1_2] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c1_2\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c1_2\seed_0\execution/m1_points.npz
+[without_reasoner] feasible_ee (VLM prior → ee_rules):
+    obj_bottle_bottle: ['2F', '3F']
+    obj_cutting_board_cutting_board: ['vac']  (fallback=vac)
+    obj_dough_dough: ['vac']  (fallback=vac)
+    obj_spatula_spatula: ['2F', '3F']
+    obj_spoon_spoon: ['2F', '3F']
+    obj_tongs_tongs: ['2F', '3F']
+[M2] 지시문: 도마 위의 반죽을 평평하게 펴라
+[M1] C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c1_2\seed_0\m1.json 사용
+[판정] 접지값 34건으로 m3 술어 15건 판정: sat 9 / unsat 2 / unknown 0 / 판정대상아님 4
+  SG1_d1_p0      reachable(obj_dough_dough)                           -> sat
+  SG1_d1_p1      top_exposed(obj_dough_dough)                         -> sat
+  SG1_d1_p2      ee_usable(?EE, obj_dough_dough)                      -> sat
+  SG1_d1_p3      graspable_on_support(?EE, obj_dough_dough)           -> sat
+  SG1_d1_p4      batch_feasible(?EE, obj_dough_dough)                 -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG1_d3_p2      fits(obj_dough_dough, obj_cutting_board_cutting_boar -> sat
+  SG1_d3_p3      clear(obj_cutting_board_cutting_board)               -> unsat
+  SG2_d1_p0      reachable(?tool)                                     -> sat
+  SG2_d1_p1      top_exposed(?tool)                                   -> sat
+  SG2_d1_p2      ee_usable(?EE, ?tool)                                -> sat
+  SG2_d1_p3      graspable_on_support(?EE, ?tool)                     -> sat
+  SG2_d1_p4      batch_feasible(?EE, ?tool)                           -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG2_d2_p1      flat_face(?tool)                                     -> unsat
+  SG2_d3_p2      fits(?tool, tool_rest)                               -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG2_d3_p3      clear(tool_rest)                                     -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  [도구 확정] SG1: obj_spatula_spatula 선택 (규칙) — 사용 가능 EE 2종, 리치 여유 167.8mm
+  [도구 확정] SG2: obj_spatula_spatula 선택 (규칙) — 사용 가능 EE 2종, 리치 여유 167.8mm
+[M2] 판정에서 기각된 조건이 있어 재분해 (1/2):
+    직전 계획 평가: 아래 조건이 실측에서 충족되지 않았다.
+    공통: 재분해하더라도 지시문이 요구하는 최종 상태(펴기, 담기, 쌓기, 꺼내기 등)는 바뀌면 안 된다. 바꿀 수 있는 것은 수행 방식, 도구 후보, 순서, 짝이다.
+    [도구 후보 부적합] kind는 그대로 유지하라. 대신 장면의 다른 물체 중 이 작업에 쓸 수 있는 것을 도구 후보(tool_candidate_ids)에 추가하거나 교체하라. 추가할 물체가 없으면 기존 분해를 그대로 출력하라.
+    - flat_face(?tool) -> 불충족: 도구 후보 obj_spatula_spatula, obj_spoon_spoon, obj_tongs_tongs, obj_bottle_bottle 전부 flat_face 조건을 만족하지 못함
+[판정] 접지값 14건으로 m3 술어 7건 판정: sat 5 / unsat 1 / unknown 0 / 판정대상아님 1
+  SG1_d1_p0      reachable(obj_dough_dough)                           -> sat
+  SG1_d1_p1      top_exposed(obj_dough_dough)                         -> sat
+  SG1_d1_p2      ee_usable(?EE, obj_dough_dough)                      -> sat
+  SG1_d1_p3      graspable_on_support(?EE, obj_dough_dough)           -> sat
+  SG1_d1_p4      batch_feasible(?EE, obj_dough_dough)                 -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG1_d3_p2      fits(obj_dough_dough, obj_cutting_board_cutting_boar -> sat
+  SG1_d3_p3      clear(obj_cutting_board_cutting_board)               -> unsat
+  [도구 확정] SG1: obj_spatula_spatula 선택 (규칙) — 사용 가능 EE 2종, 리치 여유 167.8mm
+  [도구 판정] SG1: 도구 필요 신호 obj_bottle_bottle (원통형의 형태로 반죽을 눌러 펴는 데 적합하다.) — 이 kind(relocate)에는 도구 액션이 없어 확정하지 않는다
+  [신뢰도 갱신] SG1: 분해 0.5 → 0.3 (-0.20), 객체 선택 0.7 → 0.7 (+0.00)
+      남은 불확실 요소: ['obj_cutting_board_cutting_board']
+  [M2 tokens] 서브골 분해 2927tok(2회, 3.8s) / 객체 선택 2089tok(2회, 5.0s) / confidence_update 1750tok(1회, 2.0s) | 합계 6766tok, 10.8s
+[c1_2] 서브골 1 → 상세 3 | DAG 엣지 3 | mutex 0 | 술어 판정 14
+  SG1_d1 -> SG1_d2   (causal_link: holding(obj_dough_dough))
+  SG1_d1 -> SG1_d3   (causal_link: holding(obj_dough_dough))
+  SG1_d2 -> SG1_d3   (causal_link: above(obj_dough_dough, obj_cutting_board_cutting_board))
+-> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c1_2\seed_0/m2.json
+[gk] c1_2: 서브골 1개 -> gk_SG1.json
+     SG1: nodes=6 edges=8 selected_tool=None feasible_ee=None
+[M4] gk_bundle.json 생성: 서브골 ['SG1'] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c1_2\seed_0\gk_bundle.json
+[M4] Task Planner input: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c1_2\seed_0\gk_bundle.json
+[timing] LLM prompt=5985 completion=781 total=6766 (10.78s)
+  [서브골 분해] 2675+252=2927tok 3.79s
+  [객체 선택] 1680+409=2089tok 4.96s
+  [confidence_update] 1630+120=1750tok 2.03s
+  [m1] 22.89s (prepared)
+  [vlm_prior] 13.61s (completed)
+  [m2] 10.84s (completed)
+  [gk] 0.02s (completed)
+  [m4] n/a (failed)
+  [m5] n/a (not_run)
+  [total] 47.55s
+
+[중단] run_m4 단계가 exit=3 로 끝났습니다.

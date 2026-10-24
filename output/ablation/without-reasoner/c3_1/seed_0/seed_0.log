@@ -1,0 +1,150 @@
+# 2026-10-24T16:22:36
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c3_1 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_1\seed_0 --grounding-mode without_reasoner --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[run] LLM provider=openai model=gpt-4o-mini
+[run] method=without_reasoner task=c3_1 seed=0 out=C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_1\seed_0
+[without_reasoner] Reasoner measurements: REPLACED by VLM prior; M2/G_k/M4/M5: full code
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[cam] fovy 70.0° -> 60.0°
+[cam] agentview 수동 pos=[-0.265  0.16   1.55 ] lookat=[-0.285  0.16   0.878]
+[env] instances: ['apple', 'bread', 'mug', 'plate', 'spoon', 'blue_tray', 'UR5e0', 'RethinkMount0', 'NullGripper0_right', 'gripperrack_3F_right_gripper', 'gripperrack_vac_vacuum_base', 'gripperrack_2F_robotiq_85_adapter_link', 'ee_rack']
+[env] tracked: ['apple', 'bread', 'mug', 'plate', 'spoon', 'blue_tray', 'gripperrack_3F_right_gripper', 'gripperrack_vac_vacuum_base', 'gripperrack_2F_robotiq_85_adapter_link', 'ee_rack']
+[env] robot base offset (mm): (np.float64(-680.0), np.float64(0.0))
+[cam] agentview: fovy=60.0° fovx=60.0° (H512×W512) pos=[-0.265  0.16   1.55 ] f=443.4px
+[cam] 2차 뷰(사선/크롭) agentview: pos=[0.265 0.148 1.498] lookat=[-0.285  0.16   0.878] fovy=60.0°
+     apple                    points: 1차 1766 + 2차 1781 = 3547
+     bread                    points: 1차 3302 + 2차 3343 = 6645
+     mug                      points: 1차 2976 + 2차 3083 = 6059
+     plate                    points: 1차 9903 + 2차 9917 = 19820
+     spoon                    points: 1차 1039 + 2차 1178 = 2217
+     blue_tray                points: 1차 36271 + 2차 15967 = 52238
+     ee_rack                  points: 1차 0 + 2차 3333 = 3333
+[M1] detected 7/10 tracked instances
+     apple                    points=3547
+     bread                    points=6645
+     mug                      points=6059
+     plate                    points=19820
+     spoon                    points=2217
+     blue_tray                points=52238
+     ee_rack                  points=3333
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_apple_apple', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_bread_bread', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_mug_mug', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_plate_plate', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_spoon_spoon', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_blue_tray_blue_tray', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_rack_ee_rack', 'mu_stage': 0, 'full_m3_tokens': None}
+[M1] grounding: nodes=7 grounded=7 memory_hits=0 refreshed=0
+[M1] nodes=7 edges=5 crops=7
+     near      obj_apple_apple -> obj_bread_bread
+     near      obj_apple_apple -> obj_mug_mug
+     near      obj_bread_bread -> obj_plate_plate
+     near      obj_plate_plate -> obj_spoon_spoon
+     near      obj_rack_ee_rack -> obj_spoon_spoon
+[c3_1] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_1\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_1\seed_0\execution/m1_points.npz
+[without_reasoner] feasible_ee (VLM prior → ee_rules):
+    obj_apple_apple: ['2F', '3F']
+    obj_bread_bread: ['3F']
+    obj_mug_mug: ['3F']
+    obj_plate_plate: ['vac']  (fallback=vac)
+    obj_spoon_spoon: ['2F', '3F']
+    obj_blue_tray_blue_tray: ['vac']  (fallback=vac)
+    obj_rack_ee_rack: ['vac']  (fallback=vac)
+[M2] 지시문: 테이블 위 물체를 모두 파란 트레이로 옮겨라
+[M1] C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_1\seed_0\m1.json 사용
+[판정] 접지값 27건으로 m3 술어 7건 판정: sat 6 / unsat 1 / unknown 0 / 판정대상아님 0
+  SG1_d1_p0      reachable({obj_apple_apple,obj_bread_bread,obj_mug_m -> sat
+  SG1_d1_p1      top_exposed({obj_apple_apple,obj_bread_bread,obj_mug -> sat
+  SG1_d1_p2      ee_usable(?EE, {obj_apple_apple,obj_bread_bread,obj_ -> sat
+  SG1_d1_p3      graspable_on_support(?EE, {obj_apple_apple,obj_bread -> sat
+  SG1_d1_p4      batch_feasible(?EE, {obj_apple_apple,obj_bread_bread -> unsat
+  SG1_d3_p2      fits({obj_apple_apple,obj_bread_bread,obj_mug_mug,ob -> sat
+  SG1_d3_p3      clear(obj_blue_tray_blue_tray)                       -> sat
+  [분할 계획] SG1: 그룹 5개 (접지 partition)
+  [신뢰도 갱신] SG1: 분해 0.7 → 0.7 (+0.00), 객체 선택 0.7 → 0.8 (+0.10)
+      남은 불확실 요소: ['각 물체를 파란 트레이로 옮길 때의 안정성에 대한 정보가 부족하다.']
+  [분할] SG1: 그룹 5개 → SG1_s1(1개), SG1_s2(1개), SG1_s3(1개), SG1_s4(1개), SG1_s5(1개)
+  [분할] 재계산: 서브골 5 / 상세 15 / 엣지 15 / mutex 10 / 사이클 없음
+[판정] 접지값 35건으로 m3 술어 35건 판정: sat 35 / unsat 0 / unknown 0 / 판정대상아님 0
+  SG1_s1_d1_p0   reachable(obj_apple_apple)                           -> sat
+  SG1_s1_d1_p1   top_exposed(obj_apple_apple)                         -> sat
+  SG1_s1_d1_p2   ee_usable(?EE, obj_apple_apple)                      -> sat
+  SG1_s1_d1_p3   graspable_on_support(?EE, obj_apple_apple)           -> sat
+  SG1_s1_d1_p4   batch_feasible(?EE, obj_apple_apple)                 -> sat
+  SG1_s1_d3_p2   fits(obj_apple_apple, obj_blue_tray_blue_tray)       -> sat
+  SG1_s1_d3_p3   clear(obj_blue_tray_blue_tray)                       -> sat
+  SG1_s2_d1_p0   reachable(obj_bread_bread)                           -> sat
+  SG1_s2_d1_p1   top_exposed(obj_bread_bread)                         -> sat
+  SG1_s2_d1_p2   ee_usable(?EE, obj_bread_bread)                      -> sat
+  SG1_s2_d1_p3   graspable_on_support(?EE, obj_bread_bread)           -> sat
+  SG1_s2_d1_p4   batch_feasible(?EE, obj_bread_bread)                 -> sat
+  SG1_s2_d3_p2   fits(obj_bread_bread, obj_blue_tray_blue_tray)       -> sat
+  SG1_s2_d3_p3   clear(obj_blue_tray_blue_tray)                       -> sat
+  SG1_s3_d1_p0   reachable(obj_mug_mug)                               -> sat
+  SG1_s3_d1_p1   top_exposed(obj_mug_mug)                             -> sat
+  SG1_s3_d1_p2   ee_usable(?EE, obj_mug_mug)                          -> sat
+  SG1_s3_d1_p3   graspable_on_support(?EE, obj_mug_mug)               -> sat
+  SG1_s3_d1_p4   batch_feasible(?EE, obj_mug_mug)                     -> sat
+  SG1_s3_d3_p2   fits(obj_mug_mug, obj_blue_tray_blue_tray)           -> sat
+  SG1_s3_d3_p3   clear(obj_blue_tray_blue_tray)                       -> sat
+  SG1_s4_d1_p0   reachable(obj_plate_plate)                           -> sat
+  SG1_s4_d1_p1   top_exposed(obj_plate_plate)                         -> sat
+  SG1_s4_d1_p2   ee_usable(?EE, obj_plate_plate)                      -> sat
+  SG1_s4_d1_p3   graspable_on_support(?EE, obj_plate_plate)           -> sat
+  SG1_s4_d1_p4   batch_feasible(?EE, obj_plate_plate)                 -> sat
+  SG1_s4_d3_p2   fits(obj_plate_plate, obj_blue_tray_blue_tray)       -> sat
+  SG1_s4_d3_p3   clear(obj_blue_tray_blue_tray)                       -> sat
+  SG1_s5_d1_p0   reachable(obj_spoon_spoon)                           -> sat
+  SG1_s5_d1_p1   top_exposed(obj_spoon_spoon)                         -> sat
+  SG1_s5_d1_p2   ee_usable(?EE, obj_spoon_spoon)                      -> sat
+  SG1_s5_d1_p3   graspable_on_support(?EE, obj_spoon_spoon)           -> sat
+  SG1_s5_d1_p4   batch_feasible(?EE, obj_spoon_spoon)                 -> sat
+  SG1_s5_d3_p2   fits(obj_spoon_spoon, obj_blue_tray_blue_tray)       -> sat
+  SG1_s5_d3_p3   clear(obj_blue_tray_blue_tray)                       -> sat
+  [배치] SG1 -> obj_blue_tray_blue_tray: 5자리 / 2줄, 상세 10건에 부여
+  [M2 tokens] 서브골 분해 1650tok(1회, 6.0s) / 객체 선택 972tok(1회, 2.4s) / confidence_update 1031tok(1회, 1.8s) | 합계 3653tok, 10.2s
+[c3_1] 서브골 5 → 상세 15 | DAG 엣지 15 | mutex 10 | 술어 판정 35
+  SG1_s1_d1 -> SG1_s1_d2   (causal_link: holding(obj_apple_apple))
+  SG1_s1_d1 -> SG1_s1_d3   (causal_link: holding(obj_apple_apple))task_planner: INFEASIBLE_NO_CANDIDATE (PAYLOAD_EXCEEDED: combined object/tool load exceeds EE payload; PAYLOAD_EXCEEDED: combined object/tool load exceeds EE payload; PAYLOAD_EXCEEDED: combined object/tool load exceeds EE payload; NO_CANDIDATES: no feasible candidate survived thresholding and static checks; NO_CANDIDATES: no feasible candidate survived thresholding and static checks)
+
+  SG1_s1_d2 -> SG1_s1_d3   (causal_link: above(obj_apple_apple, obj_blue_tray_blue_tray))
+  SG1_s2_d1 -> SG1_s2_d2   (causal_link: holding(obj_bread_bread))
+  SG1_s2_d1 -> SG1_s2_d3   (causal_link: holding(obj_bread_bread))
+  SG1_s2_d2 -> SG1_s2_d3   (causal_link: above(obj_bread_bread, obj_blue_tray_blue_tray))
+  SG1_s3_d1 -> SG1_s3_d2   (causal_link: holding(obj_mug_mug))
+  SG1_s3_d1 -> SG1_s3_d3   (causal_link: holding(obj_mug_mug))
+  SG1_s3_d2 -> SG1_s3_d3   (causal_link: above(obj_mug_mug, obj_blue_tray_blue_tray))
+  SG1_s4_d1 -> SG1_s4_d2   (causal_link: holding(obj_plate_plate))
+  SG1_s4_d1 -> SG1_s4_d3   (causal_link: holding(obj_plate_plate))
+  SG1_s4_d2 -> SG1_s4_d3   (causal_link: above(obj_plate_plate, obj_blue_tray_blue_tray))
+  SG1_s5_d1 -> SG1_s5_d2   (causal_link: holding(obj_spoon_spoon))
+  SG1_s5_d1 -> SG1_s5_d3   (causal_link: holding(obj_spoon_spoon))
+  SG1_s5_d2 -> SG1_s5_d3   (causal_link: above(obj_spoon_spoon, obj_blue_tray_blue_tray))
+-> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_1\seed_0/m2.json
+[gk] c3_1: 서브골 5개 -> gk_SG1_s1.json, gk_SG1_s2.json, gk_SG1_s3.json, gk_SG1_s4.json, gk_SG1_s5.json
+     SG1_s1: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s2: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s3: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s4: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s5: nodes=2 edges=0 selected_tool=None feasible_ee=None
+[M4] gk_bundle.json 생성: 서브골 ['SG1_s1', 'SG1_s2', 'SG1_s3', 'SG1_s4', 'SG1_s5'] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_1\seed_0\gk_bundle.json
+[M4] Task Planner input: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c3_1\seed_0\gk_bundle.json
+[timing] LLM prompt=3003 completion=650 total=3653 (10.17s)
+  [서브골 분해] 1239+411=1650tok 5.97s
+  [객체 선택] 829+143=972tok 2.36s
+  [confidence_update] 935+96=1031tok 1.84s
+  [m1] 16.64s (prepared)
+  [vlm_prior] 15.20s (completed)
+  [m2] 10.22s (completed)
+  [gk] 0.03s (completed)
+  [m4] n/a (failed)
+  [m5] n/a (not_run)
+  [total] 42.33s
+
+[중단] run_m4 단계가 exit=3 로 끝났습니다.

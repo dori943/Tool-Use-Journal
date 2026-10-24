@@ -1,0 +1,126 @@
+# 2026-10-24T15:05:39
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c2_2 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c2_2\seed_0 --grounding-mode without_grounding --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[run] LLM provider=openai model=gpt-4o-mini
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[env] RoboCasa Kitchen: camera_segmentations unsupported; using task-object visual geom segmentation
+[env] robocasa task objects: ['bread_a', 'bread_b', 'bread_plate', 'cheese_1', 'cheese_plate', 'knife', 'ladle', 'serving_plate', 'spatula', 'spoon', 'tomato_plate', 'tomato_slice', 'turkey_1', 'turkey_plate']
+[cam] RoboCasa scene camera [수동 pos=[ 2.537 -3.02   1.658]]: lookat=[ 2.445 -3.02   0.932] dist=0.73 az=180° el=-83° fovy=60.0°
+[env] tracked: ['bread_a', 'bread_b', 'bread_plate', 'cheese_1', 'cheese_plate', 'knife', 'ladle', 'serving_plate', 'spatula', 'spoon', 'tomato_plate', 'tomato_slice', 'turkey_1', 'turkey_plate']
+[env] robot base offset (mm): (np.float64(1844.9921209993395), np.float64(-3219.9896231893763))
+[cam] common scene: fovy=60.0° fovx=60.0° (H512×W512) pos=[ 2.537 -3.02   1.658] f=443.4px
+[M1] detected 14/14 tracked instances
+     bread_a                  points=3834
+     bread_b                  points=3941
+     bread_plate              points=3947
+     cheese_1                 points=768
+     cheese_plate             points=4195
+     knife                    points=1059
+     ladle                    points=1149
+     serving_plate            points=8869
+     spatula                  points=1650
+     spoon                    points=926
+     tomato_plate             points=4003
+     tomato_slice             points=1025
+     turkey_1                 points=1166
+     turkey_plate             points=3741
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_bread_a_bread_a', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_bread_b_bread_b', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_bread_plate_bread_plate', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [siphy] tokens: total=9080 (prompt=8786 completion=294)
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_cheese_cheese_1', 'mu_stage': 0, 'full_m3_tokens': 9080}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_cheese_plate_cheese_plate', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_knife_knife', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_ladle_ladle', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_serving_plate_serving_plate', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_spatula_spatula', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_spoon_spoon', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_tomato_plate_tomato_plate', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_tomato_slice_tomato_slice', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [siphy] tokens: total=9069 (prompt=8786 completion=283)
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_turkey_turkey_1', 'mu_stage': 0, 'full_m3_tokens': 9069}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_turkey_plate_turkey_plate', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+[M1] grounding: nodes=14 grounded=2 memory_hits=12 refreshed=12
+[M1] memory update: new=2 upgraded=0 kept=12 -> C:\Users\user\Tool-Use-Journal\output\memory.json
+[M1] m0_retrieval -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c2_2\seed_0\execution\m0_retrieval.json
+[M1] phys tokens: c3=0 (calls=0) full_siphy=18149 (calls=2) total=18149
+[M1] nodes=14 edges=50 crops=14
+     on        obj_bread_a_bread_a -> obj_bread_plate_bread_plate
+     on        obj_bread_b_bread_b -> obj_bread_plate_bread_plate
+     on        obj_cheese_cheese_1 -> obj_cheese_plate_cheese_plate
+     on        obj_tomato_slice_tomato_slice -> obj_tomato_plate_tomato_plate
+     on        obj_turkey_turkey_1 -> obj_turkey_plate_turkey_plate
+     near      obj_bread_a_bread_a -> obj_bread_b_bread_b
+     near      obj_bread_a_bread_a -> obj_cheese_cheese_1
+     near      obj_bread_a_bread_a -> obj_cheese_plate_cheese_plate
+     near      obj_bread_a_bread_a -> obj_knife_knife
+     near      obj_bread_a_bread_a -> obj_serving_plate_serving_plate
+     near      obj_bread_a_bread_a -> obj_spatula_spatula
+     near      obj_bread_a_bread_a -> obj_turkey_turkey_1
+     near      obj_bread_a_bread_a -> obj_turkey_plate_turkey_plate
+     near      obj_bread_b_bread_b -> obj_serving_plate_serving_plate
+     near      obj_bread_b_bread_b -> obj_turkey_turkey_1
+     near      obj_bread_b_bread_b -> obj_turkey_plate_turkey_plate
+     near      obj_bread_plate_bread_plate -> obj_cheese_cheese_1
+     near      obj_bread_plate_bread_plate -> obj_cheese_plate_cheese_plate
+     near      obj_bread_plate_bread_plate -> obj_knife_knife
+     near      obj_bread_plate_bread_plate -> obj_serving_plate_serving_plate
+     near      obj_bread_plate_bread_plate -> obj_spatula_spatula
+     near      obj_bread_plate_bread_plate -> obj_turkey_turkey_1
+     near      obj_bread_plate_bread_plate -> obj_turkey_plate_turkey_plate
+     near      obj_cheese_cheese_1 -> obj_knife_knife
+     near      obj_cheese_cheese_1 -> obj_spatula_spatula
+     near      obj_cheese_cheese_1 -> obj_spoon_spoon
+     near      obj_cheese_cheese_1 -> obj_tomato_plate_tomato_plate
+     near      obj_cheese_cheese_1 -> obj_turkey_plate_turkey_plate
+     near      obj_cheese_plate_cheese_plate -> obj_knife_knife
+     near      obj_cheese_plate_cheese_plate -> obj_ladle_ladle
+     near      obj_cheese_plate_cheese_plate -> obj_spatula_spatula
+     near      obj_cheese_plate_cheese_plate -> obj_spoon_spoon
+     near      obj_cheese_plate_cheese_plate -> obj_tomato_plate_tomato_plate
+     near      obj_cheese_plate_cheese_plate -> obj_tomato_slice_tomato_slice
+     near      obj_cheese_plate_cheese_plate -> obj_turkey_turkey_1
+     near      obj_cheese_plate_cheese_plate -> obj_turkey_plate_turkey_plate
+     near      obj_knife_knife -> obj_spatula_spatula
+     near      obj_knife_knife -> obj_turkey_turkey_1
+     near      obj_knife_knife -> obj_turkey_plate_turkey_plate
+     near      obj_ladle_ladle -> obj_spatula_spatula
+     near      obj_ladle_ladle -> obj_spoon_spoon
+     near      obj_ladle_ladle -> obj_tomato_plate_tomato_plate
+     near      obj_ladle_ladle -> obj_tomato_slice_tomato_slice
+     near      obj_serving_plate_serving_plate -> obj_turkey_turkey_1
+     near      obj_serving_plate_serving_plate -> obj_turkey_plate_turkey_plate
+     near      obj_spatula_spatula -> obj_spoon_spoon
+     near      obj_spatula_spatula -> obj_tomato_plate_tomato_plate
+     near      obj_spatula_spatula -> obj_tomato_slice_tomato_slice
+     near      obj_spoon_spoon -> obj_tomato_plate_tomato_plate
+     near      obj_spoon_spoon -> obj_tomato_slice_tomato_slice
+[c2_2] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c2_2\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c2_2\seed_0\execution/m1_points.npz
+  [분할] SG1: 그룹 5개 → SG1_s1(1개), SG1_s2(1개), SG1_s3(1개), SG1_s4(1개), SG1_s5(1개)
+  [순서] 지시문 순서(VLM) 체인: SG1_s1 -> SG1_s2 -> SG1_s3 -> SG1_s4 -> SG1_s5
+  [분할] 재계산: 서브골 5 / 상세 15 / 엣지 15 / mutex 10 / 사이클 없음
+[timing] LLM prompt=19211 completion=513 total=19724 (6.09s)
+  [visual_decomposition] 9398+392=9790tok 4.14s
+  [visual_selection] 9813+121=9934tok 1.95s
+  [m1] 21.12s (prepared)
+  [m2] 6.11s (completed)
+  [m4] 0.02s (failed)
+  [m5] n/a (not_run)
+  [m2_through_m4_seconds] 6.13s
+  [total] 27.25s
+[timing] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c2_2\seed_0\timing_summary.json
+Traceback (most recent call last):
+  File "C:\Users\user\Tool-Use-Journal\scripts\run.py", line 1949, in <module>
+    main()
+  File "C:\Users\user\Tool-Use-Journal\scripts\run.py", line 1887, in main
+    return run(args, sys.modules[__name__])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\scripts\run_without_grounding.py", line 339, in run
+    raise RuntimeError(
+RuntimeError: M4 found no plan: INFEASIBLE_NO_CANDIDATE; see m4.json rejections

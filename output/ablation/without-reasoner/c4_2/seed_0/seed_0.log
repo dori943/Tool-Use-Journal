@@ -1,0 +1,181 @@
+# 2026-10-24T18:30:26
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c4_2 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_2\seed_0 --grounding-mode without_reasoner --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[run] LLM provider=openai model=gpt-4o-mini
+[run] method=without_reasoner task=c4_2 seed=0 out=C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_2\seed_0
+[without_reasoner] Reasoner measurements: REPLACED by VLM prior; M2/G_k/M4/M5: full code
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[env] RoboCasa Kitchen: camera_segmentations unsupported; using task-object visual geom segmentation
+[env] robocasa task objects: ['baguette', 'cereal', 'lid', 'milk', 'rolling_pin', 'whisk']
+[cam] RoboCasa scene camera [수동 pos=[ 2.496 -3.138  1.607]]: lookat=[ 2.435 -3.137  0.871] dist=0.74 az=179° el=-85° fovy=60.0°
+[env] tracked: ['baguette', 'cereal', 'lid', 'milk', 'rolling_pin', 'whisk', 'packing_box']
+[env] robot base offset (mm): (np.float64(1844.9921209993395), np.float64(-3219.9896231893763))
+[cam] common scene: fovy=60.0° fovx=60.0° (H512×W512) pos=[ 2.496 -3.138  1.607] f=443.4px
+[M1] detected 7/7 tracked instances
+     baguette                 points=4480
+     cereal                   points=6194
+     lid                      points=24739
+     milk                     points=2934
+     rolling_pin              points=3655
+     whisk                    points=1014
+     packing_box              points=52470
+[M1] 컨테이너 내부치수 실음: packing_box inner=[240.0, 180.0, 230.0]mm wall=10.0mm floor=10.0mm (노드 1개)
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_baguette_baguette', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_cereal_cereal', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_lid_lid', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_milk_milk', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_rolling_pin_rolling_pin', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_whisk_whisk', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_box_packing_box', 'mu_stage': 0, 'full_m3_tokens': None}
+[M1] EE 교체 궤적 keep-out -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_2\seed_0\execution\m1_ee_keepout.npz (6 paths)
+[M1] grounding: nodes=7 grounded=7 memory_hits=0 refreshed=0
+[M1] nodes=7 edges=9 crops=7
+     near      obj_baguette_baguette -> obj_rolling_pin_rolling_pin
+     near      obj_baguette_baguette -> obj_whisk_whisk
+     near      obj_baguette_baguette -> obj_box_packing_box
+     near      obj_cereal_cereal -> obj_milk_milk
+     near      obj_cereal_cereal -> obj_whisk_whisk
+     near      obj_lid_lid -> obj_whisk_whisk
+     near      obj_box_packing_box -> obj_lid_lid
+     near      obj_box_packing_box -> obj_rolling_pin_rolling_pin
+     near      obj_box_packing_box -> obj_whisk_whisk
+[c4_2] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_2\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_2\seed_0\execution/m1_points.npz
+[without_reasoner] feasible_ee (VLM prior → ee_rules):
+    obj_baguette_baguette: ['2F', '3F']
+    obj_cereal_cereal: ['vac']  (fallback=vac)
+    obj_lid_lid: ['vac']  (fallback=vac)
+    obj_milk_milk: ['3F']
+    obj_rolling_pin_rolling_pin: ['2F', '3F']
+    obj_whisk_whisk: ['3F']
+    obj_box_packing_box: ['vac']  (fallback=vac)
+[M2] 지시문: 테이블 위 물건을 모두 상자에 담고 뚜껑을 덮어라
+[M1] C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_2\seed_0\m1.json 사용
+  [도구 후보] SG1: 제외 태스크 대상물 ['obj_baguette_baguette', 'obj_cereal_cereal', 'obj_milk_milk', 'obj_rolling_pin_rolling_pin', 'obj_whisk_whisk', 'obj_box_packing_box'] (남은 후보 0개)
+  [도구 후보] SG2: 제외 태스크 대상물 ['obj_lid_lid', 'obj_box_packing_box'] (남은 후보 0개)
+[판정] 접지값 32건으로 m3 술어 13건 판정: sat 11 / unsat 1 / unknown 0 / 판정대상아님 1
+  SG1_d1_p0      reachable({obj_baguette_baguette,obj_cereal_cereal,o -> sat
+  SG1_d1_p1      top_exposed({obj_baguette_baguette,obj_cereal_cereal -> sat
+  SG1_d1_p2      ee_usable(?EE, {obj_baguette_baguette,obj_cereal_cer -> sat
+  SG1_d1_p3      graspable_on_support(?EE, {obj_baguette_baguette,obj -> sat
+  SG1_d1_p4      batch_feasible(?EE, {obj_baguette_baguette,obj_cerea -> unsat
+  SG1_d3_p2      fits({obj_baguette_baguette,obj_cereal_cereal,obj_mi -> sat
+  SG1_d3_p3      clear(obj_box_packing_box)                           -> sat
+  SG2_s1a_p0     reachable(obj_lid_lid)                               -> sat
+  SG2_s1a_p1     top_exposed(obj_lid_lid)                             -> sat
+  SG2_s1a_p2     ee_usable(?EE, obj_lid_lid)                          -> sat
+  SG2_s1a_p3     graspable_on_support(?EE, obj_lid_lid)               -> sat
+  SG2_s1a_p4     batch_feasible(?EE, obj_lid_lid)                     -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG2_s1c_p2     top_exposed(obj_box_packing_box)                     -> sat
+  [분할 계획] SG1: 그룹 5개 (접지 partition)
+  [신뢰도 갱신] SG1: 분해 0.7 → 0.7 (+0.00), 객체 선택 0.7 → 0.7 (+0.00)
+  [신뢰도 갱신] SG2: 분해 0.8 → 0.8 (+0.00), 객체 선택 0.7 → 0.7 (+0.00)
+      남은 불확실 요소: ['batch_feasible(?EE, obj_lid_lid)']
+  [분할] SG1: 그룹 5개 → SG1_s1(1개), SG1_s2(1개), SG1_s3(1개), SG1_s4(1개), SG1_s5(1개)
+  [순서] SG2(obj_box_packing_box 덮기)는 ['SG1_s1', 'SG1_s2', 'SG1_s3', 'SG1_s4', 'SG1_s5'](담기) 뒤에 — 사전조건 5건 부착
+  [분할] 재계산: 서브골 6 / 상세 18 / 엣지 23 / mutex 15 / 사이클 없음
+[판정] 접지값 40건으로 m3 술어 41건 판정: sat 40 / unsat 0 / unknown 0 / 판정대상아님 1
+  SG1_s1_d1_p0   reachable(obj_baguette_baguette)                     -> sat
+  SG1_s1_d1_p1   top_exposed(obj_baguette_baguette)                   -> sat
+  SG1_s1_d1_p2   ee_usable(?EE, obj_baguette_baguette)                -> sat
+  SG1_s1_d1_p3   graspable_on_support(?EE, obj_baguette_baguette)     -> sat
+  SG1_s1_d1_p4   batch_feasible(?EE, obj_baguette_baguette)           -> sat
+  SG1_s1_d3_p2   fits(obj_baguette_baguette, obj_box_packing_box)     -> sat
+  SG1_s1_d3_p3   clear(obj_box_packing_box)                           -> sat
+  SG1_s2_d1_p0   reachable(obj_cereal_cereal)                         -> sat
+  SG1_s2_d1_p1   top_exposed(obj_cereal_cereal)                       -> sat
+  SG1_s2_d1_p2   ee_usable(?EE, obj_cereal_cereal)                    -> sat
+  SG1_s2_d1_p3   graspable_on_support(?EE, obj_cereal_cereal)         -> sat
+  SG1_s2_d1_p4   batch_feasible(?EE, obj_cereal_cereal)               -> sat
+  SG1_s2_d3_p2   fits(obj_cereal_cereal, obj_box_packing_box)         -> sat
+  SG1_s2_d3_p3   clear(obj_box_packing_box)                           -> sat
+  SG1_s3_d1_p0   reachable(obj_milk_milk)                             -> sat
+  SG1_s3_d1_p1   top_exposed(obj_milk_milk)                           -> sat
+  SG1_s3_d1_p2   ee_usable(?EE, obj_milk_milk)                        -> sat
+  SG1_s3_d1_p3   graspable_on_support(?EE, obj_milk_milk)             -> sat
+  SG1_s3_d1_p4   batch_feasible(?EE, obj_milk_milk)                   -> sat
+  SG1_s3_d3_p2   fits(obj_milk_milk, obj_box_packing_box)             -> sat
+  SG1_s3_d3_p3   clear(obj_box_packing_box)                           -> sat
+  SG1_s4_d1_p0   reachable(obj_rolling_pin_rolling_pin)               -> sat
+  SG1_s4_d1_p1   top_exposed(obj_rolling_pin_rolling_pin)             -> sat
+  SG1_s4_d1_p2   ee_usable(?EE, obj_rolling_pin_rolling_pin)          -> sat
+  SG1_s4_d1_p3   graspable_on_support(?EE, obj_rolling_pin_rolling_pi -> sat
+  SG1_s4_d1_p4   batch_feasible(?EE, obj_rolling_pin_rolling_pin)     -> sat
+  SG1_s4_d3_p2   fits(obj_rolling_pin_rolling_pin, obj_box_packing_bo -> sat
+  SG1_s4_d3_p3   clear(obj_box_packing_box)                           -> sat
+  SG1_s5_d1_p0   reachable(obj_whisk_whisk)                           -> sattask_planner: invalid input: SCRIPTED_GRASP_EE_INFEASIBLE: SG1_s2_d1: cereal supports ['2F'], grounded feasible EEs=['vac']
+
+  SG1_s5_d1_p1   top_exposed(obj_whisk_whisk)                         -> sat
+  SG1_s5_d1_p2   ee_usable(?EE, obj_whisk_whisk)                      -> sat
+  SG1_s5_d1_p3   graspable_on_support(?EE, obj_whisk_whisk)           -> sat
+  SG1_s5_d1_p4   batch_feasible(?EE, obj_whisk_whisk)                 -> sat
+  SG1_s5_d3_p2   fits(obj_whisk_whisk, obj_box_packing_box)           -> sat
+  SG1_s5_d3_p3   clear(obj_box_packing_box)                           -> sat
+  SG2_s1a_p0     reachable(obj_lid_lid)                               -> sat
+  SG2_s1a_p1     top_exposed(obj_lid_lid)                             -> sat
+  SG2_s1a_p2     ee_usable(?EE, obj_lid_lid)                          -> sat
+  SG2_s1a_p3     graspable_on_support(?EE, obj_lid_lid)               -> sat
+  SG2_s1a_p4     batch_feasible(?EE, obj_lid_lid)                     -> not_queried  (판정 대상 아님: 도구 거치 위치 등)
+  SG2_s1c_p2     top_exposed(obj_box_packing_box)                     -> sat
+  [배치] SG1 -> obj_box_packing_box: 5자리 / 3줄, 상세 10건에 부여
+  [적재 순서] obj_cereal_cereal -> obj_milk_milk: obj_cereal_cereal를 obj_box_packing_box에 넣은 뒤 다음 물체 확보
+  [적재 순서] obj_milk_milk -> obj_rolling_pin_rolling_pin: obj_milk_milk를 obj_box_packing_box에 넣은 뒤 다음 물체 확보
+  [적재 순서] obj_rolling_pin_rolling_pin -> obj_whisk_whisk: obj_rolling_pin_rolling_pin를 obj_box_packing_box에 넣은 뒤 다음 물체 확보
+  [적재 순서] obj_whisk_whisk -> obj_baguette_baguette: obj_whisk_whisk를 obj_box_packing_box에 넣은 뒤 다음 물체 확보
+  [M2 tokens] 서브골 분해 1545tok(1회, 3.6s) / 객체 선택 1181tok(1회, 2.8s) / confidence_update 1576tok(2회, 3.1s) | 합계 4302tok, 9.6s
+[c4_2] 서브골 6 → 상세 18 | DAG 엣지 27 | mutex 15 | 술어 판정 40
+  SG1_s5_d3 -> SG1_s1_d1   (causal_link: in(obj_whisk_whisk, obj_box_packing_box))
+  SG1_s1_d1 -> SG1_s1_d2   (causal_link: holding(obj_baguette_baguette))
+  SG1_s1_d1 -> SG1_s1_d3   (causal_link: holding(obj_baguette_baguette))
+  SG1_s1_d2 -> SG1_s1_d3   (causal_link: above(obj_baguette_baguette, obj_box_packing_box))
+  SG1_s2_d1 -> SG1_s2_d2   (causal_link: holding(obj_cereal_cereal))
+  SG1_s2_d1 -> SG1_s2_d3   (causal_link: holding(obj_cereal_cereal))
+  SG1_s2_d2 -> SG1_s2_d3   (causal_link: above(obj_cereal_cereal, obj_box_packing_box))
+  SG1_s2_d3 -> SG1_s3_d1   (causal_link: in(obj_cereal_cereal, obj_box_packing_box))
+  SG1_s3_d1 -> SG1_s3_d2   (causal_link: holding(obj_milk_milk))
+  SG1_s3_d1 -> SG1_s3_d3   (causal_link: holding(obj_milk_milk))
+  SG1_s3_d2 -> SG1_s3_d3   (causal_link: above(obj_milk_milk, obj_box_packing_box))
+  SG1_s3_d3 -> SG1_s4_d1   (causal_link: in(obj_milk_milk, obj_box_packing_box))
+  SG1_s4_d1 -> SG1_s4_d2   (causal_link: holding(obj_rolling_pin_rolling_pin))
+  SG1_s4_d1 -> SG1_s4_d3   (causal_link: holding(obj_rolling_pin_rolling_pin))
+  SG1_s4_d2 -> SG1_s4_d3   (causal_link: above(obj_rolling_pin_rolling_pin, obj_box_packing_box))
+  SG1_s4_d3 -> SG1_s5_d1   (causal_link: in(obj_rolling_pin_rolling_pin, obj_box_packing_box))
+  SG1_s5_d1 -> SG1_s5_d2   (causal_link: holding(obj_whisk_whisk))
+  SG1_s5_d1 -> SG1_s5_d3   (causal_link: holding(obj_whisk_whisk))
+  SG1_s5_d2 -> SG1_s5_d3   (causal_link: above(obj_whisk_whisk, obj_box_packing_box))
+  SG1_s1_d3 -> SG2_s1a   (causal_link: in(obj_baguette_baguette, obj_box_packing_box))
+  SG1_s2_d3 -> SG2_s1a   (causal_link: in(obj_cereal_cereal, obj_box_packing_box))
+  SG1_s3_d3 -> SG2_s1a   (causal_link: in(obj_milk_milk, obj_box_packing_box))
+  SG1_s4_d3 -> SG2_s1a   (causal_link: in(obj_rolling_pin_rolling_pin, obj_box_packing_box))
+  SG1_s5_d3 -> SG2_s1a   (causal_link: in(obj_whisk_whisk, obj_box_packing_box))
+  SG2_s1a -> SG2_s1b   (causal_link: holding(obj_lid_lid))
+  SG2_s1a -> SG2_s1c   (causal_link: holding(obj_lid_lid))
+  SG2_s1b -> SG2_s1c   (causal_link: above(obj_lid_lid, obj_box_packing_box))
+-> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_2\seed_0/m2.json
+[gk] c4_2: 서브골 6개 -> gk_SG1_s1.json, gk_SG1_s2.json, gk_SG1_s3.json, gk_SG1_s4.json, gk_SG1_s5.json, gk_SG2.json
+     SG1_s1: nodes=2 edges=1 selected_tool=None feasible_ee=None
+     SG1_s2: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s3: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s4: nodes=2 edges=1 selected_tool=None feasible_ee=None
+     SG1_s5: nodes=2 edges=1 selected_tool=None feasible_ee=None
+     SG2: nodes=2 edges=1 selected_tool=None feasible_ee=None
+[M4] gk_bundle.json 생성: 서브골 ['SG1_s1', 'SG1_s2', 'SG1_s3', 'SG1_s4', 'SG1_s5', 'SG2'] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_2\seed_0\gk_bundle.json
+[M4] Task Planner input: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c4_2\seed_0\gk_bundle.json
+[timing] LLM prompt=3585 completion=717 total=4302 (9.57s)
+  [서브골 분해] 1247+298=1545tok 3.62s
+  [객체 선택] 907+274=1181tok 2.84s
+  [confidence_update] 1431+145=1576tok 3.11s
+  [m1] 14.34s (prepared)
+  [vlm_prior] 14.81s (completed)
+  [m2] 9.61s (completed)
+  [gk] 0.03s (completed)
+  [m4] n/a (failed)
+  [m5] n/a (not_run)
+  [total] 39.02s
+
+[중단] run_m4 단계가 exit=2 로 끝났습니다.

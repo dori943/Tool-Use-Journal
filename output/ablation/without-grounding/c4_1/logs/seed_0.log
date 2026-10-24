@@ -1,0 +1,77 @@
+# 2026-10-24T15:13:29
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c4_1 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c4_1\seed_0 --grounding-mode without_grounding --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[run] LLM provider=openai model=gpt-4o-mini
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[env] RoboCasa Kitchen: camera_segmentations unsupported; using task-object visual geom segmentation
+[env] robocasa task objects: ['appliance_left', 'appliance_right', 'card', 'tool_2_spatula_a', 'tool_3_spatula_b', 'tool_4_spatula_c', 'tool_5_cutting_board']
+[cam] RoboCasa scene camera [수동 pos=[ 2.655 -3.221  1.634]]: lookat=[ 2.591 -3.221  1.025] dist=0.61 az=180° el=-84° fovy=60.0°
+[env] tracked: ['appliance_left', 'appliance_right', 'card', 'tool_2_spatula_a', 'tool_3_spatula_b', 'tool_4_spatula_c', 'tool_5_cutting_board']
+[env] robot base offset (mm): (np.float64(1844.9921209993395), np.float64(-3219.9896231893763))
+[cam] common scene: fovy=60.0° fovx=60.0° (H512×W512) pos=[ 2.655 -3.221  1.634] f=443.4px
+[M1] detected 7/7 tracked instances
+     appliance_left           points=42735
+     appliance_right          points=42605
+     card                     points=570
+     tool_2_spatula_a         points=714
+     tool_3_spatula_b         points=1238
+     tool_4_spatula_c         points=1982
+     tool_5_cutting_board     points=5851
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_appliance_left_appliance_left', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_appliance_right_appliance_right', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_card_card', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_tool_2_spatula_a_tool_2_spatula_a', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_tool_3_spatula_b_tool_3_spatula_b', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_tool_4_spatula_c_tool_4_spatula_c', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+  [M1] {'module': 'm1', 'event': 'memory_hit', 'node': 'obj_tool_5_cutting_board_tool_5_cutting_board', 'lookup_type': 'intra_task_exact', 'geometry_source': 'current_observation', 'intrinsic_source': 'memory'}
+[M1] grounding: nodes=7 grounded=0 memory_hits=7 refreshed=7
+[M1] memory update: new=0 upgraded=0 kept=7 -> C:\Users\user\Tool-Use-Journal\output\memory.json
+[M1] m0_retrieval -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c4_1\seed_0\execution\m0_retrieval.json
+[M1] phys tokens: c3=0 (calls=0) full_siphy=0 (calls=0) total=0
+[M1] nodes=7 edges=11 crops=7
+     near      obj_appliance_left_appliance_left -> obj_appliance_right_appliance_right
+     near      obj_appliance_left_appliance_left -> obj_card_card
+     near      obj_appliance_left_appliance_left -> obj_tool_3_spatula_b_tool_3_spatula_b
+     near      obj_appliance_left_appliance_left -> obj_tool_4_spatula_c_tool_4_spatula_c
+     near      obj_appliance_right_appliance_right -> obj_card_card
+     near      obj_appliance_right_appliance_right -> obj_tool_3_spatula_b_tool_3_spatula_b
+     near      obj_appliance_right_appliance_right -> obj_tool_4_spatula_c_tool_4_spatula_c
+     near      obj_appliance_right_appliance_right -> obj_tool_5_cutting_board_tool_5_cutting_board
+     near      obj_tool_2_spatula_a_tool_2_spatula_a -> obj_tool_3_spatula_b_tool_3_spatula_b
+     near      obj_tool_3_spatula_b_tool_3_spatula_b -> obj_tool_4_spatula_c_tool_4_spatula_c
+     near      obj_tool_4_spatula_c_tool_4_spatula_c -> obj_tool_5_cutting_board_tool_5_cutting_board
+[c4_1] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c4_1\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c4_1\seed_0\execution/m1_points.npz
+[timing] LLM prompt=0 completion=0 total=0 (0.00s)
+  [m1] 20.31s (prepared)
+  [m2] n/a (failed)
+  [m4] n/a (not_run)
+  [m5] n/a (not_run)
+  [total] 20.31s
+[timing] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-grounding\c4_1\seed_0\timing_summary.json
+Traceback (most recent call last):
+  File "C:\Users\user\Tool-Use-Journal\scripts\run.py", line 1949, in <module>
+    main()
+  File "C:\Users\user\Tool-Use-Journal\scripts\run.py", line 1887, in main
+    return run(args, sys.modules[__name__])
+           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\scripts\run_without_grounding.py", line 292, in run
+    m2 = build_m2(task_instruction(args.task), read(out / "m1.json"), rough)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\ablations\without_grounding.py", line 265, in build_m2
+    out = run_m2(task, scene, rough=rough)
+          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m2_subgoal\pipeline.py", line 40, in run_m2
+    subgoals = rough.generate(task, m1_serialized)
+               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\ablations\without_grounding.py", line 223, in generate
+    decisions = self._call(
+                ^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\ablations\without_grounding.py", line 201, in _call
+    raise ValueError(f"{stage}: invalid model response after 2 attempts: {error}")
+ValueError: visual_selection: invalid model response after 2 attempts: SG1: select a scene tool distinct from targets/destination

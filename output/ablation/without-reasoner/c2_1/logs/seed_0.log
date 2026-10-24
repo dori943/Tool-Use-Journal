@@ -1,0 +1,912 @@
+# 2026-10-24T15:44:26
+# C:\Users\user\anaconda3\envs\robosuite_env\python.exe C:\Users\user\Tool-Use-Journal\scripts\run.py c2_1 --seed 0 --output-dir C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0 --grounding-mode without_reasoner --m5-simulate controller --provider openai
+
+[robosuite WARNING] No private macro file found! (macros.py:57)
+[robosuite WARNING] It is recommended to use a private macro file (macros.py:58)
+[robosuite WARNING] To setup, run: python C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite/scripts/setup_macros.py (macros.py:59)
+[robosuite WARNING] Could not import robosuite_models. Some robots may not be available. If you want to use these robots, please install robosuite_models from source (https://github.com/ARISE-Initiative/robosuite_models) or through pip install. (__init__.py:30)
+[robosuite WARNING] Could not load the mink-based whole-body IK. Make sure you install related import properly (e.g. pip install mink==0.0.5), otherwise you will not be able to use the default IK controller setting for GR1 robot. (__init__.py:40)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[run] LLM provider=openai model=gpt-4o-mini
+[run] method=without_reasoner task=c2_1 seed=0 out=C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0
+[without_reasoner] Reasoner measurements: REPLACED by VLM prior; M2/G_k/M4/M5: full code
+WARNING: mimicgen environments not imported since mimicgen is not installed!
+[cam] fovy 70.0° -> 60.0°
+[cam] agentview 수동 pos=[-0.265  0.16   1.55 ] lookat=[-0.285  0.16   0.878]
+[env] instances: ['apple', 'bread', 'mug', 'plate', 'spoon', 'blue_tray', 'UR5e0', 'RethinkMount0', 'NullGripper0_right', 'gripperrack_3F_right_gripper', 'gripperrack_vac_vacuum_base', 'gripperrack_2F_robotiq_85_adapter_link', 'ee_rack']
+[env] tracked: ['apple', 'bread', 'mug', 'plate', 'spoon', 'blue_tray', 'gripperrack_3F_right_gripper', 'gripperrack_vac_vacuum_base', 'gripperrack_2F_robotiq_85_adapter_link', 'ee_rack']
+[env] robot base offset (mm): (np.float64(-680.0), np.float64(0.0))
+[cam] agentview: fovy=60.0° fovx=60.0° (H512×W512) pos=[-0.265  0.16   1.55 ] f=443.4px
+[cam] 2차 뷰(사선/크롭) agentview: pos=[0.265 0.148 1.498] lookat=[-0.285  0.16   0.878] fovy=60.0°
+     apple                    points: 1차 1766 + 2차 1781 = 3547
+     bread                    points: 1차 3302 + 2차 3343 = 6645
+     mug                      points: 1차 2976 + 2차 3083 = 6059
+     plate                    points: 1차 9903 + 2차 9917 = 19820
+     spoon                    points: 1차 1039 + 2차 1178 = 2217
+     blue_tray                points: 1차 36271 + 2차 15967 = 52238
+     ee_rack                  points: 1차 0 + 2차 3333 = 3333
+[M1] detected 7/10 tracked instances
+     apple                    points=3547
+     bread                    points=6645
+     mug                      points=6059
+     plate                    points=19820
+     spoon                    points=2217
+     blue_tray                points=52238
+     ee_rack                  points=3333
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_apple_apple', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_bread_bread', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_mug_mug', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_plate_plate', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_spoon_spoon', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_tray_blue_tray', 'mu_stage': 0, 'full_m3_tokens': None}
+  [M1] {'module': 'm1', 'event': 'grounded', 'node': 'obj_rack_ee_rack', 'mu_stage': 0, 'full_m3_tokens': None}
+[M1] grounding: nodes=7 grounded=7 memory_hits=0 refreshed=0
+[M1] nodes=7 edges=5 crops=7
+     near      obj_apple_apple -> obj_bread_bread
+     near      obj_apple_apple -> obj_mug_mug
+     near      obj_bread_bread -> obj_plate_plate
+     near      obj_plate_plate -> obj_spoon_spoon
+     near      obj_rack_ee_rack -> obj_spoon_spoon
+[c2_1] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0\execution/m1.json, C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0\execution/m1_points.npz
+[without_reasoner] feasible_ee (VLM prior → ee_rules):
+    obj_apple_apple: ['2F', '3F']
+    obj_bread_bread: ['3F']
+    obj_mug_mug: ['3F']
+    obj_plate_plate: ['vac']  (fallback=vac)
+    obj_spoon_spoon: ['2F', '3F']
+    obj_tray_blue_tray: ['vac']  (fallback=vac)
+    obj_rack_ee_rack: ['vac']  (fallback=vac)
+[M2] 지시문: 테이블 위 물체를 왼쪽부터 순서대로 파란 트레이로 옮겨라
+[M1] C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0\m1.json 사용
+[판정] 접지값 27건으로 m3 술어 7건 판정: sat 6 / unsat 1 / unknown 0 / 판정대상아님 0
+  SG1_d1_p0      reachable({obj_spoon_spoon,obj_plate_plate,obj_bread -> sat
+  SG1_d1_p1      top_exposed({obj_spoon_spoon,obj_plate_plate,obj_bre -> sat
+  SG1_d1_p2      ee_usable(?EE, {obj_spoon_spoon,obj_plate_plate,obj_ -> sat
+  SG1_d1_p3      graspable_on_support(?EE, {obj_spoon_spoon,obj_plate -> sat
+  SG1_d1_p4      batch_feasible(?EE, {obj_spoon_spoon,obj_plate_plate -> unsat
+  SG1_d3_p2      fits({obj_spoon_spoon,obj_plate_plate,obj_bread_brea -> sat
+  SG1_d3_p3      clear(obj_tray_blue_tray)                            -> sat
+  [분할 계획] SG1: 그룹 5개 (접지 partition)
+  [신뢰도 갱신] SG1: 분해 0.7 → 0.7 (+0.00), 객체 선택 0.7 → 0.7 (+0.00)
+      남은 불확실 요소: ['물체의 질량과 크기', '파지 가능 여부']
+  [분할] SG1: 그룹 5개 → SG1_s1(1개), SG1_s2(1개), SG1_s3(1개), SG1_s4(1개), SG1_s5(1개)
+  [순서] 지시문 순서(VLM) 체인: SG1_s1 -> SG1_s2 -> SG1_s3 -> SG1_s4 -> SG1_s5
+  [분할] 재계산: 서브골 5 / 상세 15 / 엣지 19 / mutex 10 / 사이클 없음
+[판정] 접지값 35건으로 m3 술어 35건 판정: sat 35 / unsat 0 / unknown 0 / 판정대상아님 0
+  SG1_s1_d1_p0   reachable(obj_spoon_spoon)                           -> sat
+  SG1_s1_d1_p1   top_exposed(obj_spoon_spoon)                         -> sat
+  SG1_s1_d1_p2   ee_usable(?EE, obj_spoon_spoon)                      -> sat
+  SG1_s1_d1_p3   graspable_on_support(?EE, obj_spoon_spoon)           -> sat
+  SG1_s1_d1_p4   batch_feasible(?EE, obj_spoon_spoon)                 -> sat
+  SG1_s1_d3_p2   fits(obj_spoon_spoon, obj_tray_blue_tray)            -> sat
+  SG1_s1_d3_p3   clear(obj_tray_blue_tray)                            -> sat
+  SG1_s2_d1_p0   reachable(obj_plate_plate)                           -> sat
+  SG1_s2_d1_p1   top_exposed(obj_plate_plate)                         -> sat
+  SG1_s2_d1_p2   ee_usable(?EE, obj_plate_plate)                      -> sat
+  SG1_s2_d1_p3   graspable_on_support(?EE, obj_plate_plate)           -> sat
+  SG1_s2_d1_p4   batch_feasible(?EE, obj_plate_plate)                 -> sat
+  SG1_s2_d3_p2   fits(obj_plate_plate, obj_tray_blue_tray)            -> sat
+  SG1_s2_d3_p3   clear(obj_tray_blue_tray)                            -> sat
+  SG1_s3_d1_p0   reachable(obj_bread_bread)                           -> sat
+  SG1_s3_d1_p1   top_exposed(obj_bread_bread)                         -> sat
+  SG1_s3_d1_p2   ee_usable(?EE, obj_bread_bread)                      -> sat
+  SG1_s3_d1_p3   graspable_on_support(?EE, obj_bread_bread)           -> sat
+  SG1_s3_d1_p4   batch_feasible(?EE, obj_bread_bread)                 -> sat
+  SG1_s3_d3_p2   fits(obj_bread_bread, obj_tray_blue_tray)            -> sat
+  SG1_s3_d3_p3   clear(obj_tray_blue_tray)                            -> sat
+  SG1_s4_d1_p0   reachable(obj_apple_apple)                           -> sat
+  SG1_s4_d1_p1   top_exposed(obj_apple_apple)                         -> sat
+  SG1_s4_d1_p2   ee_usable(?EE, obj_apple_apple)                      -> sat
+  SG1_s4_d1_p3   graspable_on_support(?EE, obj_apple_apple)           -> sat
+  SG1_s4_d1_p4   batch_feasible(?EE, obj_apple_apple)                 -> sat
+  SG1_s4_d3_p2   fits(obj_apple_apple, obj_tray_blue_tray)            -> sat
+  SG1_s4_d3_p3   clear(obj_tray_blue_tray)                            -> sat
+  SG1_s5_d1_p0   reachable(obj_mug_mug)                               -> sat
+  SG1_s5_d1_p1   top_exposed(obj_mug_mug)                             -> sat
+  SG1_s5_d1_p2   ee_usable(?EE, obj_mug_mug)                          -> sat
+  SG1_s5_d1_p3   graspable_on_support(?EE, obj_mug_mug)               -> sat
+  SG1_s5_d1_p4   batch_feasible(?EE, obj_mug_mug)                     -> sat
+  SG1_s5_d3_p2   fits(obj_mug_mug, obj_tray_blue_tray)                -> sat
+  SG1_s5_d3_p3   clear(obj_tray_blue_tray)                            -> sat
+  [배치] SG1 -> obj_tray_blue_tray: 5자리 / 2줄, 상세 10건에 부여
+  [M2 tokens] 서브골 분해 1650tok(1회, 4.3s) / 객체 선택 933tok(1회, 1.6s) / 순서(VLM) 8775tok(1회, 1.2s) / confidence_update 967tok(1회, 1.4s) | 합계 12325tok, 8.7s
+[c2_1] 서브골 5 → 상세 15 | DAG 엣지 19 | mutex 10 | 술어 판정 35
+  SG1_s1_d1 -> SG1_s1_d2   (causal_link: holding(obj_spoon_spoon))[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+
+  SG1_s1_d1 -> SG1_s1_d3   (causal_link: holding(obj_spoon_spoon))
+  SG1_s1_d2 -> SG1_s1_d3   (causal_link: above(obj_spoon_spoon, obj_tray_blue_tray))
+  SG1_s1_d3 -> SG1_s2_d1   (causal_link: in(obj_spoon_spoon, obj_tray_blue_tray))
+  SG1_s2_d1 -> SG1_s2_d2   (causal_link: holding(obj_plate_plate))
+  SG1_s2_d1 -> SG1_s2_d3   (causal_link: holding(obj_plate_plate))
+  SG1_s2_d2 -> SG1_s2_d3   (causal_link: above(obj_plate_plate, obj_tray_blue_tray))
+  SG1_s2_d3 -> SG1_s3_d1   (causal_link: in(obj_plate_plate, obj_tray_blue_tray))
+  SG1_s3_d1 -> SG1_s3_d2   (causal_link: holding(obj_bread_bread))
+  SG1_s3_d1 -> SG1_s3_d3   (causal_link: holding(obj_bread_bread))
+  SG1_s3_d2 -> SG1_s3_d3   (causal_link: above(obj_bread_bread, obj_tray_blue_tray))
+  SG1_s3_d3 -> SG1_s4_d1   (causal_link: in(obj_bread_bread, obj_tray_blue_tray))
+  SG1_s4_d1 -> SG1_s4_d2   (causal_link: holding(obj_apple_apple))
+  SG1_s4_d1 -> SG1_s4_d3   (causal_link: holding(obj_apple_apple))
+  SG1_s4_d2 -> SG1_s4_d3   (causal_link: above(obj_apple_apple, obj_tray_blue_tray))
+  SG1_s4_d3 -> SG1_s5_d1   (causal_link: in(obj_apple_apple, obj_tray_blue_tray))
+  SG1_s5_d1 -> SG1_s5_d2   (causal_link: holding(obj_mug_mug))
+  SG1_s5_d1 -> SG1_s5_d3   (causal_link: holding(obj_mug_mug))
+  SG1_s5_d2 -> SG1_s5_d3   (causal_link: above(obj_mug_mug, obj_tray_blue_tray))
+-> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0/m2.json
+[gk] c2_1: 서브골 5개 -> gk_SG1_s1.json, gk_SG1_s2.json, gk_SG1_s3.json, gk_SG1_s4.json, gk_SG1_s5.json
+     SG1_s1: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s2: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s3: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s4: nodes=2 edges=0 selected_tool=None feasible_ee=None
+     SG1_s5: nodes=2 edges=0 selected_tool=None feasible_ee=None
+[M4] gk_bundle.json 생성: 서브골 ['SG1_s1', 'SG1_s2', 'SG1_s3', 'SG1_s4', 'SG1_s5'] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0\gk_bundle.json
+[M4] Task Planner input: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0\gk_bundle.json
+[M4] SUCCESS: EE=2F, tool=none, EE=vac, tool=none, EE=3F, tool=none
+[M4] output: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0\m4.json
+{
+  "status": "VALID",
+  "subgoal_count": 15,
+  "request_count": 15,
+  "subgoal_order": [
+    "SG1_s1_d1",
+    "SG1_s1_d2",
+    "SG1_s1_d3",
+    "SG1_s2_d1",
+    "SG1_s2_d2",
+    "SG1_s2_d3",
+    "SG1_s3_d1",
+    "SG1_s3_d2",
+    "SG1_s3_d3",
+    "SG1_s4_d1",
+    "SG1_s4_d2",
+    "SG1_s4_d3",
+    "SG1_s5_d1",
+    "SG1_s5_d2",
+    "SG1_s5_d3"
+  ],
+  "resources": [
+    {
+      "subgoal_id": "SG1_s1_d1",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "spoon"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s1_d2",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "spoon"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s1_d3",
+      "ee": "2F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "spoon"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s2_d1",
+      "ee": "vac",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "plate"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s2_d2",
+      "ee": "vac",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "plate"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s2_d3",
+      "ee": "vac",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "plate"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "bread"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "bread"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "bread"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s4_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "apple"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s4_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "apple"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s4_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "apple"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s5_d1",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "acquire",
+      "target_ids": [
+        "mug"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s5_d2",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "transport",
+      "target_ids": [
+        "mug"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s5_d3",
+      "ee": "3F",
+      "tool": null,
+      "action_type": "place",
+      "target_ids": [
+        "mug"
+      ]
+    }
+  ],
+  "transition_actions": [
+    "MOVE_TO_EE_RACK",
+    "ATTACH_EE",
+    "VERIFY_ATTACHMENT",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "MOVE_TO_EE_RACK",
+    "DETACH_EE",
+    "ATTACH_EE",
+    "VERIFY_ATTACHMENT",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "MOVE_TO_EE_RACK",
+    "DETACH_EE",
+    "ATTACH_EE",
+    "VERIFY_ATTACHMENT",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE",
+    "KEEP_EE",
+    "MOVE_TO_WORKSPACE"
+  ],
+  "environment_name": "C2_1_ObjectSorting",
+  "initial_active_ee": null,
+  "initial_world": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-reasoner\\c2_1\\seed_0\\m5\\initial_world.json",
+  "grasp_execution_mode": "AUTO"
+}
+[M5] validation: C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0\m5\m5_input_validation.json
+[VIDEO_DIAG] ENV-CHANGE frame#1 env=3066843304848 ee=None sim_time=2.0000 frame_mean=151.45 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=3 cam_pos=[0.66, 0.0, 1.79] ncam=6 nlight=1 cameras=['frontview', 'birdview', 'sideview', 'agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=151.45
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[M5][EE_PATH] cache_dir=ee_rack/sig_059a98b9d18d mode=portable
+[M5][EE_PATH] hit: ur5e-bare-to-2F-v1
+[M5][EE_PATH] start_state=PASS
+[M5][EE_PATH] workcell_signature=PASS
+[M5][EE_PATH] collision_validation=PASS
+[M5][EE_PATH] source=precomputed
+[M5][WORKSPACE] ee=2F planner=COMMISSIONED_REVERSE target=commissioned-reverse template=ur5e-bare-to-2F-v1
+[M5][SAFE_EXIT] ok: ee=2F planner=COMMISSIONED_REVERSE
+[VIDEO_DIAG] sample frame#30 env=3066843304848 ee=None sim_time=3.4400 frame_mean=151.37 black=no
+[VIDEO_DIAG] sample frame#60 env=3066843304848 ee=None sim_time=4.9200 frame_mean=150.99 black=no
+[VIDEO_DIAG] sample frame#90 env=3066843304848 ee=None sim_time=6.4200 frame_mean=150.94 black=no
+[VIDEO_DIAG] sample frame#120 env=3066843304848 ee=None sim_time=7.9200 frame_mean=150.81 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[VIDEO_DIAG] ENV-CHANGE frame#150 env=3067817572688 ee=2F sim_time=9.4200 frame_mean=150.89 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=3 cam_pos=[0.66, 0.0, 1.79] ncam=6 nlight=1 cameras=['frontview', 'birdview', 'sideview', 'agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=150.89
+[VIDEO_DIAG] sample frame#180 env=3067817572688 ee=2F sim_time=10.9400 frame_mean=150.85 black=no
+[VIDEO_DIAG] sample frame#210 env=3067817572688 ee=2F sim_time=12.4400 frame_mean=150.85 black=no
+[VIDEO_DIAG] sample frame#240 env=3067817572688 ee=2F sim_time=13.9400 frame_mean=150.84 black=no
+[VIDEO_DIAG] sample frame#270 env=3067817572688 ee=2F sim_time=15.4400 frame_mean=150.84 black=no
+[VIDEO_DIAG] sample frame#300 env=3067817572688 ee=2F sim_time=16.9400 frame_mean=150.83 black=no
+[VIDEO_DIAG] sample frame#330 env=3067817572688 ee=2F sim_time=18.4400 frame_mean=150.83 black=no
+[VIDEO_DIAG] sample frame#360 env=3067817572688 ee=2F sim_time=19.9200 frame_mean=150.79 black=no
+[VIDEO_DIAG] sample frame#390 env=3067817572688 ee=2F sim_time=21.4200 frame_mean=150.80 black=no
+[VIDEO_DIAG] sample frame#420 env=3067817572688 ee=2F sim_time=22.9200 frame_mean=150.80 black=no
+[VIDEO_DIAG] sample frame#450 env=3067817572688 ee=2F sim_time=24.4200 frame_mean=150.80 black=no
+[VIDEO_DIAG] sample frame#480 env=3067817572688 ee=2F sim_time=25.9200 frame_mean=150.80 black=no
+[VIDEO_DIAG] sample frame#510 env=3067817572688 ee=2F sim_time=27.4200 frame_mean=150.80 black=no
+[VIDEO_DIAG] sample frame#540 env=3067817572688 ee=2F sim_time=28.9200 frame_mean=150.80 black=no
+[VIDEO_DIAG] sample frame#570 env=3067817572688 ee=2F sim_time=30.4200 frame_mean=150.79 black=no
+[VIDEO_DIAG] sample frame#600 env=3067817572688 ee=2F sim_time=31.9200 frame_mean=150.75 black=no
+[VIDEO_DIAG] sample frame#630 env=3067817572688 ee=2F sim_time=33.4200 frame_mean=150.74 black=no
+[VIDEO_DIAG] sample frame#660 env=3067817572688 ee=2F sim_time=34.9200 frame_mean=150.74 black=no
+[VIDEO_DIAG] sample frame#690 env=3067817572688 ee=2F sim_time=36.4200 frame_mean=150.74 black=no
+[VIDEO_DIAG] sample frame#720 env=3067817572688 ee=2F sim_time=37.9200 frame_mean=150.74 black=no
+[VIDEO_DIAG] sample frame#750 env=3067817572688 ee=2F sim_time=39.4400 frame_mean=150.74 black=no
+[VIDEO_DIAG] sample frame#780 env=3067817572688 ee=2F sim_time=40.9400 frame_mean=150.75 black=no
+[VIDEO_DIAG] sample frame#810 env=3067817572688 ee=2F sim_time=42.4400 frame_mean=150.78 black=no
+[VIDEO_DIAG] sample frame#840 env=3067817572688 ee=2F sim_time=43.9400 frame_mean=150.84 black=no
+[VIDEO_DIAG] sample frame#870 env=3067817572688 ee=2F sim_time=45.4400 frame_mean=150.90 black=no
+[VIDEO_DIAG] sample frame#900 env=3067817572688 ee=2F sim_time=46.9400 frame_mean=150.97 black=no
+[VIDEO_DIAG] sample frame#930 env=3067817572688 ee=2F sim_time=48.4400 frame_mean=151.05 black=no
+[VIDEO_DIAG] sample frame#960 env=3067817572688 ee=2F sim_time=49.9400 frame_mean=151.14 black=no
+[VIDEO_DIAG] sample frame#990 env=3067817572688 ee=2F sim_time=51.4400 frame_mean=151.21 black=no
+[VIDEO_DIAG] sample frame#1020 env=3067817572688 ee=2F sim_time=52.9400 frame_mean=151.28 black=no
+[VIDEO_DIAG] sample frame#1050 env=3067817572688 ee=2F sim_time=54.4400 frame_mean=151.34 black=no
+[VIDEO_DIAG] sample frame#1080 env=3067817572688 ee=2F sim_time=55.9400 frame_mean=151.38 black=no
+[VIDEO_DIAG] sample frame#1110 env=3067817572688 ee=2F sim_time=57.4400 frame_mean=151.41 black=no
+[VIDEO_DIAG] sample frame#1140 env=3067817572688 ee=2F sim_time=58.9400 frame_mean=151.43 black=no
+[VIDEO_DIAG] sample frame#1170 env=3067817572688 ee=2F sim_time=60.4400 frame_mean=151.45 black=no
+[VIDEO_DIAG] sample frame#1200 env=3067817572688 ee=2F sim_time=61.9400 frame_mean=151.47 black=no
+[VIDEO_DIAG] sample frame#1230 env=3067817572688 ee=2F sim_time=63.4400 frame_mean=151.48 black=no
+[VIDEO_DIAG] sample frame#1260 env=3067817572688 ee=2F sim_time=64.9400 frame_mean=151.49 black=no
+[VIDEO_DIAG] sample frame#1290 env=3067817572688 ee=2F sim_time=66.4400 frame_mean=151.49 black=no
+[VIDEO_DIAG] sample frame#1320 env=3067817572688 ee=2F sim_time=67.9400 frame_mean=151.49 black=no
+[VIDEO_DIAG] sample frame#1350 env=3067817572688 ee=2F sim_time=69.4400 frame_mean=151.49 black=no
+[spoon] PRESHAPE: lift=0.000m fingers=[]
+[VIDEO_DIAG] sample frame#1380 env=3067817572688 ee=2F sim_time=70.9400 frame_mean=151.50 black=no
+[VIDEO_DIAG] sample frame#1410 env=3067817572688 ee=2F sim_time=72.4400 frame_mean=151.50 black=no
+[VIDEO_DIAG] sample frame#1440 env=3067817572688 ee=2F sim_time=73.9400 frame_mean=151.50 black=no
+[spoon] PRESHAPE: lift=0.000m fingers=[]
+[preshape] 0.019830066186196486 opening -0.625
+[plan] PRE_GRASP 155 points {'position_error_m': 4.162075572678167e-06, 'orientation_error_deg': 6.254673167438874e-05}
+[VIDEO_DIAG] sample frame#1470 env=3067817572688 ee=2F sim_time=75.4400 frame_mean=151.50 black=no
+[VIDEO_DIAG] sample frame#1500 env=3067817572688 ee=2F sim_time=76.9200 frame_mean=151.48 black=no
+[VIDEO_DIAG] sample frame#1530 env=3067817572688 ee=2F sim_time=78.4200 frame_mean=151.40 black=no
+[VIDEO_DIAG] sample frame#1560 env=3067817572688 ee=2F sim_time=79.9200 frame_mean=151.28 black=no
+[spoon] PRE_GRASP: lift=0.000m fingers=[]
+[VIDEO_DIAG] sample frame#1590 env=3067817572688 ee=2F sim_time=81.4200 frame_mean=151.21 black=no
+[VIDEO_DIAG] sample frame#1620 env=3067817572688 ee=2F sim_time=82.9200 frame_mean=150.97 black=no
+[VIDEO_DIAG] sample frame#1650 env=3067817572688 ee=2F sim_time=84.4200 frame_mean=150.68 black=no
+[spoon] PRE_GRASP: lift=0.000m fingers=[]
+[VIDEO_DIAG] sample frame#1680 env=3067817572688 ee=2F sim_time=85.9200 frame_mean=150.44 black=no
+[VIDEO_DIAG] sample frame#1710 env=3067817572688 ee=2F sim_time=87.4200 frame_mean=150.30 black=no
+[VIDEO_DIAG] sample frame#1740 env=3067817572688 ee=2F sim_time=88.9200 frame_mean=150.23 black=no
+[plan] GRASP 26 points {'position_error_m': 3.6021722198911723e-07, 'orientation_error_deg': 2.543147062314437e-06}
+[VIDEO_DIAG] sample frame#1770 env=3067817572688 ee=2F sim_time=90.4200 frame_mean=150.22 black=no
+[spoon] GRASP: lift=0.000m fingers=[]
+[VIDEO_DIAG] sample frame#1800 env=3067817572688 ee=2F sim_time=91.9200 frame_mean=150.14 black=no
+[VIDEO_DIAG] sample frame#1830 env=3067817572688 ee=2F sim_time=93.4200 frame_mean=150.06 black=no
+[VIDEO_DIAG] sample frame#1860 env=3067817572688 ee=2F sim_time=94.9200 frame_mean=150.05 black=no
+[spoon] GRASP: lift=0.000m fingers=[]
+[VIDEO_DIAG] sample frame#1890 env=3067817572688 ee=2F sim_time=96.4200 frame_mean=150.05 black=no
+[VIDEO_DIAG] sample frame#1920 env=3067817572688 ee=2F sim_time=97.9200 frame_mean=150.06 black=no
+[plan] LIFT 31 points {'position_error_m': 8.161069788410843e-07, 'orientation_error_deg': 1.4395664900168855e-05}
+[VIDEO_DIAG] sample frame#1950 env=3067817572688 ee=2F sim_time=99.4200 frame_mean=150.05 black=no
+[spoon] LIFT: lift=0.042m fingers=['left', 'right']
+[VIDEO_DIAG] sample frame#1980 env=3067817572688 ee=2F sim_time=100.9200 frame_mean=150.07 black=no
+[VIDEO_DIAG] sample frame#2010 env=3067817572688 ee=2F sim_time=102.4200 frame_mean=150.22 black=no
+[VIDEO_DIAG] sample frame#2040 env=3067817572688 ee=2F sim_time=103.9200 frame_mean=150.32 black=no
+[VIDEO_DIAG] sample frame#2070 env=3067817572688 ee=2F sim_time=105.4200 frame_mean=150.32 black=no
+[spoon] SETTLE: lift=0.149m fingers=['left', 'right']
+[VIDEO_DIAG] sample frame#2100 env=3067817572688 ee=2F sim_time=106.9200 frame_mean=150.32 black=no
+[VIDEO_DIAG] sample frame#2130 env=3067817572688 ee=2F sim_time=108.4200 frame_mean=150.32 black=no
+[VIDEO_DIAG] sample frame#2160 env=3067817572688 ee=2F sim_time=109.9200 frame_mean=150.32 black=no
+[spoon] HOLD: lift=0.149m fingers=['left', 'right']
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[M5][VAC_ATTACH] intended_target='spoon' current_attached_body='spoon' candidate_body='spoon' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.000336
+[M5][VAC_ATTACH] intended_target='spoon' current_attached_body='spoon' candidate_body='spoon' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[M5][REGION_GOAL] held_transport_goal object=spoon region=blue_tray source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#2190 env=3067817572688 ee=2F sim_time=111.4200 frame_mean=150.33 black=no
+[VIDEO_DIAG] sample frame#2220 env=3067817572688 ee=2F sim_time=112.9200 frame_mean=151.35 black=no
+[VIDEO_DIAG] sample frame#2250 env=3067817572688 ee=2F sim_time=114.4200 frame_mean=151.79 black=no
+[M5][REGION_GOAL] held_place_goal object=spoon region=blue_tray source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#2280 env=3067817572688 ee=2F sim_time=115.9200 frame_mean=151.75 black=no
+[VIDEO_DIAG] sample frame#2310 env=3067817572688 ee=2F sim_time=117.4200 frame_mean=151.46 black=no
+[VIDEO_DIAG] sample frame#2340 env=3067817572688 ee=2F sim_time=118.9200 frame_mean=151.58 black=no
+[VIDEO_DIAG] sample frame#2370 env=3067817572688 ee=2F sim_time=120.4200 frame_mean=151.58 black=no
+[VIDEO_DIAG] sample frame#2400 env=3067817572688 ee=2F sim_time=121.9200 frame_mean=151.59 black=no
+[VIDEO_DIAG] sample frame#2430 env=3067817572688 ee=2F sim_time=123.4200 frame_mean=151.65 black=no
+[VIDEO_DIAG] sample frame#2460 env=3067817572688 ee=2F sim_time=124.9200 frame_mean=151.15 black=no
+[VIDEO_DIAG] sample frame#2490 env=3067817572688 ee=2F sim_time=126.4200 frame_mean=150.87 black=no
+[VIDEO_DIAG] sample frame#2520 env=3067817572688 ee=2F sim_time=127.9200 frame_mean=151.41 black=no
+[VIDEO_DIAG] sample frame#2550 env=3067817572688 ee=2F sim_time=129.4200 frame_mean=151.60 black=no
+[VIDEO_DIAG] sample frame#2580 env=3067817572688 ee=2F sim_time=130.9200 frame_mean=151.43 black=no
+[VIDEO_DIAG] sample frame#2610 env=3067817572688 ee=2F sim_time=132.4200 frame_mean=151.57 black=no
+[VIDEO_DIAG] sample frame#2640 env=3067817572688 ee=2F sim_time=133.9200 frame_mean=151.47 black=no
+[VIDEO_DIAG] sample frame#2670 env=3067817572688 ee=2F sim_time=135.4200 frame_mean=151.39 black=no
+[VIDEO_DIAG] sample frame#2700 env=3067817572688 ee=2F sim_time=136.9200 frame_mean=151.43 black=no
+[VIDEO_DIAG] sample frame#2730 env=3067817572688 ee=2F sim_time=138.4200 frame_mean=151.46 black=no
+[VIDEO_DIAG] sample frame#2760 env=3067817572688 ee=2F sim_time=139.9200 frame_mean=151.42 black=no
+[VIDEO_DIAG] sample frame#2790 env=3067817572688 ee=2F sim_time=141.4200 frame_mean=151.45 black=no
+[M5][EE_ENTRY] hit: 2F trajectory=ur5e-2F-to-bare-v1
+[M5][EE_ENTRY] planner=DIRECT_JOINT
+[M5][EE_ENTRY] workcell_signature=PASS
+[M5][EE_ENTRY] collision_validation=PASS
+[M5][EE_ENTRY] dynamic_planner_invoked=true
+[VIDEO_DIAG] sample frame#2820 env=3067817572688 ee=2F sim_time=142.9200 frame_mean=151.50 black=no
+[VIDEO_DIAG] sample frame#2850 env=3067817572688 ee=2F sim_time=144.4200 frame_mean=151.53 black=no
+[VIDEO_DIAG] sample frame#2880 env=3067817572688 ee=2F sim_time=145.9200 frame_mean=151.56 black=no
+[VIDEO_DIAG] sample frame#2910 env=3067817572688 ee=2F sim_time=147.4200 frame_mean=151.32 black=no
+[VIDEO_DIAG] sample frame#2940 env=3067817572688 ee=2F sim_time=148.9200 frame_mean=151.63 black=no
+[VIDEO_DIAG] sample frame#2970 env=3067817572688 ee=2F sim_time=150.4200 frame_mean=151.28 black=no
+[VIDEO_DIAG] sample frame#3000 env=3067817572688 ee=2F sim_time=151.9200 frame_mean=150.94 black=no
+[VIDEO_DIAG] sample frame#3030 env=3067817572688 ee=2F sim_time=153.4200 frame_mean=150.97 black=no
+[VIDEO_DIAG] sample frame#3060 env=3067817572688 ee=2F sim_time=154.9200 frame_mean=150.91 black=no
+[M5][EE_PATH] cache_dir=ee_rack mode=portable
+[M5][EE_PATH] cache_dir=ee_rack mode=portable
+[M5][EE_PATH] hit: ur5e-bare-to-vac-v1
+[M5][EE_PATH] start_state=PASS
+[M5][EE_PATH] workcell_signature=PASS
+[M5][EE_PATH] collision_validation=PASS
+[M5][EE_PATH] source=precomputed
+[M5][EE_PATH] hit: ur5e-2F-to-bare-v1 + ur5e-bare-to-vac-v1
+[M5][EE_PATH] return_start_state=PASS
+[M5][EE_PATH] transition_seam=PASS
+[M5][EE_PATH] collision_validation=PASS
+[M5][EE_PATH] source=precomputed
+[M5][WORKSPACE] ee=vac planner=COMMISSIONED_REVERSE target=commissioned-reverse template=ur5e-bare-to-vac-v1
+[M5][SAFE_EXIT] ok: ee=vac planner=COMMISSIONED_REVERSE
+[VIDEO_DIAG] sample frame#3090 env=3067817572688 ee=2F sim_time=156.4200 frame_mean=150.93 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[VIDEO_DIAG] ENV-CHANGE frame#3093 env=3065863871440 ee=None sim_time=156.5800 frame_mean=150.92 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=3 cam_pos=[0.66, 0.0, 1.79] ncam=6 nlight=1 cameras=['frontview', 'birdview', 'sideview', 'agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=150.92
+[VIDEO_DIAG] sample frame#3120 env=3065863871440 ee=None sim_time=157.9200 frame_mean=150.85 black=no
+[VIDEO_DIAG] sample frame#3150 env=3065863871440 ee=None sim_time=159.4200 frame_mean=150.99 black=no
+[VIDEO_DIAG] sample frame#3180 env=3065863871440 ee=None sim_time=160.9200 frame_mean=151.01 black=no
+[VIDEO_DIAG] sample frame#3210 env=3065863871440 ee=None sim_time=162.4200 frame_mean=151.36 black=no
+[VIDEO_DIAG] sample frame#3240 env=3065863871440 ee=None sim_time=163.9200 frame_mean=151.50 black=no
+[VIDEO_DIAG] sample frame#3270 env=3065863871440 ee=None sim_time=165.4200 frame_mean=151.34 black=no
+[VIDEO_DIAG] sample frame#3300 env=3065863871440 ee=None sim_time=166.9200 frame_mean=151.25 black=no
+[VIDEO_DIAG] sample frame#3330 env=3065863871440 ee=None sim_time=168.4200 frame_mean=151.46 black=no
+[VIDEO_DIAG] sample frame#3360 env=3065863871440 ee=None sim_time=169.9200 frame_mean=151.47 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[VIDEO_DIAG] ENV-CHANGE frame#3380 env=3066325525200 ee=vac sim_time=170.9200 frame_mean=151.43 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=3 cam_pos=[0.66, 0.0, 1.79] ncam=6 nlight=1 cameras=['frontview', 'birdview', 'sideview', 'agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=151.43
+[VIDEO_DIAG] sample frame#3390 env=3066325525200 ee=vac sim_time=171.4200 frame_mean=151.46 black=no
+[VIDEO_DIAG] sample frame#3420 env=3066325525200 ee=vac sim_time=172.9200 frame_mean=151.44 black=no
+[VIDEO_DIAG] sample frame#3450 env=3066325525200 ee=vac sim_time=174.4200 frame_mean=151.41 black=no
+[VIDEO_DIAG] sample frame#3480 env=3066325525200 ee=vac sim_time=175.9200 frame_mean=151.35 black=no
+[VIDEO_DIAG] sample frame#3510 env=3066325525200 ee=vac sim_time=177.4200 frame_mean=151.26 black=no
+[VIDEO_DIAG] sample frame#3540 env=3066325525200 ee=vac sim_time=178.9200 frame_mean=151.18 black=no
+[VIDEO_DIAG] sample frame#3570 env=3066325525200 ee=vac sim_time=180.4200 frame_mean=151.10 black=no
+[VIDEO_DIAG] sample frame#3600 env=3066325525200 ee=vac sim_time=181.9200 frame_mean=151.09 black=no
+[VIDEO_DIAG] sample frame#3630 env=3066325525200 ee=vac sim_time=183.4200 frame_mean=151.08 black=no
+[VIDEO_DIAG] sample frame#3660 env=3066325525200 ee=vac sim_time=184.9200 frame_mean=151.06 black=no
+[VIDEO_DIAG] sample frame#3690 env=3066325525200 ee=vac sim_time=186.4200 frame_mean=151.03 black=no
+[VIDEO_DIAG] sample frame#3720 env=3066325525200 ee=vac sim_time=187.9200 frame_mean=151.00 black=no
+[VIDEO_DIAG] sample frame#3750 env=3066325525200 ee=vac sim_time=189.4200 frame_mean=150.99 black=no
+[VIDEO_DIAG] sample frame#3780 env=3066325525200 ee=vac sim_time=190.9200 frame_mean=150.98 black=no
+[VIDEO_DIAG] sample frame#3810 env=3066325525200 ee=vac sim_time=192.4200 frame_mean=150.98 black=no
+[VIDEO_DIAG] sample frame#3840 env=3066325525200 ee=vac sim_time=193.9200 frame_mean=150.97 black=no
+[VIDEO_DIAG] sample frame#3870 env=3066325525200 ee=vac sim_time=195.4200 frame_mean=150.97 black=no
+[VIDEO_DIAG] sample frame#3900 env=3066325525200 ee=vac sim_time=196.9200 frame_mean=150.98 black=no
+[VIDEO_DIAG] sample frame#3930 env=3066325525200 ee=vac sim_time=198.4200 frame_mean=150.98 black=no
+[VIDEO_DIAG] sample frame#3960 env=3066325525200 ee=vac sim_time=199.9200 frame_mean=150.99 black=no
+[VIDEO_DIAG] sample frame#3990 env=3066325525200 ee=vac sim_time=201.4200 frame_mean=151.00 black=no
+[VIDEO_DIAG] sample frame#4020 env=3066325525200 ee=vac sim_time=202.9200 frame_mean=151.03 black=no
+[VIDEO_DIAG] sample frame#4050 env=3066325525200 ee=vac sim_time=204.4200 frame_mean=151.09 black=no
+[VIDEO_DIAG] sample frame#4080 env=3066325525200 ee=vac sim_time=205.9200 frame_mean=151.17 black=no
+[VIDEO_DIAG] sample frame#4110 env=3066325525200 ee=vac sim_time=207.4200 frame_mean=151.25 black=no
+[VIDEO_DIAG] sample frame#4140 env=3066325525200 ee=vac sim_time=208.9200 frame_mean=151.31 black=no
+[VIDEO_DIAG] sample frame#4170 env=3066325525200 ee=vac sim_time=210.4200 frame_mean=151.36 black=no
+[VIDEO_DIAG] sample frame#4200 env=3066325525200 ee=vac sim_time=211.9200 frame_mean=151.41 black=no
+[VIDEO_DIAG] sample frame#4230 env=3066325525200 ee=vac sim_time=213.4200 frame_mean=151.45 black=no
+[VIDEO_DIAG] sample frame#4260 env=3066325525200 ee=vac sim_time=214.9200 frame_mean=151.48 black=no
+[VIDEO_DIAG] sample frame#4290 env=3066325525200 ee=vac sim_time=216.4200 frame_mean=151.51 black=no
+[VIDEO_DIAG] sample frame#4320 env=3066325525200 ee=vac sim_time=217.9200 frame_mean=151.52 black=no
+[VIDEO_DIAG] sample frame#4350 env=3066325525200 ee=vac sim_time=219.4200 frame_mean=151.52 black=no
+[plan] PRE_GRASP 94 points {'position_error_m': 7.14494689274377e-06, 'orientation_error_deg': 0.00012191202236626784}
+[VIDEO_DIAG] sample frame#4380 env=3066325525200 ee=vac sim_time=220.9200 frame_mean=151.51 black=no
+[VIDEO_DIAG] sample frame#4410 env=3066325525200 ee=vac sim_time=222.4200 frame_mean=151.42 black=no
+[catalog] plate PRE_GRASP lift=-0.000 []
+[VIDEO_DIAG] sample frame#4440 env=3066325525200 ee=vac sim_time=223.9200 frame_mean=151.39 black=no
+[VIDEO_DIAG] sample frame#4470 env=3066325525200 ee=vac sim_time=225.4200 frame_mean=151.38 black=no
+[VIDEO_DIAG] sample frame#4500 env=3066325525200 ee=vac sim_time=226.9200 frame_mean=151.28 black=no
+[plan] GRASP 25 points {'position_error_m': 4.7518043464117973e-07, 'orientation_error_deg': 2.8617520362793967e-06}
+[VIDEO_DIAG] sample frame#4530 env=3066325525200 ee=vac sim_time=228.4200 frame_mean=151.26 black=no
+[catalog] plate GRASP lift=-0.000 []
+[VIDEO_DIAG] sample frame#4560 env=3066325525200 ee=vac sim_time=229.9200 frame_mean=150.96 black=no
+[VIDEO_DIAG] sample frame#4590 env=3066325525200 ee=vac sim_time=231.4200 frame_mean=150.79 black=no
+[VIDEO_DIAG] sample frame#4620 env=3066325525200 ee=vac sim_time=232.9200 frame_mean=150.76 black=no
+[M5][VAC_ATTACH] intended_target='plate' current_attached_body='plate' candidate_body='plate' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.001485
+[M5][VAC_ATTACH] intended_target='plate' current_attached_body='plate' candidate_body='plate' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[catalog] plate CLOSE lift=0.017 ['suction']
+[VIDEO_DIAG] sample frame#4650 env=3066325525200 ee=vac sim_time=234.4200 frame_mean=150.76 black=no
+[plan] BREAKAWAY 4 points {'position_error_m': 4.4399736826328144e-07, 'orientation_error_deg': 1.0378197572558763e-05}
+[plan] LIFT 35 points {'position_error_m': 7.555743498909223e-07, 'orientation_error_deg': 1.4696320363963501e-05}
+[plan] LIFT 2 points {'position_error_m': 7.555743498909223e-07, 'orientation_error_deg': 1.4696320363963501e-05}
+[VIDEO_DIAG] sample frame#4680 env=3066325525200 ee=vac sim_time=235.9200 frame_mean=151.49 black=no
+[VIDEO_DIAG] sample frame#4710 env=3066325525200 ee=vac sim_time=237.4200 frame_mean=151.49 black=no
+[catalog] plate LIFT lift=0.167 []
+[VIDEO_DIAG] sample frame#4740 env=3066325525200 ee=vac sim_time=238.9200 frame_mean=151.49 black=no
+[VIDEO_DIAG] sample frame#4770 env=3066325525200 ee=vac sim_time=240.4200 frame_mean=151.49 black=no
+[VIDEO_DIAG] sample frame#4800 env=3066325525200 ee=vac sim_time=241.9200 frame_mean=151.49 black=no
+[catalog] plate HOLD lift=0.167 []
+[VIDEO_DIAG] sample frame#4830 env=3066325525200 ee=vac sim_time=243.4200 frame_mean=151.49 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[M5][REGION_GOAL] held_transport_goal object=plate region=blue_tray source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#4860 env=3066325525200 ee=vac sim_time=244.9200 frame_mean=151.51 black=no
+[VIDEO_DIAG] sample frame#4890 env=3066325525200 ee=vac sim_time=246.4200 frame_mean=151.66 black=no
+[VIDEO_DIAG] sample frame#4920 env=3066325525200 ee=vac sim_time=247.9200 frame_mean=151.65 black=no
+[M5][REGION_GOAL] held_place_goal object=plate region=blue_tray source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#4950 env=3066325525200 ee=vac sim_time=249.4200 frame_mean=151.57 black=no
+[VIDEO_DIAG] sample frame#4980 env=3066325525200 ee=vac sim_time=250.9200 frame_mean=151.25 black=no
+[VIDEO_DIAG] sample frame#5010 env=3066325525200 ee=vac sim_time=252.4200 frame_mean=151.16 black=no
+[VIDEO_DIAG] sample frame#5040 env=3066325525200 ee=vac sim_time=253.9200 frame_mean=151.28 black=no
+[M5][EE_ENTRY] hit: vac trajectory=ur5e-vac-to-bare-v1
+[M5][EE_ENTRY] planner=RRT_CONNECT
+[M5][EE_ENTRY] workcell_signature=PASS
+[M5][EE_ENTRY] collision_validation=PASS
+[M5][EE_ENTRY] dynamic_planner_invoked=true
+[VIDEO_DIAG] sample frame#5070 env=3066325525200 ee=vac sim_time=255.4200 frame_mean=151.50 black=no
+[VIDEO_DIAG] sample frame#5100 env=3066325525200 ee=vac sim_time=256.9200 frame_mean=151.76 black=no
+[VIDEO_DIAG] sample frame#5130 env=3066325525200 ee=vac sim_time=258.4200 frame_mean=151.20 black=no
+[VIDEO_DIAG] sample frame#5160 env=3066325525200 ee=vac sim_time=259.9200 frame_mean=151.40 black=no
+[M5][EE_PATH] cache_dir=ee_rack mode=portable
+[M5][EE_PATH] cache_dir=ee_rack mode=portable
+[M5][EE_PATH] hit: ur5e-bare-to-3F-v1
+[M5][EE_PATH] start_state=PASS
+[M5][EE_PATH] workcell_signature=PASS
+[M5][EE_PATH] collision_validation=PASS
+[M5][EE_PATH] source=precomputed
+[M5][EE_PATH] hit: ur5e-vac-to-bare-v1 + ur5e-bare-to-3F-v1
+[M5][EE_PATH] return_start_state=PASS
+[M5][EE_PATH] transition_seam=PASS
+[M5][EE_PATH] collision_validation=PASS
+[M5][EE_PATH] source=precomputed
+[M5][WORKSPACE] ee=3F planner=COMMISSIONED_REVERSE target=commissioned-reverse template=ur5e-bare-to-3F-v1
+[M5][SAFE_EXIT] ok: ee=3F planner=COMMISSIONED_REVERSE
+[VIDEO_DIAG] sample frame#5190 env=3066325525200 ee=vac sim_time=261.4200 frame_mean=151.78 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[VIDEO_DIAG] ENV-CHANGE frame#5198 env=3066864081808 ee=None sim_time=261.8200 frame_mean=151.74 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=3 cam_pos=[0.66, 0.0, 1.79] ncam=6 nlight=1 cameras=['frontview', 'birdview', 'sideview', 'agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=151.74
+[VIDEO_DIAG] sample frame#5220 env=3066864081808 ee=None sim_time=262.9200 frame_mean=151.77 black=no
+[VIDEO_DIAG] sample frame#5250 env=3066864081808 ee=None sim_time=264.4200 frame_mean=151.78 black=no
+[VIDEO_DIAG] sample frame#5280 env=3066864081808 ee=None sim_time=265.9200 frame_mean=151.59 black=no
+[VIDEO_DIAG] sample frame#5310 env=3066864081808 ee=None sim_time=267.4200 frame_mean=151.60 black=no
+[VIDEO_DIAG] sample frame#5340 env=3066864081808 ee=None sim_time=268.9200 frame_mean=151.81 black=no
+[VIDEO_DIAG] sample frame#5370 env=3066864081808 ee=None sim_time=270.4200 frame_mean=151.51 black=no
+[VIDEO_DIAG] sample frame#5400 env=3066864081808 ee=None sim_time=271.9200 frame_mean=151.92 black=no
+[VIDEO_DIAG] sample frame#5430 env=3066864081808 ee=None sim_time=273.4200 frame_mean=152.01 black=no
+[VIDEO_DIAG] sample frame#5460 env=3066864081808 ee=None sim_time=274.9200 frame_mean=151.99 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[VIDEO_DIAG] ENV-CHANGE frame#5469 env=3066283106640 ee=3F sim_time=275.3800 frame_mean=152.02 black=no
+[VIDEO_DIAG]   camera='agentview' in_model=True cam_id=3 cam_pos=[0.66, 0.0, 1.79] ncam=6 nlight=1 cameras=['frontview', 'birdview', 'sideview', 'agentview', 'robot0_robotview', 'robot0_eye_in_hand'] free_cam_mean=152.02
+[VIDEO_DIAG] sample frame#5490 env=3066283106640 ee=3F sim_time=276.4200 frame_mean=152.03 black=no
+[VIDEO_DIAG] sample frame#5520 env=3066283106640 ee=3F sim_time=277.9200 frame_mean=152.11 black=no
+[VIDEO_DIAG] sample frame#5550 env=3066283106640 ee=3F sim_time=279.4200 frame_mean=152.10 black=no
+[VIDEO_DIAG] sample frame#5580 env=3066283106640 ee=3F sim_time=280.9200 frame_mean=152.08 black=no
+[VIDEO_DIAG] sample frame#5610 env=3066283106640 ee=3F sim_time=282.4200 frame_mean=152.06 black=no
+[VIDEO_DIAG] sample frame#5640 env=3066283106640 ee=3F sim_time=283.9200 frame_mean=152.01 black=no
+[VIDEO_DIAG] sample frame#5670 env=3066283106640 ee=3F sim_time=285.4200 frame_mean=151.94 black=no
+[VIDEO_DIAG] sample frame#5700 env=3066283106640 ee=3F sim_time=286.9200 frame_mean=151.88 black=no
+[VIDEO_DIAG] sample frame#5730 env=3066283106640 ee=3F sim_time=288.4200 frame_mean=151.83 black=no
+[VIDEO_DIAG] sample frame#5760 env=3066283106640 ee=3F sim_time=289.9200 frame_mean=151.79 black=no
+[VIDEO_DIAG] sample frame#5790 env=3066283106640 ee=3F sim_time=291.4200 frame_mean=151.75 black=no
+[VIDEO_DIAG] sample frame#5820 env=3066283106640 ee=3F sim_time=292.9400 frame_mean=151.70 black=no
+[VIDEO_DIAG] sample frame#5850 env=3066283106640 ee=3F sim_time=294.4400 frame_mean=151.65 black=no
+[VIDEO_DIAG] sample frame#5880 env=3066283106640 ee=3F sim_time=295.9400 frame_mean=151.58 black=no
+[VIDEO_DIAG] sample frame#5910 env=3066283106640 ee=3F sim_time=297.4400 frame_mean=151.54 black=no
+[VIDEO_DIAG] sample frame#5940 env=3066283106640 ee=3F sim_time=298.9400 frame_mean=151.51 black=no
+[VIDEO_DIAG] sample frame#5970 env=3066283106640 ee=3F sim_time=300.4400 frame_mean=151.48 black=no
+[VIDEO_DIAG] sample frame#6000 env=3066283106640 ee=3F sim_time=301.9400 frame_mean=151.45 black=no
+[VIDEO_DIAG] sample frame#6030 env=3066283106640 ee=3F sim_time=303.4400 frame_mean=151.43 black=no
+[VIDEO_DIAG] sample frame#6060 env=3066283106640 ee=3F sim_time=304.9400 frame_mean=151.43 black=no
+[VIDEO_DIAG] sample frame#6090 env=3066283106640 ee=3F sim_time=306.4400 frame_mean=151.43 black=no
+[VIDEO_DIAG] sample frame#6120 env=3066283106640 ee=3F sim_time=307.9400 frame_mean=151.42 black=no
+[VIDEO_DIAG] sample frame#6150 env=3066283106640 ee=3F sim_time=309.4400 frame_mean=151.47 black=no
+[VIDEO_DIAG] sample frame#6180 env=3066283106640 ee=3F sim_time=310.9400 frame_mean=151.56 black=no
+[VIDEO_DIAG] sample frame#6210 env=3066283106640 ee=3F sim_time=312.4400 frame_mean=151.66 black=no
+[VIDEO_DIAG] sample frame#6240 env=3066283106640 ee=3F sim_time=313.9400 frame_mean=151.77 black=no
+[VIDEO_DIAG] sample frame#6270 env=3066283106640 ee=3F sim_time=315.4400 frame_mean=151.87 black=no
+[VIDEO_DIAG] sample frame#6300 env=3066283106640 ee=3F sim_time=316.9400 frame_mean=151.95 black=no
+[VIDEO_DIAG] sample frame#6330 env=3066283106640 ee=3F sim_time=318.4400 frame_mean=152.01 black=no
+[VIDEO_DIAG] sample frame#6360 env=3066283106640 ee=3F sim_time=319.9400 frame_mean=152.04 black=no
+[VIDEO_DIAG] sample frame#6390 env=3066283106640 ee=3F sim_time=321.4400 frame_mean=152.07 black=no
+[VIDEO_DIAG] sample frame#6420 env=3066283106640 ee=3F sim_time=322.9400 frame_mean=152.08 black=no
+[VIDEO_DIAG] sample frame#6450 env=3066283106640 ee=3F sim_time=324.4400 frame_mean=152.07 black=no
+[VIDEO_DIAG] sample frame#6480 env=3066283106640 ee=3F sim_time=325.9400 frame_mean=152.07 black=no
+[plan] PRE_GRASP 105 points {'position_error_m': 6.259840511990419e-06, 'orientation_error_deg': 0.00011019089080735982}
+[VIDEO_DIAG] sample frame#6510 env=3066283106640 ee=3F sim_time=327.4400 frame_mean=152.06 black=no
+[catalog] bread PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#6540 env=3066283106640 ee=3F sim_time=328.9400 frame_mean=151.98 black=no
+[VIDEO_DIAG] sample frame#6570 env=3066283106640 ee=3F sim_time=330.4400 frame_mean=152.01 black=no
+[VIDEO_DIAG] sample frame#6600 env=3066283106640 ee=3F sim_time=331.9400 frame_mean=151.81 black=no
+[catalog] bread PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#6630 env=3066283106640 ee=3F sim_time=333.4400 frame_mean=151.59 black=no
+[VIDEO_DIAG] sample frame#6660 env=3066283106640 ee=3F sim_time=334.9400 frame_mean=151.57 black=no
+[plan] GRASP 25 points {'position_error_m': 4.471871182510943e-07, 'orientation_error_deg': 2.1925648297659513e-06}
+[VIDEO_DIAG] sample frame#6690 env=3066283106640 ee=3F sim_time=336.4400 frame_mean=151.53 black=no
+[catalog] bread GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#6720 env=3066283106640 ee=3F sim_time=337.9400 frame_mean=151.47 black=no
+[VIDEO_DIAG] sample frame#6750 env=3066283106640 ee=3F sim_time=339.4400 frame_mean=151.47 black=no
+[plan] LIFT 36 points {'position_error_m': 9.768677561221352e-07, 'orientation_error_deg': 1.6221627787213523e-05}
+[VIDEO_DIAG] sample frame#6780 env=3066283106640 ee=3F sim_time=340.9400 frame_mean=151.47 black=no
+[VIDEO_DIAG] sample frame#6810 env=3066283106640 ee=3F sim_time=342.4400 frame_mean=151.51 black=no
+[catalog] bread LIFT lift=0.078 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#6840 env=3066283106640 ee=3F sim_time=343.9400 frame_mean=151.57 black=no
+[VIDEO_DIAG] sample frame#6870 env=3066283106640 ee=3F sim_time=345.4400 frame_mean=151.56 black=no
+[VIDEO_DIAG] sample frame#6900 env=3066283106640 ee=3F sim_time=346.9400 frame_mean=151.56 black=no
+[catalog] bread HOLD lift=0.170 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#6930 env=3066283106640 ee=3F sim_time=348.4400 frame_mean=151.55 black=no
+[VIDEO_DIAG] sample frame#6960 env=3066283106640 ee=3F sim_time=349.9400 frame_mean=151.55 black=no
+[VIDEO_DIAG] sample frame#6990 env=3066283106640 ee=3F sim_time=351.4400 frame_mean=151.55 black=no
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[robosuite INFO] Loading controller configuration from: C:\Users\user\anaconda3\envs\robosuite_env\Lib\site-packages\robosuite\controllers\config\robots\default_ur5e.json (composite_controller_factory.py:121)
+[M5][VAC_ATTACH] intended_target='bread' current_attached_body='bread' candidate_body='bread' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.000072
+[M5][VAC_ATTACH] intended_target='bread' current_attached_body='bread' candidate_body='bread' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[M5][REGION_GOAL] held_transport_goal object=bread region=blue_tray source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#7020 env=3066283106640 ee=3F sim_time=352.9400 frame_mean=151.56 black=no
+[VIDEO_DIAG] sample frame#7050 env=3066283106640 ee=3F sim_time=354.4400 frame_mean=152.05 black=no
+[VIDEO_DIAG] sample frame#7080 env=3066283106640 ee=3F sim_time=355.9400 frame_mean=152.58 black=no
+[M5][REGION_GOAL] held_place_goal object=bread region=blue_tray source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#7110 env=3066283106640 ee=3F sim_time=357.4400 frame_mean=152.59 black=no
+[VIDEO_DIAG] sample frame#7140 env=3066283106640 ee=3F sim_time=358.9400 frame_mean=152.58 black=no
+[VIDEO_DIAG] sample frame#7170 env=3066283106640 ee=3F sim_time=360.4400 frame_mean=152.62 black=no
+[VIDEO_DIAG] sample frame#7200 env=3066283106640 ee=3F sim_time=361.9400 frame_mean=152.08 black=no
+[VIDEO_DIAG] sample frame#7230 env=3066283106640 ee=3F sim_time=363.4400 frame_mean=151.97 black=no
+[VIDEO_DIAG] sample frame#7260 env=3066283106640 ee=3F sim_time=364.9400 frame_mean=152.38 black=no
+[VIDEO_DIAG] sample frame#7290 env=3066283106640 ee=3F sim_time=366.4400 frame_mean=152.53 black=no
+[VIDEO_DIAG] sample frame#7320 env=3066283106640 ee=3F sim_time=367.9400 frame_mean=152.14 black=no
+[VIDEO_DIAG] sample frame#7350 env=3066283106640 ee=3F sim_time=369.4400 frame_mean=152.25 black=no
+[VIDEO_DIAG] sample frame#7380 env=3066283106640 ee=3F sim_time=370.9400 frame_mean=152.12 black=no
+[VIDEO_DIAG] sample frame#7410 env=3066283106640 ee=3F sim_time=372.4400 frame_mean=152.14 black=no
+[VIDEO_DIAG] sample frame#7440 env=3066283106640 ee=3F sim_time=373.9400 frame_mean=152.29 black=no
+[VIDEO_DIAG] sample frame#7470 env=3066283106640 ee=3F sim_time=375.4400 frame_mean=152.26 black=no
+[VIDEO_DIAG] sample frame#7500 env=3066283106640 ee=3F sim_time=376.9400 frame_mean=152.17 black=no
+[VIDEO_DIAG] sample frame#7530 env=3066283106640 ee=3F sim_time=378.4400 frame_mean=152.20 black=no
+[VIDEO_DIAG] sample frame#7560 env=3066283106640 ee=3F sim_time=379.9400 frame_mean=152.20 black=no
+[plan] PRE_GRASP 155 points {'position_error_m': 3.2314250706452746e-07, 'orientation_error_deg': 3.1054781281257357e-06}
+[VIDEO_DIAG] sample frame#7590 env=3066283106640 ee=3F sim_time=381.4400 frame_mean=152.20 black=no
+[catalog] apple PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#7620 env=3066283106640 ee=3F sim_time=382.9400 frame_mean=152.12 black=no
+[VIDEO_DIAG] sample frame#7650 env=3066283106640 ee=3F sim_time=384.4400 frame_mean=151.98 black=no
+[VIDEO_DIAG] sample frame#7680 env=3066283106640 ee=3F sim_time=385.9400 frame_mean=151.83 black=no
+[VIDEO_DIAG] sample frame#7710 env=3066283106640 ee=3F sim_time=387.4400 frame_mean=151.81 black=no
+[catalog] apple PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#7740 env=3066283106640 ee=3F sim_time=388.9400 frame_mean=151.82 black=no
+[VIDEO_DIAG] sample frame#7770 env=3066283106640 ee=3F sim_time=390.4400 frame_mean=151.60 black=no
+[VIDEO_DIAG] sample frame#7800 env=3066283106640 ee=3F sim_time=391.9400 frame_mean=151.35 black=no
+[catalog] apple PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#7830 env=3066283106640 ee=3F sim_time=393.4400 frame_mean=151.02 black=no
+[VIDEO_DIAG] sample frame#7860 env=3066283106640 ee=3F sim_time=394.9400 frame_mean=150.58 black=no
+[VIDEO_DIAG] sample frame#7890 env=3066283106640 ee=3F sim_time=396.4400 frame_mean=150.46 black=no
+[catalog] apple PRE_GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#7920 env=3066283106640 ee=3F sim_time=397.9400 frame_mean=150.47 black=no
+[plan] GRASP 25 points {'position_error_m': 2.854406902384123e-07, 'orientation_error_deg': 7.000755171470765e-06}
+[VIDEO_DIAG] sample frame#7950 env=3066283106640 ee=3F sim_time=399.4400 frame_mean=150.45 black=no
+[VIDEO_DIAG] sample frame#7980 env=3066283106640 ee=3F sim_time=400.9400 frame_mean=150.50 black=no
+[VIDEO_DIAG] sample frame#8010 env=3066283106640 ee=3F sim_time=402.4400 frame_mean=150.65 black=no
+[catalog] apple GRASP lift=0.000 []
+[VIDEO_DIAG] sample frame#8040 env=3066283106640 ee=3F sim_time=403.9400 frame_mean=150.64 black=no
+[plan] LIFT 37 points {'position_error_m': 2.2427604598994924e-06, 'orientation_error_deg': 2.9283980459104954e-05}
+[VIDEO_DIAG] sample frame#8070 env=3066283106640 ee=3F sim_time=405.4400 frame_mean=150.62 black=no
+[VIDEO_DIAG] sample frame#8100 env=3066283106640 ee=3F sim_time=406.9400 frame_mean=150.54 black=no
+[catalog] apple LIFT lift=0.098 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#8130 env=3066283106640 ee=3F sim_time=408.4400 frame_mean=150.63 black=no
+[VIDEO_DIAG] sample frame#8160 env=3066283106640 ee=3F sim_time=409.9400 frame_mean=150.70 black=no
+[VIDEO_DIAG] sample frame#8190 env=3066283106640 ee=3F sim_time=411.4400 frame_mean=150.70 black=no
+[catalog] apple HOLD lift=0.175 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#8220 env=3066283106640 ee=3F sim_time=412.9400 frame_mean=150.70 black=no
+[VIDEO_DIAG] sample frame#8250 env=3066283106640 ee=3F sim_time=414.4400 frame_mean=150.70 black=no
+[VIDEO_DIAG] sample frame#8280 env=3066283106640 ee=3F sim_time=415.9400 frame_mean=150.69 black=no
+[M5][VAC_ATTACH] intended_target='apple' current_attached_body='apple' candidate_body='apple' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.000073
+[M5][VAC_ATTACH] intended_target='apple' current_attached_body='apple' candidate_body='apple' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[M5][REGION_GOAL] held_transport_goal object=apple region=blue_tray source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#8310 env=3066283106640 ee=3F sim_time=417.4400 frame_mean=150.73 black=no
+[VIDEO_DIAG] sample frame#8340 env=3066283106640 ee=3F sim_time=418.9400 frame_mean=151.45 black=no
+[VIDEO_DIAG] sample frame#8370 env=3066283106640 ee=3F sim_time=420.4400 frame_mean=152.30 black=no
+[M5][REGION_GOAL] held_place_goal object=apple region=blue_tray source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#8400 env=3066283106640 ee=3F sim_time=421.9400 frame_mean=152.49 black=no
+[VIDEO_DIAG] sample frame#8430 env=3066283106640 ee=3F sim_time=423.4400 frame_mean=152.34 black=no
+[VIDEO_DIAG] sample frame#8460 env=3066283106640 ee=3F sim_time=424.9400 frame_mean=152.28 black=no
+[VIDEO_DIAG] sample frame#8490 env=3066283106640 ee=3F sim_time=426.4400 frame_mean=152.37 black=no
+[plan] PRE_GRASP 80 points {'position_error_m': 3.506831229524475e-06, 'orientation_error_deg': 4.0221326855865995e-05}
+[VIDEO_DIAG] sample frame#8520 env=3066283106640 ee=3F sim_time=427.9400 frame_mean=152.30 black=no
+[VIDEO_DIAG] sample frame#8550 env=3066283106640 ee=3F sim_time=429.4400 frame_mean=152.10 black=no
+[catalog] mug PRE_GRASP lift=-0.000 []
+[VIDEO_DIAG] sample frame#8580 env=3066283106640 ee=3F sim_time=430.9400 frame_mean=151.76 black=no
+[VIDEO_DIAG] sample frame#8610 env=3066283106640 ee=3F sim_time=432.4400 frame_mean=151.41 black=no
+[VIDEO_DIAG] sample frame#8640 env=3066283106640 ee=3F sim_time=433.9400 frame_mean=151.12 black=no
+[catalog] mug PRE_GRASP lift=-0.000 []
+[VIDEO_DIAG] sample frame#8670 env=3066283106640 ee=3F sim_time=435.4400 frame_mean=151.02 black=no
+[plan] GRASP 26 points {'position_error_m': 1.274330740260717e-07, 'orientation_error_deg': 2.6157708397249677e-06}
+[VIDEO_DIAG] sample frame#8700 env=3066283106640 ee=3F sim_time=436.9400 frame_mean=150.89 black=no
+[VIDEO_DIAG] sample frame#8730 env=3066283106640 ee=3F sim_time=438.4400 frame_mean=150.77 black=no
+[VIDEO_DIAG] sample frame#8760 env=3066283106640 ee=3F sim_time=439.9400 frame_mean=150.80 black=no
+[catalog] mug CLOSE lift=-0.000 []
+[VIDEO_DIAG] sample frame#8790 env=3066283106640 ee=3F sim_time=441.4400 frame_mean=150.80 black=no
+[VIDEO_DIAG] sample frame#8820 env=3066283106640 ee=3F sim_time=442.9400 frame_mean=150.79 black=no
+[plan] LIFT 29 points {'position_error_m': 2.4735847669607453e-06, 'orientation_error_deg': 2.9803679683773123e-05}
+[VIDEO_DIAG] sample frame#8850 env=3066283106640 ee=3F sim_time=444.4400 frame_mean=150.79 black=no
+[catalog] mug LIFT lift=0.054 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#8880 env=3066283106640 ee=3F sim_time=445.9400 frame_mean=150.89 black=no
+[VIDEO_DIAG] sample frame#8910 env=3066283106640 ee=3F sim_time=447.4400 frame_mean=151.12 black=no
+[VIDEO_DIAG] sample frame#8940 env=3066283106640 ee=3F sim_time=448.9400 frame_mean=151.14 black=no
+[catalog] mug HOLD lift=0.139 ['thumb', 'index', 'pinky']
+[VIDEO_DIAG] sample frame#8970 env=3066283106640 ee=3F sim_time=450.4400 frame_mean=151.14 black=no
+[VIDEO_DIAG] sample frame#9000 env=3066283106640 ee=3F sim_time=451.9400 frame_mean=151.14 black=no
+[VIDEO_DIAG] sample frame#9030 env=3066283106640 ee=3F sim_time=453.4400 frame_mean=151.14 black=no
+[M5][VAC_ATTACH] intended_target='mug' current_attached_body='mug' candidate_body='mug' candidate_geom=None action=ATTACH reason=mode=KINEMATIC;attach_distance_m=-0.000257
+[M5][VAC_ATTACH] intended_target='mug' current_attached_body='mug' candidate_body='mug' candidate_geom=None action=KEEP_EXISTING reason=native_adhesion_suppressed_after_attach
+[M5][REGION_GOAL] held_transport_goal object=mug region=blue_tray source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#9060 env=3066283106640 ee=3F sim_time=454.9400 frame_mean=151.14 black=no
+[VIDEO_DIAG] sample frame#9090 env=3066283106640 ee=3F sim_time=456.4400 frame_mean=151.44 black=no
+[VIDEO_DIAG] sample frame#9120 env=3066283106640 ee=3F sim_time=457.9400 frame_mean=152.21 black=no
+[VIDEO_DIAG] sample frame#9150 env=3066283106640 ee=3F sim_time=459.4400 frame_mean=152.82 black=no
+[M5][REGION_GOAL] held_place_goal object=mug region=blue_tray source=LIVE_GRASP_AND_DESTINATION_BBOX
+[VIDEO_DIAG] sample frame#9180 env=3066283106640 ee=3F sim_time=460.9400 frame_mean=152.96 black=no
+[VIDEO_DIAG] sample frame#9210 env=3066283106640 ee=3F sim_time=462.4400 frame_mean=152.91 black=no
+[VIDEO_DIAG] sample frame#9240 env=3066283106640 ee=3F sim_time=463.9400 frame_mean=152.85 black=no
+[VIDEO_DIAG] sample frame#9270 env=3066283106640 ee=3F sim_time=465.4400 frame_mean=152.88 black=no
+[VIDEO_DIAG] sample frame#9300 env=3066283106640 ee=3F sim_time=465.5800 frame_mean=152.93 black=no
+[VIDEO_DIAG] sample frame#9330 env=3066283106640 ee=3F sim_time=465.5800 frame_mean=152.93 black=no
+{
+  "mode": "SCRIPTED_GRASP_LIVE",
+  "status": "SUCCESS",
+  "task_goal_status": "NOT_EVALUATED",
+  "manifest": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-reasoner\\c2_1\\seed_0\\m5\\live\\run-20261024-154521-2f346f5e\\live-execution-manifest.json",
+  "live_run_dir": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-reasoner\\c2_1\\seed_0\\m5\\live\\run-20261024-154521-2f346f5e",
+  "scripted_grasp_count": 5,
+  "motion_plan_count": 15,
+  "simulation_execution_time_s": 463.5799999959025,
+  "executed_ee_switches": 2,
+  "executed_ee_metrics": {
+    "executed_ee_switches": 2,
+    "executed_n_ee_attaches": 3,
+    "executed_n_ee_detaches": 2,
+    "executed_ee_exchange_entry": 2,
+    "executed_ee_other_actions": 15,
+    "executed_ee_events": [
+      {
+        "index": 0,
+        "subgoal_id": "SG1_s1_d1:transition:0",
+        "action_type": "EE_ATTACH",
+        "status": "SUCCESS",
+        "counted": true
+      },
+      {
+        "index": 4,
+        "subgoal_id": "SG1_s2_d1:transition:0",
+        "action_type": "EE_EXCHANGE_ENTRY",
+        "status": "SUCCESS",
+        "counted": true
+      },
+      {
+        "index": 5,
+        "subgoal_id": "SG1_s2_d1:transition:1",
+        "action_type": "EE_EXCHANGE",
+        "status": "SUCCESS",
+        "counted": true
+      },
+      {
+        "index": 9,
+        "subgoal_id": "SG1_s3_d1:transition:0",
+        "action_type": "EE_EXCHANGE_ENTRY",
+        "status": "SUCCESS",
+        "counted": true
+      },
+      {
+        "index": 10,
+        "subgoal_id": "SG1_s3_d1:transition:1",
+        "action_type": "EE_EXCHANGE",
+        "status": "SUCCESS",
+        "counted": true
+      }
+    ],
+    "definition": "executed_ee_switches counts successful EE_EXCHANGE only (matches M4 cost_vector.ee_switches; initial EE_ATTACH excluded)"
+  }
+}
+[M5] -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0/m5.json (+ C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0\m5/)
+[result] success=True exec=True goal=NOT_EVALUATED stage=none code=None attempts=1 -> C:\Users\user\Tool-Use-Journal\output\ablation\without-reasoner\c2_1\seed_0\run_result.json
+[timing] LLM prompt=11673 completion=652 total=12325 (8.66s)
+  [서브골 분해] 1244+406=1650tok 4.33s
+  [객체 선택] 830+103=933tok 1.64s
+  [순서(VLM)] 8720+55=8775tok 1.25s
+  [confidence_update] 879+88=967tok 1.44s
+  [m1] 11.81s (prepared)
+  [vlm_prior] 14.34s (completed)
+  [m2] 8.69s (completed)
+  [gk] 0.03s (completed)
+  [m4] 0.23s (SUCCESS)
+  [m5] 2252.27s (SUCCESS)
+  [total] 2287.53s
