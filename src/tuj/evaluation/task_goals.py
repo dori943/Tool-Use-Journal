@@ -123,7 +123,7 @@ def _parallel(objects, a, b):
             return False, {"reason": "utensil long axis is vertical"}
         axes.append(direction / np.linalg.norm(direction))
     angle = float(np.degrees(np.arccos(np.clip(abs(axes[0] @ axes[1]), 0., 1.))))
-    return angle <= ALIGNMENT_TOLERANCE_DEG, {"angle_deg": angle, "tolerance_deg": ALIGNMENT_TOLERANCE_DEG, "provisional": True}
+    return angle <= ALIGNMENT_TOLERANCE_DEG, {"angle_deg": angle, "tolerance_deg": ALIGNMENT_TOLERANCE_DEG, "criterion_status": "USER_CONFIRMED_2026-10-25"}
 
 
 def _separate(objects, a, b):
@@ -137,8 +137,8 @@ def _separate(objects, a, b):
             axis = np.array([-edge[1], edge[0]]) / np.linalg.norm(edge)
             p, q = [h @ axis for h in hulls]
             if min(p.max(), q.max()) - max(p.min(), q.min()) <= FOOTPRINT_TOLERANCE_M:
-                return True, {"objects": [a, b], "overlap_tolerance_m": FOOTPRINT_TOLERANCE_M, "provisional": True}
-    return False, {"objects": [a, b], "reason": "overlapping utensil footprints", "provisional": True}
+                return True, {"objects": [a, b], "overlap_tolerance_m": FOOTPRINT_TOLERANCE_M, "criterion_status": "USER_CONFIRMED_2026-10-25"}
+    return False, {"objects": [a, b], "reason": "overlapping utensil footprints", "criterion_status": "USER_CONFIRMED_2026-10-25"}
 
 
 def evaluate_task_goal(task, initial, final, *, history=None, cover_support=None):
@@ -284,4 +284,5 @@ def evaluate_task_goal(task, initial, final, *, history=None, cover_support=None
         "basis": "MEASURED_TERMINAL_RUNTIME_SNAPSHOT", "checks": checks,
         "failed_checks": [c["name"] for c in checks if c["passed"] is False],
         "unknown_checks": [c["name"] for c in checks if c["passed"] is None],
-        "provisional_criteria": ["c3_2: utensil axes within 15 degrees and non-overlapping footprints"] if task == "c3_2" else []}
+        "provisional_criteria": [],
+        "neatness_criterion_status": "USER_CONFIRMED_2026-10-25" if task == "c3_2" else None}

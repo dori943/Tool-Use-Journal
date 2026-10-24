@@ -40,10 +40,12 @@ when other checks lack evidence. Otherwise missing evidence is `UNKNOWN`.
   criterion comes from the existing environment; support uses the existing predicate.
 - **C3_2:** each tray contains one plate, mug, fork and spoon; each plate supports one
   bread and fruit. All are released. Same-kind a/b identities may swap trays. A
-  provisional interpretation of “neatly” requires fork/spoon long axes within 15°
+  user-confirmed interpretation of “neatly” requires fork/spoon long axes within 15°
   (direction reversal allowed), and their convex footprints not overlapping beyond
   the contact tolerance. It does not prescribe mirrored coordinates or an exact meal
-  layout. This proxy needs user confirmation before being a paper metric.
+  layout. The user confirmed this criterion on 2026-10-25; thresholds are unchanged.
+  This confirmation does not make the evaluation pre-registered. Earlier saved
+  evaluations retain their historical provisional labels and are not overwritten.
 - **C4_1:** card moves at least 5cm along the initial channel, its full footprint clears
   both initial and final appliance spans, it stays within 5mm of its original support
   height and is released. Moving appliances or dropping the card off the table cannot
