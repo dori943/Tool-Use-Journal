@@ -213,6 +213,8 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
             except (OSError, json.JSONDecodeError, TypeError):
                 pass
     finally:
+        from tuj.evaluation.saved_runs import attach_live_goal_evaluation
+        attach_live_goal_evaluation(output, summary)
         if recorder:
             recorder.close()
         if runtime:

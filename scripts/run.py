@@ -1214,9 +1214,9 @@ def write_run_result(out, task, args, *, method, attempts, final_error=None,
 
       plan_success   M4(또는 대체 할당)가 plan 을 냈는가
       exec_success   M5 가 마지막 subgoal 까지 예외 없이 실행했는가
-      goal_success   환경의 _check_success 로 본 목표 달성 여부 (평가 안 됐으면 None)
-      success        goal 이 평가됐으면 goal_success, 아니면 exec_success
-      failure_stage  planning | execution | none  (마지막 시도 기준)
+      goal_success   측정된 최종 상태로 본 과제 전체 목표 달성 여부 (근거 부족이면 None)
+      success        실행과 목표 모두 성공해야 True; 실행 완료/목표 미평가는 None
+      failure_stage  planning | execution | goal | evaluation | none
     """
     out = Path(out)
     last = attempts[-1] if attempts else {}
@@ -1243,10 +1243,13 @@ def write_run_result(out, task, args, *, method, attempts, final_error=None,
         "exec_success": exec_success,
         "task_goal_status": goal_status,
         "goal_success": goal_success,
-        "success": goal_success if goal_success is not None else exec_success,
-        "failure_stage": "none" if exec_success and goal_success is not False
-        else last.get("failure_stage") or ("goal" if goal_success is False else "unknown"),
-        "failure_code": last.get("failure_code"),
+        "success": goal_success if exec_success else False,
+        "failure_stage": (("none" if goal_success is True else "goal" if goal_success is False else "evaluation")
+                          if exec_success else last.get("failure_stage") or "unknown"),
+        "failure_code": (("GOAL_NOT_ACHIEVED" if goal_success is False else "GOAL_EVIDENCE_MISSING" if goal_success is None else None)
+                         if exec_success else last.get("failure_code")),
+        "task_goal_evaluation": last.get("task_goal_evaluation"),
+        "task_goal_policy": last.get("task_goal_policy"),
         "physics_related": last.get("physics_related"),
         "failed_step": last.get("failed_step"),
         "detail": last.get("detail"),
@@ -1300,6 +1303,8 @@ def run_m5_with_retries(task, out, args, *, method="full", plan_status=None, ext
             "m5_dir": str(out / "m5"),
             "m5_status": summary.get("status"),
             "task_goal_status": summary.get("task_goal_status"),
+            "task_goal_evaluation": summary.get("task_goal_evaluation"),
+            "task_goal_policy": summary.get("task_goal_policy"),
             "failure_stage": summary.get("failure_stage"),
             "failure_code": summary.get("failure_code"),
             "physics_related": summary.get("physics_related"),

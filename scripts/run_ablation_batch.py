@@ -193,6 +193,8 @@ def collect_record(out: Path, *, task: str, seed: int, method: str,
         rec["exec_success"] = rr.get("exec_success")
         rec["goal_success"] = rr.get("goal_success")
         rec["task_goal_status"] = rr.get("task_goal_status")
+        rec["task_goal_evaluation"] = rr.get("task_goal_evaluation")
+        rec["task_goal_policy"] = rr.get("task_goal_policy")
         rec["physics_related"] = rr.get("physics_related")
         rec["m5_attempt_count"] = rr.get("m5_attempt_count")
         rec["exec_success_first_try"] = (
@@ -200,7 +202,7 @@ def collect_record(out: Path, *, task: str, seed: int, method: str,
             if rr.get("m5_attempts") else None
         )
         stage_map = {"planning": "m5_planning", "execution": "m5_execution",
-                     "goal": "goal", "none": "none"}
+                     "goal": "goal", "evaluation": "evaluation", "none": "none"}
         if rr.get("failure_stage") in stage_map and rec["failure_stage"] in ("unknown", "m5"):
             rec["failure_stage"] = stage_map[rr["failure_stage"]]
         if rr.get("failure_code"):
@@ -222,7 +224,20 @@ def collect_record(out: Path, *, task: str, seed: int, method: str,
     if summary:
         rec["m5_status"] = rec["m5_status"] or summary.get("status")
         rec["m5_mode"] = summary.get("mode")
-        rec["task_goal_status"] = summary.get("task_goal_status")
+        if not rr or not rr.get("task_goal_status"):
+            rec["task_goal_status"] = summary.get("task_goal_status")
+            rec["task_goal_evaluation"] = summary.get("task_goal_evaluation")
+            rec["task_goal_policy"] = summary.get("task_goal_policy")
+            rec["goal_success"] = {"SATISFIED": True, "FAILED": False}.get(rec["task_goal_status"])
+        if not rr:
+            rec["exec_success"] = summary.get("status") == "SUCCESS"
+            rec["success"] = rec.get("goal_success") if rec["exec_success"] else False
+            if rec["exec_success"] and rec.get("goal_success") is False:
+                rec["failure_stage"] = "goal"
+                codes["GOAL_NOT_ACHIEVED"] += 3
+            elif rec["exec_success"] and rec.get("goal_success") is None:
+                rec["failure_stage"] = "evaluation"
+                codes["GOAL_EVIDENCE_MISSING"] += 3
         rec["simulation_status"] = summary.get("simulation_status")
         note("m5_summary.detail", summary.get("detail"))
         if summary.get("failure_type"):
@@ -322,7 +337,7 @@ def collect_record(out: Path, *, task: str, seed: int, method: str,
 
     # 실패 단계 보정
     m5_ok = (rec["m5_status"] == "SUCCESS" and not failure
-             and rec.get("goal_success") is not False
+             and rec.get("goal_success") is True
              and rec["success"] is not False and exit_code in (0, None))
     if (rec["success"] is True or m5_ok) and exit_code in (0, None):
         # 성공한 run 에 남아 있는 m5_failure.json 은 중간에 거절된 전략일 뿐이다
@@ -397,19 +412,19 @@ def write_summaries(method_dir: Path, records: list[dict]) -> None:
         all_objs.update(r.get("involved_objects") or [])
 
     report_stages = ["m1", "vlm_prior", "m2", "gk", "independent_assignment", "m4",
-                     "m5", "m5_planning", "m5_execution", "goal", "unknown"]
-    columns = ["task", "runs", "pipeline success", *report_stages,
+                     "m5", "m5_planning", "m5_execution", "goal", "evaluation", "unknown"]
+    columns = ["task", "runs", "전체 성공(실행+목표)", *report_stages,
                "1차시도 exec 성공", "목표 달성/평가", "목표 미평가", "최빈 원인 코드"]
     lines = [f"# {method_dir.name} 에러 요약", "",
              f"갱신: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  총 {len(records)}회 실행", "",
-             "pipeline success는 목표 미평가 시 실행 완료만 뜻합니다. 목표 달성 여부와 구분하세요.",
+             "전체 성공은 실행 완료와 목표 달성이 모두 확인된 경우만 셉니다. 기존 파일의 success=True라도 목표 미평가면 포함하지 않습니다.",
              "m5는 세부 단계가 확인되지 않은 M5 중단입니다.", "",
              "## 태스크별 성공 / 실패 단계", "",
              "| " + " | ".join(columns) + " |",
              "|" + "---|" * len(columns)]
     for t in tasks:
         rs = [r for r in records if r["task"] == t]
-        succ = sum(1 for r in rs if r.get("success") is True)
+        succ = sum(1 for r in rs if r.get("exec_success") is True and r.get("goal_success") is True)
         evaluated = sum(r.get("goal_success") is not None for r in rs)
         goals = sum(r.get("goal_success") is True for r in rs)
         goal_result = f"{goals}/{evaluated}" if evaluated else "미평가"
@@ -432,7 +447,8 @@ def write_summaries(method_dir: Path, records: list[dict]) -> None:
 
     lines += ["", "## 실행별 상세", ""]
     for r in records:
-        mark = "OK " if r.get("success") is True else "FAIL"
+        mark = ("OK " if r.get("exec_success") is True and r.get("goal_success") is True
+                else "UNKNOWN" if r.get("exec_success") is True and r.get("goal_success") is None else "FAIL")
         lines.append(f"### {mark} {r['task']} seed={r['seed']} rep={r.get('rep', 0)}  stage={r['failure_stage']}  "
                      f"code={r.get('reason_code')}  exit={r.get('exit_code')}  "
                      f"{(r.get('duration_s') or 0) / 60:.1f}min")
