@@ -1,0 +1,197 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:36501f6d9f7eadc22479:execution-report",
+  "run_id": "simulation-run:0000:36501f6d9f7eadc22479",
+  "plan_id": "motion-plan:91fab69b899247568b7a20d5",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:36501f6d9f7eadc22479:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:36501f6d9f7eadc22479",
+    "input_artifact_ids": [
+      "simulation-run-artifact:36501f6d9f7eadc224796ee6",
+      "motion-plan-artifact:91fab69b899247568b7a20d5"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "SUCCESS",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      -0.6828722529478087,
+      -1.5173080151406053,
+      1.8160292133844804,
+      -1.8703465417740313,
+      -1.5714194906569119,
+      -5.3380506628430995
+    ],
+    "joint_velocities_rad_s": [
+      -0.0027420978300195047,
+      -0.034639085587462246,
+      -0.05810806536800397,
+      0.09272763549984232,
+      -9.403765257094134e-6,
+      -0.002742166217744821
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        2.3154448353371326,
+        -3.4301287989680103,
+        1.029110289378007
+      ],
+      "orientation_xyzw": [
+        0.6865930824847197,
+        -0.7270417252013055,
+        0.00045169073558332784,
+        0.00025470751777340755
+      ]
+    },
+    "gripper": {
+      "mode": "OPEN",
+      "command": -1.0
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 4.320000000020627,
+    "max_joint_tracking_error_rad": 0.03746583749921917,
+    "max_eef_tracking_error_m": 0.02218675261098021,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG2_d3:strategy_001:2:kf_002:event:0:DETACH_OBJECT",
+      "scheduled_time_s": 2.629841881109711,
+      "actual_time_s": 2.700000000012892,
+      "status": "SUCCESS",
+      "message": "detached tool_2_spatula_a and preserved world pose"
+    },
+    {
+      "event_id": "SG2_d3:strategy_001:2:kf_002:event:1:GRIPPER_OPEN",
+      "scheduled_time_s": 2.629841881109711,
+      "actual_time_s": 2.700000000012892,
+      "status": "SUCCESS",
+      "message": "finger gripper open command set to -1.000"
+    }
+  ],
+  "failure": null,
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "2F",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": -1.0,
+    "ee_transition_count": 1,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 216,
+    "nominal_plan_duration_s": 4.227103436170938,
+    "final_plan_time_s": 4.227103436170938,
+    "adaptive_settle_extra_duration_s": 0.09289656384968925,
+    "segment_tracking": [
+      {
+        "segment_id": "SG2_d3:strategy_001:0:SG2_d3:strategy_001:1:kf_001",
+        "keyframe_id": "SG2_d3:strategy_001:1:kf_001",
+        "target_block_id": null,
+        "nominal_end_time_s": 0.8805556073175986,
+        "actual_execution_time_s": 0.9000000000042974,
+        "max_joint_error_rad": 0.000014150592005268692,
+        "eef_position_error_m": 5.480518626034905e-6,
+        "eef_orientation_error_rad": 5.683400037653236e-11,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG2_d3:strategy_001:1:SG2_d3:strategy_001:2:kf_002",
+        "keyframe_id": "SG2_d3:strategy_001:2:kf_002",
+        "target_block_id": null,
+        "nominal_end_time_s": 2.629841881109711,
+        "actual_execution_time_s": 2.700000000012892,
+        "max_joint_error_rad": 0.0,
+        "eef_position_error_m": 5.551115123125783e-16,
+        "eef_orientation_error_rad": 4.989108351033021e-16,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.06000000000028649,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG2_d3:strategy_001:2:SG2_d3:strategy_001:3:kf_003",
+        "keyframe_id": "SG2_d3:strategy_001:3:kf_003",
+        "target_block_id": null,
+        "nominal_end_time_s": 4.227103436170938,
+        "actual_execution_time_s": 4.320000000020627,
+        "max_joint_error_rad": 0.010694207527757849,
+        "eef_position_error_m": 0.004158736026072574,
+        "eef_orientation_error_rad": 0.00009189652241392262,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      }
+    ],
+    "gripper_release_waits": [
+      {
+        "object_id": "tool_2_spatula_a",
+        "wait_duration_s": 0.14000000000066848,
+        "open_target": [
+          -1.0,
+          -1.0
+        ],
+        "current_target": [
+          -1.0,
+          -1.0
+        ],
+        "target_reached": true,
+        "ee_object_contact_count": 0,
+        "consecutive_ticks": 3,
+        "max_wait_s": 5.2,
+        "command_mode": "SCRIPTED_POSITION_TARGET",
+        "succeeded": true
+      }
+    ],
+    "goal_evaluation": {
+      "request_id": "motion-request:live:8319fb9a2fc8001e02ea",
+      "goal_type": "POSE",
+      "status": "SATISFIED",
+      "detail": "all target footprints are inside the goal region",
+      "position_error_m": null,
+      "orientation_error_rad": null,
+      "joint_error_rad": null,
+      "observed": {
+        "region_id": "tool_5_cutting_board",
+        "inside_target_ids": [
+          "tool_2_spatula_a"
+        ],
+        "outside_target_ids": [],
+        "geometry_errors": {},
+        "inset_margin_m": 0.0,
+        "include_vertical": false,
+        "contact_tolerance_m": 0.03
+      }
+    }
+  }
+}

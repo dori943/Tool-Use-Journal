@@ -1,0 +1,31 @@
+{
+  "task": "c1_1",
+  "seed": 0,
+  "method": "without-grounding",
+  "exit_code": 1,
+  "duration_s": 83.9,
+  "started_at": "2026-10-24T15:03:07",
+  "output_dir": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-grounding\\c1_1\\seed_0",
+  "failure_stage": "m2",
+  "plan_status": null,
+  "m5_status": null,
+  "success": null,
+  "reason_code": null,
+  "reason_codes": {},
+  "involved_objects": [],
+  "messages": [
+    "[manifest.failure] ValueError at stage=m2",
+    "[traceback] ValueError: visual_selection: invalid model response after 2 attempts: SG1: EE hypotheses must cover exactly ['obj_ladle_ladle']",
+    "[run.log] raise ValueError(f\"{stage}: invalid model response after 2 attempts: {error}\")",
+    "[run.log] ValueError: visual_selection: invalid model response after 2 attempts: SG1: EE hypotheses must cover exactly ['obj_ladle_ladle']"
+  ],
+  "traceback_tail": "Traceback (most recent call last):\n  File \"C:\\Users\\user\\Tool-Use-Journal\\scripts\\run.py\", line 1949, in <module>\n    main()\n  File \"C:\\Users\\user\\Tool-Use-Journal\\scripts\\run.py\", line 1887, in main\n    return run(args, sys.modules[__name__])\n           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\user\\Tool-Use-Journal\\scripts\\run_without_grounding.py\", line 292, in run\n    m2 = build_m2(task_instruction(args.task), read(out / \"m1.json\"), rough)\n         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\user\\Tool-Use-Journal\\src\\tuj\\ablations\\without_grounding.py\", line 265, in build_m2\n    out = run_m2(task, scene, rough=rough)\n          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\user\\Tool-Use-Journal\\src\\tuj\\m2_subgoal\\pipeline.py\", line 40, in run_m2\n    subgoals = rough.generate(task, m1_serialized)\n               ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n  File \"C:\\Users\\user\\Tool-Use-Journal\\src\\tuj\\ablations\\without_grounding.py\", line 223, in generate\n    decisions = self._call(\n                ^^^^^^^^^^^\n  File \"C:\\Users\\user\\Tool-Use-Journal\\src\\tuj\\ablations\\without_grounding.py\", line 201, in _call\n    raise ValueError(f\"{stage}: invalid model response after 2 attempts: {error}\")\nValueError: visual_selection: invalid model response after 2 attempts: SG1: EE hypotheses must cover exactly ['obj_ladle_ladle']",
+  "sources": [
+    "manifest.failure",
+    "run.log",
+    "traceback"
+  ],
+  "rep": 0,
+  "m5_only": false,
+  "log": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-grounding\\c1_1\\logs\\seed_0.log"
+}

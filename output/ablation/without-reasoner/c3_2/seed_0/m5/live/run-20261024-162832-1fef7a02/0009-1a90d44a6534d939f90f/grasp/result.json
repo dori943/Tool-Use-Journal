@@ -1,0 +1,759 @@
+{
+  "status": "SUCCESS",
+  "object_id": "spoon",
+  "environment": "C3_2_BreakfastTrayPreparation",
+  "controller": "NATIVE_JOINT_PD_WITH_HANDLE_CONTACT_FORCE_HOLD",
+  "recipe": {
+    "recipe_id": "spoon_3f_c3_2_handle_center_v2",
+    "ee_id": "3F",
+    "model_class": "JacoThreeFingerDexterousGripper",
+    "handle_fraction": -0.15,
+    "lateral_offset_m": -0.004,
+    "height_offset_m": 0.014,
+    "tilt_deg": 5.0,
+    "handle_roll_deg": 0.0,
+    "approach_yaw_deg": 90.0,
+    "approach_distance_m": 0.12,
+    "lift_distance_m": 0.15,
+    "arm_kp": 150.0,
+    "close_duration_s": 2.0,
+    "closure_kp": 20.0,
+    "preshape_aperture_m": 0.025,
+    "preshape_closure_command": 0.05,
+    "physics_timestep_s": 0.001,
+    "physics_integrator": "implicitfast",
+    "thin_contact_timeconstant_s": 0.004,
+    "three_finger_force_targets_n": [
+      3.0,
+      1.5,
+      0.5
+    ],
+    "three_finger_force_gain": 0.002,
+    "three_finger_force_deadband_n": 0.25,
+    "three_finger_joint_limit_timeconstant_s": 0.002,
+    "three_finger_joint_limit_impedance": [
+      0.9999,
+      0.9999,
+      0.001,
+      0.5,
+      2.0
+    ],
+    "three_finger_joint_armature_kg_m2": 0.0001,
+    "three_finger_hold_close_margin": 0.05,
+    "three_finger_hold_open_margin": 0.005,
+    "prelift_stabilization_s": 0.5,
+    "two_finger_parallel_linkage": false,
+    "two_finger_force_target_n": 5.0,
+    "two_finger_force_gain": 0.002,
+    "settle_s": 1.0,
+    "hold_s": 5.0,
+    "joint_speed_rad_s": 0.35,
+    "cartesian_speed_m_s": 0.04,
+    "minimum_lift_m": 0.1,
+    "maximum_slip_m": 0.005,
+    "maximum_slip_deg": 5.0,
+    "contact_ticks": 5,
+    "maximum_joint_limit_error_rad": 0.01,
+    "expected_size_m": [
+      0.044984882,
+      0.137213218,
+      0.023900813
+    ],
+    "thin_handle_pinch": true,
+    "hold_finger_positions": true,
+    "thin_handle_close_retries": 0,
+    "thin_handle_lateral_retry_m": 0.002
+  },
+  "scenario": {
+    "seed": 0,
+    "mode": "BORROWED_M5_RUNTIME",
+    "request_id": "motion-request:live:1a90d44a6534d939f90f"
+  },
+  "metrics": {
+    "minimum_hold_lift_m": 0.14317329010352609,
+    "minimum_bottom_clearance_m": 0.12442684004484461,
+    "all_finger_contact_fraction": 1.0,
+    "max_slip_m": 1.2609709600486848e-15,
+    "max_slip_deg": 5.97596579749277e-14,
+    "hold_s": 5.0,
+    "attachment_active_fraction": 1.0
+  },
+  "failure_reason": null,
+  "thin_handle_attachment": {
+    "policy": "CONTACT_GATED_KINEMATIC_THIN_HANDLE",
+    "time_s": 157.16000000038636,
+    "attachment": {
+      "object_id": "spoon_b",
+      "free_joint_name": "spoon_b_joint0",
+      "reference_kind": "site",
+      "reference_name": "gripper0_right_grip_site",
+      "position_in_reference_m": [
+        0.015665940798121288,
+        0.004474007639238723,
+        0.020066236712319246
+      ],
+      "rotation_in_reference": [
+        [
+          -0.013617297776896931,
+          0.9974217450160162,
+          -0.07045872387757415
+        ],
+        [
+          0.9913795530068656,
+          0.02265090385867734,
+          0.12904851194139316
+        ],
+        [
+          0.1303117457528609,
+          -0.0680940461684124,
+          -0.9891319678360677
+        ]
+      ],
+      "attach_distance_m": -0.00043556757899720504,
+      "mode": "KINEMATIC",
+      "breakable_weld": null
+    },
+    "contact_before_attach": {
+      "time_s": 157.16000000038636,
+      "stage": "CLOSE",
+      "q": [
+        -0.4603803450832363,
+        -0.9567928017576762,
+        1.216318646850396,
+        -1.9125373357871867,
+        -1.5494840405208348,
+        -0.46556497723524615
+      ],
+      "finger_contacts": [
+        "thumb",
+        "index"
+      ],
+      "finger_force_n": {
+        "thumb": 1.521459243515338,
+        "index": 2.6428713363635374,
+        "pinky": 0.0
+      },
+      "normal_opposition": 0.0,
+      "contact_span_m": 0.05344829947184759,
+      "lift_m": -0.00018628852670554696,
+      "bottom_clearance_m": -0.01970336535675532,
+      "T_GB": [
+        [
+          -0.013586313430430699,
+          0.9974217278792982,
+          -0.07046494760973106,
+          0.015659755828631994
+        ],
+        [
+          0.9914172237502232,
+          0.022601570114166615,
+          0.1287674550488999,
+          0.004478811561444029
+        ],
+        [
+          0.1300280759634862,
+          -0.0681106877270113,
+          -0.989168152377837,
+          0.02006490897607438
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "gripper_q": [
+        1.1712522550640128,
+        0.6623583377468621,
+        0.5557050309511894,
+        0.06038585544443268,
+        0.5372710295993786,
+        0.060847711314820516
+      ],
+      "gripper_ctrl": [
+        0.5338383838383838,
+        0.5338383838383838,
+        0.5338383838383838
+      ],
+      "gripper_command": [
+        -0.29292929292929304,
+        -0.29292929292929304,
+        -0.29292929292929304
+      ],
+      "object_pose": [
+        [
+          0.002537242764095171,
+          0.9884276681432141,
+          -0.1516717087927801,
+          2.617779891538224
+        ],
+        [
+          -0.9935960574588604,
+          -0.014641429015975538,
+          -0.11203795409849641,
+          -3.4308423245931556
+        ],
+        [
+          -0.1129621042711346,
+          0.15098467937289528,
+          0.9820606852905267,
+          0.9248668655075277
+        ],
+        [
+          0.0,
+          0.0,
+          0.0,
+          1.0
+        ]
+      ],
+      "bad_contacts": [],
+      "gripper_joint_limit_violations": []
+    },
+    "T_GB_at_attach": [
+      [
+        -0.01361729777689533,
+        0.9974217450160175,
+        -0.07045872387757407,
+        0.015665940798121447
+      ],
+      [
+        0.9913795530068671,
+        0.02265090385867574,
+        0.12904851194139336,
+        0.004474007639238664
+      ],
+      [
+        0.13031174575286097,
+        -0.06809404616841248,
+        -0.989131967836069,
+        0.02006623671231933
+      ],
+      [
+        0.0,
+        0.0,
+        0.0,
+        1.0
+      ]
+    ]
+  },
+  "object_pose_in_gripper": {
+    "position_m": [
+      0.015665940798121003,
+      0.004474007639238664,
+      0.02006623671231922
+    ],
+    "orientation_xyzw": [
+      0.6987245104832981,
+      0.711582772675049,
+      0.02141510029249132,
+      -0.07053658314256259
+    ]
+  },
+  "center_pose_in_gripper": {
+    "position_m": [
+      0.015520382850199094,
+      0.004404987868078628,
+      0.019987492344495057
+    ],
+    "orientation_xyzw": [
+      0.6987245104832981,
+      0.711582772675049,
+      0.02141510029249132,
+      -0.07053658314256259
+    ]
+  },
+  "final_object_pose": {
+    "position_m": [
+      2.6135931410058353,
+      -3.4275609246035934,
+      1.0682264441377594
+    ],
+    "orientation_xyzw": [
+      -0.09168583607756671,
+      0.005691120809908151,
+      0.7060960876912359,
+      -0.7021322051820548
+    ]
+  },
+  "final_robot_q": [
+    -0.45943369331155637,
+    -0.9902300155930596,
+    0.895656170161861,
+    -1.542023114837782,
+    -1.5483056180694361,
+    -0.4664812183779998
+  ],
+  "attachment_used": true,
+  "object_material_inputs": [],
+  "learned_model_calls": 0,
+  "contact_solver_profile": {
+    "timeconstant_s": 0.004,
+    "original_solref": {
+      "spoon_b_g7": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g8": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g9": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g10": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g11": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g12": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g13": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g14": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g15": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g16": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g17": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g18": [
+        0.02,
+        1.0
+      ],
+      "island_island_group_top_2": [
+        0.004,
+        1.0
+      ],
+      "gripper0_right_hand_visual": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_hand_ring_visual": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_hand_collision": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_thumb_proximal_visual": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_thumb_proximal_collision": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_thumb_distal_visual": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_thumb_distal_collision": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_thumb_tip_collision": [
+        0.01,
+        0.25
+      ],
+      "gripper0_right_thumb_pad_collision": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_index_proximal_visual": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_index_proximal_collision": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_index_distal_visual": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_index_distal_collision": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_index_tip_collision": [
+        0.01,
+        0.25
+      ],
+      "gripper0_right_index_pad_collision": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_pinky_proximal_visual": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_pinky_proximal_collision": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_pinky_distal_visual": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_pinky_distal_collision": [
+        0.02,
+        1.0
+      ],
+      "gripper0_right_pinky_tip_collision": [
+        0.01,
+        0.25
+      ],
+      "gripper0_right_pinky_pad_collision": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g0": [
+        0.001,
+        1.0
+      ],
+      "spoon_b_g1": [
+        0.001,
+        1.0
+      ],
+      "spoon_b_g2": [
+        0.001,
+        1.0
+      ],
+      "spoon_b_reg_bbox": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g4": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g5": [
+        0.02,
+        1.0
+      ],
+      "spoon_b_g6": [
+        0.02,
+        1.0
+      ]
+    },
+    "solimp": null,
+    "original_solimp": null
+  },
+  "nominal_joint_limit_diagnostics": {
+    "policy": "ENFORCE_FOR_BOTH_HANDS",
+    "max_violation_rad": 5.0326639614716516e-05,
+    "allowed_numerical_residual_rad": 0.01,
+    "physics_steps_audited": 28520,
+    "hardware_joint_limits_validated": false
+  },
+  "hand_model_correction": {
+    "policy": "TENDON_REFERENCE_ALIGNED_TO_DECLARED_REST_AND_INIT",
+    "couplings": [
+      {
+        "name": "gripper0_right_thumb_cpl",
+        "reference_length": 0.6400000000000001,
+        "rest_length": 0.2,
+        "polycoef_constant": -0.4400000000000001,
+        "before": {
+          "name": "gripper0_right_thumb_cpl",
+          "tendon1": "gripper0_right_thumb_cpl"
+        },
+        "after": {
+          "name": "gripper0_right_thumb_cpl",
+          "tendon1": "gripper0_right_thumb_cpl",
+          "polycoef": "-0.44 1 0 0 0",
+          "solref": "0.004 1"
+        }
+      },
+      {
+        "name": "gripper0_right_index_12_cpl",
+        "reference_length": 0.6400000000000001,
+        "rest_length": 0.2,
+        "polycoef_constant": -0.4400000000000001,
+        "before": {
+          "name": "gripper0_right_index_12_cpl",
+          "tendon1": "gripper0_right_index_12_cpl"
+        },
+        "after": {
+          "name": "gripper0_right_index_12_cpl",
+          "tendon1": "gripper0_right_index_12_cpl",
+          "polycoef": "-0.44 1 0 0 0",
+          "solref": "0.004 1"
+        }
+      },
+      {
+        "name": "gripper0_right_pinky_12_cpl",
+        "reference_length": 0.6400000000000001,
+        "rest_length": 0.2,
+        "polycoef_constant": -0.4400000000000001,
+        "before": {
+          "name": "gripper0_right_pinky_12_cpl",
+          "tendon1": "gripper0_right_pinky_12_cpl"
+        },
+        "after": {
+          "name": "gripper0_right_pinky_12_cpl",
+          "tendon1": "gripper0_right_pinky_12_cpl",
+          "polycoef": "-0.44 1 0 0 0",
+          "solref": "0.004 1"
+        }
+      }
+    ],
+    "joint_limit_timeconstant_s": 0.002,
+    "joint_ranges_changed": false,
+    "mass_or_friction_changed": false,
+    "joint_limit_impedance": [
+      0.9999,
+      0.9999,
+      0.001,
+      0.5,
+      2
+    ],
+    "joint_armature_kg_m2": 0.0001,
+    "source_assets_changed": false,
+    "minimum_proximal_command_rad": 0.0
+  },
+  "spoon_hand_numerical_profile": {
+    "policy": "SPOON_ONLY_STIFF_NATIVE_JACO_JOINT_LIMITS",
+    "joint_names": [
+      "gripper0_right_joint_thumb",
+      "gripper0_right_joint_thumb_distal",
+      "gripper0_right_joint_index",
+      "gripper0_right_joint_index_distal",
+      "gripper0_right_joint_pinky",
+      "gripper0_right_joint_pinky_distal"
+    ],
+    "joint_limit_timeconstant_s": 0.002,
+    "joint_limit_impedance": [
+      0.9999,
+      0.9999,
+      0.001,
+      0.5,
+      2.0
+    ],
+    "joint_armature_floor_kg_m2": 0.0001,
+    "joint_ranges_changed": false,
+    "tendon_coupling_changed": true,
+    "tendon_profile": {
+      "policy": "SPOON_ONLY_NATIVE_JACO_TENDON_RESPONSE",
+      "equalities": [
+        {
+          "name": "gripper0_right_thumb_cpl",
+          "data": [
+            -0.44,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "solref": [
+            0.004,
+            1.0
+          ],
+          "native_data": [
+            -0.44,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "native_solref": [
+            0.02,
+            1.0
+          ]
+        },
+        {
+          "name": "gripper0_right_index_12_cpl",
+          "data": [
+            -0.44,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "solref": [
+            0.004,
+            1.0
+          ],
+          "native_data": [
+            -0.44,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "native_solref": [
+            0.02,
+            1.0
+          ]
+        },
+        {
+          "name": "gripper0_right_pinky_12_cpl",
+          "data": [
+            -0.44,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "solref": [
+            0.004,
+            1.0
+          ],
+          "native_data": [
+            -0.44,
+            1.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            0.0,
+            1.0
+          ],
+          "native_solref": [
+            0.02,
+            1.0
+          ]
+        }
+      ]
+    },
+    "source_assets_changed": false,
+    "original": {
+      "joint_solref": [
+        [
+          0.002,
+          1.0
+        ],
+        [
+          0.002,
+          1.0
+        ],
+        [
+          0.002,
+          1.0
+        ],
+        [
+          0.002,
+          1.0
+        ],
+        [
+          0.002,
+          1.0
+        ],
+        [
+          0.002,
+          1.0
+        ]
+      ],
+      "joint_solimp": [
+        [
+          0.9999,
+          0.9999,
+          0.001,
+          0.5,
+          2.0
+        ],
+        [
+          0.9999,
+          0.9999,
+          0.001,
+          0.5,
+          2.0
+        ],
+        [
+          0.9999,
+          0.9999,
+          0.001,
+          0.5,
+          2.0
+        ],
+        [
+          0.9999,
+          0.9999,
+          0.001,
+          0.5,
+          2.0
+        ],
+        [
+          0.9999,
+          0.9999,
+          0.001,
+          0.5,
+          2.0
+        ],
+        [
+          0.9999,
+          0.9999,
+          0.001,
+          0.5,
+          2.0
+        ]
+      ],
+      "dof_armature": [
+        0.0001,
+        0.0001,
+        0.0001,
+        0.0001,
+        0.0001,
+        0.0001
+      ]
+    }
+  },
+  "validation_scope": "SIMULATOR_CONTACT_LIFT_HOLD_AND_JOINT_RANGE_TOLERANCE",
+  "acquisition_status": "SUCCESS",
+  "acquisition_attachment_used": true,
+  "attachment_mode": "KINEMATIC",
+  "attachment_phase": "ACQUISITION",
+  "attachment_geometry_audit": null
+}

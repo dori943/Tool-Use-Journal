@@ -1,0 +1,58 @@
+{
+  "schema": "run_result-v1",
+  "method": "without_reasoner",
+  "task": "c1_1",
+  "seed": 0,
+  "provider": "openai",
+  "model": "gpt-4o-mini",
+  "m5_simulate": "controller",
+  "exec_retries_allowed": 0,
+  "plan_status": "SUCCESS",
+  "plan_success": true,
+  "m5_status": "FAILED",
+  "exec_success": false,
+  "task_goal_status": "NOT_EVALUATED",
+  "goal_success": null,
+  "success": false,
+  "failure_stage": "execution",
+  "failure_code": "EXECUTION_FAILED",
+  "physics_related": true,
+  "failed_step": {
+    "index": 1,
+    "subgoal_id": "SG1_s1_d1",
+    "action_type": "PICK_TOOL",
+    "route": "M5_MOTION_PLAN",
+    "object_id": null,
+    "execution_status": "EXECUTION_FAILED"
+  },
+  "detail": "RuntimeError: object 'scissors' is 0.0847 m from the EE; attach limit is 0.0200 m; closest geom pair 'gripper0_right_right_fingertip_collision' <-> 'scissors_g9' measured by GEOM_QUERY",
+  "m5_attempt_count": 1,
+  "m5_attempts": [
+    {
+      "attempt": 1,
+      "m5_dir": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-reasoner\\c1_1\\seed_0\\m5",
+      "m5_status": "FAILED",
+      "task_goal_status": "NOT_EVALUATED",
+      "failure_stage": "execution",
+      "failure_code": "EXECUTION_FAILED",
+      "physics_related": true,
+      "failed_step": {
+        "index": 1,
+        "subgoal_id": "SG1_s1_d1",
+        "action_type": "PICK_TOOL",
+        "route": "M5_MOTION_PLAN",
+        "object_id": null,
+        "execution_status": "EXECUTION_FAILED"
+      },
+      "detail": "RuntimeError: object 'scissors' is 0.0847 m from the EE; attach limit is 0.0200 m; closest geom pair 'gripper0_right_right_fingertip_collision' <-> 'scissors_g9' measured by GEOM_QUERY",
+      "error": "SystemExit: \n[중단] run_m5 단계가 exit=2 로 끝났습니다."
+    }
+  ],
+  "final_error": "SystemExit: \n[중단] run_m5 단계가 exit=2 로 끝났습니다.",
+  "policy_version": "vlm-prior-attributes-v1",
+  "ee_fallback": {
+    "obj_plate_plate": "vac",
+    "obj_zone_collection_zone_visual": "vac",
+    "obj_rack_ee_rack": "vac"
+  }
+}

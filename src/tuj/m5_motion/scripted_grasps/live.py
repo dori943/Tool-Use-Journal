@@ -67,6 +67,7 @@ class ScriptedGraspSession:
         self.failure = None
         self._planner = None
         self._planner_key = None
+        self._ee_path_keepouts = {}
         # Per-step artifact dirs (``<index>-<token>`` and their ``grasp``/plan
         # subfolders) are created with exist_ok=False, and a re-run reuses the
         # same index+request-hash names, so a prior run's tree collides
@@ -98,6 +99,45 @@ class ScriptedGraspSession:
             collision_factory = self._planner.collision_context_factory
             collision_factory.compiler = collision_factory.compiler.with_reference_environment(self.runtime.env)
         return self._planner
+
+    def _bind_ee_path_keepout(self, request):
+        """Tag ``request`` with the swept volume of the stored EE-rack paths.
+
+        Seat grounding then keeps placed objects out from under the exchange
+        trajectories.  Computed once per rack; the arm, base and templates do
+        not change when an EE swap rebuilds the environment.
+        """
+        from tuj.m5_motion.ee_path_keepout import (
+            EE_PATH_KEEPOUT_METADATA_KEY, compute_swept_arm_height_field,
+            rack_templates, register_keepout,
+        )
+        from tuj.m5_motion.precomputed_ee_attach import compute_rack_signature
+        world = request.world
+        environment = world.metadata.get("environment_name")
+        if not world.rack or not isinstance(environment, str):
+            return
+        key = f"{environment}:{compute_rack_signature(world)[:16]}"
+        cache = self._ee_path_keepouts
+        if key not in cache:
+            planner = self._get_planner()
+            attach = getattr(planner, "precomputed_ee_attach_planner", None)
+            exchange = getattr(planner, "precomputed_ee_exchange_planner", None)
+            cache[key] = None
+            if attach is not None:
+                try:
+                    templates = rack_templates(
+                        environment, world, attach.registry,
+                        getattr(exchange, "return_registry", None))
+                    field = compute_swept_arm_height_field(self.runtime.env, templates)
+                except ValueError as error:
+                    print(f"[M5][EE_KEEPOUT] skipped: {error}")
+                else:
+                    register_keepout(key, field)
+                    cache[key] = field
+                    print(f"[M5][EE_KEEPOUT] {len(templates)} rack paths swept "
+                          f"({', '.join(field.trajectory_ids)})")
+        if cache[key] is not None:
+            request.task.metadata[EE_PATH_KEEPOUT_METADATA_KEY] = key
 
     def execute_request(self, request, *, completed_subgoal=None):
         from .context import execute_grasp
@@ -143,6 +183,7 @@ class ScriptedGraspSession:
             if needs_packing_transport_filter(request, retention):
                 bind_packing_transport_filter(request, retention, self._get_planner())
             from .transport import ground_held_region_goal
+            self._bind_ee_path_keepout(request)
             ground_held_region_goal(request, retention)
         token = hashlib.sha256(request.model_dump_json().encode()).hexdigest()[:20]
         request.request_id = f"motion-request:live:{token}"

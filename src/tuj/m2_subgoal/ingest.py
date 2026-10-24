@@ -648,7 +648,8 @@ def assign_container_slots(m2_out: dict, m1: dict) -> list[str]:
                    if t in nodes and "bbox_mm" in nodes[t]]
         if len(members) < 2:
             continue
-        layout = ground.container_layout(members, nodes[container])
+        layout = ground.container_layout_clear_of_sweep(
+            members, nodes[container], m1.get("_ee_keepout"))
         if not layout or not layout.get("slots"):
             continue
         slots = layout["slots"]
@@ -669,6 +670,15 @@ def assign_container_slots(m2_out: dict, m1: dict) -> list[str]:
             s["placement_slot"] = {"region": container, "uv": list(slot["uv"]),
                                    "row": slot["row"]}
         note = "" if layout.get("pass") else f", 한 층 초과 {layout.get('overflow')}"
+        sweep = layout.get("ee_sweep")
+        if sweep:
+            if sweep["blocked"]:
+                note += f", EE 교체 궤적 아래 회피 실패 {sweep['blocked']}"
+            elif sweep["rearranged"]:
+                note += (f", EE 교체 궤적 회피로 줄 순서 {layout['row_order']}"
+                         f"{' x반전' if layout['mirror_x'] else ''}")
+            if sweep["min_clearance_mm"] is not None:
+                note += f" (궤적까지 최소 여유 {sweep['min_clearance_mm']}mm)"
         logs.append(f"  [배치] {parent} -> {container}: {len(slots)}자리 / "
                     f"{layout.get('rows')}줄, 상세 {placed}건에 부여{note}")
     return logs

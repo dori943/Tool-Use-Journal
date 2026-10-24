@@ -365,6 +365,8 @@ class _Grounding:
         )
         self.preserve_destination_rotation = home_orientation is not None
         self.half = np.abs(self.destination_rotation) @ self.local_size / 2.
+        from tuj.m5_motion.ee_path_keepout import keepout_for_task
+        self.ee_path_keepout = keepout_for_task(task)
         from .container_orientation import configure_packing_orientation
         configure_packing_orientation(self)
 
@@ -602,7 +604,50 @@ class _Grounding:
         local[:2] = local_xy
         return (self.T_WR @ np.r_[local, 1.])[:2]
 
+    def ee_path_clearance(self, xy):
+        """Gap between the seated object and the fixed EE-rack arm sweep.
+
+        ``inf`` when no keep-out is bound.  The footprint is the larger half
+        extent on both axes because ``publish`` may still yaw the object 90
+        degrees after the seat is chosen.
+        """
+        field = self.ee_path_keepout
+        if field is None:
+            return math.inf
+        from tuj.common.ee_keepout import placement_margin_m
+        r = float(np.max(self.half[:2]))
+        top = self.floor_top_world_z() + 2. * float(self.half[2])
+        margin = placement_margin_m(self.request.constraints.collision_margin_m)
+        return field.clearance(xy, (r, r), top, margin)
+
     def free_destination_xy(self):
+        """Seat search that also keeps clear of the fixed EE-rack arm sweep.
+
+        A seat under the stored attach/return trajectories is accepted here
+        and fails only at the next EE exchange, after the rest of the plan has
+        run (c3_2 mug_a).  Seats outside the sweep are preferred; when the
+        region has none, the unconstrained choice is kept and recorded so the
+        conflict is visible before the exchange rejects it.
+        """
+        def outside_sweep(xy):
+            return self.ee_path_clearance(xy) >= 0.
+
+        if self.ee_path_keepout is None:
+            return self._free_destination_xy(None)
+        xy = self._free_destination_xy(outside_sweep)
+        unavoidable = xy is None
+        if unavoidable:
+            xy = self._free_destination_xy(None)
+        note = {'clearance_m': round(float(self.ee_path_clearance(xy)), 4)}
+        if unavoidable:
+            note['unavoidable'] = True
+        anchor = self._slot_xy()
+        if anchor is not None and not outside_sweep(anchor):
+            note['slot_xy_in_sweep'] = [round(float(v), 4) for v in anchor]
+        self.task.metadata['ee_path_keepout_seat'] = note
+        return xy
+
+    def _free_destination_xy(self, seat_allowed):
         """The plan's slot when it is clear enough, else the least-overlapping seat.
 
         Nested platforms already inside the region are stacking-forbidden: a
@@ -610,6 +655,10 @@ class _Grounding:
         fully on them.  Thin occupants remain hard blockers.  Returning the
         anchor whenever it was taken put every object at the same place
         (c3_1: mug into the plate).
+
+        ``seat_allowed`` is an extra hard filter.  With one, ``None`` is
+        returned when no seat passes it; without one the best-overlap fallback
+        below always yields a seat.
         """
         occupants = self._occupants()
         mine = self.half[:2]
@@ -631,6 +680,8 @@ class _Grounding:
 
         def acceptable(xy):
             """Clear enough: hard blockers need gap>=0; soft platforms allow a graze."""
+            if seat_allowed is not None and not seat_allowed(xy):
+                return False
             if not occupants:
                 return True
             for c, h, _t, soft in occupants:
@@ -647,7 +698,7 @@ class _Grounding:
             return anchor
         limit = self.usable_half_xy() - mine
         if np.any(limit <= 0.):
-            return anchor
+            return None if seat_allowed is not None else anchor
         center_xy = self.region_world[:2]
         xs = np.arange(-limit[0], limit[0] + 1e-9, FREE_SPOT_GRID_M)
         ys = np.arange(-limit[1], limit[1] + 1e-9, FREE_SPOT_GRID_M)
@@ -663,7 +714,7 @@ class _Grounding:
             key = (clearance(xy), -float(np.sum((xy - anchor) ** 2)))
             if best_key is None or key > best_key:
                 best, best_key = xy, key
-        return best
+        return None if seat_allowed is not None else best
 
     def place_xy_away_from(
         self,
@@ -698,6 +749,9 @@ class _Grounding:
             if current_xy is not None
             else self.free_destination_xy()
         )
+        # A repair must not trade a hand-margin miss for the EE-rack sweep,
+        # unless the seat it repairs was already inside it (no clear seat).
+        keep_sweep_clear = self.ee_path_clearance(anchor) >= 0.
 
         def occupants_acceptable(xy):
             occupants = self._occupants()
@@ -717,6 +771,8 @@ class _Grounding:
             if np.any(np.abs(xy - self.region_world[:2]) > limit + 1e-9):
                 return False
             if not occupants_acceptable(xy):
+                return False
+            if keep_sweep_clear and self.ee_path_clearance(xy) < 0.:
                 return False
             for prior in rejected:
                 if float(np.linalg.norm(xy - prior)) < REJECTED_PLACE_EPS_M:

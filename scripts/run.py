@@ -534,6 +534,11 @@ def stage_m1(task, out, args):
                 encoding="utf-8",
             )
 
+            keepout = src.parent / "m1_ee_keepout.npz"
+
+            if keepout.exists():
+                (out / "m1_ee_keepout.npz").write_bytes(keepout.read_bytes())
+
             npz = src.parent / "m1_points.npz"
 
             if npz.exists():
@@ -1180,6 +1185,141 @@ def stage_m5(task, out, args):
 
 
 # ══════════════════════════════════════════════════════════════════════
+# M5 실행 재시도 + 공통 결과 스키마 (ablation 공정 비교용)
+# ══════════════════════════════════════════════════════════════════════
+
+def _m5_summary_of(out):
+    """<out>/m5/m5_summary.json 을 읽는다. 없으면 {}."""
+    path = Path(out) / "m5" / "m5_summary.json"
+    return read_json(path) if path.is_file() else {}
+
+
+def _classified(summary, error=None):
+    """m5_summary 에 분류가 없으면(generic 경로/예외 경로) 여기서 보충한다."""
+    if summary.get("failure_stage"):
+        return summary
+    if summary.get("status") == "SUCCESS" and error is None:
+        return summary
+    from tuj.m5_motion.failure_taxonomy import classify_failure
+
+    detail = summary.get("detail") or (str(error) if error is not None else "")
+    summary = dict(summary)
+    summary.update(classify_failure(detail, error=error))
+    return summary
+
+
+def write_run_result(out, task, args, *, method, attempts, final_error=None,
+                     plan_status=None, extra=None):
+    """조건(Full / w/o ...)에 상관없이 같은 필드로 <out>/run_result.json 을 쓴다.
+
+      plan_success   M4(또는 대체 할당)가 plan 을 냈는가
+      exec_success   M5 가 마지막 subgoal 까지 예외 없이 실행했는가
+      goal_success   환경의 _check_success 로 본 목표 달성 여부 (평가 안 됐으면 None)
+      success        goal 이 평가됐으면 goal_success, 아니면 exec_success
+      failure_stage  planning | execution | none  (마지막 시도 기준)
+    """
+    out = Path(out)
+    last = attempts[-1] if attempts else {}
+    m5_status = last.get("m5_status")
+    exec_success = m5_status == "SUCCESS"
+    goal_status = last.get("task_goal_status")
+    goal_success = (
+        True if goal_status == "SATISFIED"
+        else False if goal_status == "FAILED"
+        else None
+    )
+    result = {
+        "schema": "run_result-v1",
+        "method": method,
+        "task": task,
+        "seed": getattr(args, "seed", None),
+        "provider": os.environ.get("TUJ_LLM_PROVIDER"),
+        "model": getattr(args, "model", None),
+        "m5_simulate": getattr(args, "m5_simulate", None),
+        "exec_retries_allowed": getattr(args, "exec_retries", 0),
+        "plan_status": plan_status,
+        "plan_success": (plan_status == "SUCCESS") if plan_status is not None else None,
+        "m5_status": m5_status,
+        "exec_success": exec_success,
+        "task_goal_status": goal_status,
+        "goal_success": goal_success,
+        "success": goal_success if goal_success is not None else exec_success,
+        "failure_stage": "none" if exec_success and goal_success is not False
+        else last.get("failure_stage") or ("goal" if goal_success is False else "unknown"),
+        "failure_code": last.get("failure_code"),
+        "physics_related": last.get("physics_related"),
+        "failed_step": last.get("failed_step"),
+        "detail": last.get("detail"),
+        "m5_attempt_count": len(attempts),
+        "m5_attempts": attempts,
+        "final_error": (
+            f"{type(final_error).__name__}: {final_error}" if final_error is not None else None
+        ),
+    }
+    if extra:
+        result.update(extra)
+    (out / "run_result.json").write_text(
+        json.dumps(result, ensure_ascii=False, indent=2, default=str), encoding="utf-8"
+    )
+    print(
+        f"[result] success={result['success']} exec={exec_success} goal={goal_status} "
+        f"stage={result['failure_stage']} code={result['failure_code']} "
+        f"attempts={len(attempts)} -> {out / 'run_result.json'}"
+    )
+    return result
+
+
+def run_m5_with_retries(task, out, args, *, method="full", plan_status=None, extra=None):
+    """stage_m5 를 돌리고, '실행(물리) 실패'일 때만 --exec-retries 만큼 다시 돈다.
+
+    계획 실패는 같은 입력으로 다시 돌려도 같은 결과이므로 재시도하지 않는다.
+    이전 시도의 m5/ 는 m5_attempt_<k>/ 로 보존된다. 모든 시도는 run_result.json 의
+    m5_attempts 에 남으므로 '재시도 없는 성공률'도 나중에 계산할 수 있다.
+    마지막 시도가 실패하면 원래 예외(SystemExit 포함)를 그대로 올린다.
+    """
+    import shutil
+
+    out = Path(out)
+    retries = max(0, int(getattr(args, "exec_retries", 0) or 0))
+    attempts = []
+    last_error = None
+    for attempt in range(retries + 1):
+        if attempt > 0:
+            prev = out / "m5"
+            if prev.exists():
+                shutil.move(str(prev), str(out / f"m5_attempt_{attempt}"))
+            print(f"\n[M5] 실행 실패 재시도 {attempt}/{retries}")
+        last_error = None
+        try:
+            stage_m5(task, out, args)
+        except BaseException as exc:  # SystemExit 도 기록 후 재판단
+            last_error = exc
+        summary = _classified(_m5_summary_of(out), last_error)
+        record = {
+            "attempt": attempt + 1,
+            "m5_dir": str(out / "m5"),
+            "m5_status": summary.get("status"),
+            "task_goal_status": summary.get("task_goal_status"),
+            "failure_stage": summary.get("failure_stage"),
+            "failure_code": summary.get("failure_code"),
+            "physics_related": summary.get("physics_related"),
+            "failed_step": summary.get("failed_step"),
+            "detail": summary.get("detail"),
+            "error": f"{type(last_error).__name__}: {last_error}" if last_error else None,
+        }
+        attempts.append(record)
+        write_run_result(out, task, args, method=method, attempts=attempts,
+                         final_error=last_error, plan_status=plan_status, extra=extra)
+        if last_error is None and summary.get("status") == "SUCCESS":
+            break
+        if record["failure_stage"] != "execution" and not record.get("physics_related"):
+            break  # 순수 계획 실패는 재시도 대상이 아니다 (물리 접촉 코드가 있으면 재시도)
+    if last_error is not None:
+        raise last_error
+    return attempts
+
+
+# ══════════════════════════════════════════════════════════════════════
 # Argument Parser
 # ══════════════════════════════════════════════════════════════════════
 
@@ -1196,8 +1336,11 @@ def build_parser():
         ),
     )
 
-    p.add_argument("--grounding-mode", choices=("full", "without_grounding"), default="full",
-                   help="Separate upper-level grounding ablation; default keeps the full pipeline")
+    p.add_argument("--grounding-mode", choices=("full", "without_grounding", "without_reasoner"),
+                   default="full",
+                   help=("full=Reasoner 측정값 사용; without_reasoner=논문 'w/o Reasoner' "
+                         "(측정값만 VLM 추정으로 대체, 나머지 Full 동일); "
+                         "without_grounding=구 상위 grounding ablation (VLM 이 EE 직접 선택)"))
     p.add_argument(
         "--planner-mode",
         choices=("full", "without-planner", "greedy-ee-order"),
@@ -1396,6 +1539,17 @@ def build_parser():
         help=(
             "M5 초기 world 캡처에 쓸 환경 이름 "
             "(기본: 태스크 기본값)"
+        ),
+    )
+
+    p.add_argument(
+        "--exec-retries",
+        type=int,
+        default=0,
+        help=(
+            "M5 가 '실행(물리) 실패'로 끝났을 때만 같은 plan 으로 다시 돌리는 횟수 "
+            "(기본 0 = 재시도 없음; Full 과 ablation 에 동일하게 적용할 것). "
+            "이전 시도는 m5_attempt_<k>/ 로 보존되고 run_result.json 에 모두 기록된다"
         ),
     )
 
@@ -1692,10 +1846,17 @@ def _run_integrated(
             "M5  Motion Planner"
         )
         t0 = time.monotonic()
-        stage_m5(
+        m4_status = (
+            (read_json(out / "m4.json") or {}).get("status")
+            if (out / "m4.json").is_file()
+            else None
+        )
+        run_m5_with_retries(
             task,
             out,
             args,
+            method="full",
+            plan_status=m4_status,
         )
         stage_seconds["m5"] = time.monotonic() - t0
         stage_status["m5"] = "completed"
@@ -1731,6 +1892,10 @@ def main():
 
     if args.grounding_mode == "without_grounding":
         from run_without_grounding import run
+        return run(args, sys.modules[__name__])
+
+    if args.grounding_mode == "without_reasoner":
+        from run_without_reasoner import run
         return run(args, sys.modules[__name__])
 
     task = args.task

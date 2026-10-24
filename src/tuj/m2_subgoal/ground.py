@@ -86,6 +86,78 @@ def container_layout(members: list[dict], container: dict) -> dict | None:
     return _call(fn, members, container)
 
 
+# 컨테이너 bbox 바닥에서 내부 바닥 윗면까지 (M5 REGION_FLOOR_FALLBACK_M 와 같은 값).
+_CONTAINER_FLOOR_MM = 5.0
+# 줄 순서를 전부 시도하는 상한. 이보다 많으면 원래 순서/역순만 본다.
+_MAX_PERMUTED_ROWS = 6
+
+
+def _sweep_check(layout: dict, members: list[dict], container: dict, keepout) -> dict:
+    """배치의 각 자리에서 놓인 물체 윗면이 고정 EE 궤적의 팔과 margin 이상 떨어지는가.
+
+    keepout 은 M1 좌표계(로봇 베이스 기준 xy, 월드 z, 단위 m)의 높이장이다.
+    물체 발자국은 긴 변 기준 정사각형으로 본다 — M5 가 놓을 때 90도 돌릴 수 있다.
+    """
+    from tuj.common.ee_keepout import placement_margin_m
+
+    margin = placement_margin_m()
+    cz = float(container["center_mm"][2])
+    floor_mm = cz - float(container["bbox_mm"][2]) / 2.0 + _CONTAINER_FLOOR_MM
+    by_id = {m["id"]: m for m in members}
+    per_slot, blocked = {}, []
+    for oid, slot in layout["slots"].items():
+        m = by_id[oid]
+        cx = float(container["center_mm"][0]) + slot["offset_mm"][0]
+        cy = float(container["center_mm"][1]) + slot["offset_mm"][1]
+        r = max(float(m["bbox_mm"][0]), float(m["bbox_mm"][1])) / 2.0
+        top = floor_mm + float(m["bbox_mm"][2])
+        gap = keepout.clearance((cx / 1000.0, cy / 1000.0), (r / 1000.0, r / 1000.0),
+                                top / 1000.0, margin)
+        per_slot[oid] = round(gap * 1000.0, 1) if np.isfinite(gap) else None
+        if gap < 0:
+            blocked.append(oid)
+    finite = [v for v in per_slot.values() if v is not None]
+    return {"blocked": blocked, "clearance_mm": per_slot,
+            "min_clearance_mm": min(finite) if finite else None}
+
+
+def container_layout_clear_of_sweep(members: list[dict], container: dict,
+                                    keepout) -> dict | None:
+    """container_layout 중 고정 EE 교체 궤적 아래에 키 큰 물체를 두지 않는 배치.
+
+    EE 교체는 저장된 관절 궤적을 그대로 재생한다. 그 아래 놓인 물체는 다음 교체에서야
+    걸린다 (c3_2: 트레이 A 머그가 3F->vac 궤적 3mm 아래 — 30 스텝 뒤 M5 중단).
+    줄 구성은 그대로 두고 줄 순서와 x 방향만 바꿔 보며, 원래 배치가 통과하면 그대로 쓴다.
+    전부 걸리면 걸리는 물체가 가장 적은 배치를 고르고 blocked 로 보고한다.
+    """
+    from itertools import permutations
+
+    base = container_layout(members, container)
+    if keepout is None or not base or not base.get("slots"):
+        return base
+    n = int(base["rows"])
+    orders = (permutations(range(n)) if n <= _MAX_PERMUTED_ROWS
+              else (tuple(range(n)), tuple(reversed(range(n)))))
+    best = None
+    for order in orders:
+        for mirror in (False, True):
+            layout = (base if list(order) == list(range(n)) and not mirror
+                      else _call(_rel.container_layout, members, container,
+                                 row_order=list(order), mirror_x=mirror))
+            check = _sweep_check(layout, members, container, keepout)
+            key = (len(check["blocked"]), -(check["min_clearance_mm"] or 0.0))
+            if best is None or key < best[0]:
+                best = (key, layout, check)
+            if not check["blocked"]:
+                break
+        if not best[2]["blocked"]:
+            break
+    _, layout, check = best
+    rearranged = (layout.get("row_order", list(range(n))) != list(range(n))
+                  or bool(layout.get("mirror_x")))
+    return dict(layout) | {"ee_sweep": check | {"rearranged": rearranged}}
+
+
 _EE_POOL_CACHE: list[dict] | None = None
 
 
@@ -196,6 +268,8 @@ def load_scene(m1_json: str | Path, points_npz: str | Path | None = None) -> dic
         for n in m1["nodes"]:
             if n["id"] in pts:
                 n["_points"] = pts[n["id"]]
+    from tuj.common.ee_keepout import load_height_field
+    m1["_ee_keepout"] = load_height_field(m1_json.parent / "m1_ee_keepout.npz")
     return m1
 
 

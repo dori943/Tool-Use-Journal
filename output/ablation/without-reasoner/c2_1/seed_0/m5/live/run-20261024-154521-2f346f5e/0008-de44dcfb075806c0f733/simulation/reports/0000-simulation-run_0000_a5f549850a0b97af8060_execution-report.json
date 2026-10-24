@@ -1,0 +1,178 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:a5f549850a0b97af8060:execution-report",
+  "run_id": "simulation-run:0000:a5f549850a0b97af8060",
+  "plan_id": "motion-plan:f8ca4bac16147a71b4f26887",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:a5f549850a0b97af8060:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:a5f549850a0b97af8060",
+    "input_artifact_ids": [
+      "simulation-run-artifact:a5f549850a0b97af80604fb7",
+      "motion-plan-artifact:f8ca4bac16147a71b4f26887"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "SUCCESS",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      0.3753637510356125,
+      -1.4416727101055922,
+      2.550063716765819,
+      -2.6791916593038687,
+      -1.570793653747859,
+      -1.195501056170946
+    ],
+    "joint_velocities_rad_s": [
+      0.004797768852167361,
+      -0.023679317179492385,
+      -0.01180379438627271,
+      0.035483597465854444,
+      6.132428930206028e-8,
+      0.00479817645613997
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        -0.42247645988385885,
+        0.24550496641040648,
+        0.9356293883796503
+      ],
+      "orientation_xyzw": [
+        -0.7070825692859873,
+        -0.7071309922535304,
+        -2.516438677783589e-6,
+        3.6341895944078196e-7
+      ]
+    },
+    "gripper": {
+      "mode": "OPEN",
+      "command": -1.0
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 6.5800000000314185,
+    "max_joint_tracking_error_rad": 0.07517587405296489,
+    "max_eef_tracking_error_m": 0.013668994422935643,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG1_s2_d3:strategy_1:2:kf_1_place:event:0:DETACH_OBJECT",
+      "scheduled_time_s": 4.165560238747702,
+      "actual_time_s": 4.240000000020245,
+      "status": "SUCCESS",
+      "message": "detached plate and preserved world pose"
+    },
+    {
+      "event_id": "SG1_s2_d3:strategy_1:2:kf_1_place:event:1:SUCTION_OFF",
+      "scheduled_time_s": 4.165560238747702,
+      "actual_time_s": 4.240000000020245,
+      "status": "SUCCESS",
+      "message": "vacuum suction disabled with command -1.000"
+    }
+  ],
+  "failure": null,
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "vac",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": -1.0,
+    "ee_transition_count": 3,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 329,
+    "nominal_plan_duration_s": 6.488232663699769,
+    "final_plan_time_s": 6.488232663699769,
+    "adaptive_settle_extra_duration_s": 0.09176733633164957,
+    "segment_tracking": [
+      {
+        "segment_id": "SG1_s2_d3:strategy_1:0:SG1_s2_d3:strategy_1:1:kf_1_pre_place",
+        "keyframe_id": "SG1_s2_d3:strategy_1:1:kf_1_pre_place",
+        "target_block_id": null,
+        "nominal_end_time_s": 2.248323664123472,
+        "actual_execution_time_s": 2.260000000010791,
+        "max_joint_error_rad": 2.8246177614654755e-6,
+        "eef_position_error_m": 4.3984005009881213e-7,
+        "eef_orientation_error_rad": 6.793669285068368e-12,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_s2_d3:strategy_1:1:SG1_s2_d3:strategy_1:2:kf_1_place",
+        "keyframe_id": "SG1_s2_d3:strategy_1:2:kf_1_place",
+        "target_block_id": null,
+        "nominal_end_time_s": 4.165560238747702,
+        "actual_execution_time_s": 4.240000000020245,
+        "max_joint_error_rad": 0.0,
+        "eef_position_error_m": 1.5700924586837752e-16,
+        "eef_orientation_error_rad": 4.730720264509344e-16,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.06000000000028649,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_s2_d3:strategy_1:2:SG1_s2_d3:strategy_1:3:kf_1_retreat",
+        "keyframe_id": "SG1_s2_d3:strategy_1:3:kf_1_retreat",
+        "target_block_id": null,
+        "nominal_end_time_s": 6.488232663699769,
+        "actual_execution_time_s": 6.5800000000314185,
+        "max_joint_error_rad": 0.0038996972501315064,
+        "eef_position_error_m": 0.0008730576983358613,
+        "eef_orientation_error_rad": 0.0000684995283766395,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      }
+    ],
+    "gripper_release_waits": [],
+    "goal_evaluation": {
+      "request_id": "motion-request:live:de44dcfb075806c0f733",
+      "goal_type": "POSE",
+      "status": "SATISFIED",
+      "detail": "all target footprints are inside the goal region",
+      "position_error_m": null,
+      "orientation_error_rad": null,
+      "joint_error_rad": null,
+      "observed": {
+        "region_id": "blue_tray",
+        "inside_target_ids": [
+          "plate"
+        ],
+        "outside_target_ids": [],
+        "geometry_errors": {},
+        "inset_margin_m": 0.0,
+        "include_vertical": false,
+        "contact_tolerance_m": 0.03
+      }
+    }
+  }
+}

@@ -1,0 +1,268 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:723f0c02ce14865f387d:execution-report",
+  "run_id": "simulation-run:0000:723f0c02ce14865f387d",
+  "plan_id": "motion-plan:d9b97f144e0fcb9081da1560",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:723f0c02ce14865f387d:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:723f0c02ce14865f387d",
+    "input_artifact_ids": [
+      "simulation-run-artifact:723f0c02ce14865f387de2d5",
+      "motion-plan-artifact:d9b97f144e0fcb9081da1560"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "SUCCESS",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      -0.8710544826538399,
+      -1.4046051048911832,
+      1.7499322008143712,
+      -1.8966331580517053,
+      -1.5799280664765818,
+      -1.600126312104823
+    ],
+    "joint_velocities_rad_s": [
+      0.016722854944448397,
+      -0.013776177194464957,
+      0.030441373226640228,
+      -0.015774968133612368,
+      -0.0004172564087541225,
+      -0.016295376471915524
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        2.3143417172633973,
+        -3.543654872618466,
+        0.9720654980432236
+      ],
+      "orientation_xyzw": [
+        -0.9342185948603658,
+        -0.356538650578165,
+        0.00751721937701114,
+        0.007700589189337955
+      ]
+    },
+    "gripper": {
+      "mode": "OPEN",
+      "command": -1.0
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 46.520000000222126,
+    "max_joint_tracking_error_rad": 0.2315577056074829,
+    "max_eef_tracking_error_m": 0.27163639248926824,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG2_s4_d1:transition:1:precomputed:return:event:0:TOOL_UNLOCK",
+      "scheduled_time_s": 1.186481110997776,
+      "actual_time_s": 1.2000000000057298,
+      "status": "SUCCESS",
+      "message": "unlocked vac; active model is bare flange"
+    },
+    {
+      "event_id": "SG2_s4_d1:transition:1:precomputed:return:event:1:VERIFY_TOOL_RELEASE",
+      "scheduled_time_s": 1.186481110997776,
+      "actual_time_s": 1.2000000000057298,
+      "status": "SUCCESS",
+      "message": "verified vac released to rack"
+    },
+    {
+      "event_id": "SG2_s4_d1:transition:1:exchange:SG2_s4_d1:transition:1:attach-component:precomputed:event:0:TOOL_LOCK",
+      "scheduled_time_s": 15.679347372285019,
+      "actual_time_s": 15.740000000075156,
+      "status": "SUCCESS",
+      "message": "locked 3F; runtime model replaced"
+    },
+    {
+      "event_id": "SG2_s4_d1:transition:1:exchange:SG2_s4_d1:transition:1:attach-component:precomputed:event:1:VERIFY_TOOL_LOCK",
+      "scheduled_time_s": 15.679347372285019,
+      "actual_time_s": 15.740000000075156,
+      "status": "SUCCESS",
+      "message": "verified 3F mounted and rack duplicate hidden"
+    }
+  ],
+  "failure": null,
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "3F",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": -1.0,
+    "ee_transition_count": 3,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 2326,
+    "nominal_plan_duration_s": 45.99455697330765,
+    "final_plan_time_s": 45.99455697330765,
+    "adaptive_settle_extra_duration_s": 0.5254430269144734,
+    "segment_tracking": [
+      {
+        "segment_id": "SG2_s4_d1:transition:1:precomputed:return:0:vac-return:0:commission:attach:vac:ee-attach:bare->vac:3:commission:attach:vac:new-retreat",
+        "keyframe_id": null,
+        "target_block_id": null,
+        "nominal_end_time_s": 1.186481110997776,
+        "actual_execution_time_s": 1.2000000000057298,
+        "max_joint_error_rad": 0.008886846809442961,
+        "eef_position_error_m": 0.00359924514448563,
+        "eef_orientation_error_rad": 0.00008216546013444622,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG2_s4_d1:transition:1:precomputed:return:1:vac-return:1:commission:attach:vac:ee-attach:bare->vac:2:commission:attach:vac:new-dock",
+        "keyframe_id": null,
+        "target_block_id": null,
+        "nominal_end_time_s": 1.9264447898337282,
+        "actual_execution_time_s": 1.9400000000092632,
+        "max_joint_error_rad": 0.009801622039571356,
+        "eef_position_error_m": 0.004180910481613759,
+        "eef_orientation_error_rad": 0.00011408244887810988,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG2_s4_d1:transition:1:precomputed:return:2:vac-return:2:commission:attach:vac:ee-attach:bare->vac:1:commission:attach:vac:new-pre-dock",
+        "keyframe_id": null,
+        "target_block_id": null,
+        "nominal_end_time_s": 2.8539097114119407,
+        "actual_execution_time_s": 2.860000000013656,
+        "max_joint_error_rad": 0.010224366387451278,
+        "eef_position_error_m": 0.004147370618277208,
+        "eef_orientation_error_rad": 0.000089055069499429,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG2_s4_d1:transition:1:precomputed:return:3:vac-return:3:commission:attach:vac:ee-attach:bare->vac:0:commission:attach:vac:new-staging",
+        "keyframe_id": null,
+        "target_block_id": null,
+        "nominal_end_time_s": 8.159425479003025,
+        "actual_execution_time_s": 8.22000000003925,
+        "max_joint_error_rad": 0.0006046101897116962,
+        "eef_position_error_m": 0.0002645355101576127,
+        "eef_orientation_error_rad": 0.0007169732955607241,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.06000000000028649,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG2_s4_d1:transition:1:exchange:SG2_s4_d1:transition:1:attach-component:precomputed:0:commission:attach:3F:ee-attach:bare->3F:0:commission:attach:3F:new-staging",
+        "keyframe_id": "commission:attach:3F:new-staging",
+        "target_block_id": null,
+        "nominal_end_time_s": 13.418008850835893,
+        "actual_execution_time_s": 13.480000000064365,
+        "max_joint_error_rad": 0.0010540192426025108,
+        "eef_position_error_m": 0.0004793656069154491,
+        "eef_orientation_error_rad": 0.0012024664986355674,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG2_s4_d1:transition:1:exchange:SG2_s4_d1:transition:1:attach-component:precomputed:1:commission:attach:3F:ee-attach:bare->3F:1:commission:attach:3F:new-pre-dock",
+        "keyframe_id": "commission:attach:3F:new-pre-dock",
+        "target_block_id": null,
+        "nominal_end_time_s": 14.659435338564798,
+        "actual_execution_time_s": 14.740000000070381,
+        "max_joint_error_rad": 0.00791773584319655,
+        "eef_position_error_m": 0.0029995621215272443,
+        "eef_orientation_error_rad": 0.000105798226399416,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG2_s4_d1:transition:1:exchange:SG2_s4_d1:transition:1:attach-component:precomputed:2:commission:attach:3F:ee-attach:bare->3F:2:commission:attach:3F:new-dock",
+        "keyframe_id": "commission:attach:3F:new-dock",
+        "target_block_id": null,
+        "nominal_end_time_s": 15.679347372285019,
+        "actual_execution_time_s": 15.740000000075156,
+        "max_joint_error_rad": 0.009117128198760316,
+        "eef_position_error_m": 0.17388946225106358,
+        "eef_orientation_error_rad": 0.00008926535653650707,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG2_s4_d1:transition:1:exchange:SG2_s4_d1:transition:1:attach-component:precomputed:3:commission:attach:3F:ee-attach:bare->3F:3:commission:attach:3F:new-retreat",
+        "keyframe_id": "commission:attach:3F:new-retreat",
+        "target_block_id": null,
+        "nominal_end_time_s": 16.859492944302524,
+        "actual_execution_time_s": 17.400000000083082,
+        "max_joint_error_rad": 0.008406062246666401,
+        "eef_position_error_m": 0.1809927248471685,
+        "eef_orientation_error_rad": 0.00005162967312639985,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.46000000000219643,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG2_s4_d1:transition:1:move-to-workspace:safe-rack-exit",
+        "keyframe_id": null,
+        "target_block_id": null,
+        "nominal_end_time_s": 45.99455697330765,
+        "actual_execution_time_s": 46.520000000222126,
+        "max_joint_error_rad": 0.003936104249334882,
+        "eef_position_error_m": null,
+        "eef_orientation_error_rad": null,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      }
+    ],
+    "gripper_release_waits": [],
+    "goal_evaluation": {
+      "request_id": "motion-request:live:f0404ee15fdd4c203210",
+      "goal_type": "POSE",
+      "status": "SATISFIED",
+      "detail": "EE '3F' is active",
+      "position_error_m": null,
+      "orientation_error_rad": null,
+      "joint_error_rad": null,
+      "observed": {
+        "final_active_ee": "3F"
+      }
+    }
+  }
+}

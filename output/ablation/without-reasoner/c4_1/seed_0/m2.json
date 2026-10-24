@@ -1,0 +1,2283 @@
+{
+  "task": "가전 사이 틈에 떨어진 카드를 꺼내라",
+  "m2_subgoals": [
+    {
+      "subgoal_id": "SG1",
+      "goal": "스패출라를 사용하여 카드를 꺼내라.",
+      "kind": "extract",
+      "target_ids": [
+        "obj_card_card"
+      ],
+      "container_id": "obj_appliance_left_appliance_left",
+      "ordered": false,
+      "tool_candidate_ids": [
+        "obj_tool_3_spatula_b_tool_3_spatula_b",
+        "obj_tool_4_spatula_c_tool_4_spatula_c"
+      ],
+      "object_ids": [
+        "obj_card_card",
+        "obj_tool_3_spatula_b_tool_3_spatula_b",
+        "obj_tool_4_spatula_c_tool_4_spatula_c"
+      ],
+      "selection_reason": "카드를 꺼내기 위해 스패출라가 필요하며, 카드는 서브골의 대상이다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.7,
+          "object_selection": 0.7,
+          "uncertain_about": []
+        },
+        "after": {
+          "decomposition": 0.9,
+          "object_selection": 0.9,
+          "uncertain_about": [],
+          "reason": "모든 측정 조건이 충족되어 신뢰도가 높아졌다."
+        },
+        "delta": {
+          "decomposition": 0.2,
+          "object_selection": 0.2
+        }
+      },
+      "details": [
+        {
+          "detail_id": "SG1_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "?tool"
+          },
+          "group_id": "G_SG1_tool",
+          "note": "extract 도구 확보 (?tool: 후보 중 M4 선택)",
+          "pre": [
+            {
+              "id": "SG1_d1_p0",
+              "expr": "reachable(?tool)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
+                  "reachable": true,
+                  "margin_mm": 375.5
+                },
+                {
+                  "node": "obj_tool_4_spatula_c_tool_4_spatula_c",
+                  "reachable": true,
+                  "margin_mm": 368.4
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p1",
+              "expr": "top_exposed(?tool)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
+                  "top_exposed": true,
+                  "blockers": []
+                },
+                {
+                  "node": "obj_tool_4_spatula_c_tool_4_spatula_c",
+                  "top_exposed": true,
+                  "blockers": []
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p2",
+              "expr": "ee_usable(?EE, ?tool)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                },
+                {
+                  "node": "obj_tool_4_spatula_c_tool_4_spatula_c",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p3",
+              "expr": "graspable_on_support(?EE, ?tool)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 2.4
+                },
+                {
+                  "node": "obj_tool_4_spatula_c_tool_4_spatula_c",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 3.9
+                }
+              ]
+            },
+            {
+              "id": "SG1_d1_p4",
+              "expr": "batch_feasible(?EE, ?tool)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d1_e0",
+              "expr": "holding(?tool)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_d2",
+          "action_type": "tool_act:extract",
+          "binding": {
+            "?t": "?tool",
+            "?o": "obj_card_card"
+          },
+          "group_id": "G_SG1_tool",
+          "note": "obj_card_card를 틈에서 빼낸다",
+          "pre": [
+            {
+              "id": "SG1_d2_p0",
+              "expr": "holding(?tool)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d2_p1",
+              "expr": "gap_accessible(?tool, obj_card_card)",
+              "head": "gap_accessible",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
+                  "gap_accessible": true,
+                  "margin_mm": 11.9
+                },
+                {
+                  "node": "obj_tool_4_spatula_c_tool_4_spatula_c",
+                  "gap_accessible": false,
+                  "margin_mm": -2.8
+                }
+              ]
+            },
+            {
+              "id": "SG1_d2_p2",
+              "expr": "path_clear(?tool, obj_card_card)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d2_e0",
+              "expr": "extracted(obj_card_card)",
+              "head": "extracted",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_d2b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "?tool",
+            "?r": "tool_rest"
+          },
+          "group_id": "G_SG1_tool",
+          "note": "도구를 거치 위치로 운반",
+          "pre": [
+            {
+              "id": "SG1_d2b_p0",
+              "expr": "holding(?tool)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d2b_p1",
+              "expr": "act_space_clear(?EE, ?tool, tool_rest)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_d2b_p2",
+              "expr": "path_clear(?tool, tool_rest)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_d2b_p3",
+              "expr": "extracted(obj_card_card)",
+              "head": "extracted",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d2b_e0",
+              "expr": "above(?tool, tool_rest)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "?tool",
+            "?r": "tool_rest"
+          },
+          "group_id": "G_SG1_tool",
+          "note": "도구 반환",
+          "pre": [
+            {
+              "id": "SG1_d3_p0",
+              "expr": "holding(?tool)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p1",
+              "expr": "above(?tool, tool_rest)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_p2",
+              "expr": "fits(?tool, tool_rest)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG1_d3_p3",
+              "expr": "clear(tool_rest)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_d3_e0",
+              "expr": "in(?tool, tool_rest)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_d3_d0",
+              "expr": "holding(?tool)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_d3_d1",
+              "expr": "above(?tool, tool_rest)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ],
+      "measurements": [
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p0",
+          "node_id": "obj_tool_3_spatula_b_tool_3_spatula_b",
+          "geometry": {
+            "length_mm": 300.0,
+            "diameter_mm": null,
+            "extents_mm": [
+              300.0,
+              70.0,
+              10.0
+            ],
+            "height_z_mm": 10.0,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.5,
+            "seal_patch_rms_mm": 0.5,
+            "footprint_mm": [
+              300.0,
+              70.0
+            ],
+            "height_mm": 10.0,
+            "center": [
+              474.5,
+              -1.0,
+              925.9
+            ],
+            "aabb_size": [
+              204.2,
+              36.3,
+              2.4
+            ]
+          },
+          "material": "wood",
+          "density_kgm3": 600.0,
+          "mass_kg": 0.12,
+          "youngs_gpa": 12.0,
+          "mu": {
+            "mu": 0.6,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.5
+          },
+          "confidence": 0.8,
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.88,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 0.5kg",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 70.0,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 474.5,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 375.5
+          }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p0",
+          "node_id": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "geometry": {
+            "length_mm": 300.0,
+            "diameter_mm": null,
+            "extents_mm": [
+              300.0,
+              70.0,
+              10.0
+            ],
+            "height_z_mm": 10.0,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.5,
+            "seal_patch_rms_mm": 0.5,
+            "footprint_mm": [
+              300.0,
+              70.0
+            ],
+            "height_mm": 10.0,
+            "center": [
+              469.9,
+              -105.3,
+              929.2
+            ],
+            "aabb_size": [
+              215.1,
+              51.0,
+              3.9
+            ]
+          },
+          "material": "wood",
+          "density_kgm3": 600.0,
+          "mass_kg": 0.12,
+          "youngs_gpa": 12.0,
+          "mu": {
+            "mu": 0.6,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.5
+          },
+          "confidence": 0.8,
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.88,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 0.5kg",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 70.0,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 481.6,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 368.4
+          }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p1",
+          "node_id": "obj_tool_3_spatula_b_tool_3_spatula_b",
+          "type": "top_exposed",
+          "value": true,
+          "pass": true,
+          "blockers": []
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p1",
+          "node_id": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "type": "top_exposed",
+          "value": true,
+          "pass": true,
+          "blockers": []
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p2",
+          "node_id": "obj_tool_3_spatula_b_tool_3_spatula_b",
+          "geometry": {
+            "length_mm": 300.0,
+            "diameter_mm": null,
+            "extents_mm": [
+              300.0,
+              70.0,
+              10.0
+            ],
+            "height_z_mm": 10.0,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.5,
+            "seal_patch_rms_mm": 0.5,
+            "footprint_mm": [
+              300.0,
+              70.0
+            ],
+            "height_mm": 10.0,
+            "center": [
+              474.5,
+              -1.0,
+              925.9
+            ],
+            "aabb_size": [
+              204.2,
+              36.3,
+              2.4
+            ]
+          },
+          "material": "wood",
+          "density_kgm3": 600.0,
+          "mass_kg": 0.12,
+          "youngs_gpa": 12.0,
+          "mu": {
+            "mu": 0.6,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.5
+          },
+          "confidence": 0.8,
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.88,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 0.5kg",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 70.0,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 474.5,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 375.5
+          }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p2",
+          "node_id": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "geometry": {
+            "length_mm": 300.0,
+            "diameter_mm": null,
+            "extents_mm": [
+              300.0,
+              70.0,
+              10.0
+            ],
+            "height_z_mm": 10.0,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.5,
+            "seal_patch_rms_mm": 0.5,
+            "footprint_mm": [
+              300.0,
+              70.0
+            ],
+            "height_mm": 10.0,
+            "center": [
+              469.9,
+              -105.3,
+              929.2
+            ],
+            "aabb_size": [
+              215.1,
+              51.0,
+              3.9
+            ]
+          },
+          "material": "wood",
+          "density_kgm3": 600.0,
+          "mass_kg": 0.12,
+          "youngs_gpa": 12.0,
+          "mu": {
+            "mu": 0.6,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.5
+          },
+          "confidence": 0.8,
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.88,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 0.5kg",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 70.0,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 481.6,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 368.4
+          }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p3",
+          "node_id": "obj_tool_3_spatula_b_tool_3_spatula_b",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 2.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 2.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 2.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d1_p3",
+          "node_id": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 3.9,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 3.9,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 3.9,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d2_p1",
+          "from": "obj_tool_3_spatula_b_tool_3_spatula_b",
+          "to": "obj_card_card",
+          "type": "gap_accessible",
+          "value_mm": 11.9,
+          "check": "thickness<gap & contact<=target & reach>=depth",
+          "checks": [
+            {
+              "rule": "thickness_lt_gap",
+              "value_mm": 2.4,
+              "limit_mm": 52.0,
+              "pass": true
+            },
+            {
+              "rule": "contact_le_target",
+              "value_mm": 36.3,
+              "limit_mm": 48.2,
+              "pass": true
+            },
+            {
+              "rule": "reach_ge_depth",
+              "value_mm": 204.2,
+              "limit_mm": 155.7,
+              "pass": true
+            }
+          ],
+          "pass": true,
+          "approach": "HORIZONTAL_SLIDE_FROM_OPEN_END",
+          "flank_ids": [
+            "obj_appliance_right_appliance_right",
+            "obj_appliance_left_appliance_left"
+          ]
+        },
+        {
+          "subgoal_id": "SG1",
+          "queried_by": "SG1_d2_p1",
+          "from": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "to": "obj_card_card",
+          "type": "gap_accessible",
+          "value_mm": -2.8,
+          "check": "thickness<gap & contact<=target & reach>=depth",
+          "checks": [
+            {
+              "rule": "thickness_lt_gap",
+              "value_mm": 3.9,
+              "limit_mm": 52.0,
+              "pass": true
+            },
+            {
+              "rule": "contact_le_target",
+              "value_mm": 51.0,
+              "limit_mm": 48.2,
+              "pass": false
+            },
+            {
+              "rule": "reach_ge_depth",
+              "value_mm": 215.1,
+              "limit_mm": 155.7,
+              "pass": true
+            }
+          ],
+          "pass": false,
+          "approach": "HORIZONTAL_SLIDE_FROM_OPEN_END",
+          "flank_ids": [
+            "obj_appliance_right_appliance_right",
+            "obj_appliance_left_appliance_left"
+          ]
+        }
+      ],
+      "selected_tool_id": "obj_tool_3_spatula_b_tool_3_spatula_b",
+      "selection_evidence": [
+        {
+          "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
+          "feasible_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "reach_margin_mm": 375.5,
+          "batch_groups": null
+        },
+        {
+          "node": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "feasible_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "reach_margin_mm": 368.4,
+          "batch_groups": null
+        }
+      ],
+      "selection_by": "llm",
+      "tool_candidates_measured": [
+        {
+          "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
+          "extents_mm": [
+            300.0,
+            70.0,
+            10.0
+          ],
+          "length_mm": 300.0,
+          "cylinder_like": false,
+          "mass_kg": 0.12,
+          "material": "wood",
+          "feasible_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "reach_margin_mm": 375.5,
+          "batch_groups": null,
+          "partition": null,
+          "core_pred": "gap_accessible",
+          "core_value": true
+        },
+        {
+          "node": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "extents_mm": [
+            300.0,
+            70.0,
+            10.0
+          ],
+          "length_mm": 300.0,
+          "cylinder_like": false,
+          "mass_kg": 0.12,
+          "material": "wood",
+          "feasible_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "reach_margin_mm": 368.4,
+          "batch_groups": null,
+          "partition": null,
+          "core_pred": "gap_accessible",
+          "core_value": false
+        }
+      ],
+      "selection_reason_tool": "gap_accessible 조건이 충족되어 카드를 꺼내기에 적합하다."
+    },
+    {
+      "subgoal_id": "SG2",
+      "goal": "카드를 꺼낸 후 스패출라를 제자리에 놓아라.",
+      "kind": "relocate",
+      "target_ids": [
+        "obj_tool_2_spatula_a_tool_2_spatula_a"
+      ],
+      "container_id": "obj_tool_5_cutting_board_tool_5_cutting_board",
+      "ordered": false,
+      "tool_candidate_ids": [],
+      "object_ids": [
+        "obj_tool_5_cutting_board_tool_5_cutting_board",
+        "obj_tool_3_spatula_b_tool_3_spatula_b",
+        "obj_tool_4_spatula_c_tool_4_spatula_c"
+      ],
+      "selection_reason": "스패출라를 제자리에 놓기 위해 대상과 목적지가 필요하다.",
+      "confidence": {
+        "before": {
+          "decomposition": 0.7,
+          "object_selection": 0.7,
+          "uncertain_about": []
+        },
+        "after": {
+          "decomposition": 0.7,
+          "object_selection": 0.7,
+          "uncertain_about": [],
+          "reason": "측정 결과에 따라 도구 선택과 서브골 분해 신뢰도를 갱신하였습니다."
+        },
+        "delta": {
+          "decomposition": 0.0,
+          "object_selection": 0.0
+        }
+      },
+      "details": [
+        {
+          "detail_id": "SG2_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_tool_2_spatula_a_tool_2_spatula_a"
+          },
+          "group_id": "G_SG2",
+          "note": "obj_tool_2_spatula_a_tool_2_spatula_a 확보",
+          "pre": [
+            {
+              "id": "SG2_d1_p0",
+              "expr": "reachable(obj_tool_2_spatula_a_tool_2_spatula_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
+                  "reachable": true,
+                  "margin_mm": 368.8
+                }
+              ]
+            },
+            {
+              "id": "SG2_d1_p1",
+              "expr": "top_exposed(obj_tool_2_spatula_a_tool_2_spatula_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
+                  "top_exposed": true,
+                  "blockers": []
+                }
+              ]
+            },
+            {
+              "id": "SG2_d1_p2",
+              "expr": "ee_usable(?EE, obj_tool_2_spatula_a_tool_2_spatula_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
+                  "feasible_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ]
+                }
+              ]
+            },
+            {
+              "id": "SG2_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_tool_2_spatula_a_tool_2_spatula_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
+                  "graspable_on_support": true,
+                  "graspable_ees": [
+                    "2F",
+                    "3F",
+                    "vac"
+                  ],
+                  "supports": [],
+                  "height_mm": 1.4
+                }
+              ]
+            },
+            {
+              "id": "SG2_d1_p4",
+              "expr": "batch_feasible(?EE, obj_tool_2_spatula_a_tool_2_spatula_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "not_queried",
+              "evidence": []
+            },
+            {
+              "id": "SG2_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG2_d1_e0",
+              "expr": "holding(obj_tool_2_spatula_a_tool_2_spatula_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG2_d1_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG2_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_tool_2_spatula_a_tool_2_spatula_a",
+            "?r": "obj_tool_5_cutting_board_tool_5_cutting_board"
+          },
+          "group_id": "G_SG2",
+          "note": "obj_tool_2_spatula_a_tool_2_spatula_a를 obj_tool_5_cutting_board_tool_5_cutting_board로 운반",
+          "pre": [
+            {
+              "id": "SG2_d2_p0",
+              "expr": "holding(obj_tool_2_spatula_a_tool_2_spatula_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_d2_p1",
+              "expr": "act_space_clear(?EE, obj_tool_2_spatula_a_tool_2_spatula_a, obj_tool_5_cutting_board_tool_5_cutting_board)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG2_d2_p2",
+              "expr": "path_clear(obj_tool_2_spatula_a_tool_2_spatula_a, obj_tool_5_cutting_board_tool_5_cutting_board)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG2_d2_e0",
+              "expr": "above(obj_tool_2_spatula_a_tool_2_spatula_a, obj_tool_5_cutting_board_tool_5_cutting_board)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG2_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_tool_2_spatula_a_tool_2_spatula_a",
+            "?r": "obj_tool_5_cutting_board_tool_5_cutting_board"
+          },
+          "group_id": "G_SG2",
+          "note": "obj_tool_2_spatula_a_tool_2_spatula_a를 obj_tool_5_cutting_board_tool_5_cutting_board에 배치",
+          "pre": [
+            {
+              "id": "SG2_d3_p0",
+              "expr": "holding(obj_tool_2_spatula_a_tool_2_spatula_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_d3_p1",
+              "expr": "above(obj_tool_2_spatula_a_tool_2_spatula_a, obj_tool_5_cutting_board_tool_5_cutting_board)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_d3_p2",
+              "expr": "fits(obj_tool_2_spatula_a_tool_2_spatula_a, obj_tool_5_cutting_board_tool_5_cutting_board)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tool_2_spatula_a_tool_2_spatula_a",
+                  "check": "opening_64.3[bbox-2*wall(4.0)] - footprint_31.7",
+                  "value_mm": 32.6,
+                  "pass": true
+                }
+              ]
+            },
+            {
+              "id": "SG2_d3_p3",
+              "expr": "clear(obj_tool_5_cutting_board_tool_5_cutting_board)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "sat",
+              "evidence": [
+                {
+                  "node": "obj_tool_5_cutting_board_tool_5_cutting_board",
+                  "check": null,
+                  "value_mm": null,
+                  "pass": true
+                }
+              ]
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG2_d3_e0",
+              "expr": "in(obj_tool_2_spatula_a_tool_2_spatula_a, obj_tool_5_cutting_board_tool_5_cutting_board)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_d3_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG2_d3_d0",
+              "expr": "holding(obj_tool_2_spatula_a_tool_2_spatula_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_d3_d1",
+              "expr": "above(obj_tool_2_spatula_a_tool_2_spatula_a, obj_tool_5_cutting_board_tool_5_cutting_board)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ],
+      "measurements": [
+        {
+          "subgoal_id": "SG2",
+          "queried_by": "SG2_d1_p0",
+          "node_id": "obj_tool_2_spatula_a_tool_2_spatula_a",
+          "geometry": {
+            "length_mm": 300.0,
+            "diameter_mm": null,
+            "extents_mm": [
+              300.0,
+              70.0,
+              10.0
+            ],
+            "height_z_mm": 10.0,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.5,
+            "seal_patch_rms_mm": 0.5,
+            "footprint_mm": [
+              300.0,
+              70.0
+            ],
+            "height_mm": 10.0,
+            "center": [
+              469.7,
+              104.5,
+              923.5
+            ],
+            "aabb_size": [
+              134.0,
+              31.7,
+              1.4
+            ]
+          },
+          "material": "wood",
+          "density_kgm3": 600.0,
+          "mass_kg": 0.12,
+          "youngs_gpa": 12.0,
+          "mu": {
+            "mu": 0.6,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.5
+          },
+          "confidence": 0.8,
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.88,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 0.5kg",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 70.0,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 481.2,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 368.8
+          }
+        },
+        {
+          "subgoal_id": "SG2",
+          "queried_by": "SG2_d1_p1",
+          "node_id": "obj_tool_2_spatula_a_tool_2_spatula_a",
+          "type": "top_exposed",
+          "value": true,
+          "pass": true,
+          "blockers": []
+        },
+        {
+          "subgoal_id": "SG2",
+          "queried_by": "SG2_d1_p2",
+          "node_id": "obj_tool_2_spatula_a_tool_2_spatula_a",
+          "geometry": {
+            "length_mm": 300.0,
+            "diameter_mm": null,
+            "extents_mm": [
+              300.0,
+              70.0,
+              10.0
+            ],
+            "height_z_mm": 10.0,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.5,
+            "seal_patch_rms_mm": 0.5,
+            "footprint_mm": [
+              300.0,
+              70.0
+            ],
+            "height_mm": 10.0,
+            "center": [
+              469.7,
+              104.5,
+              923.5
+            ],
+            "aabb_size": [
+              134.0,
+              31.7,
+              1.4
+            ]
+          },
+          "material": "wood",
+          "density_kgm3": 600.0,
+          "mass_kg": 0.12,
+          "youngs_gpa": 12.0,
+          "mu": {
+            "mu": 0.6,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.5
+          },
+          "confidence": 0.8,
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.88,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 0.5kg",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 70.0,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 481.2,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 368.8
+          }
+        },
+        {
+          "subgoal_id": "SG2",
+          "queried_by": "SG2_d1_p3",
+          "node_id": "obj_tool_2_spatula_a_tool_2_spatula_a",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 1.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 1.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 1.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG2",
+          "queried_by": "SG2_d3_p2",
+          "from": "obj_tool_2_spatula_a_tool_2_spatula_a",
+          "to": "obj_tool_5_cutting_board_tool_5_cutting_board",
+          "type": "fits_inside",
+          "value_mm": 32.6,
+          "check": "opening_64.3[bbox-2*wall(4.0)] - footprint_31.7",
+          "pass": true
+        },
+        {
+          "subgoal_id": "SG2",
+          "queried_by": "SG2_d3_p3",
+          "node_id": "obj_tool_5_cutting_board_tool_5_cutting_board",
+          "type": "clear",
+          "value": true,
+          "pass": true,
+          "occupants": [],
+          "depth_clearance": [
+            {
+              "type": "clearance",
+              "value_mm": 32.6,
+              "check": "floor_fit(open_64.3[bbox-2*wall(4.0)]-base_31.7) & walled(container_11.7>=h/2_0.7)",
+              "pass": true
+            }
+          ],
+          "unfit_members": []
+        },
+        {
+          "subgoal_id": "SG2",
+          "queried_by": "SG2_toolprobe",
+          "node_id": "obj_tool_3_spatula_b_tool_3_spatula_b",
+          "geometry": {
+            "length_mm": 300.0,
+            "diameter_mm": null,
+            "extents_mm": [
+              300.0,
+              70.0,
+              10.0
+            ],
+            "height_z_mm": 10.0,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.5,
+            "seal_patch_rms_mm": 0.5,
+            "footprint_mm": [
+              300.0,
+              70.0
+            ],
+            "height_mm": 10.0,
+            "center": [
+              474.5,
+              -1.0,
+              925.9
+            ],
+            "aabb_size": [
+              204.2,
+              36.3,
+              2.4
+            ]
+          },
+          "material": "wood",
+          "density_kgm3": 600.0,
+          "mass_kg": 0.12,
+          "youngs_gpa": 12.0,
+          "mu": {
+            "mu": 0.6,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.5
+          },
+          "confidence": 0.8,
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.88,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 0.5kg",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 70.0,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 474.5,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 375.5
+          }
+        },
+        {
+          "subgoal_id": "SG2",
+          "queried_by": "SG2_toolprobe",
+          "node_id": "obj_tool_3_spatula_b_tool_3_spatula_b",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 2.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 2.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 2.4,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        },
+        {
+          "subgoal_id": "SG2",
+          "queried_by": "SG2_toolprobe",
+          "node_id": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "geometry": {
+            "length_mm": 300.0,
+            "diameter_mm": null,
+            "extents_mm": [
+              300.0,
+              70.0,
+              10.0
+            ],
+            "height_z_mm": 10.0,
+            "cylinder_like": false,
+            "surface_rms_mm": 0.5,
+            "seal_patch_rms_mm": 0.5,
+            "footprint_mm": [
+              300.0,
+              70.0
+            ],
+            "height_mm": 10.0,
+            "center": [
+              469.9,
+              -105.3,
+              929.2
+            ],
+            "aabb_size": [
+              215.1,
+              51.0,
+              3.9
+            ]
+          },
+          "material": "wood",
+          "density_kgm3": 600.0,
+          "mass_kg": 0.12,
+          "youngs_gpa": 12.0,
+          "mu": {
+            "mu": 0.6,
+            "stage": 0,
+            "material": "wood",
+            "rms_mm": 0.5
+          },
+          "confidence": 0.8,
+          "ee": {
+            "2F": {
+              "feasible": true,
+              "margin": 4.88,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 5.0kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 85.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 5.0,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 235.0,
+                  "pass": true
+                }
+              ]
+            },
+            "3F": {
+              "feasible": true,
+              "margin": 2.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 2.5kg",
+              "checks": [
+                {
+                  "rule": "dim_lt_stroke",
+                  "value": 70.0,
+                  "limit": 140.0,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 2.5,
+                  "pass": true
+                },
+                {
+                  "rule": "grip_slip",
+                  "value": 0.981,
+                  "limit": 60.0,
+                  "pass": true
+                }
+              ]
+            },
+            "vac": {
+              "feasible": true,
+              "margin": 0.38,
+              "margin_unit": "kg",
+              "reason": "질량 0.12 vs 페이로드 0.5kg",
+              "checks": [
+                {
+                  "rule": "flatness",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                },
+                {
+                  "rule": "mass_lt_payload",
+                  "value": 0.12,
+                  "limit": 0.5,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_contact",
+                  "value": 30.0,
+                  "limit": 70.0,
+                  "pass": true
+                },
+                {
+                  "rule": "seal_patch",
+                  "value": 0.5,
+                  "limit": 1.5,
+                  "pass": true
+                }
+              ]
+            }
+          },
+          "reachability": {
+            "distance_mm": 481.6,
+            "reach_mm": 850,
+            "reachable": true,
+            "margin_mm": 368.4
+          }
+        },
+        {
+          "subgoal_id": "SG2",
+          "queried_by": "SG2_toolprobe",
+          "node_id": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "type": "graspable_on_support",
+          "value": true,
+          "pass": true,
+          "graspable_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "per_ee": {
+            "2F": {
+              "type": "graspable_on_support",
+              "ee_id": "2F",
+              "supports": [],
+              "height_mm": 3.9,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "3F": {
+              "type": "graspable_on_support",
+              "ee_id": "3F",
+              "supports": [],
+              "height_mm": 3.9,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            },
+            "vac": {
+              "type": "graspable_on_support",
+              "ee_id": "vac",
+              "supports": [],
+              "height_mm": 3.9,
+              "value": true,
+              "pass": true,
+              "check": "no_support_node"
+            }
+          }
+        }
+      ],
+      "selection_evidence": [
+        {
+          "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
+          "feasible_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "reach_margin_mm": 375.5,
+          "batch_groups": null
+        },
+        {
+          "node": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "feasible_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "reach_margin_mm": 368.4,
+          "batch_groups": null
+        }
+      ],
+      "selection_by": "rule",
+      "tool_candidates_measured": [
+        {
+          "node": "obj_tool_3_spatula_b_tool_3_spatula_b",
+          "extents_mm": [
+            300.0,
+            70.0,
+            10.0
+          ],
+          "length_mm": 300.0,
+          "cylinder_like": false,
+          "mass_kg": 0.12,
+          "material": "wood",
+          "feasible_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "reach_margin_mm": 375.5,
+          "batch_groups": null,
+          "partition": null,
+          "core_pred": null,
+          "core_value": null
+        },
+        {
+          "node": "obj_tool_4_spatula_c_tool_4_spatula_c",
+          "extents_mm": [
+            300.0,
+            70.0,
+            10.0
+          ],
+          "length_mm": 300.0,
+          "cylinder_like": false,
+          "mass_kg": 0.12,
+          "material": "wood",
+          "feasible_ees": [
+            "2F",
+            "3F",
+            "vac"
+          ],
+          "reach_margin_mm": 368.4,
+          "batch_groups": null,
+          "partition": null,
+          "core_pred": null,
+          "core_value": null
+        }
+      ],
+      "tool_needed_hint": {
+        "tool_id": "obj_tool_3_spatula_b_tool_3_spatula_b",
+        "reason": "리치 여유가 더 크고, 잡을 수 있는 EE가 동일하여 이 도구가 더 적합합니다."
+      }
+    }
+  ],
+  "m2_partial_order": [
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d2",
+      "why": "causal_link: holding(?tool)"
+    },
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d2b",
+      "why": "causal_link: holding(?tool)"
+    },
+    {
+      "from": "SG1_d2",
+      "to": "SG1_d2b",
+      "why": "causal_link: extracted(obj_card_card)"
+    },
+    {
+      "from": "SG1_d1",
+      "to": "SG1_d3",
+      "why": "causal_link: holding(?tool)"
+    },
+    {
+      "from": "SG1_d2b",
+      "to": "SG1_d3",
+      "why": "causal_link: above(?tool, tool_rest)"
+    },
+    {
+      "from": "SG2_d1",
+      "to": "SG2_d2",
+      "why": "causal_link: holding(obj_tool_2_spatula_a_tool_2_spatula_a)"
+    },
+    {
+      "from": "SG2_d1",
+      "to": "SG2_d3",
+      "why": "causal_link: holding(obj_tool_2_spatula_a_tool_2_spatula_a)"
+    },
+    {
+      "from": "SG2_d2",
+      "to": "SG2_d3",
+      "why": "causal_link: above(obj_tool_2_spatula_a_tool_2_spatula_a, obj_tool_5_cutting_board_tool_5_cutting_board)"
+    },
+    {
+      "from": "SG1_d2",
+      "to": "SG1_d3",
+      "why": "threat: SG1_d3가 holding(?tool)를 파괴"
+    }
+  ],
+  "m2_mutex": [
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_tool",
+        "G_SG2"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    }
+  ],
+  "m2_invariants": [
+    {
+      "id": "INV_SG1",
+      "expr": "extracted(obj_card_card)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG2",
+      "expr": "in(obj_tool_2_spatula_a_tool_2_spatula_a, obj_tool_5_cutting_board_tool_5_cutting_board)",
+      "check_at": "final"
+    }
+  ],
+  "m2_stats": {
+    "n_subgoals": 2,
+    "n_details": 7,
+    "n_edges": 9,
+    "n_mutex": 1,
+    "llm_usage": {
+      "서브골 분해": {
+        "calls": 1,
+        "prompt_tokens": 1275,
+        "completion_tokens": 187,
+        "tokens": 1462,
+        "seconds": 2.2
+      },
+      "객체 선택": {
+        "calls": 1,
+        "prompt_tokens": 941,
+        "completion_tokens": 354,
+        "tokens": 1295,
+        "seconds": 3.58
+      },
+      "confidence_update": {
+        "calls": 2,
+        "prompt_tokens": 3096,
+        "completion_tokens": 217,
+        "tokens": 3313,
+        "seconds": 3.5
+      }
+    },
+    "n_evaluations": 20,
+    "m3_predicates": {
+      "sat": 11,
+      "unsat": 0,
+      "unknown": 0,
+      "not_queried": 4
+    }
+  }
+}

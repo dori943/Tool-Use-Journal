@@ -1,0 +1,199 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:d1f0d943424d164b5ae7:execution-report",
+  "run_id": "simulation-run:0000:d1f0d943424d164b5ae7",
+  "plan_id": "motion-plan:3e8877135c2ea57a5ad42971",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:d1f0d943424d164b5ae7:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:d1f0d943424d164b5ae7",
+    "input_artifact_ids": [
+      "simulation-run-artifact:d1f0d943424d164b5ae76cae",
+      "motion-plan-artifact:3e8877135c2ea57a5ad42971"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "SUCCESS",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      0.5641055139076162,
+      -1.5487409696711205,
+      1.7736055997870708,
+      -1.9153530045824172,
+      -1.6118294630760768,
+      -1.0107004721384374
+    ],
+    "joint_velocities_rad_s": [
+      0.004968644273807943,
+      -0.020953555217662307,
+      -0.06468814325660671,
+      0.0858416939879121,
+      -0.0005841572852471815,
+      0.0049326815927015965
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        2.2469156417844705,
+        -2.8363224695593154,
+        1.0391326344474558
+      ],
+      "orientation_xyzw": [
+        0.7051440025107648,
+        0.7062413210541437,
+        0.05377815403759999,
+        0.0332120807403647
+      ]
+    },
+    "gripper": {
+      "mode": "OPEN",
+      "command": -1.0
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 3.2599999999229112,
+    "max_joint_tracking_error_rad": 0.031428634203679806,
+    "max_eef_tracking_error_m": 0.01148741353854619,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG4_s1_d3:strategy_1:2:KF_1_2:event:0:DETACH_OBJECT",
+      "scheduled_time_s": 1.3915700302996226,
+      "actual_time_s": 1.4599999999654756,
+      "status": "SUCCESS",
+      "message": "detached bread_b and preserved world pose"
+    },
+    {
+      "event_id": "SG4_s1_d3:strategy_1:2:KF_1_2:event:1:GRIPPER_OPEN",
+      "scheduled_time_s": 1.3915700302996226,
+      "actual_time_s": 1.4599999999654756,
+      "status": "SUCCESS",
+      "message": "finger gripper open command set to -1.000"
+    }
+  ],
+  "failure": null,
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "3F",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": -1.0,
+    "ee_transition_count": 3,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 163,
+    "nominal_plan_duration_s": 2.1189860214880705,
+    "final_plan_time_s": 2.1189860214880705,
+    "adaptive_settle_extra_duration_s": 1.1410139784348408,
+    "segment_tracking": [
+      {
+        "segment_id": "SG4_s1_d3:strategy_1:0:SG4_s1_d3:strategy_1:1:KF_1_1",
+        "keyframe_id": "SG4_s1_d3:strategy_1:1:KF_1_1",
+        "target_block_id": null,
+        "nominal_end_time_s": 0.5234512438727399,
+        "actual_execution_time_s": 0.5399999999872307,
+        "max_joint_error_rad": 8.794994733385408e-6,
+        "eef_position_error_m": 3.4181847061995753e-6,
+        "eef_orientation_error_rad": 1.788437045365487e-10,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG4_s1_d3:strategy_1:1:SG4_s1_d3:strategy_1:2:KF_1_2",
+        "keyframe_id": "SG4_s1_d3:strategy_1:2:KF_1_2",
+        "target_block_id": null,
+        "nominal_end_time_s": 1.3915700302996226,
+        "actual_execution_time_s": 1.4599999999654756,
+        "max_joint_error_rad": 0.0,
+        "eef_position_error_m": 4.965068306494546e-16,
+        "eef_orientation_error_rad": 2.9049367727357946e-16,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.05999999999858119,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG4_s1_d3:strategy_1:2:SG4_s1_d3:strategy_1:3:KF_1_3",
+        "keyframe_id": "SG4_s1_d3:strategy_1:3:KF_1_3",
+        "target_block_id": null,
+        "nominal_end_time_s": 2.1189860214880705,
+        "actual_execution_time_s": 3.2599999999229112,
+        "max_joint_error_rad": 0.009890495969755664,
+        "eef_position_error_m": 0.00383682266240543,
+        "eef_orientation_error_rad": 0.00009435403371521188,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      }
+    ],
+    "gripper_release_waits": [
+      {
+        "object_id": "bread_b",
+        "wait_duration_s": 1.0999999999739885,
+        "open_target": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "current_target": [
+          1.0,
+          1.0,
+          1.0
+        ],
+        "target_reached": true,
+        "ee_object_contact_count": 0,
+        "consecutive_ticks": 3,
+        "max_wait_s": 6.08,
+        "command_mode": "INCREMENTAL",
+        "succeeded": true
+      }
+    ],
+    "goal_evaluation": {
+      "request_id": "motion-request:live:bb2185a51727576edba2",
+      "goal_type": "POSE",
+      "status": "SATISFIED",
+      "detail": "all target footprints are inside the goal region",
+      "position_error_m": null,
+      "orientation_error_rad": null,
+      "joint_error_rad": null,
+      "observed": {
+        "region_id": "plate_b",
+        "inside_target_ids": [
+          "bread_b"
+        ],
+        "outside_target_ids": [],
+        "geometry_errors": {},
+        "inset_margin_m": 0.0,
+        "include_vertical": false,
+        "contact_tolerance_m": 0.03
+      }
+    }
+  }
+}

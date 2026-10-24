@@ -262,7 +262,9 @@ def graspable_on_support(node: dict, ee: dict, edges: list[dict],
 
 
 def container_layout(members: list[dict], container: dict,
-                     gap_mm: float = 10.0, wall_mm: float | None = None) -> dict:
+                     gap_mm: float = 10.0, wall_mm: float | None = None,
+                     row_order: list[int] | None = None,
+                     mirror_x: bool = False) -> dict:
     """컨테이너 내부를 나눠 멤버마다 서로 다른 목표 자리를 준다 (0909).
 
     같은 컨테이너로 가는 물체들이 저마다 "그 영역에 놓아라"만 받으면, 놓는 쪽은
@@ -278,6 +280,10 @@ def container_layout(members: list[dict], container: dict,
     반환 slots[id] = {"uv": [u, v], "offset_mm": [dx, dy], "row": r}
       · uv 는 내부 반치수 기준 정규화 좌표(-1..1). M1 점군 mm 와 실행계 m 의
         절대 치수가 어긋나도(같은 물체를 다른 시야로 잰다) 비율은 옮겨 간다.
+
+    row_order / mirror_x 는 줄 구성은 그대로 두고 줄을 쌓는 순서(-y 부터)와
+    x 방향만 바꾼다. 같은 칸 구성에서 어느 줄을 어디에 둘지는 바깥 제약(고정
+    EE 궤적 아래 높이 등)이 고른다 — ground.container_layout_clear_of_sweep.
     """
     open_w, open_d, src_tag = _container_opening_mm(container, wall_mm)
     half = (open_w / 2.0, open_d / 2.0)
@@ -305,11 +311,16 @@ def container_layout(members: list[dict], container: dict,
     total_d = sum(r["depth"] for r in rows) + step_gap * max(0, len(rows) - 1)
     slots: dict[str, dict] = {}
     y = -min(total_d, open_d) / 2.0
-    for r_index, row in enumerate(rows):
+    order_idx = list(row_order) if row_order is not None else list(range(len(rows)))
+    if sorted(order_idx) != list(range(len(rows))):
+        raise ValueError(f"row_order {order_idx} is not a permutation of {len(rows)} rows")
+    sign = -1.0 if mirror_x else 1.0
+    for r_index in order_idx:
+        row = rows[r_index]
         cy = y + row["depth"] / 2.0
         x = -row["width"] / 2.0
         for oid, w, _d in row["items"]:
-            cx = x + w / 2.0
+            cx = sign * (x + w / 2.0)
             slots[oid] = {
                 "uv": [round(max(-1.0, min(1.0, cx / half[0])), 4),
                        round(max(-1.0, min(1.0, cy / half[1])), 4)],
@@ -319,6 +330,7 @@ def container_layout(members: list[dict], container: dict,
     ok = not overflow
     return {"type": "container_layout", "container_id": container.get("id"),
             "slots": slots, "rows": len(rows), "overflow": overflow,
+            "row_order": order_idx, "mirror_x": bool(mirror_x),
             "value_mm": round(open_d - total_d, 1), "pass": bool(ok),
             "check": (f"shelf_fit(open_{round(open_w, 1)}x{round(open_d, 1)}[{src_tag}]"
                       f", rows_{len(rows)}, used_d_{round(total_d, 1)}, gap_{gap_mm})")}

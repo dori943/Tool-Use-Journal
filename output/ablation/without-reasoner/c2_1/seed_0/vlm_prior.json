@@ -1,0 +1,223 @@
+{
+  "mode": "without_reasoner",
+  "policy_version": "vlm-prior-attributes-v1",
+  "model": "gpt-4o-mini",
+  "estimate": {
+    "objects": [
+      {
+        "id": "obj_apple_apple",
+        "extents_mm": [
+          80.0,
+          80.0,
+          80.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 1.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "fruit",
+        "density_kgm3": 600.0,
+        "mass_kg": 0.48,
+        "youngs_gpa": 0.5,
+        "mu": 0.5,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_bread_bread",
+        "extents_mm": [
+          150.0,
+          100.0,
+          50.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 2.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "bread",
+        "density_kgm3": 300.0,
+        "mass_kg": 0.15,
+        "youngs_gpa": 0.1,
+        "mu": 0.4,
+        "confidence": 0.85,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_mug_mug",
+        "extents_mm": [
+          120.0,
+          100.0,
+          90.0
+        ],
+        "cylinder_like": true,
+        "surface_rms_mm": 1.5,
+        "seal_patch_rms_mm": 5.0,
+        "material": "ceramic",
+        "density_kgm3": 800.0,
+        "mass_kg": 0.25,
+        "youngs_gpa": 20.0,
+        "mu": 0.6,
+        "confidence": 0.9,
+        "inner_bbox_mm": [
+          90.0,
+          90.0,
+          70.0
+        ],
+        "wall_mm": 15.0,
+        "floor_mm": 5.0
+      },
+      {
+        "id": "obj_plate_plate",
+        "extents_mm": [
+          250.0,
+          250.0,
+          20.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 1.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "ceramic",
+        "density_kgm3": 800.0,
+        "mass_kg": 0.5,
+        "youngs_gpa": 20.0,
+        "mu": 0.6,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_spoon_spoon",
+        "extents_mm": [
+          200.0,
+          40.0,
+          10.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 0.5,
+        "seal_patch_rms_mm": 5.0,
+        "material": "metal",
+        "density_kgm3": 8000.0,
+        "mass_kg": 0.05,
+        "youngs_gpa": 200.0,
+        "mu": 0.3,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_tray_blue_tray",
+        "extents_mm": [
+          300.0,
+          200.0,
+          50.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 2.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "plastic",
+        "density_kgm3": 900.0,
+        "mass_kg": 0.27,
+        "youngs_gpa": 2.0,
+        "mu": 0.4,
+        "confidence": 0.9,
+        "inner_bbox_mm": [
+          280.0,
+          180.0,
+          40.0
+        ],
+        "wall_mm": 10.0,
+        "floor_mm": 5.0
+      },
+      {
+        "id": "obj_rack_ee_rack",
+        "extents_mm": [
+          600.0,
+          400.0,
+          100.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 5.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "metal",
+        "density_kgm3": 7800.0,
+        "mass_kg": 4.68,
+        "youngs_gpa": 210.0,
+        "mu": 0.5,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "obj_apple_apple",
+        "to": "obj_bread_bread",
+        "gap_mm": 0.0
+      },
+      {
+        "from": "obj_apple_apple",
+        "to": "obj_mug_mug",
+        "gap_mm": 0.0
+      },
+      {
+        "from": "obj_bread_bread",
+        "to": "obj_plate_plate",
+        "gap_mm": 0.0
+      },
+      {
+        "from": "obj_plate_plate",
+        "to": "obj_spoon_spoon",
+        "gap_mm": 0.0
+      },
+      {
+        "from": "obj_rack_ee_rack",
+        "to": "obj_spoon_spoon",
+        "gap_mm": 0.0
+      }
+    ]
+  },
+  "feasible_ee": {
+    "obj_apple_apple": [
+      "2F",
+      "3F"
+    ],
+    "obj_bread_bread": [
+      "3F"
+    ],
+    "obj_mug_mug": [
+      "3F"
+    ],
+    "obj_plate_plate": [
+      "vac"
+    ],
+    "obj_spoon_spoon": [
+      "2F",
+      "3F"
+    ],
+    "obj_tray_blue_tray": [
+      "vac"
+    ],
+    "obj_rack_ee_rack": [
+      "vac"
+    ]
+  },
+  "ee_fallback": {
+    "obj_plate_plate": "vac",
+    "obj_tray_blue_tray": "vac",
+    "obj_rack_ee_rack": "vac"
+  },
+  "usage": {
+    "vlm_prior_attributes": {
+      "calls": 1,
+      "prompt_tokens": 9759,
+      "completion_tokens": 1209,
+      "tokens": 10968,
+      "seconds": 12.64
+    }
+  }
+}

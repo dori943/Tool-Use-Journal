@@ -301,7 +301,11 @@ def run(args, pipeline):
             summary_path.stat().st_mtime_ns if summary_path.is_file() else None
         )
         t0 = time.monotonic()
-        pipeline.stage_m5(task, out, args)
+        # 실행(물리) 실패 재시도와 run_result.json 은 Full 과 같은 래퍼를 쓴다.
+        attempts = pipeline.run_m5_with_retries(
+            task, out, args, method=METHOD, plan_status=report.get("plan_status"),
+            extra={"m4_invoked": False, "evaluation_scope": report["evaluation_scope"]},
+        )
         stage_seconds["m5"] = time.monotonic() - t0
         if (
             not summary_path.is_file()
@@ -310,10 +314,15 @@ def run(args, pipeline):
             raise RuntimeError("M5 returned without a new m5_summary.json")
         summary = _read(summary_path)
         report["m5_status"] = summary.get("status")
+        report["m5_attempt_count"] = len(attempts)
+        run_result = _read(out / "run_result.json") if (out / "run_result.json").is_file() else {}
+        for key in ("exec_success", "task_goal_status", "goal_success",
+                    "failure_stage", "failure_code", "physics_related"):
+            report[key] = run_result.get(key)
         report["success"] = (
             None
             if args.m5_validate_only or partial_execution
-            else summary.get("status") == "SUCCESS"
+            else run_result.get("success", summary.get("status") == "SUCCESS")
         )
         stage_status["m5"] = str(report["m5_status"])
         manifest["stages"][stage] = report["m5_status"]
@@ -339,6 +348,13 @@ def run(args, pipeline):
             summary = _read(summary_path) if fresh_summary else {}
             report["m5_status"] = summary.get("status", "FAILED")
             report["m5_failure_detail"] = summary.get("detail", str(error))
+            run_result = _read(out / "run_result.json") if (out / "run_result.json").is_file() else {}
+            for key in ("exec_success", "task_goal_status", "goal_success",
+                        "failure_stage", "failure_code", "physics_related", "m5_attempt_count"):
+                if key in run_result:
+                    report[key] = run_result[key]
+            manifest["failure"]["failure_stage"] = run_result.get("failure_stage")
+            manifest["failure"]["failure_code"] = run_result.get("failure_code")
             report["success"] = (
                 None if args.m5_validate_only or partial_execution else False
             )

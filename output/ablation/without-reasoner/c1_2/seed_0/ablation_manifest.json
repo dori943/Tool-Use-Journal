@@ -1,0 +1,100 @@
+{
+  "method": "without_reasoner",
+  "policy_version": "vlm-prior-attributes-v1",
+  "task": "c1_2",
+  "seed": 0,
+  "stages": {
+    "m1": "prepared",
+    "vlm_prior": "completed",
+    "m2": "completed",
+    "m4": "failed"
+  },
+  "artifacts": {
+    "execution/m1.json": "b9c7fe5e888a136f786f14806676213bddb6408ce28adc73499ed2b03715adb0",
+    "frame.png": "33f371c72678c71eac46c7c2d58957c26be6ae2de9346e40e0bec656cbb36881",
+    "m1_full.json": "b9c7fe5e888a136f786f14806676213bddb6408ce28adc73499ed2b03715adb0",
+    "m1.json": "7056083d8071db31fc70f191718e200755d686d0bb5664687443e4aa51bd05d7",
+    "vlm_prior.json": "69a3ae349956a9ce25b3bf11e5a0346b4c343353304d86c12b1353ecdd9cecdb",
+    "m2.json": "52df493803dde9da9ee37f7e183ce1d009eea5c20878ebf70dc1d9dbe1b2f86e"
+  },
+  "failure": {
+    "stage": "m4",
+    "type": "SystemExit",
+    "message": "\n[중단] run_m4 단계가 exit=3 로 끝났습니다.",
+    "causal_attribution": "not_established"
+  },
+  "timing_summary": {
+    "llm_calls": [
+      {
+        "call": "서브골 분해",
+        "prompt_tokens": 2675,
+        "completion_tokens": 252,
+        "total_tokens": 2927,
+        "seconds": 3.79,
+        "calls": 2
+      },
+      {
+        "call": "객체 선택",
+        "prompt_tokens": 1680,
+        "completion_tokens": 409,
+        "total_tokens": 2089,
+        "seconds": 4.96,
+        "calls": 2
+      },
+      {
+        "call": "confidence_update",
+        "prompt_tokens": 1630,
+        "completion_tokens": 120,
+        "total_tokens": 1750,
+        "seconds": 2.03,
+        "calls": 1
+      }
+    ],
+    "llm_total": {
+      "prompt_tokens": 5985,
+      "completion_tokens": 781,
+      "total_tokens": 6766,
+      "seconds": 10.78,
+      "calls": 5
+    },
+    "stages": {
+      "m1": {
+        "seconds": 22.89,
+        "status": "prepared"
+      },
+      "vlm_prior": {
+        "seconds": 13.61,
+        "status": "completed"
+      },
+      "m2": {
+        "seconds": 10.84,
+        "status": "completed"
+      },
+      "gk": {
+        "seconds": 0.02,
+        "status": "completed"
+      },
+      "m4": {
+        "seconds": null,
+        "status": "failed"
+      },
+      "m5": {
+        "seconds": null,
+        "status": "not_run"
+      }
+    },
+    "combined_seconds": null,
+    "total_seconds": 47.55,
+    "measured_stage_sum_seconds": 47.36,
+    "vlm_prior_usage": {
+      "vlm_prior_attributes": {
+        "calls": 1,
+        "prompt_tokens": 9804,
+        "completion_tokens": 1140,
+        "tokens": 10944,
+        "seconds": 11.42
+      }
+    },
+    "incomplete": true
+  }
+}

@@ -1,0 +1,84 @@
+{
+  "identity": {
+    "mode": "without_grounding",
+    "policy_version": "upper-level-visual-semantic-v1",
+    "task": "c2_2",
+    "seed": 0,
+    "model": "gpt-4o-mini",
+    "provider": "openai",
+    "robot_sha256": "c9d28649e28fea3c6a2034838499cfcef77abde930c79faaf76ee644253dd806"
+  },
+  "artifacts": {
+    "execution/m1.json": "374077d88e6a1eafc176c3508c7ce672755fdcf75c28275f960e5bdb50742f35",
+    "frame.png": "8783fcda99402614d4efedb91d59e61fbcdaf7078d7c66467b2d16b72495326f",
+    "m1.json": "f192957574dc11e4286bae2b800f9c6b1822abc2e33562bd2423e9ff4891bf95",
+    "robot_decision.json": "9bd3e7cdf103cdcb3b993f5a63cc71435ffba2c3b4bbb9aea2dd503b5f818b73",
+    "m2.json": "2c4bc1cb751e17c75e17a9a6c328a5cc17833548993f84622337818fd638ca01",
+    "m4_request.json": "a97c116a24910cc1cf7065da38b668a5da6210d6df658f6cce4983f7a731eabf",
+    "gk_bundle.json": "3f1d0fb710e37f92e64d4911d769d08977abb0dca79ebafa7fe5a25ca5081a3e",
+    "m4.json": "eae3242037e4b356ad9c7c08dc3c45b3d1f117a918d2eb40544d3dfb668078ec"
+  },
+  "stages": {
+    "m1": "prepared",
+    "m2": "completed",
+    "m4": "failed"
+  },
+  "scope": "explicit physical/geometric information removed from M2/M4 only",
+  "scripted_registry_prefilter": false,
+  "m5_execution_information": "same common runner; live state and collision geometry retained",
+  "failure": {
+    "stage": "m4",
+    "type": "RuntimeError",
+    "causal_attribution": "not_established"
+  },
+  "timing_summary": {
+    "llm_calls": [
+      {
+        "call": "visual_decomposition",
+        "prompt_tokens": 9398,
+        "completion_tokens": 392,
+        "total_tokens": 9790,
+        "seconds": 4.14,
+        "calls": 1
+      },
+      {
+        "call": "visual_selection",
+        "prompt_tokens": 9813,
+        "completion_tokens": 121,
+        "total_tokens": 9934,
+        "seconds": 1.95,
+        "calls": 1
+      }
+    ],
+    "llm_total": {
+      "prompt_tokens": 19211,
+      "completion_tokens": 513,
+      "total_tokens": 19724,
+      "seconds": 6.09,
+      "calls": 2
+    },
+    "stages": {
+      "m1": {
+        "seconds": 21.12,
+        "status": "prepared"
+      },
+      "m2": {
+        "seconds": 6.11,
+        "status": "completed"
+      },
+      "m4": {
+        "seconds": 0.02,
+        "status": "failed"
+      },
+      "m5": {
+        "seconds": null,
+        "status": "not_run"
+      }
+    },
+    "m2_through_m4_seconds": 6.13,
+    "total_seconds": 27.25,
+    "measured_stage_sum_seconds": 27.25,
+    "session_wall_seconds": 27.33,
+    "incomplete": true
+  }
+}

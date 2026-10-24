@@ -1,0 +1,203 @@
+{
+  "mode": "without_reasoner",
+  "policy_version": "vlm-prior-attributes-v1",
+  "model": "gpt-4o-mini",
+  "estimate": {
+    "objects": [
+      {
+        "id": "obj_bottle_bottle",
+        "extents_mm": [
+          200.0,
+          70.0,
+          70.0
+        ],
+        "cylinder_like": true,
+        "surface_rms_mm": 1.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "plastic",
+        "density_kgm3": 950.0,
+        "mass_kg": 1.4,
+        "youngs_gpa": 2.5,
+        "mu": 0.5,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_cutting_board_cutting_board",
+        "extents_mm": [
+          400.0,
+          300.0,
+          20.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 0.5,
+        "seal_patch_rms_mm": 2.0,
+        "material": "wood",
+        "density_kgm3": 600.0,
+        "mass_kg": 4.8,
+        "youngs_gpa": 12.0,
+        "mu": 0.4,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_dough_dough",
+        "extents_mm": [
+          300.0,
+          200.0,
+          50.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 2.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "dough",
+        "density_kgm3": 800.0,
+        "mass_kg": 1.2,
+        "youngs_gpa": 0.1,
+        "mu": 0.6,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_spatula_spatula",
+        "extents_mm": [
+          300.0,
+          60.0,
+          10.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 0.5,
+        "seal_patch_rms_mm": 5.0,
+        "material": "wood",
+        "density_kgm3": 700.0,
+        "mass_kg": 0.2,
+        "youngs_gpa": 10.0,
+        "mu": 0.4,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_spoon_spoon",
+        "extents_mm": [
+          200.0,
+          50.0,
+          10.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 0.5,
+        "seal_patch_rms_mm": 5.0,
+        "material": "wood",
+        "density_kgm3": 700.0,
+        "mass_kg": 0.1,
+        "youngs_gpa": 10.0,
+        "mu": 0.4,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_tongs_tongs",
+        "extents_mm": [
+          250.0,
+          50.0,
+          10.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 1.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "metal",
+        "density_kgm3": 8000.0,
+        "mass_kg": 0.3,
+        "youngs_gpa": 200.0,
+        "mu": 0.3,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      }
+    ],
+    "edges": [
+      {
+        "from": "obj_bottle_bottle",
+        "to": "obj_spatula_spatula",
+        "gap_mm": 10.0
+      },
+      {
+        "from": "obj_cutting_board_cutting_board",
+        "to": "obj_spatula_spatula",
+        "gap_mm": 5.0
+      },
+      {
+        "from": "obj_cutting_board_cutting_board",
+        "to": "obj_tongs_tongs",
+        "gap_mm": 5.0
+      },
+      {
+        "from": "obj_dough_dough",
+        "to": "obj_spatula_spatula",
+        "gap_mm": 5.0
+      },
+      {
+        "from": "obj_dough_dough",
+        "to": "obj_tongs_tongs",
+        "gap_mm": 5.0
+      },
+      {
+        "from": "obj_spatula_spatula",
+        "to": "obj_spoon_spoon",
+        "gap_mm": 5.0
+      },
+      {
+        "from": "obj_spoon_spoon",
+        "to": "obj_tongs_tongs",
+        "gap_mm": 5.0
+      }
+    ]
+  },
+  "feasible_ee": {
+    "obj_bottle_bottle": [
+      "2F",
+      "3F"
+    ],
+    "obj_cutting_board_cutting_board": [
+      "vac"
+    ],
+    "obj_dough_dough": [
+      "vac"
+    ],
+    "obj_spatula_spatula": [
+      "2F",
+      "3F"
+    ],
+    "obj_spoon_spoon": [
+      "2F",
+      "3F"
+    ],
+    "obj_tongs_tongs": [
+      "2F",
+      "3F"
+    ]
+  },
+  "ee_fallback": {
+    "obj_cutting_board_cutting_board": "vac",
+    "obj_dough_dough": "vac"
+  },
+  "usage": {
+    "vlm_prior_attributes": {
+      "calls": 1,
+      "prompt_tokens": 9804,
+      "completion_tokens": 1140,
+      "tokens": 10944,
+      "seconds": 11.42
+    }
+  }
+}

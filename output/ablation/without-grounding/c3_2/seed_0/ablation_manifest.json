@@ -1,0 +1,95 @@
+{
+  "identity": {
+    "mode": "without_grounding",
+    "policy_version": "upper-level-visual-semantic-v1",
+    "task": "c3_2",
+    "seed": 0,
+    "model": "gpt-4o-mini",
+    "provider": "openai",
+    "robot_sha256": "c9d28649e28fea3c6a2034838499cfcef77abde930c79faaf76ee644253dd806"
+  },
+  "artifacts": {
+    "execution/m1.json": "31e266d1c4297a82e029cb736190cc8f5407959b9604269a63d18d6c5a6aa50e",
+    "frame.png": "2f1b0926396d6a9bda9926f7c36c743f5b18e1f623f957ba82edc2266fab1f0b",
+    "m1.json": "4d1058b22299833adb5a1b55ad3322fcba49add848eaffe725ec0b96be2e82ac",
+    "robot_decision.json": "9bd3e7cdf103cdcb3b993f5a63cc71435ffba2c3b4bbb9aea2dd503b5f818b73",
+    "m2.json": "50faebc10f9d29f138ccba36eb2e17594ccf3e9d44d987e7693dabbcb7a5f222",
+    "m4_request.json": "cb597ccfa7c7ef094a06638a52d430897acc8b99c88218f77399d48ff2efd5c8",
+    "gk_bundle.json": "e7b1fdcb9db69af12c064cab414223570157044a174d09f8ffe49205aac4845a",
+    "m4.json": "082e5511c9b49208f03430784fb7b1f636d7352ee9325eb3d7ec8b48c483f05d"
+  },
+  "stages": {
+    "m1": "prepared",
+    "m2": "completed",
+    "m4": "SUCCESS",
+    "m5": "failed"
+  },
+  "scope": "explicit physical/geometric information removed from M2/M4 only",
+  "scripted_registry_prefilter": false,
+  "m5_execution_information": "same common runner; live state and collision geometry retained",
+  "m5_attempts": [
+    {
+      "directory": "C:\\Users\\user\\Tool-Use-Journal\\output\\ablation\\without-grounding\\c3_2\\seed_0\\motion_attempt_001",
+      "m4_sha256": "082e5511c9b49208f03430784fb7b1f636d7352ee9325eb3d7ec8b48c483f05d",
+      "m5_args": [],
+      "simulate": "controller",
+      "validate_only": false,
+      "environment": "C3_2_BreakfastTrayPreparation"
+    }
+  ],
+  "failure": {
+    "stage": "m5",
+    "type": "SystemExit",
+    "causal_attribution": "not_established"
+  },
+  "timing_summary": {
+    "llm_calls": [
+      {
+        "call": "visual_decomposition",
+        "prompt_tokens": 9438,
+        "completion_tokens": 470,
+        "total_tokens": 9908,
+        "seconds": 5.53,
+        "calls": 1
+      },
+      {
+        "call": "visual_selection",
+        "prompt_tokens": 10158,
+        "completion_tokens": 604,
+        "total_tokens": 10762,
+        "seconds": 5.33,
+        "calls": 1
+      }
+    ],
+    "llm_total": {
+      "prompt_tokens": 19596,
+      "completion_tokens": 1074,
+      "total_tokens": 20670,
+      "seconds": 10.86,
+      "calls": 2
+    },
+    "stages": {
+      "m1": {
+        "seconds": 16.91,
+        "status": "prepared"
+      },
+      "m2": {
+        "seconds": 10.91,
+        "status": "completed"
+      },
+      "m4": {
+        "seconds": 57.02,
+        "status": "SUCCESS"
+      },
+      "m5": {
+        "seconds": null,
+        "status": "failed"
+      }
+    },
+    "m2_through_m4_seconds": 67.93,
+    "total_seconds": 84.84,
+    "measured_stage_sum_seconds": 84.84,
+    "session_wall_seconds": 439.09,
+    "incomplete": true
+  }
+}

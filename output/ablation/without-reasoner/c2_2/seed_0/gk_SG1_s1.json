@@ -1,0 +1,1063 @@
+{
+  "subgoal_id": "SG1_s1",
+  "task": "재료를 순서대로 쌓아 샌드위치를 만들어라",
+  "goal": "대상 1개를 obj_bread_plate_bread_plate로 옮긴다 (1/2)",
+  "subgoal_kind": "relocate",
+  "nodes": {
+    "obj_bread_a_bread_a": {
+      "id": "obj_bread_a_bread_a",
+      "canonical_id": "bread_a",
+      "class": "bread_a",
+      "source_name": "bread_a",
+      "center_mm": [
+        480.4,
+        259.4,
+        948.6
+      ],
+      "bbox_mm": [
+        103.9,
+        102.6,
+        12.5
+      ],
+      "geometry": {
+        "length_mm": 120.0,
+        "diameter_mm": null,
+        "extents_mm": [
+          120.0,
+          80.0,
+          20.0
+        ],
+        "height_z_mm": 20.0,
+        "cylinder_like": false,
+        "surface_rms_mm": 1.0,
+        "seal_patch_rms_mm": 1.0,
+        "footprint_mm": [
+          120.0,
+          80.0
+        ],
+        "height_mm": 20.0,
+        "center": [
+          480.4,
+          259.4,
+          948.6
+        ],
+        "aabb_size": [
+          103.9,
+          102.6,
+          12.5
+        ]
+      },
+      "reachability": {
+        "distance_mm": 546.0,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 304.0
+      },
+      "material": "bread",
+      "density_kgm3": 300.0,
+      "mass_kg": 0.24,
+      "youngs_gpa": 0.5,
+      "mu": {
+        "mu": 0.4,
+        "stage": 0,
+        "material": "bread",
+        "rms_mm": 1.0
+      },
+      "confidence": 0.9,
+      "geometry_source": "vlm_prior",
+      "intrinsic_source": "vlm_prior",
+      "grounding_source": "vlm_prior",
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.76,
+          "margin_unit": "kg",
+          "reason": "질량 0.24 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 80.0,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.24,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 2.943,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.26,
+          "margin_unit": "kg",
+          "reason": "질량 0.24 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 80.0,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.24,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 2.943,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": true,
+          "margin": 0.26,
+          "margin_unit": "kg",
+          "reason": "질량 0.24 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.0,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.24,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 80.0,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 1.0,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "predicates": {
+        "top_exposed": {
+          "type": "top_exposed",
+          "value": true,
+          "blockers": [],
+          "pass": true
+        },
+        "clear": {
+          "type": "clear",
+          "value": true,
+          "occupants": [],
+          "pass": true
+        },
+        "flat_face": {
+          "type": "flat_face",
+          "value": true,
+          "pass": true,
+          "face_mm": 80.0,
+          "check": "rms_1.0<=2.0 & patch_1.0<=1.5 & face_80.0>=40.0"
+        }
+      }
+    },
+    "obj_bread_plate_bread_plate": {
+      "id": "obj_bread_plate_bread_plate",
+      "canonical_id": "bread_plate",
+      "class": "bread_plate",
+      "source_name": "bread_plate",
+      "center_mm": [
+        498.0,
+        319.2,
+        931.5
+      ],
+      "bbox_mm": [
+        112.6,
+        245.2,
+        8.0
+      ],
+      "geometry": {
+        "length_mm": 250.0,
+        "diameter_mm": null,
+        "extents_mm": [
+          250.0,
+          250.0,
+          10.0
+        ],
+        "height_z_mm": 10.0,
+        "cylinder_like": false,
+        "surface_rms_mm": 0.5,
+        "seal_patch_rms_mm": 0.5,
+        "footprint_mm": [
+          250.0,
+          250.0
+        ],
+        "height_mm": 10.0,
+        "center": [
+          498.0,
+          319.2,
+          931.5
+        ],
+        "aabb_size": [
+          112.6,
+          245.2,
+          8.0
+        ]
+      },
+      "reachability": {
+        "distance_mm": 591.5,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 258.5
+      },
+      "material": "plastic",
+      "density_kgm3": 800.0,
+      "mass_kg": 2.0,
+      "youngs_gpa": 2.0,
+      "mu": {
+        "mu": 0.3,
+        "stage": 0,
+        "material": "plastic",
+        "rms_mm": 0.5
+      },
+      "confidence": 0.9,
+      "geometry_source": "vlm_prior",
+      "intrinsic_source": "vlm_prior",
+      "grounding_source": "vlm_prior",
+      "ee_fallback": "vac",
+      "ee": {
+        "2F": {
+          "feasible": false,
+          "margin": -165.0,
+          "margin_unit": "mm",
+          "reason": "치수 250 vs 개구 85mm",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 250.0,
+              "limit": 85.0,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 2.0,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 32.7,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": false,
+          "margin": -110.0,
+          "margin_unit": "mm",
+          "reason": "치수 250 vs 개구 140mm",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 250.0,
+              "limit": 140.0,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 2.0,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 32.7,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": true,
+          "margin": -1.5,
+          "margin_unit": "kg",
+          "reason": "vlm_prior_fallback(no EE passed; best margin kept): 질량 2.0 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.5,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 2.0,
+              "limit": 0.5,
+              "pass": false
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 250.0,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.5,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "predicates": {
+        "top_exposed": {
+          "type": "top_exposed",
+          "value": false,
+          "blockers": [
+            "obj_bread_a_bread_a",
+            "obj_bread_b_bread_b"
+          ],
+          "pass": false
+        },
+        "clear": {
+          "type": "clear",
+          "value": false,
+          "occupants": [
+            "obj_bread_a_bread_a",
+            "obj_bread_b_bread_b"
+          ],
+          "pass": false
+        },
+        "flat_face": {
+          "type": "flat_face",
+          "value": true,
+          "pass": true,
+          "face_mm": 250.0,
+          "check": "rms_0.5<=2.0 & patch_0.5<=1.5 & face_250.0>=40.0"
+        }
+      }
+    }
+  },
+  "edges": [
+    {
+      "from": "obj_bread_a_bread_a",
+      "to": "obj_bread_plate_bread_plate",
+      "type": "on"
+    }
+  ],
+  "roles": {
+    "target": [
+      "obj_bread_a_bread_a"
+    ],
+    "container": "obj_bread_plate_bread_plate",
+    "tool_candidates": [],
+    "selected_tool": null,
+    "selection_evidence": [
+      {
+        "node": "obj_spatula_spatula",
+        "feasible_ees": [
+          "2F",
+          "3F",
+          "vac"
+        ],
+        "reach_margin_mm": 398.3,
+        "batch_groups": 2
+      },
+      {
+        "node": "obj_knife_knife",
+        "feasible_ees": [
+          "2F",
+          "3F"
+        ],
+        "reach_margin_mm": 380.0,
+        "batch_groups": 2
+      },
+      {
+        "node": "obj_spoon_spoon",
+        "feasible_ees": [
+          "2F",
+          "3F",
+          "vac"
+        ],
+        "reach_margin_mm": 368.0,
+        "batch_groups": 2
+      },
+      {
+        "node": "obj_ladle_ladle",
+        "feasible_ees": [
+          "3F"
+        ],
+        "reach_margin_mm": 315.9,
+        "batch_groups": 2
+      }
+    ]
+  },
+  "details": [
+    {
+      "detail_id": "SG1_s1_d1",
+      "action_type": "acquire",
+      "binding": {
+        "?o": "obj_bread_a_bread_a"
+      },
+      "group_id": "G_SG1_s1",
+      "pre": [
+        {
+          "id": "SG1_s1_d1_p0",
+          "expr": "reachable(obj_bread_a_bread_a)",
+          "head": "reachable",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_bread_a_bread_a",
+              "reachable": true,
+              "margin_mm": 304.0
+            }
+          ]
+        },
+        {
+          "id": "SG1_s1_d1_p1",
+          "expr": "top_exposed(obj_bread_a_bread_a)",
+          "head": "top_exposed",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_bread_a_bread_a",
+              "top_exposed": true,
+              "blockers": []
+            }
+          ]
+        },
+        {
+          "id": "SG1_s1_d1_p2",
+          "expr": "ee_usable(?EE, obj_bread_a_bread_a)",
+          "head": "ee_usable",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_bread_a_bread_a",
+              "feasible_ees": [
+                "2F",
+                "3F",
+                "vac"
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SG1_s1_d1_p3",
+          "expr": "graspable_on_support(?EE, obj_bread_a_bread_a)",
+          "head": "graspable_on_support",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_bread_a_bread_a",
+              "graspable_on_support": true,
+              "graspable_ees": [
+                "2F",
+                "3F",
+                "vac"
+              ],
+              "supports": [
+                "obj_bread_plate_bread_plate"
+              ],
+              "height_mm": 12.5
+            }
+          ]
+        },
+        {
+          "id": "SG1_s1_d1_p4",
+          "expr": "batch_feasible(?EE, obj_bread_a_bread_a)",
+          "head": "batch_feasible",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "actor": {
+                "type": "ee_pool"
+              },
+              "feasible": true,
+              "binding_check": "ee_pool_one_per_grasp",
+              "partition": [
+                [
+                  "obj_bread_a_bread_a"
+                ]
+              ]
+            }
+          ]
+        },
+        {
+          "id": "SG1_s1_d1_p5",
+          "expr": "hand_empty",
+          "head": "hand_empty",
+          "eval_by": "m2"
+        }
+      ],
+      "establish": [
+        "holding(obj_bread_a_bread_a)"
+      ],
+      "destroy": [
+        "hand_empty"
+      ]
+    },
+    {
+      "detail_id": "SG1_s1_d2",
+      "action_type": "transport",
+      "binding": {
+        "?o": "obj_bread_a_bread_a",
+        "?r": "obj_bread_plate_bread_plate"
+      },
+      "group_id": "G_SG1_s1",
+      "action_parameters": {
+        "placement_slot": {
+          "region": "obj_bread_plate_bread_plate",
+          "target": "obj_bread_a_bread_a",
+          "uv": [
+            0.0,
+            0.4874
+          ],
+          "offset_mm": [
+            0.0,
+            57.8
+          ],
+          "row": 1,
+          "source": "m2_container_layout"
+        }
+      },
+      "pre": [
+        {
+          "id": "SG1_s1_d2_p0",
+          "expr": "holding(obj_bread_a_bread_a)",
+          "head": "holding",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG1_s1_d2_p1",
+          "expr": "act_space_clear(?EE, obj_bread_a_bread_a, obj_bread_plate_bread_plate)",
+          "head": "act_space_clear",
+          "eval_by": "motion"
+        },
+        {
+          "id": "SG1_s1_d2_p2",
+          "expr": "path_clear(obj_bread_a_bread_a, obj_bread_plate_bread_plate)",
+          "head": "path_clear",
+          "eval_by": "motion"
+        }
+      ],
+      "establish": [
+        "above(obj_bread_a_bread_a, obj_bread_plate_bread_plate)"
+      ],
+      "destroy": []
+    },
+    {
+      "detail_id": "SG1_s1_d3",
+      "action_type": "place",
+      "binding": {
+        "?o": "obj_bread_a_bread_a",
+        "?r": "obj_bread_plate_bread_plate"
+      },
+      "group_id": "G_SG1_s1",
+      "action_parameters": {
+        "placement_slot": {
+          "region": "obj_bread_plate_bread_plate",
+          "target": "obj_bread_a_bread_a",
+          "uv": [
+            0.0,
+            0.4874
+          ],
+          "offset_mm": [
+            0.0,
+            57.8
+          ],
+          "row": 1,
+          "source": "m2_container_layout"
+        }
+      },
+      "pre": [
+        {
+          "id": "SG1_s1_d3_p0",
+          "expr": "holding(obj_bread_a_bread_a)",
+          "head": "holding",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG1_s1_d3_p1",
+          "expr": "above(obj_bread_a_bread_a, obj_bread_plate_bread_plate)",
+          "head": "above",
+          "eval_by": "m2"
+        },
+        {
+          "id": "SG1_s1_d3_p2",
+          "expr": "fits(obj_bread_a_bread_a, obj_bread_plate_bread_plate)",
+          "head": "fits",
+          "eval_by": "m3",
+          "status": "sat",
+          "evidence": [
+            {
+              "node": "obj_bread_a_bread_a",
+              "check": "opening_104.6[bbox-2*wall(4.0)] - footprint_102.6",
+              "value_mm": 2.0,
+              "pass": true
+            }
+          ]
+        },
+        {
+          "id": "SG1_s1_d3_p3",
+          "expr": "clear(obj_bread_plate_bread_plate)",
+          "head": "clear",
+          "eval_by": "m3",
+          "status": "unsat",
+          "evidence": [
+            {
+              "node": "obj_bread_plate_bread_plate",
+              "check": null,
+              "value_mm": null,
+              "pass": false
+            }
+          ]
+        }
+      ],
+      "establish": [
+        "in(obj_bread_a_bread_a, obj_bread_plate_bread_plate)",
+        "hand_empty"
+      ],
+      "destroy": [
+        "holding(obj_bread_a_bread_a)",
+        "above(obj_bread_a_bread_a, obj_bread_plate_bread_plate)"
+      ]
+    }
+  ],
+  "partial_order": [
+    {
+      "from": "SG1_s1_d1",
+      "to": "SG1_s1_d2",
+      "why": "causal_link: holding(obj_bread_a_bread_a)"
+    },
+    {
+      "from": "SG1_s1_d1",
+      "to": "SG1_s1_d3",
+      "why": "causal_link: holding(obj_bread_a_bread_a)"
+    },
+    {
+      "from": "SG1_s1_d2",
+      "to": "SG1_s1_d3",
+      "why": "causal_link: above(obj_bread_a_bread_a, obj_bread_plate_bread_plate)"
+    }
+  ],
+  "mutex": [],
+  "invariants": [
+    {
+      "id": "INV_SG1_s1",
+      "expr": "in(obj_bread_a_bread_a, obj_bread_plate_bread_plate)",
+      "check_at": "final"
+    }
+  ],
+  "measurements": [
+    {
+      "subgoal_id": "SG1_s1",
+      "queried_by": "SG1_s1_d1_p0",
+      "node_id": "obj_bread_a_bread_a",
+      "geometry": {
+        "length_mm": 120.0,
+        "diameter_mm": null,
+        "extents_mm": [
+          120.0,
+          80.0,
+          20.0
+        ],
+        "height_z_mm": 20.0,
+        "cylinder_like": false,
+        "surface_rms_mm": 1.0,
+        "seal_patch_rms_mm": 1.0,
+        "footprint_mm": [
+          120.0,
+          80.0
+        ],
+        "height_mm": 20.0,
+        "center": [
+          480.4,
+          259.4,
+          948.6
+        ],
+        "aabb_size": [
+          103.9,
+          102.6,
+          12.5
+        ]
+      },
+      "material": "bread",
+      "density_kgm3": 300.0,
+      "mass_kg": 0.24,
+      "youngs_gpa": 0.5,
+      "mu": {
+        "mu": 0.4,
+        "stage": 0,
+        "material": "bread",
+        "rms_mm": 1.0
+      },
+      "confidence": 0.9,
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.76,
+          "margin_unit": "kg",
+          "reason": "질량 0.24 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 80.0,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.24,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 2.943,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.26,
+          "margin_unit": "kg",
+          "reason": "질량 0.24 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 80.0,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.24,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 2.943,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": true,
+          "margin": 0.26,
+          "margin_unit": "kg",
+          "reason": "질량 0.24 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.0,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.24,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 80.0,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 1.0,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 546.0,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 304.0
+      }
+    },
+    {
+      "subgoal_id": "SG1_s1",
+      "queried_by": "SG1_s1_d1_p1",
+      "node_id": "obj_bread_a_bread_a",
+      "type": "top_exposed",
+      "value": true,
+      "pass": true,
+      "blockers": []
+    },
+    {
+      "subgoal_id": "SG1_s1",
+      "queried_by": "SG1_s1_d1_p2",
+      "node_id": "obj_bread_a_bread_a",
+      "geometry": {
+        "length_mm": 120.0,
+        "diameter_mm": null,
+        "extents_mm": [
+          120.0,
+          80.0,
+          20.0
+        ],
+        "height_z_mm": 20.0,
+        "cylinder_like": false,
+        "surface_rms_mm": 1.0,
+        "seal_patch_rms_mm": 1.0,
+        "footprint_mm": [
+          120.0,
+          80.0
+        ],
+        "height_mm": 20.0,
+        "center": [
+          480.4,
+          259.4,
+          948.6
+        ],
+        "aabb_size": [
+          103.9,
+          102.6,
+          12.5
+        ]
+      },
+      "material": "bread",
+      "density_kgm3": 300.0,
+      "mass_kg": 0.24,
+      "youngs_gpa": 0.5,
+      "mu": {
+        "mu": 0.4,
+        "stage": 0,
+        "material": "bread",
+        "rms_mm": 1.0
+      },
+      "confidence": 0.9,
+      "ee": {
+        "2F": {
+          "feasible": true,
+          "margin": 4.76,
+          "margin_unit": "kg",
+          "reason": "질량 0.24 vs 페이로드 5.0kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 80.0,
+              "limit": 85.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.24,
+              "limit": 5.0,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 2.943,
+              "limit": 235.0,
+              "pass": true
+            }
+          ]
+        },
+        "3F": {
+          "feasible": true,
+          "margin": 2.26,
+          "margin_unit": "kg",
+          "reason": "질량 0.24 vs 페이로드 2.5kg",
+          "checks": [
+            {
+              "rule": "dim_lt_stroke",
+              "value": 80.0,
+              "limit": 140.0,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.24,
+              "limit": 2.5,
+              "pass": true
+            },
+            {
+              "rule": "grip_slip",
+              "value": 2.943,
+              "limit": 60.0,
+              "pass": true
+            }
+          ]
+        },
+        "vac": {
+          "feasible": true,
+          "margin": 0.26,
+          "margin_unit": "kg",
+          "reason": "질량 0.24 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.0,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.24,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 80.0,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 1.0,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        }
+      },
+      "reachability": {
+        "distance_mm": 546.0,
+        "reach_mm": 850,
+        "reachable": true,
+        "margin_mm": 304.0
+      }
+    },
+    {
+      "subgoal_id": "SG1_s1",
+      "queried_by": "SG1_s1_d1_p3",
+      "node_id": "obj_bread_a_bread_a",
+      "type": "graspable_on_support",
+      "value": true,
+      "pass": true,
+      "graspable_ees": [
+        "2F",
+        "3F",
+        "vac"
+      ],
+      "per_ee": {
+        "2F": {
+          "type": "graspable_on_support",
+          "ee_id": "2F",
+          "supports": [
+            "obj_bread_plate_bread_plate"
+          ],
+          "height_mm": 12.5,
+          "value": true,
+          "pass": true,
+          "check": "height_12.5>=10.0"
+        },
+        "3F": {
+          "type": "graspable_on_support",
+          "ee_id": "3F",
+          "supports": [
+            "obj_bread_plate_bread_plate"
+          ],
+          "height_mm": 12.5,
+          "value": true,
+          "pass": true,
+          "check": "height_12.5>=10.0"
+        },
+        "vac": {
+          "type": "graspable_on_support",
+          "ee_id": "vac",
+          "supports": [
+            "obj_bread_plate_bread_plate"
+          ],
+          "height_mm": 12.5,
+          "value": true,
+          "pass": true,
+          "check": "suction_approaches_from_above"
+        }
+      }
+    },
+    {
+      "subgoal_id": "SG1_s1",
+      "queried_by": "SG1_s1_d1_p4",
+      "kind": "batch",
+      "actor": {
+        "type": "ee_pool"
+      },
+      "feasible": true,
+      "checks": [
+        {
+          "rule": "ee_pool_one_per_grasp",
+          "capacity": 1,
+          "demand": 1,
+          "unit": "count",
+          "margin": 0,
+          "pass": true
+        }
+      ],
+      "binding_check": "ee_pool_one_per_grasp",
+      "partition": [
+        [
+          "obj_bread_a_bread_a"
+        ]
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s1",
+      "queried_by": "SG1_s1_d3_p2",
+      "from": "obj_bread_a_bread_a",
+      "to": "obj_bread_plate_bread_plate",
+      "type": "fits_inside",
+      "value_mm": 2.0,
+      "check": "opening_104.6[bbox-2*wall(4.0)] - footprint_102.6",
+      "pass": true
+    },
+    {
+      "subgoal_id": "SG1_s1",
+      "queried_by": "SG1_s1_d3_p3",
+      "node_id": "obj_bread_plate_bread_plate",
+      "type": "clear",
+      "value": false,
+      "pass": false,
+      "occupants": [
+        "obj_bread_a_bread_a",
+        "obj_bread_b_bread_b"
+      ],
+      "depth_clearance": [
+        {
+          "type": "clearance",
+          "value_mm": 2.0,
+          "check": "floor_fit(open_104.6[bbox-2*wall(4.0)]-base_102.6) & walled(container_8.0>=h/2_6.2)",
+          "pass": true
+        }
+      ],
+      "unfit_members": []
+    }
+  ],
+  "split_from": "SG1",
+  "split_index": 1
+}

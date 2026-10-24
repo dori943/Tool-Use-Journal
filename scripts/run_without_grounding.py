@@ -364,7 +364,16 @@ def run(args, pipeline):
         write(manifest_path, manifest)
         t0 = time.monotonic()
         with isolated_motion_cache(attempt_out / "keyframe_cache"):
-            pipeline.stage_m5(args.task, attempt_out, copy.deepcopy(args))
+            # 실행(물리) 실패 재시도와 run_result.json 은 Full 과 같은 래퍼를 쓴다.
+            try:
+                pipeline.run_m5_with_retries(
+                    args.task, attempt_out, copy.deepcopy(args), method=MODE,
+                    plan_status=(read(out / "m4.json") or {}).get("status"),
+                )
+            finally:
+                rr = attempt_out / "run_result.json"
+                if rr.is_file():
+                    shutil.copyfile(rr, out / "run_result.json")
         stage_seconds["m5"] = time.monotonic() - t0
         summary = attempt_out / "m5" / "m5_summary.json"
         manifest["stages"][stage] = (

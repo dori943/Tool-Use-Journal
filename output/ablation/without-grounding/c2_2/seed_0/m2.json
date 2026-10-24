@@ -1,0 +1,1291 @@
+{
+  "task": "재료를 순서대로 쌓아 샌드위치를 만들어라",
+  "m2_subgoals": [
+    {
+      "subgoal_id": "SG1_s1",
+      "goal": "대상 1개를 obj_serving_plate_serving_plate로 옮긴다 (1/5)",
+      "kind": "stack",
+      "target_ids": [
+        "obj_bread_a_bread_a"
+      ],
+      "container_id": "obj_serving_plate_serving_plate",
+      "ordered": true,
+      "confidence": 1.0,
+      "tool_candidate_ids": [],
+      "selected_tool_id": null,
+      "object_ids": [
+        "obj_bread_a_bread_a",
+        "obj_serving_plate_serving_plate"
+      ],
+      "selection_by": "visual_semantic",
+      "visual_decision": {
+        "subgoal_id": "SG1_s1",
+        "selected_tool_id": null,
+        "ee_candidates_by_object": {
+          "obj_bread_a_bread_a": []
+        },
+        "reason": "No suitable end effectors available for stacking the specified objects.",
+        "confidence": 0.0
+      },
+      "split_from": "SG1",
+      "split_index": 1,
+      "details": [
+        {
+          "detail_id": "SG1_s1_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_bread_a_bread_a"
+          },
+          "group_id": "G_SG1_s1_L1",
+          "note": "obj_bread_a_bread_a 확보",
+          "pre": [
+            {
+              "id": "SG1_s1_s1a_p0",
+              "expr": "reachable(obj_bread_a_bread_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s1_s1a_p1",
+              "expr": "top_exposed(obj_bread_a_bread_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s1_s1a_p2",
+              "expr": "ee_usable(?EE, obj_bread_a_bread_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s1_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_bread_a_bread_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s1_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_bread_a_bread_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s1_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s1_s1a_e0",
+              "expr": "holding(obj_bread_a_bread_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s1_s1a_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_s1_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_bread_a_bread_a",
+            "?r": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1_s1_L1",
+          "note": "obj_bread_a_bread_a를 obj_serving_plate_serving_plate 위로 운반",
+          "pre": [
+            {
+              "id": "SG1_s1_s1b_p0",
+              "expr": "holding(obj_bread_a_bread_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s1_s1b_p2",
+              "expr": "path_clear(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s1_s1b_e0",
+              "expr": "above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s1_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_bread_a_bread_a",
+            "?base": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1_s1_L1",
+          "note": "obj_bread_a_bread_a를 obj_serving_plate_serving_plate 위에 놓기",
+          "pre": [
+            {
+              "id": "SG1_s1_s1c_p0",
+              "expr": "holding(obj_bread_a_bread_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_s1c_p1",
+              "expr": "above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_s1c_p2",
+              "expr": "top_exposed(obj_serving_plate_serving_plate)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s1_s1c_e0",
+              "expr": "on(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "on",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_s1c_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s1_s1c_d0",
+              "expr": "holding(obj_bread_a_bread_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_s1c_d1",
+              "expr": "above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ],
+      "ignore_ids": [
+        "obj_bread_b_bread_b",
+        "obj_cheese_cheese_1",
+        "obj_tomato_slice_tomato_slice",
+        "obj_turkey_turkey_1"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s2",
+      "goal": "대상 1개를 obj_serving_plate_serving_plate로 옮긴다 (2/5)",
+      "kind": "stack",
+      "target_ids": [
+        "obj_turkey_turkey_1"
+      ],
+      "container_id": "obj_serving_plate_serving_plate",
+      "ordered": true,
+      "confidence": 1.0,
+      "tool_candidate_ids": [],
+      "selected_tool_id": null,
+      "object_ids": [
+        "obj_turkey_turkey_1",
+        "obj_serving_plate_serving_plate"
+      ],
+      "selection_by": "visual_semantic",
+      "visual_decision": {
+        "subgoal_id": "SG1_s2",
+        "selected_tool_id": null,
+        "ee_candidates_by_object": {
+          "obj_turkey_turkey_1": []
+        },
+        "reason": "No suitable end effectors available for stacking the specified objects.",
+        "confidence": 0.0
+      },
+      "split_from": "SG1",
+      "split_index": 2,
+      "details": [
+        {
+          "detail_id": "SG1_s2_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_turkey_turkey_1"
+          },
+          "group_id": "G_SG1_s2_L1",
+          "note": "obj_turkey_turkey_1 확보",
+          "pre": [
+            {
+              "id": "SG1_s2_s1a_p0",
+              "expr": "reachable(obj_turkey_turkey_1)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s2_s1a_p1",
+              "expr": "top_exposed(obj_turkey_turkey_1)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s2_s1a_p2",
+              "expr": "ee_usable(?EE, obj_turkey_turkey_1)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s2_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_turkey_turkey_1)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s2_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_turkey_turkey_1)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s2_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_s1a_p6",
+              "expr": "in(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+              "head": "in",
+              "eval_by": "m2",
+              "auto": "instruction_order"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s2_s1a_e0",
+              "expr": "holding(obj_turkey_turkey_1)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s2_s1a_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_s2_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_turkey_turkey_1",
+            "?r": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1_s2_L1",
+          "note": "obj_turkey_turkey_1를 obj_serving_plate_serving_plate 위로 운반",
+          "pre": [
+            {
+              "id": "SG1_s2_s1b_p0",
+              "expr": "holding(obj_turkey_turkey_1)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_turkey_turkey_1, obj_serving_plate_serving_plate)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s2_s1b_p2",
+              "expr": "path_clear(obj_turkey_turkey_1, obj_serving_plate_serving_plate)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s2_s1b_e0",
+              "expr": "above(obj_turkey_turkey_1, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s2_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_turkey_turkey_1",
+            "?base": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1_s2_L1",
+          "note": "obj_turkey_turkey_1를 obj_serving_plate_serving_plate 위에 놓기",
+          "pre": [
+            {
+              "id": "SG1_s2_s1c_p0",
+              "expr": "holding(obj_turkey_turkey_1)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_s1c_p1",
+              "expr": "above(obj_turkey_turkey_1, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_s1c_p2",
+              "expr": "top_exposed(obj_serving_plate_serving_plate)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s2_s1c_e0",
+              "expr": "on(obj_turkey_turkey_1, obj_serving_plate_serving_plate)",
+              "head": "on",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_s1c_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s2_s1c_d0",
+              "expr": "holding(obj_turkey_turkey_1)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_s1c_d1",
+              "expr": "above(obj_turkey_turkey_1, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ],
+      "ignore_ids": [
+        "obj_bread_a_bread_a",
+        "obj_bread_b_bread_b",
+        "obj_cheese_cheese_1",
+        "obj_tomato_slice_tomato_slice"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s3",
+      "goal": "대상 1개를 obj_serving_plate_serving_plate로 옮긴다 (3/5)",
+      "kind": "stack",
+      "target_ids": [
+        "obj_cheese_cheese_1"
+      ],
+      "container_id": "obj_serving_plate_serving_plate",
+      "ordered": true,
+      "confidence": 1.0,
+      "tool_candidate_ids": [],
+      "selected_tool_id": null,
+      "object_ids": [
+        "obj_cheese_cheese_1",
+        "obj_serving_plate_serving_plate"
+      ],
+      "selection_by": "visual_semantic",
+      "visual_decision": {
+        "subgoal_id": "SG1_s3",
+        "selected_tool_id": null,
+        "ee_candidates_by_object": {
+          "obj_cheese_cheese_1": []
+        },
+        "reason": "No suitable end effectors available for stacking the specified objects.",
+        "confidence": 0.0
+      },
+      "split_from": "SG1",
+      "split_index": 3,
+      "details": [
+        {
+          "detail_id": "SG1_s3_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_cheese_cheese_1"
+          },
+          "group_id": "G_SG1_s3_L1",
+          "note": "obj_cheese_cheese_1 확보",
+          "pre": [
+            {
+              "id": "SG1_s3_s1a_p0",
+              "expr": "reachable(obj_cheese_cheese_1)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s3_s1a_p1",
+              "expr": "top_exposed(obj_cheese_cheese_1)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s3_s1a_p2",
+              "expr": "ee_usable(?EE, obj_cheese_cheese_1)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s3_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_cheese_cheese_1)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s3_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_cheese_cheese_1)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s3_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_s1a_p6",
+              "expr": "in(obj_turkey_turkey_1, obj_serving_plate_serving_plate)",
+              "head": "in",
+              "eval_by": "m2",
+              "auto": "instruction_order"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s3_s1a_e0",
+              "expr": "holding(obj_cheese_cheese_1)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s3_s1a_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_s3_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_cheese_cheese_1",
+            "?r": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1_s3_L1",
+          "note": "obj_cheese_cheese_1를 obj_serving_plate_serving_plate 위로 운반",
+          "pre": [
+            {
+              "id": "SG1_s3_s1b_p0",
+              "expr": "holding(obj_cheese_cheese_1)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_cheese_cheese_1, obj_serving_plate_serving_plate)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s3_s1b_p2",
+              "expr": "path_clear(obj_cheese_cheese_1, obj_serving_plate_serving_plate)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s3_s1b_e0",
+              "expr": "above(obj_cheese_cheese_1, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s3_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_cheese_cheese_1",
+            "?base": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1_s3_L1",
+          "note": "obj_cheese_cheese_1를 obj_serving_plate_serving_plate 위에 놓기",
+          "pre": [
+            {
+              "id": "SG1_s3_s1c_p0",
+              "expr": "holding(obj_cheese_cheese_1)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_s1c_p1",
+              "expr": "above(obj_cheese_cheese_1, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_s1c_p2",
+              "expr": "top_exposed(obj_serving_plate_serving_plate)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s3_s1c_e0",
+              "expr": "on(obj_cheese_cheese_1, obj_serving_plate_serving_plate)",
+              "head": "on",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_s1c_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s3_s1c_d0",
+              "expr": "holding(obj_cheese_cheese_1)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_s1c_d1",
+              "expr": "above(obj_cheese_cheese_1, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ],
+      "ignore_ids": [
+        "obj_bread_a_bread_a",
+        "obj_bread_b_bread_b",
+        "obj_tomato_slice_tomato_slice",
+        "obj_turkey_turkey_1"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s4",
+      "goal": "대상 1개를 obj_serving_plate_serving_plate로 옮긴다 (4/5)",
+      "kind": "stack",
+      "target_ids": [
+        "obj_tomato_slice_tomato_slice"
+      ],
+      "container_id": "obj_serving_plate_serving_plate",
+      "ordered": true,
+      "confidence": 1.0,
+      "tool_candidate_ids": [],
+      "selected_tool_id": null,
+      "object_ids": [
+        "obj_tomato_slice_tomato_slice",
+        "obj_serving_plate_serving_plate"
+      ],
+      "selection_by": "visual_semantic",
+      "visual_decision": {
+        "subgoal_id": "SG1_s4",
+        "selected_tool_id": null,
+        "ee_candidates_by_object": {
+          "obj_tomato_slice_tomato_slice": []
+        },
+        "reason": "No suitable end effectors available for stacking the specified objects.",
+        "confidence": 0.0
+      },
+      "split_from": "SG1",
+      "split_index": 4,
+      "details": [
+        {
+          "detail_id": "SG1_s4_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_tomato_slice_tomato_slice"
+          },
+          "group_id": "G_SG1_s4_L1",
+          "note": "obj_tomato_slice_tomato_slice 확보",
+          "pre": [
+            {
+              "id": "SG1_s4_s1a_p0",
+              "expr": "reachable(obj_tomato_slice_tomato_slice)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s4_s1a_p1",
+              "expr": "top_exposed(obj_tomato_slice_tomato_slice)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s4_s1a_p2",
+              "expr": "ee_usable(?EE, obj_tomato_slice_tomato_slice)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s4_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_tomato_slice_tomato_slice)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s4_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_tomato_slice_tomato_slice)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s4_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s4_s1a_p6",
+              "expr": "in(obj_cheese_cheese_1, obj_serving_plate_serving_plate)",
+              "head": "in",
+              "eval_by": "m2",
+              "auto": "instruction_order"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s4_s1a_e0",
+              "expr": "holding(obj_tomato_slice_tomato_slice)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s4_s1a_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_s4_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_tomato_slice_tomato_slice",
+            "?r": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1_s4_L1",
+          "note": "obj_tomato_slice_tomato_slice를 obj_serving_plate_serving_plate 위로 운반",
+          "pre": [
+            {
+              "id": "SG1_s4_s1b_p0",
+              "expr": "holding(obj_tomato_slice_tomato_slice)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s4_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_tomato_slice_tomato_slice, obj_serving_plate_serving_plate)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s4_s1b_p2",
+              "expr": "path_clear(obj_tomato_slice_tomato_slice, obj_serving_plate_serving_plate)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s4_s1b_e0",
+              "expr": "above(obj_tomato_slice_tomato_slice, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s4_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_tomato_slice_tomato_slice",
+            "?base": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1_s4_L1",
+          "note": "obj_tomato_slice_tomato_slice를 obj_serving_plate_serving_plate 위에 놓기",
+          "pre": [
+            {
+              "id": "SG1_s4_s1c_p0",
+              "expr": "holding(obj_tomato_slice_tomato_slice)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s4_s1c_p1",
+              "expr": "above(obj_tomato_slice_tomato_slice, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s4_s1c_p2",
+              "expr": "top_exposed(obj_serving_plate_serving_plate)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s4_s1c_e0",
+              "expr": "on(obj_tomato_slice_tomato_slice, obj_serving_plate_serving_plate)",
+              "head": "on",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s4_s1c_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s4_s1c_d0",
+              "expr": "holding(obj_tomato_slice_tomato_slice)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s4_s1c_d1",
+              "expr": "above(obj_tomato_slice_tomato_slice, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ],
+      "ignore_ids": [
+        "obj_bread_a_bread_a",
+        "obj_bread_b_bread_b",
+        "obj_cheese_cheese_1",
+        "obj_turkey_turkey_1"
+      ]
+    },
+    {
+      "subgoal_id": "SG1_s5",
+      "goal": "대상 1개를 obj_serving_plate_serving_plate로 옮긴다 (5/5)",
+      "kind": "stack",
+      "target_ids": [
+        "obj_bread_b_bread_b"
+      ],
+      "container_id": "obj_serving_plate_serving_plate",
+      "ordered": true,
+      "confidence": 1.0,
+      "tool_candidate_ids": [],
+      "selected_tool_id": null,
+      "object_ids": [
+        "obj_bread_b_bread_b",
+        "obj_serving_plate_serving_plate"
+      ],
+      "selection_by": "visual_semantic",
+      "visual_decision": {
+        "subgoal_id": "SG1_s5",
+        "selected_tool_id": null,
+        "ee_candidates_by_object": {
+          "obj_bread_b_bread_b": []
+        },
+        "reason": "No suitable end effectors available for stacking the specified objects.",
+        "confidence": 0.0
+      },
+      "split_from": "SG1",
+      "split_index": 5,
+      "details": [
+        {
+          "detail_id": "SG1_s5_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_bread_b_bread_b"
+          },
+          "group_id": "G_SG1_s5_L1",
+          "note": "obj_bread_b_bread_b 확보",
+          "pre": [
+            {
+              "id": "SG1_s5_s1a_p0",
+              "expr": "reachable(obj_bread_b_bread_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s5_s1a_p1",
+              "expr": "top_exposed(obj_bread_b_bread_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s5_s1a_p2",
+              "expr": "ee_usable(?EE, obj_bread_b_bread_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s5_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_bread_b_bread_b)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s5_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_bread_b_bread_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s5_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_s1a_p6",
+              "expr": "in(obj_tomato_slice_tomato_slice, obj_serving_plate_serving_plate)",
+              "head": "in",
+              "eval_by": "m2",
+              "auto": "instruction_order"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s5_s1a_e0",
+              "expr": "holding(obj_bread_b_bread_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s5_s1a_d0",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ]
+        },
+        {
+          "detail_id": "SG1_s5_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_bread_b_bread_b",
+            "?r": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1_s5_L1",
+          "note": "obj_bread_b_bread_b를 obj_serving_plate_serving_plate 위로 운반",
+          "pre": [
+            {
+              "id": "SG1_s5_s1b_p0",
+              "expr": "holding(obj_bread_b_bread_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_bread_b_bread_b, obj_serving_plate_serving_plate)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s5_s1b_p2",
+              "expr": "path_clear(obj_bread_b_bread_b, obj_serving_plate_serving_plate)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s5_s1b_e0",
+              "expr": "above(obj_bread_b_bread_b, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s5_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_bread_b_bread_b",
+            "?base": "obj_serving_plate_serving_plate"
+          },
+          "group_id": "G_SG1_s5_L1",
+          "note": "obj_bread_b_bread_b를 obj_serving_plate_serving_plate 위에 놓기",
+          "pre": [
+            {
+              "id": "SG1_s5_s1c_p0",
+              "expr": "holding(obj_bread_b_bread_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_s1c_p1",
+              "expr": "above(obj_bread_b_bread_b, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_s1c_p2",
+              "expr": "top_exposed(obj_serving_plate_serving_plate)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            {
+              "id": "SG1_s5_s1c_e0",
+              "expr": "on(obj_bread_b_bread_b, obj_serving_plate_serving_plate)",
+              "head": "on",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_s1c_e1",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "destroy": [
+            {
+              "id": "SG1_s5_s1c_d0",
+              "expr": "holding(obj_bread_b_bread_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_s1c_d1",
+              "expr": "above(obj_bread_b_bread_b, obj_serving_plate_serving_plate)",
+              "head": "above",
+              "eval_by": "m2"
+            }
+          ]
+        }
+      ],
+      "ignore_ids": [
+        "obj_bread_a_bread_a",
+        "obj_cheese_cheese_1",
+        "obj_tomato_slice_tomato_slice",
+        "obj_turkey_turkey_1"
+      ]
+    }
+  ],
+  "m2_partial_order": [
+    {
+      "from": "SG1_s1_s1a",
+      "to": "SG1_s1_s1b",
+      "why": "causal_link: holding(obj_bread_a_bread_a)"
+    },
+    {
+      "from": "SG1_s1_s1a",
+      "to": "SG1_s1_s1c",
+      "why": "causal_link: holding(obj_bread_a_bread_a)"
+    },
+    {
+      "from": "SG1_s1_s1b",
+      "to": "SG1_s1_s1c",
+      "why": "causal_link: above(obj_bread_a_bread_a, obj_serving_plate_serving_plate)"
+    },
+    {
+      "from": "SG1_s2_s1a",
+      "to": "SG1_s2_s1b",
+      "why": "causal_link: holding(obj_turkey_turkey_1)"
+    },
+    {
+      "from": "SG1_s2_s1a",
+      "to": "SG1_s2_s1c",
+      "why": "causal_link: holding(obj_turkey_turkey_1)"
+    },
+    {
+      "from": "SG1_s2_s1b",
+      "to": "SG1_s2_s1c",
+      "why": "causal_link: above(obj_turkey_turkey_1, obj_serving_plate_serving_plate)"
+    },
+    {
+      "from": "SG1_s3_s1a",
+      "to": "SG1_s3_s1b",
+      "why": "causal_link: holding(obj_cheese_cheese_1)"
+    },
+    {
+      "from": "SG1_s3_s1a",
+      "to": "SG1_s3_s1c",
+      "why": "causal_link: holding(obj_cheese_cheese_1)"
+    },
+    {
+      "from": "SG1_s3_s1b",
+      "to": "SG1_s3_s1c",
+      "why": "causal_link: above(obj_cheese_cheese_1, obj_serving_plate_serving_plate)"
+    },
+    {
+      "from": "SG1_s4_s1a",
+      "to": "SG1_s4_s1b",
+      "why": "causal_link: holding(obj_tomato_slice_tomato_slice)"
+    },
+    {
+      "from": "SG1_s4_s1a",
+      "to": "SG1_s4_s1c",
+      "why": "causal_link: holding(obj_tomato_slice_tomato_slice)"
+    },
+    {
+      "from": "SG1_s4_s1b",
+      "to": "SG1_s4_s1c",
+      "why": "causal_link: above(obj_tomato_slice_tomato_slice, obj_serving_plate_serving_plate)"
+    },
+    {
+      "from": "SG1_s5_s1a",
+      "to": "SG1_s5_s1b",
+      "why": "causal_link: holding(obj_bread_b_bread_b)"
+    },
+    {
+      "from": "SG1_s5_s1a",
+      "to": "SG1_s5_s1c",
+      "why": "causal_link: holding(obj_bread_b_bread_b)"
+    },
+    {
+      "from": "SG1_s5_s1b",
+      "to": "SG1_s5_s1c",
+      "why": "causal_link: above(obj_bread_b_bread_b, obj_serving_plate_serving_plate)"
+    }
+  ],
+  "m2_mutex": [
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s1_L1",
+        "G_SG1_s2_L1"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s1_L1",
+        "G_SG1_s3_L1"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s1_L1",
+        "G_SG1_s4_L1"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s1_L1",
+        "G_SG1_s5_L1"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s2_L1",
+        "G_SG1_s3_L1"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s2_L1",
+        "G_SG1_s4_L1"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s2_L1",
+        "G_SG1_s5_L1"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s3_L1",
+        "G_SG1_s4_L1"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s3_L1",
+        "G_SG1_s5_L1"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    },
+    {
+      "resource": "hand_empty",
+      "groups": [
+        "G_SG1_s4_L1",
+        "G_SG1_s5_L1"
+      ],
+      "rule": "두 그룹의 작업을 끼워 넣으려면 이 조건을 재확립하는 detail(place의 establish: hand_empty)이 사이에 있어야 한다"
+    }
+  ],
+  "m2_invariants": [
+    {
+      "id": "INV_SG1_s1_1",
+      "expr": "on(obj_bread_a_bread_a, obj_serving_plate_serving_plate)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG1_s2_1",
+      "expr": "on(obj_turkey_turkey_1, obj_serving_plate_serving_plate)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG1_s3_1",
+      "expr": "on(obj_cheese_cheese_1, obj_serving_plate_serving_plate)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG1_s4_1",
+      "expr": "on(obj_tomato_slice_tomato_slice, obj_serving_plate_serving_plate)",
+      "check_at": "final"
+    },
+    {
+      "id": "INV_SG1_s5_1",
+      "expr": "on(obj_bread_b_bread_b, obj_serving_plate_serving_plate)",
+      "check_at": "final"
+    }
+  ],
+  "m2_stats": {
+    "n_subgoals": 5,
+    "n_details": 15,
+    "n_edges": 15,
+    "n_mutex": 10,
+    "llm_usage": {
+      "visual_decomposition": {
+        "calls": 1,
+        "prompt_tokens": 9398,
+        "completion_tokens": 392,
+        "tokens": 9790,
+        "seconds": 4.14
+      },
+      "visual_selection": {
+        "calls": 1,
+        "prompt_tokens": 9813,
+        "completion_tokens": 121,
+        "tokens": 9934,
+        "seconds": 1.95
+      }
+    },
+    "n_split_subgoals": 5
+  },
+  "ablation": {
+    "mode": "without_grounding",
+    "policy_version": "upper-level-visual-semantic-v1"
+  }
+}

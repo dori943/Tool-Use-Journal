@@ -1,0 +1,254 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:cbd2d9b2af856034d4c4:execution-report",
+  "run_id": "simulation-run:0000:cbd2d9b2af856034d4c4",
+  "plan_id": "motion-plan:0734baf6fa507af8c60a84eb",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:cbd2d9b2af856034d4c4:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:cbd2d9b2af856034d4c4",
+    "input_artifact_ids": [
+      "simulation-run-artifact:cbd2d9b2af856034d4c46760",
+      "motion-plan-artifact:0734baf6fa507af8c60a84eb"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "SUCCESS",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      -1.2402172429988878,
+      -1.0093241984627577,
+      1.4215100233085538,
+      -1.9831544917651016,
+      -1.5707938932929038,
+      -1.2401433717652015
+    ],
+    "joint_velocities_rad_s": [
+      -0.00010142433664963589,
+      -0.045816048243093564,
+      -0.02733169286134409,
+      0.0730624878160772,
+      0.000024049134263495605,
+      -0.00009209188210342986
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        -0.3307477218020959,
+        -0.6048882909090939,
+        1.0022276196355706
+      ],
+      "orientation_xyzw": [
+        0.999999995680606,
+        -0.00003481419067236092,
+        0.00002912370360615341,
+        0.00008110838411143863
+      ]
+    },
+    "gripper": {
+      "mode": "OPEN",
+      "command": -1.0
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 16.74000000007993,
+    "max_joint_tracking_error_rad": 0.2912695119990323,
+    "max_eef_tracking_error_m": 0.32011668774986296,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG1_s3_d1:transition:1:precomputed:return:event:0:TOOL_UNLOCK",
+      "scheduled_time_s": 1.3498424119225234,
+      "actual_time_s": 1.3600000000064938,
+      "status": "SUCCESS",
+      "message": "unlocked vac; active model is bare flange"
+    },
+    {
+      "event_id": "SG1_s3_d1:transition:1:precomputed:return:event:1:VERIFY_TOOL_RELEASE",
+      "scheduled_time_s": 1.3498424119225234,
+      "actual_time_s": 1.3600000000064938,
+      "status": "SUCCESS",
+      "message": "verified vac released to rack"
+    },
+    {
+      "event_id": "SG1_s3_d1:transition:1:exchange:SG1_s3_d1:transition:1:attach-component:precomputed:event:0:TOOL_LOCK",
+      "scheduled_time_s": 14.849091506230046,
+      "actual_time_s": 14.940000000071336,
+      "status": "SUCCESS",
+      "message": "locked 3F; runtime model replaced"
+    },
+    {
+      "event_id": "SG1_s3_d1:transition:1:exchange:SG1_s3_d1:transition:1:attach-component:precomputed:event:1:VERIFY_TOOL_LOCK",
+      "scheduled_time_s": 14.849091506230046,
+      "actual_time_s": 14.940000000071336,
+      "status": "SUCCESS",
+      "message": "verified 3F mounted and rack duplicate hidden"
+    }
+  ],
+  "failure": null,
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "3F",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": -1.0,
+    "ee_transition_count": 5,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 837,
+    "nominal_plan_duration_s": 16.168641861749485,
+    "final_plan_time_s": 16.168641861749485,
+    "adaptive_settle_extra_duration_s": 0.5713581383304458,
+    "segment_tracking": [
+      {
+        "segment_id": "SG1_s3_d1:transition:1:precomputed:return:0:vac-return:0:commission:attach:vac:ee-attach:bare->vac:3:commission:attach:vac:new-retreat",
+        "keyframe_id": null,
+        "target_block_id": null,
+        "nominal_end_time_s": 1.3498424119225234,
+        "actual_execution_time_s": 1.3600000000064938,
+        "max_joint_error_rad": 0.00865920776096063,
+        "eef_position_error_m": 0.004057363422091435,
+        "eef_orientation_error_rad": 0.00009253896555321334,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_s3_d1:transition:1:precomputed:return:1:vac-return:1:commission:attach:vac:ee-attach:bare->vac:2:commission:attach:vac:new-dock",
+        "keyframe_id": null,
+        "target_block_id": null,
+        "nominal_end_time_s": 2.3103582223591657,
+        "actual_execution_time_s": 2.3200000000110776,
+        "max_joint_error_rad": 0.009767999429453944,
+        "eef_position_error_m": 0.005300032940672616,
+        "eef_orientation_error_rad": 0.00005600371091391988,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_s3_d1:transition:1:precomputed:return:2:vac-return:2:commission:attach:vac:ee-attach:bare->vac:1:commission:attach:vac:new-pre-dock",
+        "keyframe_id": null,
+        "target_block_id": null,
+        "nominal_end_time_s": 4.240410488676157,
+        "actual_execution_time_s": 4.260000000020341,
+        "max_joint_error_rad": 0.009291907773870456,
+        "eef_position_error_m": 0.004413048862801733,
+        "eef_orientation_error_rad": 0.000059642802053983513,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_s3_d1:transition:1:precomputed:return:3:vac-return:3:commission:attach:vac:ee-attach:bare->vac:0:commission:attach:vac:new-staging",
+        "keyframe_id": null,
+        "target_block_id": null,
+        "nominal_end_time_s": 8.247726957513635,
+        "actual_execution_time_s": 8.320000000039727,
+        "max_joint_error_rad": 0.000899289976906692,
+        "eef_position_error_m": 0.0004283890537137858,
+        "eef_orientation_error_rad": 0.0013361987797704724,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.06000000000028649,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_s3_d1:transition:1:exchange:SG1_s3_d1:transition:1:attach-component:precomputed:0:commission:attach:3F:ee-attach:bare->3F:0:commission:attach:3F:new-staging",
+        "keyframe_id": "commission:attach:3F:new-staging",
+        "target_block_id": null,
+        "nominal_end_time_s": 12.22839776008309,
+        "actual_execution_time_s": 12.320000000058826,
+        "max_joint_error_rad": 0.0014818249488257607,
+        "eef_position_error_m": 0.000929719287093241,
+        "eef_orientation_error_rad": 0.002180133613518479,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_s3_d1:transition:1:exchange:SG1_s3_d1:transition:1:attach-component:precomputed:1:commission:attach:3F:ee-attach:bare->3F:1:commission:attach:3F:new-pre-dock",
+        "keyframe_id": "commission:attach:3F:new-pre-dock",
+        "target_block_id": null,
+        "nominal_end_time_s": 14.180218823582623,
+        "actual_execution_time_s": 14.26000000006809,
+        "max_joint_error_rad": 0.01005108430859325,
+        "eef_position_error_m": 0.0050784482185477825,
+        "eef_orientation_error_rad": 0.00008395030062328247,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_s3_d1:transition:1:exchange:SG1_s3_d1:transition:1:attach-component:precomputed:2:commission:attach:3F:ee-attach:bare->3F:2:commission:attach:3F:new-dock",
+        "keyframe_id": "commission:attach:3F:new-dock",
+        "target_block_id": null,
+        "nominal_end_time_s": 14.849091506230046,
+        "actual_execution_time_s": 14.940000000071336,
+        "max_joint_error_rad": 0.009349552113596449,
+        "eef_position_error_m": 0.1727151960943595,
+        "eef_orientation_error_rad": 0.00008336811221129678,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG1_s3_d1:transition:1:exchange:SG1_s3_d1:transition:1:attach-component:precomputed:3:commission:attach:3F:ee-attach:bare->3F:3:commission:attach:3F:new-retreat",
+        "keyframe_id": "commission:attach:3F:new-retreat",
+        "target_block_id": null,
+        "nominal_end_time_s": 16.168641861749485,
+        "actual_execution_time_s": 16.74000000007993,
+        "max_joint_error_rad": 0.008077331983048941,
+        "eef_position_error_m": 0.18157042860285202,
+        "eef_orientation_error_rad": 0.0000694641355218011,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": true,
+        "adaptive_settle_wait_s": 0.4800000000022919,
+        "custom_settle": null
+      }
+    ],
+    "gripper_release_waits": [],
+    "goal_evaluation": {
+      "request_id": "motion-request:live:15c4b17531056b13cabb",
+      "goal_type": "POSE",
+      "status": "SATISFIED",
+      "detail": "EE '3F' is active",
+      "position_error_m": null,
+      "orientation_error_rad": null,
+      "joint_error_rad": null,
+      "observed": {
+        "final_active_ee": "3F"
+      }
+    }
+  }
+}

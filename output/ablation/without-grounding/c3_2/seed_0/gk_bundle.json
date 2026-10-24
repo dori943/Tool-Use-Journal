@@ -1,0 +1,4716 @@
+{
+  "gk_by_subgoal": [
+    {
+      "subgoal_id": "SG1_s1",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_a_tray_a로 옮긴다 (1/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_plate_a_plate_a": {
+          "id": "obj_plate_a_plate_a",
+          "canonical_id": "plate_a",
+          "class": "plate_a",
+          "source_name": "plate_a"
+        },
+        "obj_tray_a_tray_a": {
+          "id": "obj_tray_a_tray_a",
+          "canonical_id": "tray_a",
+          "class": "tray_a",
+          "source_name": "tray_a"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_plate_a_plate_a"
+        ],
+        "container": "obj_tray_a_tray_a",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG1_s1_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_plate_a_plate_a"
+          },
+          "group_id": "G_SG1_s1",
+          "pre": [
+            {
+              "id": "SG1_s1_d1_p0",
+              "expr": "reachable(obj_plate_a_plate_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s1_d1_p1",
+              "expr": "top_exposed(obj_plate_a_plate_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s1_d1_p2",
+              "expr": "ee_usable(?EE, obj_plate_a_plate_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s1_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_plate_a_plate_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s1_d1_p4",
+              "expr": "batch_feasible(?EE, obj_plate_a_plate_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s1_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_plate_a_plate_a)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG1_s1_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_plate_a_plate_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s1",
+          "pre": [
+            {
+              "id": "SG1_s1_d2_p0",
+              "expr": "holding(obj_plate_a_plate_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_d2_p1",
+              "expr": "act_space_clear(?EE, obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s1_d2_p2",
+              "expr": "path_clear(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_plate_a_plate_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s1",
+          "pre": [
+            {
+              "id": "SG1_s1_d3_p0",
+              "expr": "holding(obj_plate_a_plate_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_d3_p1",
+              "expr": "above(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s1_d3_p2",
+              "expr": "fits(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s1_d3_p3",
+              "expr": "clear(obj_tray_a_tray_a)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_plate_a_plate_a)",
+            "above(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_s1_d1",
+          "to": "SG1_s1_d2",
+          "why": "causal_link: holding(obj_plate_a_plate_a)"
+        },
+        {
+          "from": "SG1_s1_d1",
+          "to": "SG1_s1_d3",
+          "why": "causal_link: holding(obj_plate_a_plate_a)"
+        },
+        {
+          "from": "SG1_s1_d2",
+          "to": "SG1_s1_d3",
+          "why": "causal_link: above(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s1_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s1_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s1_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s1_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG1_s1",
+          "expr": "in(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG1",
+      "split_index": 1
+    },
+    {
+      "subgoal_id": "SG1_s2",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_a_tray_a로 옮긴다 (2/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_fork_a_fork_a": {
+          "id": "obj_fork_a_fork_a",
+          "canonical_id": "fork_a",
+          "class": "fork_a",
+          "source_name": "fork_a"
+        },
+        "obj_tray_a_tray_a": {
+          "id": "obj_tray_a_tray_a",
+          "canonical_id": "tray_a",
+          "class": "tray_a",
+          "source_name": "tray_a"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_fork_a_fork_a"
+        ],
+        "container": "obj_tray_a_tray_a",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG1_s2_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_fork_a_fork_a"
+          },
+          "group_id": "G_SG1_s2",
+          "pre": [
+            {
+              "id": "SG1_s2_d1_p0",
+              "expr": "reachable(obj_fork_a_fork_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s2_d1_p1",
+              "expr": "top_exposed(obj_fork_a_fork_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s2_d1_p2",
+              "expr": "ee_usable(?EE, obj_fork_a_fork_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s2_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_fork_a_fork_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s2_d1_p4",
+              "expr": "batch_feasible(?EE, obj_fork_a_fork_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s2_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_fork_a_fork_a)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG1_s2_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_fork_a_fork_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s2",
+          "pre": [
+            {
+              "id": "SG1_s2_d2_p0",
+              "expr": "holding(obj_fork_a_fork_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_d2_p1",
+              "expr": "act_space_clear(?EE, obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s2_d2_p2",
+              "expr": "path_clear(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s2_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_fork_a_fork_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s2",
+          "pre": [
+            {
+              "id": "SG1_s2_d3_p0",
+              "expr": "holding(obj_fork_a_fork_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_d3_p1",
+              "expr": "above(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s2_d3_p2",
+              "expr": "fits(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s2_d3_p3",
+              "expr": "clear(obj_tray_a_tray_a)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_fork_a_fork_a)",
+            "above(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_s2_d1",
+          "to": "SG1_s2_d2",
+          "why": "causal_link: holding(obj_fork_a_fork_a)"
+        },
+        {
+          "from": "SG1_s2_d1",
+          "to": "SG1_s2_d3",
+          "why": "causal_link: holding(obj_fork_a_fork_a)"
+        },
+        {
+          "from": "SG1_s2_d2",
+          "to": "SG1_s2_d3",
+          "why": "causal_link: above(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s2_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s2_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s2_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s2_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG1_s2",
+          "expr": "in(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG1",
+      "split_index": 2
+    },
+    {
+      "subgoal_id": "SG1_s3",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_a_tray_a로 옮긴다 (3/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_spoon_a_spoon_a": {
+          "id": "obj_spoon_a_spoon_a",
+          "canonical_id": "spoon_a",
+          "class": "spoon_a",
+          "source_name": "spoon_a"
+        },
+        "obj_tray_a_tray_a": {
+          "id": "obj_tray_a_tray_a",
+          "canonical_id": "tray_a",
+          "class": "tray_a",
+          "source_name": "tray_a"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_spoon_a_spoon_a"
+        ],
+        "container": "obj_tray_a_tray_a",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG1_s3_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_spoon_a_spoon_a"
+          },
+          "group_id": "G_SG1_s3",
+          "pre": [
+            {
+              "id": "SG1_s3_d1_p0",
+              "expr": "reachable(obj_spoon_a_spoon_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s3_d1_p1",
+              "expr": "top_exposed(obj_spoon_a_spoon_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s3_d1_p2",
+              "expr": "ee_usable(?EE, obj_spoon_a_spoon_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s3_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_spoon_a_spoon_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s3_d1_p4",
+              "expr": "batch_feasible(?EE, obj_spoon_a_spoon_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s3_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_spoon_a_spoon_a)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG1_s3_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_spoon_a_spoon_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s3",
+          "pre": [
+            {
+              "id": "SG1_s3_d2_p0",
+              "expr": "holding(obj_spoon_a_spoon_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_d2_p1",
+              "expr": "act_space_clear(?EE, obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s3_d2_p2",
+              "expr": "path_clear(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s3_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_spoon_a_spoon_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s3",
+          "pre": [
+            {
+              "id": "SG1_s3_d3_p0",
+              "expr": "holding(obj_spoon_a_spoon_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_d3_p1",
+              "expr": "above(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s3_d3_p2",
+              "expr": "fits(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s3_d3_p3",
+              "expr": "clear(obj_tray_a_tray_a)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_spoon_a_spoon_a)",
+            "above(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_s3_d1",
+          "to": "SG1_s3_d2",
+          "why": "causal_link: holding(obj_spoon_a_spoon_a)"
+        },
+        {
+          "from": "SG1_s3_d1",
+          "to": "SG1_s3_d3",
+          "why": "causal_link: holding(obj_spoon_a_spoon_a)"
+        },
+        {
+          "from": "SG1_s3_d2",
+          "to": "SG1_s3_d3",
+          "why": "causal_link: above(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s3_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s3_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s3_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s3_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG1_s3",
+          "expr": "in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG1",
+      "split_index": 3
+    },
+    {
+      "subgoal_id": "SG1_s4",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_a_tray_a로 옮긴다 (4/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_mug_a_mug_a": {
+          "id": "obj_mug_a_mug_a",
+          "canonical_id": "mug_a",
+          "class": "mug_a",
+          "source_name": "mug_a"
+        },
+        "obj_tray_a_tray_a": {
+          "id": "obj_tray_a_tray_a",
+          "canonical_id": "tray_a",
+          "class": "tray_a",
+          "source_name": "tray_a"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_mug_a_mug_a"
+        ],
+        "container": "obj_tray_a_tray_a",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG1_s4_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_mug_a_mug_a"
+          },
+          "group_id": "G_SG1_s4",
+          "pre": [
+            {
+              "id": "SG1_s4_d1_p0",
+              "expr": "reachable(obj_mug_a_mug_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s4_d1_p1",
+              "expr": "top_exposed(obj_mug_a_mug_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s4_d1_p2",
+              "expr": "ee_usable(?EE, obj_mug_a_mug_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s4_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_mug_a_mug_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s4_d1_p4",
+              "expr": "batch_feasible(?EE, obj_mug_a_mug_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s4_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_mug_a_mug_a)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG1_s4_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_mug_a_mug_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s4",
+          "pre": [
+            {
+              "id": "SG1_s4_d2_p0",
+              "expr": "holding(obj_mug_a_mug_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s4_d2_p1",
+              "expr": "act_space_clear(?EE, obj_mug_a_mug_a, obj_tray_a_tray_a)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s4_d2_p2",
+              "expr": "path_clear(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s4_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_mug_a_mug_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s4",
+          "pre": [
+            {
+              "id": "SG1_s4_d3_p0",
+              "expr": "holding(obj_mug_a_mug_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s4_d3_p1",
+              "expr": "above(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s4_d3_p2",
+              "expr": "fits(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s4_d3_p3",
+              "expr": "clear(obj_tray_a_tray_a)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_mug_a_mug_a)",
+            "above(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_s4_d1",
+          "to": "SG1_s4_d2",
+          "why": "causal_link: holding(obj_mug_a_mug_a)"
+        },
+        {
+          "from": "SG1_s4_d1",
+          "to": "SG1_s4_d3",
+          "why": "causal_link: holding(obj_mug_a_mug_a)"
+        },
+        {
+          "from": "SG1_s4_d2",
+          "to": "SG1_s4_d3",
+          "why": "causal_link: above(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s4_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s4_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s4_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s4_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG1_s4",
+          "expr": "in(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG1",
+      "split_index": 4
+    },
+    {
+      "subgoal_id": "SG1_s5",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_a_tray_a로 옮긴다 (5/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_bread_a_bread_a": {
+          "id": "obj_bread_a_bread_a",
+          "canonical_id": "bread_a",
+          "class": "bread_a",
+          "source_name": "bread_a"
+        },
+        "obj_tray_a_tray_a": {
+          "id": "obj_tray_a_tray_a",
+          "canonical_id": "tray_a",
+          "class": "tray_a",
+          "source_name": "tray_a"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_bread_a_bread_a"
+        ],
+        "container": "obj_tray_a_tray_a",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG1_s5_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_bread_a_bread_a"
+          },
+          "group_id": "G_SG1_s5",
+          "pre": [
+            {
+              "id": "SG1_s5_d1_p0",
+              "expr": "reachable(obj_bread_a_bread_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s5_d1_p1",
+              "expr": "top_exposed(obj_bread_a_bread_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s5_d1_p2",
+              "expr": "ee_usable(?EE, obj_bread_a_bread_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s5_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_bread_a_bread_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s5_d1_p4",
+              "expr": "batch_feasible(?EE, obj_bread_a_bread_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s5_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_bread_a_bread_a)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG1_s5_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_bread_a_bread_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s5",
+          "pre": [
+            {
+              "id": "SG1_s5_d2_p0",
+              "expr": "holding(obj_bread_a_bread_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_d2_p1",
+              "expr": "act_space_clear(?EE, obj_bread_a_bread_a, obj_tray_a_tray_a)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s5_d2_p2",
+              "expr": "path_clear(obj_bread_a_bread_a, obj_tray_a_tray_a)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_bread_a_bread_a, obj_tray_a_tray_a)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s5_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_bread_a_bread_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s5",
+          "pre": [
+            {
+              "id": "SG1_s5_d3_p0",
+              "expr": "holding(obj_bread_a_bread_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_d3_p1",
+              "expr": "above(obj_bread_a_bread_a, obj_tray_a_tray_a)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s5_d3_p2",
+              "expr": "fits(obj_bread_a_bread_a, obj_tray_a_tray_a)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s5_d3_p3",
+              "expr": "clear(obj_tray_a_tray_a)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_bread_a_bread_a, obj_tray_a_tray_a)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_bread_a_bread_a)",
+            "above(obj_bread_a_bread_a, obj_tray_a_tray_a)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_s5_d1",
+          "to": "SG1_s5_d2",
+          "why": "causal_link: holding(obj_bread_a_bread_a)"
+        },
+        {
+          "from": "SG1_s5_d1",
+          "to": "SG1_s5_d3",
+          "why": "causal_link: holding(obj_bread_a_bread_a)"
+        },
+        {
+          "from": "SG1_s5_d2",
+          "to": "SG1_s5_d3",
+          "why": "causal_link: above(obj_bread_a_bread_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s5_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_bread_a_bread_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s5_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_bread_a_bread_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s5_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_bread_a_bread_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s5_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_bread_a_bread_a, obj_tray_a_tray_a)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG1_s5",
+          "expr": "in(obj_bread_a_bread_a, obj_tray_a_tray_a)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG1",
+      "split_index": 5
+    },
+    {
+      "subgoal_id": "SG1_s6",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_a_tray_a로 옮긴다 (6/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_fruit_a_fruit_a": {
+          "id": "obj_fruit_a_fruit_a",
+          "canonical_id": "fruit_a",
+          "class": "fruit_a",
+          "source_name": "fruit_a"
+        },
+        "obj_tray_a_tray_a": {
+          "id": "obj_tray_a_tray_a",
+          "canonical_id": "tray_a",
+          "class": "tray_a",
+          "source_name": "tray_a"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_fruit_a_fruit_a"
+        ],
+        "container": "obj_tray_a_tray_a",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG1_s6_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_fruit_a_fruit_a"
+          },
+          "group_id": "G_SG1_s6",
+          "pre": [
+            {
+              "id": "SG1_s6_d1_p0",
+              "expr": "reachable(obj_fruit_a_fruit_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s6_d1_p1",
+              "expr": "top_exposed(obj_fruit_a_fruit_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s6_d1_p2",
+              "expr": "ee_usable(?EE, obj_fruit_a_fruit_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s6_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_fruit_a_fruit_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s6_d1_p4",
+              "expr": "batch_feasible(?EE, obj_fruit_a_fruit_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s6_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_fruit_a_fruit_a)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG1_s6_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_fruit_a_fruit_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s6",
+          "pre": [
+            {
+              "id": "SG1_s6_d2_p0",
+              "expr": "holding(obj_fruit_a_fruit_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s6_d2_p1",
+              "expr": "act_space_clear(?EE, obj_fruit_a_fruit_a, obj_tray_a_tray_a)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG1_s6_d2_p2",
+              "expr": "path_clear(obj_fruit_a_fruit_a, obj_tray_a_tray_a)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_fruit_a_fruit_a, obj_tray_a_tray_a)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG1_s6_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_fruit_a_fruit_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG1_s6",
+          "pre": [
+            {
+              "id": "SG1_s6_d3_p0",
+              "expr": "holding(obj_fruit_a_fruit_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s6_d3_p1",
+              "expr": "above(obj_fruit_a_fruit_a, obj_tray_a_tray_a)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG1_s6_d3_p2",
+              "expr": "fits(obj_fruit_a_fruit_a, obj_tray_a_tray_a)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG1_s6_d3_p3",
+              "expr": "clear(obj_tray_a_tray_a)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_fruit_a_fruit_a)",
+            "above(obj_fruit_a_fruit_a, obj_tray_a_tray_a)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_s6_d1",
+          "to": "SG1_s6_d2",
+          "why": "causal_link: holding(obj_fruit_a_fruit_a)"
+        },
+        {
+          "from": "SG1_s6_d1",
+          "to": "SG1_s6_d3",
+          "why": "causal_link: holding(obj_fruit_a_fruit_a)"
+        },
+        {
+          "from": "SG1_s6_d2",
+          "to": "SG1_s6_d3",
+          "why": "causal_link: above(obj_fruit_a_fruit_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s6_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s6_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s6_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s6_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG1_s6",
+          "expr": "in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG1",
+      "split_index": 6
+    },
+    {
+      "subgoal_id": "SG2_s1",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_b_tray_b로 옮긴다 (1/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_plate_b_plate_b": {
+          "id": "obj_plate_b_plate_b",
+          "canonical_id": "plate_b",
+          "class": "plate_b",
+          "source_name": "plate_b"
+        },
+        "obj_tray_b_tray_b": {
+          "id": "obj_tray_b_tray_b",
+          "canonical_id": "tray_b",
+          "class": "tray_b",
+          "source_name": "tray_b"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_plate_b_plate_b"
+        ],
+        "container": "obj_tray_b_tray_b",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG2_s1_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_plate_b_plate_b"
+          },
+          "group_id": "G_SG2_s1",
+          "pre": [
+            {
+              "id": "SG2_s1_d1_p0",
+              "expr": "reachable(obj_plate_b_plate_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s1_d1_p1",
+              "expr": "top_exposed(obj_plate_b_plate_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s1_d1_p2",
+              "expr": "ee_usable(?EE, obj_plate_b_plate_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s1_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_plate_b_plate_b)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s1_d1_p4",
+              "expr": "batch_feasible(?EE, obj_plate_b_plate_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s1_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_plate_b_plate_b)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG2_s1_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_plate_b_plate_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s1",
+          "pre": [
+            {
+              "id": "SG2_s1_d2_p0",
+              "expr": "holding(obj_plate_b_plate_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s1_d2_p1",
+              "expr": "act_space_clear(?EE, obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG2_s1_d2_p2",
+              "expr": "path_clear(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG2_s1_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_plate_b_plate_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s1",
+          "pre": [
+            {
+              "id": "SG2_s1_d3_p0",
+              "expr": "holding(obj_plate_b_plate_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s1_d3_p1",
+              "expr": "above(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s1_d3_p2",
+              "expr": "fits(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s1_d3_p3",
+              "expr": "clear(obj_tray_b_tray_b)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_plate_b_plate_b)",
+            "above(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG2_s1_d1",
+          "to": "SG2_s1_d2",
+          "why": "causal_link: holding(obj_plate_b_plate_b)"
+        },
+        {
+          "from": "SG2_s1_d1",
+          "to": "SG2_s1_d3",
+          "why": "causal_link: holding(obj_plate_b_plate_b)"
+        },
+        {
+          "from": "SG2_s1_d2",
+          "to": "SG2_s1_d3",
+          "why": "causal_link: above(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s1_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s1_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s1_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s1_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG2_s1",
+          "expr": "in(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG2",
+      "split_index": 1
+    },
+    {
+      "subgoal_id": "SG2_s2",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_b_tray_b로 옮긴다 (2/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_fork_b_fork_b": {
+          "id": "obj_fork_b_fork_b",
+          "canonical_id": "fork_b",
+          "class": "fork_b",
+          "source_name": "fork_b"
+        },
+        "obj_tray_b_tray_b": {
+          "id": "obj_tray_b_tray_b",
+          "canonical_id": "tray_b",
+          "class": "tray_b",
+          "source_name": "tray_b"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_fork_b_fork_b"
+        ],
+        "container": "obj_tray_b_tray_b",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG2_s2_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_fork_b_fork_b"
+          },
+          "group_id": "G_SG2_s2",
+          "pre": [
+            {
+              "id": "SG2_s2_d1_p0",
+              "expr": "reachable(obj_fork_b_fork_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s2_d1_p1",
+              "expr": "top_exposed(obj_fork_b_fork_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s2_d1_p2",
+              "expr": "ee_usable(?EE, obj_fork_b_fork_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s2_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_fork_b_fork_b)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s2_d1_p4",
+              "expr": "batch_feasible(?EE, obj_fork_b_fork_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s2_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_fork_b_fork_b)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG2_s2_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_fork_b_fork_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s2",
+          "pre": [
+            {
+              "id": "SG2_s2_d2_p0",
+              "expr": "holding(obj_fork_b_fork_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s2_d2_p1",
+              "expr": "act_space_clear(?EE, obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG2_s2_d2_p2",
+              "expr": "path_clear(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG2_s2_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_fork_b_fork_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s2",
+          "pre": [
+            {
+              "id": "SG2_s2_d3_p0",
+              "expr": "holding(obj_fork_b_fork_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s2_d3_p1",
+              "expr": "above(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s2_d3_p2",
+              "expr": "fits(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s2_d3_p3",
+              "expr": "clear(obj_tray_b_tray_b)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_fork_b_fork_b)",
+            "above(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG2_s2_d1",
+          "to": "SG2_s2_d2",
+          "why": "causal_link: holding(obj_fork_b_fork_b)"
+        },
+        {
+          "from": "SG2_s2_d1",
+          "to": "SG2_s2_d3",
+          "why": "causal_link: holding(obj_fork_b_fork_b)"
+        },
+        {
+          "from": "SG2_s2_d2",
+          "to": "SG2_s2_d3",
+          "why": "causal_link: above(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s2_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s2_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s2_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s2_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG2_s2",
+          "expr": "in(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG2",
+      "split_index": 2
+    },
+    {
+      "subgoal_id": "SG2_s3",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_b_tray_b로 옮긴다 (3/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_spoon_b_spoon_b": {
+          "id": "obj_spoon_b_spoon_b",
+          "canonical_id": "spoon_b",
+          "class": "spoon_b",
+          "source_name": "spoon_b"
+        },
+        "obj_tray_b_tray_b": {
+          "id": "obj_tray_b_tray_b",
+          "canonical_id": "tray_b",
+          "class": "tray_b",
+          "source_name": "tray_b"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_spoon_b_spoon_b"
+        ],
+        "container": "obj_tray_b_tray_b",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG2_s3_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_spoon_b_spoon_b"
+          },
+          "group_id": "G_SG2_s3",
+          "pre": [
+            {
+              "id": "SG2_s3_d1_p0",
+              "expr": "reachable(obj_spoon_b_spoon_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s3_d1_p1",
+              "expr": "top_exposed(obj_spoon_b_spoon_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s3_d1_p2",
+              "expr": "ee_usable(?EE, obj_spoon_b_spoon_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s3_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_spoon_b_spoon_b)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s3_d1_p4",
+              "expr": "batch_feasible(?EE, obj_spoon_b_spoon_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s3_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_spoon_b_spoon_b)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG2_s3_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_spoon_b_spoon_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s3",
+          "pre": [
+            {
+              "id": "SG2_s3_d2_p0",
+              "expr": "holding(obj_spoon_b_spoon_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s3_d2_p1",
+              "expr": "act_space_clear(?EE, obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG2_s3_d2_p2",
+              "expr": "path_clear(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG2_s3_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_spoon_b_spoon_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s3",
+          "pre": [
+            {
+              "id": "SG2_s3_d3_p0",
+              "expr": "holding(obj_spoon_b_spoon_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s3_d3_p1",
+              "expr": "above(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s3_d3_p2",
+              "expr": "fits(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s3_d3_p3",
+              "expr": "clear(obj_tray_b_tray_b)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_spoon_b_spoon_b)",
+            "above(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG2_s3_d1",
+          "to": "SG2_s3_d2",
+          "why": "causal_link: holding(obj_spoon_b_spoon_b)"
+        },
+        {
+          "from": "SG2_s3_d1",
+          "to": "SG2_s3_d3",
+          "why": "causal_link: holding(obj_spoon_b_spoon_b)"
+        },
+        {
+          "from": "SG2_s3_d2",
+          "to": "SG2_s3_d3",
+          "why": "causal_link: above(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s3_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s3_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s3_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s3_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG2_s3",
+          "expr": "in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG2",
+      "split_index": 3
+    },
+    {
+      "subgoal_id": "SG2_s4",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_b_tray_b로 옮긴다 (4/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_mug_b_mug_b": {
+          "id": "obj_mug_b_mug_b",
+          "canonical_id": "mug_b",
+          "class": "mug_b",
+          "source_name": "mug_b"
+        },
+        "obj_tray_b_tray_b": {
+          "id": "obj_tray_b_tray_b",
+          "canonical_id": "tray_b",
+          "class": "tray_b",
+          "source_name": "tray_b"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_mug_b_mug_b"
+        ],
+        "container": "obj_tray_b_tray_b",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG2_s4_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_mug_b_mug_b"
+          },
+          "group_id": "G_SG2_s4",
+          "pre": [
+            {
+              "id": "SG2_s4_d1_p0",
+              "expr": "reachable(obj_mug_b_mug_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s4_d1_p1",
+              "expr": "top_exposed(obj_mug_b_mug_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s4_d1_p2",
+              "expr": "ee_usable(?EE, obj_mug_b_mug_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s4_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_mug_b_mug_b)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s4_d1_p4",
+              "expr": "batch_feasible(?EE, obj_mug_b_mug_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s4_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_mug_b_mug_b)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG2_s4_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_mug_b_mug_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s4",
+          "pre": [
+            {
+              "id": "SG2_s4_d2_p0",
+              "expr": "holding(obj_mug_b_mug_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s4_d2_p1",
+              "expr": "act_space_clear(?EE, obj_mug_b_mug_b, obj_tray_b_tray_b)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG2_s4_d2_p2",
+              "expr": "path_clear(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG2_s4_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_mug_b_mug_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s4",
+          "pre": [
+            {
+              "id": "SG2_s4_d3_p0",
+              "expr": "holding(obj_mug_b_mug_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s4_d3_p1",
+              "expr": "above(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s4_d3_p2",
+              "expr": "fits(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s4_d3_p3",
+              "expr": "clear(obj_tray_b_tray_b)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_mug_b_mug_b)",
+            "above(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG2_s4_d1",
+          "to": "SG2_s4_d2",
+          "why": "causal_link: holding(obj_mug_b_mug_b)"
+        },
+        {
+          "from": "SG2_s4_d1",
+          "to": "SG2_s4_d3",
+          "why": "causal_link: holding(obj_mug_b_mug_b)"
+        },
+        {
+          "from": "SG2_s4_d2",
+          "to": "SG2_s4_d3",
+          "why": "causal_link: above(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s4_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s4_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s4_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s4_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG2_s4",
+          "expr": "in(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG2",
+      "split_index": 4
+    },
+    {
+      "subgoal_id": "SG2_s5",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_b_tray_b로 옮긴다 (5/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_bread_b_bread_b": {
+          "id": "obj_bread_b_bread_b",
+          "canonical_id": "bread_b",
+          "class": "bread_b",
+          "source_name": "bread_b"
+        },
+        "obj_tray_b_tray_b": {
+          "id": "obj_tray_b_tray_b",
+          "canonical_id": "tray_b",
+          "class": "tray_b",
+          "source_name": "tray_b"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_bread_b_bread_b"
+        ],
+        "container": "obj_tray_b_tray_b",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG2_s5_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_bread_b_bread_b"
+          },
+          "group_id": "G_SG2_s5",
+          "pre": [
+            {
+              "id": "SG2_s5_d1_p0",
+              "expr": "reachable(obj_bread_b_bread_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s5_d1_p1",
+              "expr": "top_exposed(obj_bread_b_bread_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s5_d1_p2",
+              "expr": "ee_usable(?EE, obj_bread_b_bread_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s5_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_bread_b_bread_b)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s5_d1_p4",
+              "expr": "batch_feasible(?EE, obj_bread_b_bread_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s5_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_bread_b_bread_b)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG2_s5_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_bread_b_bread_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s5",
+          "pre": [
+            {
+              "id": "SG2_s5_d2_p0",
+              "expr": "holding(obj_bread_b_bread_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s5_d2_p1",
+              "expr": "act_space_clear(?EE, obj_bread_b_bread_b, obj_tray_b_tray_b)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG2_s5_d2_p2",
+              "expr": "path_clear(obj_bread_b_bread_b, obj_tray_b_tray_b)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_bread_b_bread_b, obj_tray_b_tray_b)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG2_s5_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_bread_b_bread_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s5",
+          "pre": [
+            {
+              "id": "SG2_s5_d3_p0",
+              "expr": "holding(obj_bread_b_bread_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s5_d3_p1",
+              "expr": "above(obj_bread_b_bread_b, obj_tray_b_tray_b)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s5_d3_p2",
+              "expr": "fits(obj_bread_b_bread_b, obj_tray_b_tray_b)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s5_d3_p3",
+              "expr": "clear(obj_tray_b_tray_b)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_bread_b_bread_b, obj_tray_b_tray_b)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_bread_b_bread_b)",
+            "above(obj_bread_b_bread_b, obj_tray_b_tray_b)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG2_s5_d1",
+          "to": "SG2_s5_d2",
+          "why": "causal_link: holding(obj_bread_b_bread_b)"
+        },
+        {
+          "from": "SG2_s5_d1",
+          "to": "SG2_s5_d3",
+          "why": "causal_link: holding(obj_bread_b_bread_b)"
+        },
+        {
+          "from": "SG2_s5_d2",
+          "to": "SG2_s5_d3",
+          "why": "causal_link: above(obj_bread_b_bread_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s5_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_bread_b_bread_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s5_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_bread_b_bread_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s5_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_bread_b_bread_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s5_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_bread_b_bread_b, obj_tray_b_tray_b)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG2_s5",
+          "expr": "in(obj_bread_b_bread_b, obj_tray_b_tray_b)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG2",
+      "split_index": 5
+    },
+    {
+      "subgoal_id": "SG2_s6",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_b_tray_b로 옮긴다 (6/6)",
+      "subgoal_kind": "relocate",
+      "nodes": {
+        "obj_fruit_b_fruit_b": {
+          "id": "obj_fruit_b_fruit_b",
+          "canonical_id": "fruit_b",
+          "class": "fruit_b",
+          "source_name": "fruit_b"
+        },
+        "obj_tray_b_tray_b": {
+          "id": "obj_tray_b_tray_b",
+          "canonical_id": "tray_b",
+          "class": "tray_b",
+          "source_name": "tray_b"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_fruit_b_fruit_b"
+        ],
+        "container": "obj_tray_b_tray_b",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG2_s6_d1",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_fruit_b_fruit_b"
+          },
+          "group_id": "G_SG2_s6",
+          "pre": [
+            {
+              "id": "SG2_s6_d1_p0",
+              "expr": "reachable(obj_fruit_b_fruit_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s6_d1_p1",
+              "expr": "top_exposed(obj_fruit_b_fruit_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s6_d1_p2",
+              "expr": "ee_usable(?EE, obj_fruit_b_fruit_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s6_d1_p3",
+              "expr": "graspable_on_support(?EE, obj_fruit_b_fruit_b)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s6_d1_p4",
+              "expr": "batch_feasible(?EE, obj_fruit_b_fruit_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s6_d1_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_fruit_b_fruit_b)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG2_s6_d2",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_fruit_b_fruit_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s6",
+          "pre": [
+            {
+              "id": "SG2_s6_d2_p0",
+              "expr": "holding(obj_fruit_b_fruit_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s6_d2_p1",
+              "expr": "act_space_clear(?EE, obj_fruit_b_fruit_b, obj_tray_b_tray_b)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG2_s6_d2_p2",
+              "expr": "path_clear(obj_fruit_b_fruit_b, obj_tray_b_tray_b)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_fruit_b_fruit_b, obj_tray_b_tray_b)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG2_s6_d3",
+          "action_type": "place",
+          "binding": {
+            "?o": "obj_fruit_b_fruit_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG2_s6",
+          "pre": [
+            {
+              "id": "SG2_s6_d3_p0",
+              "expr": "holding(obj_fruit_b_fruit_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s6_d3_p1",
+              "expr": "above(obj_fruit_b_fruit_b, obj_tray_b_tray_b)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG2_s6_d3_p2",
+              "expr": "fits(obj_fruit_b_fruit_b, obj_tray_b_tray_b)",
+              "head": "fits",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG2_s6_d3_p3",
+              "expr": "clear(obj_tray_b_tray_b)",
+              "head": "clear",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_fruit_b_fruit_b)",
+            "above(obj_fruit_b_fruit_b, obj_tray_b_tray_b)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG2_s6_d1",
+          "to": "SG2_s6_d2",
+          "why": "causal_link: holding(obj_fruit_b_fruit_b)"
+        },
+        {
+          "from": "SG2_s6_d1",
+          "to": "SG2_s6_d3",
+          "why": "causal_link: holding(obj_fruit_b_fruit_b)"
+        },
+        {
+          "from": "SG2_s6_d2",
+          "to": "SG2_s6_d3",
+          "why": "causal_link: above(obj_fruit_b_fruit_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s6_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s6_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s6_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s6_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [
+        {
+          "id": "INV_SG2_s6",
+          "expr": "in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)",
+          "check_at": "final"
+        }
+      ],
+      "split_from": "SG2",
+      "split_index": 6
+    },
+    {
+      "subgoal_id": "SG3_s1",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_a_tray_a로 옮긴다 (1/4)",
+      "subgoal_kind": "stack",
+      "nodes": {
+        "obj_plate_a_plate_a": {
+          "id": "obj_plate_a_plate_a",
+          "canonical_id": "plate_a",
+          "class": "plate_a",
+          "source_name": "plate_a"
+        },
+        "obj_tray_a_tray_a": {
+          "id": "obj_tray_a_tray_a",
+          "canonical_id": "tray_a",
+          "class": "tray_a",
+          "source_name": "tray_a"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_plate_a_plate_a"
+        ],
+        "container": "obj_tray_a_tray_a",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG3_s1_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_plate_a_plate_a"
+          },
+          "group_id": "G_SG3_s1_L1",
+          "pre": [
+            {
+              "id": "SG3_s1_s1a_p0",
+              "expr": "reachable(obj_plate_a_plate_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s1_s1a_p1",
+              "expr": "top_exposed(obj_plate_a_plate_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s1_s1a_p2",
+              "expr": "ee_usable(?EE, obj_plate_a_plate_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s1_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_plate_a_plate_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s1_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_plate_a_plate_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s1_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s1_s1a_p6",
+              "expr": "in(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s1_s1a_p7",
+              "expr": "in(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s1_s1a_p8",
+              "expr": "in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s1_s1a_p9",
+              "expr": "in(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s1_s1a_p10",
+              "expr": "in(obj_bread_a_bread_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s1_s1a_p11",
+              "expr": "in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_plate_a_plate_a)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG3_s1_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_plate_a_plate_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG3_s1_L1",
+          "pre": [
+            {
+              "id": "SG3_s1_s1b_p0",
+              "expr": "holding(obj_plate_a_plate_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s1_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG3_s1_s1b_p2",
+              "expr": "path_clear(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG3_s1_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_plate_a_plate_a",
+            "?base": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG3_s1_L1",
+          "pre": [
+            {
+              "id": "SG3_s1_s1c_p0",
+              "expr": "holding(obj_plate_a_plate_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s1_s1c_p1",
+              "expr": "above(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s1_s1c_p2",
+              "expr": "top_exposed(obj_tray_a_tray_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "on(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_plate_a_plate_a)",
+            "above(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_s1_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s2_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s3_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s4_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s5_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_bread_a_bread_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s6_d3",
+          "to": "SG3_s1_s1a",
+          "why": "causal_link: in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG3_s1_s1a",
+          "to": "SG3_s1_s1b",
+          "why": "causal_link: holding(obj_plate_a_plate_a)"
+        },
+        {
+          "from": "SG3_s1_s1a",
+          "to": "SG3_s1_s1c",
+          "why": "causal_link: holding(obj_plate_a_plate_a)"
+        },
+        {
+          "from": "SG3_s1_s1b",
+          "to": "SG3_s1_s1c",
+          "why": "causal_link: above(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [],
+      "split_from": "SG3",
+      "split_index": 1
+    },
+    {
+      "subgoal_id": "SG3_s2",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_a_tray_a로 옮긴다 (2/4)",
+      "subgoal_kind": "stack",
+      "nodes": {
+        "obj_fork_a_fork_a": {
+          "id": "obj_fork_a_fork_a",
+          "canonical_id": "fork_a",
+          "class": "fork_a",
+          "source_name": "fork_a"
+        },
+        "obj_tray_a_tray_a": {
+          "id": "obj_tray_a_tray_a",
+          "canonical_id": "tray_a",
+          "class": "tray_a",
+          "source_name": "tray_a"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_fork_a_fork_a"
+        ],
+        "container": "obj_tray_a_tray_a",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG3_s2_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_fork_a_fork_a"
+          },
+          "group_id": "G_SG3_s2_L1",
+          "pre": [
+            {
+              "id": "SG3_s2_s1a_p0",
+              "expr": "reachable(obj_fork_a_fork_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s2_s1a_p1",
+              "expr": "top_exposed(obj_fork_a_fork_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s2_s1a_p2",
+              "expr": "ee_usable(?EE, obj_fork_a_fork_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s2_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_fork_a_fork_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s2_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_fork_a_fork_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s2_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s2_s1a_p6",
+              "expr": "in(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s2_s1a_p7",
+              "expr": "in(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s2_s1a_p8",
+              "expr": "in(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s2_s1a_p9",
+              "expr": "in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s2_s1a_p10",
+              "expr": "in(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s2_s1a_p11",
+              "expr": "in(obj_bread_a_bread_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s2_s1a_p12",
+              "expr": "in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_fork_a_fork_a)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG3_s2_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_fork_a_fork_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG3_s2_L1",
+          "pre": [
+            {
+              "id": "SG3_s2_s1b_p0",
+              "expr": "holding(obj_fork_a_fork_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s2_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG3_s2_s1b_p2",
+              "expr": "path_clear(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG3_s2_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_fork_a_fork_a",
+            "?base": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG3_s2_L1",
+          "pre": [
+            {
+              "id": "SG3_s2_s1c_p0",
+              "expr": "holding(obj_fork_a_fork_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s2_s1c_p1",
+              "expr": "above(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s2_s1c_p2",
+              "expr": "top_exposed(obj_tray_a_tray_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "on(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_fork_a_fork_a)",
+            "above(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_s1_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s2_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s3_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s4_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s5_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_bread_a_bread_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s6_d3",
+          "to": "SG3_s2_s1a",
+          "why": "causal_link: in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG3_s2_s1a",
+          "to": "SG3_s2_s1b",
+          "why": "causal_link: holding(obj_fork_a_fork_a)"
+        },
+        {
+          "from": "SG3_s2_s1a",
+          "to": "SG3_s2_s1c",
+          "why": "causal_link: holding(obj_fork_a_fork_a)"
+        },
+        {
+          "from": "SG3_s2_s1b",
+          "to": "SG3_s2_s1c",
+          "why": "causal_link: above(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [],
+      "split_from": "SG3",
+      "split_index": 2
+    },
+    {
+      "subgoal_id": "SG3_s3",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_a_tray_a로 옮긴다 (3/4)",
+      "subgoal_kind": "stack",
+      "nodes": {
+        "obj_spoon_a_spoon_a": {
+          "id": "obj_spoon_a_spoon_a",
+          "canonical_id": "spoon_a",
+          "class": "spoon_a",
+          "source_name": "spoon_a"
+        },
+        "obj_tray_a_tray_a": {
+          "id": "obj_tray_a_tray_a",
+          "canonical_id": "tray_a",
+          "class": "tray_a",
+          "source_name": "tray_a"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_spoon_a_spoon_a"
+        ],
+        "container": "obj_tray_a_tray_a",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG3_s3_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_spoon_a_spoon_a"
+          },
+          "group_id": "G_SG3_s3_L1",
+          "pre": [
+            {
+              "id": "SG3_s3_s1a_p0",
+              "expr": "reachable(obj_spoon_a_spoon_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s3_s1a_p1",
+              "expr": "top_exposed(obj_spoon_a_spoon_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s3_s1a_p2",
+              "expr": "ee_usable(?EE, obj_spoon_a_spoon_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s3_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_spoon_a_spoon_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s3_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_spoon_a_spoon_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s3_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s3_s1a_p6",
+              "expr": "in(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s3_s1a_p7",
+              "expr": "in(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s3_s1a_p8",
+              "expr": "in(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s3_s1a_p9",
+              "expr": "in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s3_s1a_p10",
+              "expr": "in(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s3_s1a_p11",
+              "expr": "in(obj_bread_a_bread_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s3_s1a_p12",
+              "expr": "in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_spoon_a_spoon_a)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG3_s3_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_spoon_a_spoon_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG3_s3_L1",
+          "pre": [
+            {
+              "id": "SG3_s3_s1b_p0",
+              "expr": "holding(obj_spoon_a_spoon_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s3_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG3_s3_s1b_p2",
+              "expr": "path_clear(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG3_s3_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_spoon_a_spoon_a",
+            "?base": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG3_s3_L1",
+          "pre": [
+            {
+              "id": "SG3_s3_s1c_p0",
+              "expr": "holding(obj_spoon_a_spoon_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s3_s1c_p1",
+              "expr": "above(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s3_s1c_p2",
+              "expr": "top_exposed(obj_tray_a_tray_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "on(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_spoon_a_spoon_a)",
+            "above(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_s2_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s1_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s3_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s4_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s5_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_bread_a_bread_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s6_d3",
+          "to": "SG3_s3_s1a",
+          "why": "causal_link: in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG3_s3_s1a",
+          "to": "SG3_s3_s1b",
+          "why": "causal_link: holding(obj_spoon_a_spoon_a)"
+        },
+        {
+          "from": "SG3_s3_s1a",
+          "to": "SG3_s3_s1c",
+          "why": "causal_link: holding(obj_spoon_a_spoon_a)"
+        },
+        {
+          "from": "SG3_s3_s1b",
+          "to": "SG3_s3_s1c",
+          "why": "causal_link: above(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [],
+      "split_from": "SG3",
+      "split_index": 3
+    },
+    {
+      "subgoal_id": "SG3_s4",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_a_tray_a로 옮긴다 (4/4)",
+      "subgoal_kind": "stack",
+      "nodes": {
+        "obj_mug_a_mug_a": {
+          "id": "obj_mug_a_mug_a",
+          "canonical_id": "mug_a",
+          "class": "mug_a",
+          "source_name": "mug_a"
+        },
+        "obj_tray_a_tray_a": {
+          "id": "obj_tray_a_tray_a",
+          "canonical_id": "tray_a",
+          "class": "tray_a",
+          "source_name": "tray_a"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_mug_a_mug_a"
+        ],
+        "container": "obj_tray_a_tray_a",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG3_s4_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_mug_a_mug_a"
+          },
+          "group_id": "G_SG3_s4_L1",
+          "pre": [
+            {
+              "id": "SG3_s4_s1a_p0",
+              "expr": "reachable(obj_mug_a_mug_a)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s4_s1a_p1",
+              "expr": "top_exposed(obj_mug_a_mug_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s4_s1a_p2",
+              "expr": "ee_usable(?EE, obj_mug_a_mug_a)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s4_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_mug_a_mug_a)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s4_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_mug_a_mug_a)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG3_s4_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s4_s1a_p6",
+              "expr": "in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s4_s1a_p7",
+              "expr": "in(obj_plate_a_plate_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s4_s1a_p8",
+              "expr": "in(obj_fork_a_fork_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s4_s1a_p9",
+              "expr": "in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s4_s1a_p10",
+              "expr": "in(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s4_s1a_p11",
+              "expr": "in(obj_bread_a_bread_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s4_s1a_p12",
+              "expr": "in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)",
+              "head": "in",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_mug_a_mug_a)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG3_s4_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_mug_a_mug_a",
+            "?r": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG3_s4_L1",
+          "pre": [
+            {
+              "id": "SG3_s4_s1b_p0",
+              "expr": "holding(obj_mug_a_mug_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s4_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_mug_a_mug_a, obj_tray_a_tray_a)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG3_s4_s1b_p2",
+              "expr": "path_clear(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG3_s4_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_mug_a_mug_a",
+            "?base": "obj_tray_a_tray_a"
+          },
+          "group_id": "G_SG3_s4_L1",
+          "pre": [
+            {
+              "id": "SG3_s4_s1c_p0",
+              "expr": "holding(obj_mug_a_mug_a)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s4_s1c_p1",
+              "expr": "above(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG3_s4_s1c_p2",
+              "expr": "top_exposed(obj_tray_a_tray_a)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "on(obj_mug_a_mug_a, obj_tray_a_tray_a)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_mug_a_mug_a)",
+            "above(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG1_s3_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_spoon_a_spoon_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s1_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_plate_a_plate_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s2_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_fork_a_fork_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s4_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s5_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_bread_a_bread_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG1_s6_d3",
+          "to": "SG3_s4_s1a",
+          "why": "causal_link: in(obj_fruit_a_fruit_a, obj_tray_a_tray_a)"
+        },
+        {
+          "from": "SG3_s4_s1a",
+          "to": "SG3_s4_s1b",
+          "why": "causal_link: holding(obj_mug_a_mug_a)"
+        },
+        {
+          "from": "SG3_s4_s1a",
+          "to": "SG3_s4_s1c",
+          "why": "causal_link: holding(obj_mug_a_mug_a)"
+        },
+        {
+          "from": "SG3_s4_s1b",
+          "to": "SG3_s4_s1c",
+          "why": "causal_link: above(obj_mug_a_mug_a, obj_tray_a_tray_a)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [],
+      "split_from": "SG3",
+      "split_index": 4
+    },
+    {
+      "subgoal_id": "SG4_s1",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_b_tray_b로 옮긴다 (1/4)",
+      "subgoal_kind": "stack",
+      "nodes": {
+        "obj_plate_b_plate_b": {
+          "id": "obj_plate_b_plate_b",
+          "canonical_id": "plate_b",
+          "class": "plate_b",
+          "source_name": "plate_b"
+        },
+        "obj_tray_b_tray_b": {
+          "id": "obj_tray_b_tray_b",
+          "canonical_id": "tray_b",
+          "class": "tray_b",
+          "source_name": "tray_b"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_plate_b_plate_b"
+        ],
+        "container": "obj_tray_b_tray_b",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG4_s1_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_plate_b_plate_b"
+          },
+          "group_id": "G_SG4_s1_L1",
+          "pre": [
+            {
+              "id": "SG4_s1_s1a_p0",
+              "expr": "reachable(obj_plate_b_plate_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s1_s1a_p1",
+              "expr": "top_exposed(obj_plate_b_plate_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s1_s1a_p2",
+              "expr": "ee_usable(?EE, obj_plate_b_plate_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s1_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_plate_b_plate_b)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s1_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_plate_b_plate_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s1_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s1_s1a_p6",
+              "expr": "in(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s1_s1a_p7",
+              "expr": "in(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s1_s1a_p8",
+              "expr": "in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s1_s1a_p9",
+              "expr": "in(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s1_s1a_p10",
+              "expr": "in(obj_bread_b_bread_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s1_s1a_p11",
+              "expr": "in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_plate_b_plate_b)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG4_s1_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_plate_b_plate_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG4_s1_L1",
+          "pre": [
+            {
+              "id": "SG4_s1_s1b_p0",
+              "expr": "holding(obj_plate_b_plate_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s1_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG4_s1_s1b_p2",
+              "expr": "path_clear(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG4_s1_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_plate_b_plate_b",
+            "?base": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG4_s1_L1",
+          "pre": [
+            {
+              "id": "SG4_s1_s1c_p0",
+              "expr": "holding(obj_plate_b_plate_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s1_s1c_p1",
+              "expr": "above(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s1_s1c_p2",
+              "expr": "top_exposed(obj_tray_b_tray_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "on(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_plate_b_plate_b)",
+            "above(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG2_s1_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s2_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s3_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s4_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s5_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_bread_b_bread_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s6_d3",
+          "to": "SG4_s1_s1a",
+          "why": "causal_link: in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG4_s1_s1a",
+          "to": "SG4_s1_s1b",
+          "why": "causal_link: holding(obj_plate_b_plate_b)"
+        },
+        {
+          "from": "SG4_s1_s1a",
+          "to": "SG4_s1_s1c",
+          "why": "causal_link: holding(obj_plate_b_plate_b)"
+        },
+        {
+          "from": "SG4_s1_s1b",
+          "to": "SG4_s1_s1c",
+          "why": "causal_link: above(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [],
+      "split_from": "SG4",
+      "split_index": 1
+    },
+    {
+      "subgoal_id": "SG4_s2",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_b_tray_b로 옮긴다 (2/4)",
+      "subgoal_kind": "stack",
+      "nodes": {
+        "obj_fork_b_fork_b": {
+          "id": "obj_fork_b_fork_b",
+          "canonical_id": "fork_b",
+          "class": "fork_b",
+          "source_name": "fork_b"
+        },
+        "obj_tray_b_tray_b": {
+          "id": "obj_tray_b_tray_b",
+          "canonical_id": "tray_b",
+          "class": "tray_b",
+          "source_name": "tray_b"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_fork_b_fork_b"
+        ],
+        "container": "obj_tray_b_tray_b",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG4_s2_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_fork_b_fork_b"
+          },
+          "group_id": "G_SG4_s2_L1",
+          "pre": [
+            {
+              "id": "SG4_s2_s1a_p0",
+              "expr": "reachable(obj_fork_b_fork_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s2_s1a_p1",
+              "expr": "top_exposed(obj_fork_b_fork_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s2_s1a_p2",
+              "expr": "ee_usable(?EE, obj_fork_b_fork_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s2_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_fork_b_fork_b)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s2_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_fork_b_fork_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s2_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s2_s1a_p6",
+              "expr": "in(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s2_s1a_p7",
+              "expr": "in(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s2_s1a_p8",
+              "expr": "in(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s2_s1a_p9",
+              "expr": "in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s2_s1a_p10",
+              "expr": "in(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s2_s1a_p11",
+              "expr": "in(obj_bread_b_bread_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s2_s1a_p12",
+              "expr": "in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_fork_b_fork_b)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG4_s2_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_fork_b_fork_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG4_s2_L1",
+          "pre": [
+            {
+              "id": "SG4_s2_s1b_p0",
+              "expr": "holding(obj_fork_b_fork_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s2_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG4_s2_s1b_p2",
+              "expr": "path_clear(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG4_s2_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_fork_b_fork_b",
+            "?base": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG4_s2_L1",
+          "pre": [
+            {
+              "id": "SG4_s2_s1c_p0",
+              "expr": "holding(obj_fork_b_fork_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s2_s1c_p1",
+              "expr": "above(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s2_s1c_p2",
+              "expr": "top_exposed(obj_tray_b_tray_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "on(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_fork_b_fork_b)",
+            "above(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG2_s1_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s2_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s3_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s4_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s5_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_bread_b_bread_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s6_d3",
+          "to": "SG4_s2_s1a",
+          "why": "causal_link: in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG4_s2_s1a",
+          "to": "SG4_s2_s1b",
+          "why": "causal_link: holding(obj_fork_b_fork_b)"
+        },
+        {
+          "from": "SG4_s2_s1a",
+          "to": "SG4_s2_s1c",
+          "why": "causal_link: holding(obj_fork_b_fork_b)"
+        },
+        {
+          "from": "SG4_s2_s1b",
+          "to": "SG4_s2_s1c",
+          "why": "causal_link: above(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [],
+      "split_from": "SG4",
+      "split_index": 2
+    },
+    {
+      "subgoal_id": "SG4_s3",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_b_tray_b로 옮긴다 (3/4)",
+      "subgoal_kind": "stack",
+      "nodes": {
+        "obj_spoon_b_spoon_b": {
+          "id": "obj_spoon_b_spoon_b",
+          "canonical_id": "spoon_b",
+          "class": "spoon_b",
+          "source_name": "spoon_b"
+        },
+        "obj_tray_b_tray_b": {
+          "id": "obj_tray_b_tray_b",
+          "canonical_id": "tray_b",
+          "class": "tray_b",
+          "source_name": "tray_b"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_spoon_b_spoon_b"
+        ],
+        "container": "obj_tray_b_tray_b",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG4_s3_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_spoon_b_spoon_b"
+          },
+          "group_id": "G_SG4_s3_L1",
+          "pre": [
+            {
+              "id": "SG4_s3_s1a_p0",
+              "expr": "reachable(obj_spoon_b_spoon_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s3_s1a_p1",
+              "expr": "top_exposed(obj_spoon_b_spoon_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s3_s1a_p2",
+              "expr": "ee_usable(?EE, obj_spoon_b_spoon_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s3_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_spoon_b_spoon_b)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s3_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_spoon_b_spoon_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s3_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s3_s1a_p6",
+              "expr": "in(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s3_s1a_p7",
+              "expr": "in(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s3_s1a_p8",
+              "expr": "in(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s3_s1a_p9",
+              "expr": "in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s3_s1a_p10",
+              "expr": "in(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s3_s1a_p11",
+              "expr": "in(obj_bread_b_bread_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s3_s1a_p12",
+              "expr": "in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_spoon_b_spoon_b)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG4_s3_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_spoon_b_spoon_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG4_s3_L1",
+          "pre": [
+            {
+              "id": "SG4_s3_s1b_p0",
+              "expr": "holding(obj_spoon_b_spoon_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s3_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG4_s3_s1b_p2",
+              "expr": "path_clear(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG4_s3_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_spoon_b_spoon_b",
+            "?base": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG4_s3_L1",
+          "pre": [
+            {
+              "id": "SG4_s3_s1c_p0",
+              "expr": "holding(obj_spoon_b_spoon_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s3_s1c_p1",
+              "expr": "above(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s3_s1c_p2",
+              "expr": "top_exposed(obj_tray_b_tray_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "on(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_spoon_b_spoon_b)",
+            "above(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG2_s2_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s1_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s3_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s4_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s5_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_bread_b_bread_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s6_d3",
+          "to": "SG4_s3_s1a",
+          "why": "causal_link: in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG4_s3_s1a",
+          "to": "SG4_s3_s1b",
+          "why": "causal_link: holding(obj_spoon_b_spoon_b)"
+        },
+        {
+          "from": "SG4_s3_s1a",
+          "to": "SG4_s3_s1c",
+          "why": "causal_link: holding(obj_spoon_b_spoon_b)"
+        },
+        {
+          "from": "SG4_s3_s1b",
+          "to": "SG4_s3_s1c",
+          "why": "causal_link: above(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [],
+      "split_from": "SG4",
+      "split_index": 3
+    },
+    {
+      "subgoal_id": "SG4_s4",
+      "task": "두 사람을 위한 아침 식사 트레이를 준비하라. 각 트레이에 접시, 머그컵, 포크, 숟가락을 담고, 빵과 과일은 접시 위에 올려라. 두 트레이를 같은 구성으로, 식사하기 편하도록 식기를 가지런히 배치하라.",
+      "goal": "대상 1개를 obj_tray_b_tray_b로 옮긴다 (4/4)",
+      "subgoal_kind": "stack",
+      "nodes": {
+        "obj_mug_b_mug_b": {
+          "id": "obj_mug_b_mug_b",
+          "canonical_id": "mug_b",
+          "class": "mug_b",
+          "source_name": "mug_b"
+        },
+        "obj_tray_b_tray_b": {
+          "id": "obj_tray_b_tray_b",
+          "canonical_id": "tray_b",
+          "class": "tray_b",
+          "source_name": "tray_b"
+        }
+      },
+      "edges": [],
+      "roles": {
+        "target": [
+          "obj_mug_b_mug_b"
+        ],
+        "container": "obj_tray_b_tray_b",
+        "tool_candidates": [],
+        "selected_tool": null,
+        "selection_evidence": null
+      },
+      "details": [
+        {
+          "detail_id": "SG4_s4_s1a",
+          "action_type": "acquire",
+          "binding": {
+            "?o": "obj_mug_b_mug_b"
+          },
+          "group_id": "G_SG4_s4_L1",
+          "pre": [
+            {
+              "id": "SG4_s4_s1a_p0",
+              "expr": "reachable(obj_mug_b_mug_b)",
+              "head": "reachable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s4_s1a_p1",
+              "expr": "top_exposed(obj_mug_b_mug_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s4_s1a_p2",
+              "expr": "ee_usable(?EE, obj_mug_b_mug_b)",
+              "head": "ee_usable",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s4_s1a_p3",
+              "expr": "graspable_on_support(?EE, obj_mug_b_mug_b)",
+              "head": "graspable_on_support",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s4_s1a_p4",
+              "expr": "batch_feasible(?EE, obj_mug_b_mug_b)",
+              "head": "batch_feasible",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            },
+            {
+              "id": "SG4_s4_s1a_p5",
+              "expr": "hand_empty",
+              "head": "hand_empty",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s4_s1a_p6",
+              "expr": "in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s4_s1a_p7",
+              "expr": "in(obj_plate_b_plate_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s4_s1a_p8",
+              "expr": "in(obj_fork_b_fork_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s4_s1a_p9",
+              "expr": "in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s4_s1a_p10",
+              "expr": "in(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s4_s1a_p11",
+              "expr": "in(obj_bread_b_bread_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s4_s1a_p12",
+              "expr": "in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)",
+              "head": "in",
+              "eval_by": "m2"
+            }
+          ],
+          "establish": [
+            "holding(obj_mug_b_mug_b)"
+          ],
+          "destroy": [
+            "hand_empty"
+          ]
+        },
+        {
+          "detail_id": "SG4_s4_s1b",
+          "action_type": "transport",
+          "binding": {
+            "?o": "obj_mug_b_mug_b",
+            "?r": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG4_s4_L1",
+          "pre": [
+            {
+              "id": "SG4_s4_s1b_p0",
+              "expr": "holding(obj_mug_b_mug_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s4_s1b_p1",
+              "expr": "act_space_clear(?EE, obj_mug_b_mug_b, obj_tray_b_tray_b)",
+              "head": "act_space_clear",
+              "eval_by": "motion"
+            },
+            {
+              "id": "SG4_s4_s1b_p2",
+              "expr": "path_clear(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+              "head": "path_clear",
+              "eval_by": "motion"
+            }
+          ],
+          "establish": [
+            "above(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+          ],
+          "destroy": []
+        },
+        {
+          "detail_id": "SG4_s4_s1c",
+          "action_type": "place_on",
+          "binding": {
+            "?o": "obj_mug_b_mug_b",
+            "?base": "obj_tray_b_tray_b"
+          },
+          "group_id": "G_SG4_s4_L1",
+          "pre": [
+            {
+              "id": "SG4_s4_s1c_p0",
+              "expr": "holding(obj_mug_b_mug_b)",
+              "head": "holding",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s4_s1c_p1",
+              "expr": "above(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+              "head": "above",
+              "eval_by": "m2"
+            },
+            {
+              "id": "SG4_s4_s1c_p2",
+              "expr": "top_exposed(obj_tray_b_tray_b)",
+              "head": "top_exposed",
+              "eval_by": "m3",
+              "status": "unknown",
+              "evidence": []
+            }
+          ],
+          "establish": [
+            "on(obj_mug_b_mug_b, obj_tray_b_tray_b)",
+            "hand_empty"
+          ],
+          "destroy": [
+            "holding(obj_mug_b_mug_b)",
+            "above(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+          ]
+        }
+      ],
+      "partial_order": [
+        {
+          "from": "SG2_s3_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_spoon_b_spoon_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s1_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_plate_b_plate_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s2_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_fork_b_fork_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s4_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s5_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_bread_b_bread_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG2_s6_d3",
+          "to": "SG4_s4_s1a",
+          "why": "causal_link: in(obj_fruit_b_fruit_b, obj_tray_b_tray_b)"
+        },
+        {
+          "from": "SG4_s4_s1a",
+          "to": "SG4_s4_s1b",
+          "why": "causal_link: holding(obj_mug_b_mug_b)"
+        },
+        {
+          "from": "SG4_s4_s1a",
+          "to": "SG4_s4_s1c",
+          "why": "causal_link: holding(obj_mug_b_mug_b)"
+        },
+        {
+          "from": "SG4_s4_s1b",
+          "to": "SG4_s4_s1c",
+          "why": "causal_link: above(obj_mug_b_mug_b, obj_tray_b_tray_b)"
+        }
+      ],
+      "mutex": [],
+      "invariants": [],
+      "split_from": "SG4",
+      "split_index": 4
+    }
+  ]
+}

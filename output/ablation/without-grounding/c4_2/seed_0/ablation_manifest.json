@@ -1,0 +1,62 @@
+{
+  "identity": {
+    "mode": "without_grounding",
+    "policy_version": "upper-level-visual-semantic-v1",
+    "task": "c4_2",
+    "seed": 0,
+    "model": "gpt-4o-mini",
+    "provider": "openai",
+    "robot_sha256": "c9d28649e28fea3c6a2034838499cfcef77abde930c79faaf76ee644253dd806"
+  },
+  "artifacts": {
+    "execution/m1.json": "75eef6d7dcce62139502aa1b21181fa87a424379f87c0a1c4a67260a0fe2cc75",
+    "frame.png": "9f3b1cabde2a6b509b0e63bd5ef0142c01f4f5f597b5f2ee3e550e7a60e25033",
+    "m1.json": "0b73b89259a3df660ed0984cc80564ab20b86f220793648ff060df4dfc4bf637",
+    "robot_decision.json": "9bd3e7cdf103cdcb3b993f5a63cc71435ffba2c3b4bbb9aea2dd503b5f818b73"
+  },
+  "stages": {
+    "m1": "prepared",
+    "m2": "failed"
+  },
+  "scope": "explicit physical/geometric information removed from M2/M4 only",
+  "scripted_registry_prefilter": false,
+  "m5_execution_information": "same common runner; live state and collision geometry retained",
+  "failure": {
+    "stage": "m2",
+    "type": "ValueError",
+    "causal_attribution": "not_established"
+  },
+  "timing_summary": {
+    "llm_calls": [],
+    "llm_total": {
+      "prompt_tokens": 0,
+      "completion_tokens": 0,
+      "total_tokens": 0,
+      "seconds": 0,
+      "calls": 0
+    },
+    "stages": {
+      "m1": {
+        "seconds": 45.31,
+        "status": "prepared"
+      },
+      "m2": {
+        "seconds": null,
+        "status": "failed"
+      },
+      "m4": {
+        "seconds": null,
+        "status": "not_run"
+      },
+      "m5": {
+        "seconds": null,
+        "status": "not_run"
+      }
+    },
+    "m2_through_m4_seconds": null,
+    "total_seconds": 45.31,
+    "measured_stage_sum_seconds": 45.31,
+    "session_wall_seconds": 52.72,
+    "incomplete": true
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:ebaff63545c36a588906:execution-report",
+  "run_id": "simulation-run:0000:ebaff63545c36a588906",
+  "plan_id": "motion-plan:0f3e2a784557e7db187fb627",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:ebaff63545c36a588906:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:ebaff63545c36a588906",
+    "input_artifact_ids": [
+      "simulation-run-artifact:ebaff63545c36a5889060a46",
+      "motion-plan-artifact:0f3e2a784557e7db187fb627"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "SUCCESS",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      0.20682345481070918,
+      -1.8651156274643876,
+      1.8908675959840788,
+      -1.619411404710626,
+      -1.5039308864865477,
+      -1.3709767165635638
+    ],
+    "joint_velocities_rad_s": [
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0,
+      0.0
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        2.205546788671576,
+        -2.9938557357886757,
+        1.087104872242965
+      ],
+      "orientation_xyzw": [
+        -0.7039138022136218,
+        -0.709406544888119,
+        -0.027918880421992087,
+        0.021639067425509115
+      ]
+    },
+    "gripper": {
+      "mode": "HOLDING",
+      "command": 1.0
+    },
+    "attached_object_id": "spoon_b",
+    "held_tool_id": "spoon_b"
+  },
+  "metrics": {
+    "executed_duration_s": 3.8000000000181444,
+    "max_joint_tracking_error_rad": 0.0,
+    "max_eef_tracking_error_m": 0.004313360771250353,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [],
+  "failure": null,
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "3F",
+    "final_attached_object_id": "spoon_b",
+    "final_held_tool_id": "spoon_b",
+    "final_gripper_command": 1.0,
+    "ee_transition_count": 3,
+    "attachment_mode": "KINEMATIC",
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 190,
+    "nominal_plan_duration_s": 3.7820428468333165,
+    "final_plan_time_s": 3.7820428468333165,
+    "adaptive_settle_extra_duration_s": 0.017957153184827934,
+    "segment_tracking": [
+      {
+        "segment_id": "SG2_s4_d2:strategy_1:0:SG2_s4_d2:strategy_1:1:kf_1",
+        "keyframe_id": "SG2_s4_d2:strategy_1:1:kf_1",
+        "target_block_id": null,
+        "nominal_end_time_s": 0.05,
+        "actual_execution_time_s": 0.06000000000028649,
+        "max_joint_error_rad": 1.91449077258099e-7,
+        "eef_position_error_m": 1.288354335762998e-7,
+        "eef_orientation_error_rad": 3.023522804519466e-7,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "SG2_s4_d2:strategy_1:1:SG2_s4_d2:strategy_1:2:kf_2",
+        "keyframe_id": "SG2_s4_d2:strategy_1:2:kf_2",
+        "target_block_id": null,
+        "nominal_end_time_s": 3.7820428468333165,
+        "actual_execution_time_s": 3.8000000000181444,
+        "max_joint_error_rad": 0.0,
+        "eef_position_error_m": 8.881784197001252e-16,
+        "eef_orientation_error_rad": 8.18639039531489e-16,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      }
+    ],
+    "gripper_release_waits": [],
+    "goal_evaluation": {
+      "request_id": "motion-request:live:4beb3858d9c093e20731",
+      "goal_type": "POSE",
+      "status": "SATISFIED",
+      "detail": "all targets are above the goal region; selected tool remains held",
+      "position_error_m": null,
+      "orientation_error_rad": null,
+      "joint_error_rad": null,
+      "observed": {
+        "evaluations": [
+          {
+            "request_id": "motion-request:live:4beb3858d9c093e20731",
+            "goal_type": "POSE",
+            "status": "SATISFIED",
+            "detail": "all targets are above the goal region",
+            "position_error_m": null,
+            "orientation_error_rad": null,
+            "joint_error_rad": null,
+            "observed": {
+              "region_id": "tray_b",
+              "above_target_ids": [
+                "spoon_b"
+              ],
+              "not_above_target_ids": [],
+              "geometry_errors": {}
+            }
+          },
+          {
+            "request_id": "motion-request:live:4beb3858d9c093e20731",
+            "goal_type": "POSE",
+            "status": "SATISFIED",
+            "detail": "selected tool remains held",
+            "position_error_m": null,
+            "orientation_error_rad": null,
+            "joint_error_rad": null,
+            "observed": {
+              "expected_tool_id": "spoon_b",
+              "held_tool_id": "spoon_b"
+            }
+          }
+        ]
+      }
+    }
+  }
+}

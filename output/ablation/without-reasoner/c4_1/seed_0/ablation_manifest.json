@@ -1,0 +1,95 @@
+{
+  "method": "without_reasoner",
+  "policy_version": "vlm-prior-attributes-v1",
+  "task": "c4_1",
+  "seed": 0,
+  "stages": {
+    "m1": "prepared",
+    "vlm_prior": "completed",
+    "m2": "completed",
+    "m4": "SUCCESS",
+    "m5": "SUCCESS"
+  },
+  "artifacts": {
+    "execution/m1.json": "309f60f46aa7b8e6eaca23631d3ebb104635887da092b334211d492a049cffa7",
+    "frame.png": "9104564a7719814e05930dbdca94e27ce512fac050e092324fd625a9cfe985b1",
+    "m1_full.json": "309f60f46aa7b8e6eaca23631d3ebb104635887da092b334211d492a049cffa7",
+    "m1.json": "4d8f0440815300ee2347838a44b532ff7a174b4c509712439b2824db87342f5e",
+    "vlm_prior.json": "7022b67835b0a6d80f2b34e358fb27661ed9a706a1e35f62ad9cd56f722b244d",
+    "m2.json": "dea3a747467e026a2e5b6c79b429e148dd3425cf64c6b78ebaeb5a93f0f816f2",
+    "m4.json": "21be4f352241644d3283362db3ed337b59265874aa545874396260a65f64103f"
+  },
+  "timing_summary": {
+    "llm_calls": [
+      {
+        "call": "서브골 분해",
+        "prompt_tokens": 1275,
+        "completion_tokens": 187,
+        "total_tokens": 1462,
+        "seconds": 2.2,
+        "calls": 1
+      },
+      {
+        "call": "객체 선택",
+        "prompt_tokens": 941,
+        "completion_tokens": 354,
+        "total_tokens": 1295,
+        "seconds": 3.58,
+        "calls": 1
+      },
+      {
+        "call": "confidence_update",
+        "prompt_tokens": 3096,
+        "completion_tokens": 217,
+        "total_tokens": 3313,
+        "seconds": 3.5,
+        "calls": 2
+      }
+    ],
+    "llm_total": {
+      "prompt_tokens": 5312,
+      "completion_tokens": 758,
+      "total_tokens": 6070,
+      "seconds": 9.28,
+      "calls": 4
+    },
+    "stages": {
+      "m1": {
+        "seconds": 9.31,
+        "status": "prepared"
+      },
+      "vlm_prior": {
+        "seconds": 21.73,
+        "status": "completed"
+      },
+      "m2": {
+        "seconds": 9.28,
+        "status": "completed"
+      },
+      "gk": {
+        "seconds": 0.02,
+        "status": "completed"
+      },
+      "m4": {
+        "seconds": 0.05,
+        "status": "SUCCESS"
+      },
+      "m5": {
+        "seconds": 2059.84,
+        "status": "SUCCESS"
+      }
+    },
+    "combined_seconds": null,
+    "total_seconds": 2100.31,
+    "measured_stage_sum_seconds": 2100.23,
+    "vlm_prior_usage": {
+      "vlm_prior_attributes": {
+        "calls": 1,
+        "prompt_tokens": 10114,
+        "completion_tokens": 1550,
+        "tokens": 11664,
+        "seconds": 20.86
+      }
+    }
+  }
+}

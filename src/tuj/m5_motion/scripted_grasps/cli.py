@@ -178,6 +178,12 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
                 time.sleep(.02)
     except Exception as error:
         summary["detail"] = f"{type(error).__name__}: {error}"
+        summary["failure_type"] = type(error).__name__
+        # 계획 실패 / 실행(물리) 실패를 ablation 공통 규칙으로 분류해 기록한다.
+        from tuj.m5_motion.failure_taxonomy import classify_failure
+        summary.update(classify_failure(
+            summary["detail"], error=error,
+            steps=session.records if session is not None else None))
         # A planning failure carries its per-strategy rejected edges on the
         # exception. This path catches the exception instead of letting it
         # reach the integrated runner's dump, so the reasons were lost and a

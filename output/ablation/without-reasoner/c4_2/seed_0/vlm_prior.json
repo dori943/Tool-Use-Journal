@@ -1,0 +1,239 @@
+{
+  "mode": "without_reasoner",
+  "policy_version": "vlm-prior-attributes-v1",
+  "model": "gpt-4o-mini",
+  "estimate": {
+    "objects": [
+      {
+        "id": "obj_baguette_baguette",
+        "extents_mm": [
+          600.0,
+          80.0,
+          30.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 1.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "bread",
+        "density_kgm3": 300.0,
+        "mass_kg": 0.18,
+        "youngs_gpa": 0.5,
+        "mu": 0.5,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_cereal_cereal",
+        "extents_mm": [
+          200.0,
+          150.0,
+          50.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 2.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "cardboard",
+        "density_kgm3": 600.0,
+        "mass_kg": 0.12,
+        "youngs_gpa": 3.0,
+        "mu": 0.4,
+        "confidence": 0.85,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_lid_lid",
+        "extents_mm": [
+          250.0,
+          200.0,
+          20.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 0.5,
+        "seal_patch_rms_mm": 5.0,
+        "material": "plastic",
+        "density_kgm3": 900.0,
+        "mass_kg": 0.045,
+        "youngs_gpa": 2.0,
+        "mu": 0.3,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_milk_milk",
+        "extents_mm": [
+          100.0,
+          100.0,
+          250.0
+        ],
+        "cylinder_like": true,
+        "surface_rms_mm": 1.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "liquid",
+        "density_kgm3": 1030.0,
+        "mass_kg": 0.25,
+        "youngs_gpa": 0.5,
+        "mu": 0.5,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_rolling_pin_rolling_pin",
+        "extents_mm": [
+          450.0,
+          80.0,
+          80.0
+        ],
+        "cylinder_like": true,
+        "surface_rms_mm": 0.5,
+        "seal_patch_rms_mm": 5.0,
+        "material": "wood",
+        "density_kgm3": 700.0,
+        "mass_kg": 0.25,
+        "youngs_gpa": 12.0,
+        "mu": 0.4,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_whisk_whisk",
+        "extents_mm": [
+          300.0,
+          100.0,
+          100.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 0.5,
+        "seal_patch_rms_mm": 5.0,
+        "material": "metal",
+        "density_kgm3": 8000.0,
+        "mass_kg": 0.15,
+        "youngs_gpa": 200.0,
+        "mu": 0.3,
+        "confidence": 0.9,
+        "inner_bbox_mm": null,
+        "wall_mm": null,
+        "floor_mm": null
+      },
+      {
+        "id": "obj_box_packing_box",
+        "extents_mm": [
+          400.0,
+          300.0,
+          200.0
+        ],
+        "cylinder_like": false,
+        "surface_rms_mm": 2.0,
+        "seal_patch_rms_mm": 5.0,
+        "material": "cardboard",
+        "density_kgm3": 600.0,
+        "mass_kg": 0.48,
+        "youngs_gpa": 3.0,
+        "mu": 0.4,
+        "confidence": 0.9,
+        "inner_bbox_mm": [
+          390.0,
+          290.0,
+          180.0
+        ],
+        "wall_mm": 5.0,
+        "floor_mm": 5.0
+      }
+    ],
+    "edges": [
+      {
+        "from": "obj_baguette_baguette",
+        "to": "obj_rolling_pin_rolling_pin",
+        "gap_mm": 10.0
+      },
+      {
+        "from": "obj_baguette_baguette",
+        "to": "obj_whisk_whisk",
+        "gap_mm": 15.0
+      },
+      {
+        "from": "obj_baguette_baguette",
+        "to": "obj_box_packing_box",
+        "gap_mm": 20.0
+      },
+      {
+        "from": "obj_cereal_cereal",
+        "to": "obj_milk_milk",
+        "gap_mm": 5.0
+      },
+      {
+        "from": "obj_cereal_cereal",
+        "to": "obj_whisk_whisk",
+        "gap_mm": 10.0
+      },
+      {
+        "from": "obj_lid_lid",
+        "to": "obj_whisk_whisk",
+        "gap_mm": 5.0
+      },
+      {
+        "from": "obj_box_packing_box",
+        "to": "obj_lid_lid",
+        "gap_mm": 5.0
+      },
+      {
+        "from": "obj_box_packing_box",
+        "to": "obj_rolling_pin_rolling_pin",
+        "gap_mm": 10.0
+      },
+      {
+        "from": "obj_box_packing_box",
+        "to": "obj_whisk_whisk",
+        "gap_mm": 15.0
+      }
+    ]
+  },
+  "feasible_ee": {
+    "obj_baguette_baguette": [
+      "2F",
+      "3F"
+    ],
+    "obj_cereal_cereal": [
+      "vac"
+    ],
+    "obj_lid_lid": [
+      "vac"
+    ],
+    "obj_milk_milk": [
+      "3F"
+    ],
+    "obj_rolling_pin_rolling_pin": [
+      "2F",
+      "3F"
+    ],
+    "obj_whisk_whisk": [
+      "3F"
+    ],
+    "obj_box_packing_box": [
+      "vac"
+    ]
+  },
+  "ee_fallback": {
+    "obj_cereal_cereal": "vac",
+    "obj_lid_lid": "vac",
+    "obj_box_packing_box": "vac"
+  },
+  "usage": {
+    "vlm_prior_attributes": {
+      "calls": 1,
+      "prompt_tokens": 9886,
+      "completion_tokens": 1362,
+      "tokens": 11248,
+      "seconds": 13.61
+    }
+  }
+}

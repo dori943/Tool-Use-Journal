@@ -1062,6 +1062,22 @@ def main():
         json.dumps(serialize(m1), ensure_ascii=False, indent=2), encoding="utf-8")
     np.savez_compressed(OUT / "m1_points.npz",
                         **{n["id"]: n["_points"] for n in m1["nodes"]})
+    # 고정 EE 교체 궤적이 쓸고 가는 팔 부피를 M1 좌표계(로봇 베이스 기준 xy,
+    # 월드 z)로 남긴다. M2 배치표가 이 아래에 키 큰 물체를 두지 않게 한다
+    # (c3_2: 트레이 A 의 머그가 3F->vac 교체 궤적 3mm 아래에 놓여 M5 가 멈춤).
+    keepout_path = OUT / "m1_ee_keepout.npz"
+    try:
+        from tuj.common.ee_keepout import save_height_field
+        from tuj.m5_motion.ee_path_keepout import compute_rack_keepout
+        field = compute_rack_keepout(
+            env, environment_adapter.world_snapshot(), spec["env_name"],
+            ROOT / "configs" / "precomputed_ee_paths")
+        save_height_field(keepout_path, field.shifted((bp[0], bp[1])))
+        print(f"[M1] EE 교체 궤적 keep-out -> {keepout_path} "
+              f"({len(field.trajectory_ids)} paths)")
+    except Exception as error:  # noqa: BLE001 - 없으면 M2 는 높이 검사를 건너뛴다
+        keepout_path.unlink(missing_ok=True)
+        print(f"[M1] 경고: EE 교체 궤적 keep-out 계산 실패 — {error}")
     print("[M1] grounding: "
           f"nodes={stats['n_nodes']} grounded={stats['grounded']} "
           f"memory_hits={stats['memory_hits']} refreshed={stats['geom_refreshed']}")

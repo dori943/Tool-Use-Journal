@@ -1,0 +1,128 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "simulation-run:0000:a8f30a4721a2de0adf41:execution-report",
+  "run_id": "simulation-run:0000:a8f30a4721a2de0adf41",
+  "plan_id": "motion-plan:e2d36dca06e273ae64364681",
+  "provenance": {
+    "artifact_id": "simulation-run:0000:a8f30a4721a2de0adf41:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "simulation-run:0000:a8f30a4721a2de0adf41",
+    "input_artifact_ids": [
+      "simulation-run-artifact:a8f30a4721a2de0adf412810",
+      "motion-plan-artifact:e2d36dca06e273ae64364681"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "FAILED",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      0.3730793923732089,
+      -1.2260036056269898,
+      2.2508357253373754,
+      -2.629082469157887,
+      -1.5988373631360726,
+      0.355528053976322
+    ],
+    "joint_velocities_rad_s": [
+      0.03911999138303656,
+      0.03357377115703876,
+      -0.031744629000518824,
+      -0.0029978926120368394,
+      -0.006411602822297745,
+      0.12477471128265422
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        -0.3024131187868405,
+        0.2843738217883256,
+        0.9005492762230198
+      ],
+      "orientation_xyzw": [
+        0.999725395827626,
+        0.00853897280931909,
+        0.02062161863710335,
+        0.00713916840003605
+      ]
+    },
+    "gripper": {
+      "mode": "CLOSED",
+      "command": 1.0
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 10.519999999976825,
+    "max_joint_tracking_error_rad": 0.1160870408698591,
+    "max_eef_tracking_error_m": 0.015330593378121558,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [
+    {
+      "event_id": "SG1_s1_d1:strategy_01:1:k1:event:0:GRIPPER_CLOSE",
+      "scheduled_time_s": 10.451033229079359,
+      "actual_time_s": 10.519999999976825,
+      "status": "SUCCESS",
+      "message": "finger gripper close command set to 1.000"
+    },
+    {
+      "event_id": "SG1_s1_d1:strategy_01:1:k1:event:1:ATTACH_OBJECT",
+      "scheduled_time_s": 10.451033229079359,
+      "actual_time_s": 10.519999999976825,
+      "status": "FAILED",
+      "message": "object 'scissors' is 0.0847 m from the EE; attach limit is 0.0200 m; closest geom pair 'gripper0_right_right_fingertip_collision' <-> 'scissors_g9' measured by GEOM_QUERY"
+    }
+  ],
+  "failure": {
+    "code": "EVENT_EXECUTION_FAILED",
+    "category": "SIMULATION_RUNTIME",
+    "message": "object 'scissors' is 0.0847 m from the EE; attach limit is 0.0200 m; closest geom pair 'gripper0_right_right_fingertip_collision' <-> 'scissors_g9' measured by GEOM_QUERY",
+    "segment_id": null,
+    "waypoint_index": null,
+    "event_id": "SG1_s1_d1:strategy_01:1:k1:event:1:ATTACH_OBJECT",
+    "expected": {},
+    "observed": {
+      "active_ee": "2F",
+      "attached_object_id": null
+    },
+    "evidence_refs": []
+  },
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "2F",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": 1.0,
+    "ee_transition_count": 1,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 1,
+    "collision_check_count": 526,
+    "nominal_plan_duration_s": 10.772336752359118,
+    "final_plan_time_s": 10.451033229079359,
+    "adaptive_settle_extra_duration_s": 0.06896677089746639,
+    "segment_tracking": [],
+    "gripper_release_waits": []
+  }
+}
