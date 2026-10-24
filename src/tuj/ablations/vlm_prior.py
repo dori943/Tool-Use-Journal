@@ -21,7 +21,7 @@ import copy
 import json
 import time
 from pathlib import Path
-from typing import Any
+from typing import Annotated
 
 from pydantic import BaseModel, ConfigDict, Field, TypeAdapter
 
@@ -30,7 +30,8 @@ from tuj.m1_scene.relations import flat_face, region_clear, top_exposed
 from tuj.m2_subgoal.rough import _image_part, make_llm_client, track_usage
 
 MODE = "without_reasoner"
-POLICY_VERSION = "vlm-prior-attributes-v1"
+POLICY_VERSION = "vlm-prior-attributes-v2"
+PositiveDimension = Annotated[float, Field(gt=0, allow_inf_nan=False)]
 
 # 노드에서 VLM 추정으로 갈아끼우는 키 (geometry 는 통째로 재구성)
 _REPLACED_NODE_KEYS = (
@@ -47,7 +48,9 @@ class _Record(BaseModel):
 
 class ObjectEstimate(_Record):
     id: str
-    extents_mm: list[float] = Field(min_length=3, max_length=3)   # [길이, 폭, 높이] 큰 순서
+    extents_mm: list[PositiveDimension] = Field(min_length=3, max_length=3)  # principal dimensions
+    height_z_mm: PositiveDimension  # vertical height in the observed pose
+    footprint_mm: list[PositiveDimension] = Field(min_length=2, max_length=2)  # tabletop footprint
     cylinder_like: bool
     surface_rms_mm: float = Field(ge=0)        # 상면 거칠기 RMS
     seal_patch_rms_mm: float = Field(ge=0)     # 흡착컵 크기 평면 패치 RMS (없으면 큰 값)
@@ -120,8 +123,12 @@ class VLMPriorEstimator:
             "names ONLY, estimate the physical and geometric attributes of every listed "
             "object. No depth, point cloud, mass sensor or ground truth is available; use "
             "visual appearance and common knowledge of such objects. Units: millimetres, "
-            "kilograms, kg/m^3, GPa. extents_mm is [length, width, height] in descending "
-            "order of the object's principal dimensions. surface_rms_mm is the roughness of "
+            "kilograms, kg/m^3, GPa. extents_mm contains the object's three principal "
+            "dimensions in descending order; these are NOT world x/y/z axes. Separately "
+            "estimate height_z_mm (vertical height above the support surface in the "
+            "observed pose) and footprint_mm (the two horizontal dimensions on that "
+            "surface). Never assume the shortest principal dimension is the height: an "
+            "upright mug can be tallest vertically. surface_rms_mm is the roughness of "
             "the top surface; seal_patch_rms_mm is the plane-fit residual of the flattest "
             "patch of a suction-cup-sized region on top (use >= 5.0 if the top is rounded, "
             "concave or has no such flat patch). mu is the friction coefficient against a "
@@ -160,8 +167,6 @@ class VLMPriorEstimator:
                     if o.id in containers and (o.inner_bbox_mm is None or o.wall_mm is None
                                                or o.floor_mm is None):
                         raise ValueError(f"{o.id} is a container: inner_bbox_mm/wall_mm/floor_mm required")
-                    if any(v <= 0 for v in o.extents_mm):
-                        raise ValueError(f"{o.id}: extents_mm must be positive")
                 return est
             except (ValueError, TypeError) as exc:
                 error = str(exc)[:600]
@@ -169,8 +174,9 @@ class VLMPriorEstimator:
 
 
 def _geometry_from_estimate(o: ObjectEstimate, node: dict) -> dict:
-    ext = sorted(float(v) for v in o.extents_mm)[::-1]            # [L, W, H]
-    length, width, height = ext
+    ext = sorted(float(v) for v in o.extents_mm)[::-1]
+    length, width, _ = ext
+    height = float(o.height_z_mm)
     geom = {
         "length_mm": round(length, 1),
         "diameter_mm": round(width, 1) if o.cylinder_like else None,
@@ -179,7 +185,7 @@ def _geometry_from_estimate(o: ObjectEstimate, node: dict) -> dict:
         "cylinder_like": bool(o.cylinder_like),
         "surface_rms_mm": round(float(o.surface_rms_mm), 3),
         "seal_patch_rms_mm": round(float(o.seal_patch_rms_mm), 3),
-        "footprint_mm": [round(length, 1), round(width, 1)],
+        "footprint_mm": [round(float(v), 1) for v in o.footprint_mm],
         "height_mm": round(height, 1),
     }
     # 관측값(시뮬레이터)은 Full 과 동일하게 유지

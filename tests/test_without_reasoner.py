@@ -39,14 +39,17 @@ def _full_m1():
     }
 
 
-def _estimate(mass_kg=0.2, extents=(100.0, 85.0, 80.0), plate_extents=(180.0, 180.0, 12.0)):
+def _estimate(mass_kg=0.2, extents=(100.0, 85.0, 80.0), plate_extents=(180.0, 180.0, 12.0),
+              height_z_mm=80.0, footprint_mm=(100.0, 85.0)):
     from tuj.ablations.vlm_prior import SceneEstimate
     return SceneEstimate.model_validate({
         "objects": [
             {"id": "obj_mug_mug", "extents_mm": list(extents), "cylinder_like": True,
+             "height_z_mm": height_z_mm, "footprint_mm": list(footprint_mm),
              "surface_rms_mm": 3.0, "seal_patch_rms_mm": 6.0, "material": "ceramic",
              "density_kgm3": 2500.0, "mass_kg": mass_kg, "youngs_gpa": 70.0, "mu": 0.5, "confidence": 0.6},
             {"id": "obj_plate_plate", "extents_mm": list(plate_extents), "cylinder_like": True,
+             "height_z_mm": 12.0, "footprint_mm": [180.0, 180.0],
              "surface_rms_mm": 0.3, "seal_patch_rms_mm": 0.2, "material": "ceramic",
              "density_kgm3": 2500.0, "mass_kg": 0.4, "youngs_gpa": 70.0, "mu": 0.4, "confidence": 0.6},
         ],
@@ -126,3 +129,140 @@ def test_run_dispatch_routes_without_reasoner(monkeypatch):
     monkeypatch.setattr(sys, "argv", ["run.py", "c2_1", "--grounding-mode", "without_reasoner"])
     pipeline.main()
     assert captured and captured[0][0] == "without_reasoner" and captured[0][1] is pipeline
+
+
+@pytest.mark.parametrize("height,footprint", [(120.0, (100.0, 100.0)),
+                                             (100.0, (100.0, 120.0))])
+def test_geometry_preserves_estimated_vertical_axis(height, footprint):
+    from tuj.ablations.vlm_prior import build_prior_scene
+    est = _estimate(extents=(100.0, 100.0, 120.0), height_z_mm=height,
+                    footprint_mm=footprint)
+    mug = build_prior_scene(_full_m1(), est, _robot())["nodes"][0]
+    assert mug["geometry"]["extents_mm"] == [120.0, 100.0, 100.0]
+    assert mug["geometry"]["height_z_mm"] == height
+    assert mug["geometry"]["height_mm"] == height
+    assert mug["geometry"]["footprint_mm"] == list(footprint)
+    assert mug["bbox_mm"] == _full_m1()["nodes"][0]["bbox_mm"]
+
+
+@pytest.mark.parametrize("kwargs", [
+    {"height_z_mm": 0}, {"height_z_mm": float("nan")},
+    {"footprint_mm": (100, -2)}, {"footprint_mm": (100, float("inf"))},
+    {"footprint_mm": (100,)}, {"extents": (100, 0, 20)},
+])
+def test_estimated_dimensions_must_be_positive_and_finite(kwargs):
+    with pytest.raises(ValueError):
+        _estimate(**kwargs)
+
+
+def _runner_case(tmp_path, monkeypatch, with_keepout=True):
+    from types import SimpleNamespace
+    import numpy as np
+    monkeypatch.syspath_prepend(str(ROOT / "scripts"))
+    import run_without_reasoner as runner
+    from tuj.common.ee_keepout import SweptArmHeightField, save_height_field
+    from tuj.m2_subgoal.ground import load_scene
+
+    def m1(task, execution, args):
+        assert args.backend == "mock" and args.memory == "none"
+        (execution / "m1.json").write_text(json.dumps(_full_m1()))
+        (execution / "frame.png").write_bytes(b"frame supplied to mocked VLM")
+        np.savez(execution / "m1_points.npz", points=np.array([1, 2, 3]))
+        if with_keepout:
+            save_height_field(execution / "m1_ee_keepout.npz", SweptArmHeightField(
+                origin_xy=np.array([0., 0.]), cell_m=.01,
+                floor_z=np.full((2, 2), 1.0), trajectory_ids=("test-sweep",)))
+
+    def m2(task, out, args):
+        scene = load_scene(out / "m1.json")
+        if with_keepout:
+            assert scene["_ee_keepout"].trajectory_ids == ("test-sweep",)
+        else:
+            assert scene["_ee_keepout"] is None
+        assert not (out / "m1_points.npz").exists()
+        (out / "m2.json").write_text(json.dumps({"m2_stats": {}}))
+
+    class Estimator:
+        usage = {}
+
+        def __init__(self, *args):
+            pass
+
+        def estimate(self, *args):
+            return _estimate()
+
+    monkeypatch.setattr(runner, "VLMPriorEstimator", Estimator)
+    args = SimpleNamespace(
+        planner_mode="full", m5_physical=False, m5_args=[], start_from=None,
+        stop_after="m2", task="c2_1", output_dir=tmp_path / "run", seed=0,
+        backend="unused", memory="unused", scene_frame=None,
+        robot_spec=ROOT / "configs/robot_spec.json", model="mock")
+    pipeline = SimpleNamespace(ROOT=ROOT, STAGES=("m1", "m2", "m4", "m5"),
+                               stage_m1=m1, stage_m2=m2)
+    return runner, args, pipeline
+
+
+@pytest.mark.parametrize("with_keepout", [True, False])
+def test_reasoner_runner_passes_only_keepout_to_m2(tmp_path, monkeypatch, with_keepout):
+    runner, args, pipeline = _runner_case(tmp_path, monkeypatch, with_keepout)
+    runner.run(args, pipeline)
+    manifest = json.loads((args.output_dir / "ablation_manifest.json").read_text())
+    assert ("m1_ee_keepout.npz" in manifest["artifacts"]) is with_keepout
+
+
+@pytest.mark.parametrize("change", ["remove", "modify", "unexpected"])
+def test_resume_checks_keepout_provenance(tmp_path, monkeypatch, change):
+    runner, args, pipeline = _runner_case(tmp_path, monkeypatch, change != "unexpected")
+    runner.run(args, pipeline)
+    keepout = args.output_dir / "m1_ee_keepout.npz"
+    if change == "remove":
+        keepout.unlink()
+    else:
+        keepout.write_bytes(b"different sweep")
+    args.start_from = "m2"
+    with pytest.raises(ValueError, match="m1_ee_keepout"):
+        runner.run(args, pipeline)
+
+
+def test_resume_rejects_old_geometry_policy(tmp_path, monkeypatch):
+    runner, args, pipeline = _runner_case(tmp_path, monkeypatch)
+    runner.run(args, pipeline)
+    path = args.output_dir / "ablation_manifest.json"
+    manifest = json.loads(path.read_text())
+    manifest["policy_version"] = "vlm-prior-attributes-v1"
+    path.write_text(json.dumps(manifest))
+    args.start_from = "m2"
+    with pytest.raises(ValueError, match="policy_version"):
+        runner.run(args, pipeline)
+
+
+def test_current_policy_can_resume_with_matching_keepout(tmp_path, monkeypatch):
+    runner, args, pipeline = _runner_case(tmp_path, monkeypatch)
+    runner.run(args, pipeline)
+    args.start_from = "m2"
+    runner.run(args, pipeline)
+    manifest = json.loads((args.output_dir / "ablation_manifest.json").read_text())
+    assert manifest["stages"]["m2"] == "completed"
+
+
+def test_vlm_request_and_response_include_pose_dimensions(tmp_path):
+    from types import SimpleNamespace
+    from tuj.ablations.vlm_prior import VLMPriorEstimator, identity_view
+    expected = _estimate(extents=(100, 100, 120), height_z_mm=120,
+                         footprint_mm=(100, 100))
+    requests = []
+
+    def create(**request):
+        requests.append(request)
+        message = SimpleNamespace(content=expected.model_dump_json(by_alias=True))
+        return SimpleNamespace(choices=[SimpleNamespace(message=message)], usage=None)
+
+    frame = tmp_path / "frame.png"
+    frame.write_bytes(b"test image; no external API")
+    client = SimpleNamespace(chat=SimpleNamespace(completions=SimpleNamespace(create=create)))
+    result = VLMPriorEstimator("mock", frame, client=client).estimate(
+        identity_view(_full_m1()), "Move the mug")
+    assert result.objects[0].height_z_mm == 120
+    prompt = requests[0]["messages"][0]["content"][0]["text"]
+    assert "height_z_mm" in prompt and "footprint_mm" in prompt
+    assert "NOT world x/y/z axes" in prompt

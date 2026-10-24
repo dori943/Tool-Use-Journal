@@ -11,8 +11,12 @@ Full 코드 그대로 호출한다. 자세한 정책은 tuj.ablations.vlm_prior 
          execution/            Full M1 원본 (mock backend, memory 미사용 — 값은 버림)
          m1_full.json          Full M1 payload 사본 (사후 비교용)
          m1.json               VLM 추정으로 대체된 payload  ← 이후 단계 입력
+         m1_ee_keepout.npz      공유 EE 교체 금지영역 (M1이 생성한 경우에만)
          vlm_prior.json        VLM 원응답 + feasible_ee 표 + fallback 목록
          m2.json, gk_*.json, m4.json, m5/, run_result.json
+
+v2는 VLM에 세로 높이와 바닥면 크기를 별도로 요청한다. v1 결과는 새 출력
+폴더에서 M1부터 다시 실행해야 하며, 기존 결과는 재집계용으로 보존할 수 있다.
 """
 
 from __future__ import annotations
@@ -76,6 +80,8 @@ def run(args, pipeline):
         manifest = _read(manifest_path)
         if (manifest.get("method"), manifest.get("task"), manifest.get("seed")) != (MODE, task, args.seed):
             raise ValueError("output directory belongs to a different ablation/task/seed")
+        if manifest.get("policy_version") != POLICY_VERSION:
+            raise ValueError("policy_version changed; rerun M1/VLM in a fresh output directory")
         if not args.start_from:
             raise ValueError("existing run requires --start-from or a fresh output directory")
     else:
@@ -139,6 +145,16 @@ def run(args, pipeline):
                 raise ValueError("Matching frame.png is missing; provide --scene-frame")
             shutil.copyfile(frame, out / "frame.png")
             shutil.copyfile(execution / "m1.json", out / "m1_full.json")
+            # Robot sweep geometry is shared by Full and this ablation. Keep
+            # it beside the replacement m1.json, where M2 load_scene reads it.
+            # Do not copy m1_points.npz: measured object geometry is ablated.
+            keepout_name = "m1_ee_keepout.npz"
+            keepout = execution / keepout_name
+            if keepout.is_file():
+                shutil.copyfile(keepout, out / keepout_name)
+                checkpoint(keepout_name)
+            else:
+                (out / keepout_name).unlink(missing_ok=True)
             for name in ("execution/m1.json", "frame.png", "m1_full.json"):
                 checkpoint(name)
             manifest["stages"]["m1"] = "prepared"
@@ -172,8 +188,15 @@ def run(args, pipeline):
                 fb = prior["ablation"]["ee_fallback"].get(nid)
                 print(f"    {nid}: {ees}" + (f"  (fallback={fb})" if fb else ""))
         else:
-            for name in ("m1.json", "vlm_prior.json"):
-                if name not in manifest["artifacts"] or _digest(out / name) != manifest["artifacts"][name]:
+            names = ["m1.json", "vlm_prior.json"]
+            keepout_name = "m1_ee_keepout.npz"
+            if keepout_name in manifest["artifacts"]:
+                names.append(keepout_name)
+            elif (out / keepout_name).exists():
+                raise ValueError(f"resume found unexpected {keepout_name} from another run")
+            for name in names:
+                if (name not in manifest["artifacts"] or not (out / name).is_file()
+                        or _digest(out / name) != manifest["artifacts"][name]):
                     raise ValueError(f"resume requires unchanged {name} from this run")
             stage_status["m1"] = stage_status["vlm_prior"] = "resumed"
         if stop == 0:
