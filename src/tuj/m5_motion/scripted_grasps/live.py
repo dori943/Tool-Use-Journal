@@ -68,6 +68,8 @@ class ScriptedGraspSession:
         self._planner = None
         self._planner_key = None
         self._ee_path_keepouts = {}
+        from .preservation import PlacementPreservation
+        self._placement_preservation = PlacementPreservation()
         # Per-step artifact dirs (``<index>-<token>`` and their ``grasp``/plan
         # subfolders) are created with exist_ok=False, and a re-run reuses the
         # same index+request-hash names, so a prior run's tree collides
@@ -178,13 +180,6 @@ class ScriptedGraspSession:
             # penetration resolution; all original arm limits remain in force.
             contact_speed = ContactExecutionProfile().contact_penetration_m / env.control_timestep
             request.constraints.max_cartesian_speed_m_s = min(request.constraints.max_cartesian_speed_m_s or contact_speed, contact_speed)
-        if retention is not None:
-            from .packing_validity import needs_packing_transport_filter, bind_packing_transport_filter
-            if needs_packing_transport_filter(request, retention):
-                bind_packing_transport_filter(request, retention, self._get_planner())
-            from .transport import ground_held_region_goal
-            self._bind_ee_path_keepout(request)
-            ground_held_region_goal(request, retention)
         token = hashlib.sha256(request.model_dump_json().encode()).hexdigest()[:20]
         request.request_id = f"motion-request:live:{token}"
         request.provenance = request.provenance.model_copy(update={
@@ -210,6 +205,14 @@ class ScriptedGraspSession:
         }
         self.records.append(record)
         try:
+            if retention is not None:
+                from .packing_validity import needs_packing_transport_filter, bind_packing_transport_filter
+                if needs_packing_transport_filter(request, retention):
+                    bind_packing_transport_filter(request, retention, self._get_planner())
+                from .transport import ground_held_region_goal
+                self._bind_ee_path_keepout(request)
+                ground_held_region_goal(request, retention)
+            store.save_request(request, index=0)
             entry = resolve(request)
             if entry is not None:
                 record.update(route="SCRIPTED_GRASP", object_id=entry.object_id,
@@ -250,6 +253,10 @@ class ScriptedGraspSession:
                 save_json(directory / 'flattening_evaluation.json', evidence)
                 if not passed:
                     raise RuntimeError('FLATTEN_PHYSICAL_GOAL_NOT_SATISFIED')
+            checks = self._placement_preservation.observe(task, self.world)
+            if checks:
+                record['placement_preservation'] = checks
+                save_json(directory / 'placement_preservation.json', checks)
             if completed_subgoal and completed_subgoal not in self.world.scene.completed_subgoals:
                 self.world.scene.completed_subgoals.append(completed_subgoal)
             record["status"] = "SUCCESS"
@@ -260,6 +267,10 @@ class ScriptedGraspSession:
             return record
         except Exception as error:
             record.update(status="FAILED", error=f"{type(error).__name__}: {error}")
+            from .preservation import PlacementPreservationError
+            if isinstance(error, PlacementPreservationError):
+                record['placement_preservation'] = error.checks
+                save_json(directory / 'placement_preservation.json', error.checks)
             if getattr(error, "compilation", None) is not None:
                 from tuj.m5_motion.object_function_runner import _write_planning_failure
                 record["planning_failure"] = str(_write_planning_failure(directory, request, error))

@@ -454,27 +454,15 @@ def test_tray_place_avoids_stacking_on_nested_platform():
     assert carried_center[2] - half_height < plate_center[2] + .005 + 1e-6
 
 
-def test_a_full_region_prefers_least_overlap_not_stacking_on_occupant():
-    """No clear tray floor left: minimize penetration, still do not stack on plate."""
+def test_a_full_region_rejects_placement_instead_of_overlapping():
     from tuj.m5_motion.scripted_grasps.transport import ground_held_place
     request = _tray_request(.005)
     request.task.action_type = 'place'
     _generic_held(request, ENTRIES[4].object_id)
-    plate_center = _plate_in_tray(request, half_xy=(.14, .09), thickness=.01)
-    ground_held_place(request)
-    hint = request.task.metadata['held_place_goal']
-    destination = REGION @ request.world.objects['tray']['anchors'][hint['anchor']] + REGION_POSITION
-    carried_center = destination + BODY[:3, :3] @ CENTER_IN_BODY
-    my_half = np.abs(BODY[:2, :3]) @ LOCAL_SIZE / 2.
-    # Must not sit fully on the plate (old stacking behaviour).
-    assert np.any(
-        np.abs(carried_center[:2] - plate_center[:2]) + my_half
-        > np.array([.14, .09]) + 1e-9
-    )
-    half_height = float(np.abs(BODY[2, :3]) @ LOCAL_SIZE / 2.)
-    plate_top = plate_center[2] + .005
-    # Released on the tray floor, not stacked on the plate top.
-    assert carried_center[2] - half_height < plate_top - 1e-6
+    _plate_in_tray(request, half_xy=(.14, .09), thickness=.01)
+    with pytest.raises(ValueError, match='PLACEMENT_SPACE_EXHAUSTED'):
+        ground_held_place(request)
+    assert 'held_place_goal' not in request.task.metadata
 
 
 def test_tray_place_keeps_clear_of_taller_neighbour_without_stacking_on_plate():

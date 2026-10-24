@@ -633,11 +633,16 @@ class _Grounding:
             return self.ee_path_clearance(xy) >= 0.
 
         if self.ee_path_keepout is None:
-            return self._free_destination_xy(None)
+            xy = self._free_destination_xy(None)
+            if xy is None:
+                raise ValueError('PLACEMENT_SPACE_EXHAUSTED: no unoccupied seat')
+            return xy
         xy = self._free_destination_xy(outside_sweep)
         unavoidable = xy is None
         if unavoidable:
             xy = self._free_destination_xy(None)
+        if xy is None:
+            raise ValueError('PLACEMENT_SPACE_EXHAUSTED: no unoccupied seat')
         note = {'clearance_m': round(float(self.ee_path_clearance(xy)), 4)}
         if unavoidable:
             note['unavoidable'] = True
@@ -647,49 +652,21 @@ class _Grounding:
         self.task.metadata['ee_path_keepout_seat'] = note
         return xy
 
-    def _free_destination_xy(self, seat_allowed):
-        """The plan's slot when it is clear enough, else the least-overlapping seat.
-
-        Nested platforms already inside the region are stacking-forbidden: a
-        small contact tolerance is allowed, but the search never prefers resting
-        fully on them.  Thin occupants remain hard blockers.  Returning the
-        anchor whenever it was taken put every object at the same place
-        (c3_1: mug into the plate).
-
-        ``seat_allowed`` is an extra hard filter.  With one, ``None`` is
-        returned when no seat passes it; without one the best-overlap fallback
-        below always yields a seat.
-        """
-        occupants = self._occupants()
-        mine = self.half[:2]
+    def seat_clear_of_occupants(self, xy):
         margin = max(.01, float(self.request.constraints.collision_margin_m) * 2.)
-        # 0912: 여기에 "점유자가 없으면 영역 중심을 돌려준다" 는 이른 리턴이
-        # 있었다. 영역이 비어 있는 때가 바로 첫 물체를 놓는 순간이라, 계획이
-        # 배정한 칸이 가장 필요한 그 배치에서 _slot_xy() 를 아예 보지 못하고
-        # 모두가 중심을 겨눴다. 빈 영역은 아래 clearance(anchor) 가 무한대를
-        # 돌려주어 슬롯을 그대로 쓰므로 따로 처리할 필요가 없다.
-        # (같은 자리에 clearance 가 두 번 정의돼 있었다. 첫 정의는 두 번째에
-        # 가려진 죽은 코드인데 occupants 를 2개씩 풀어 실행되면 터진다. 지운다.)
+        for center, half, _top, soft in self._occupants():
+            gap = float(np.max(np.abs(xy - center) - (half + self.half[:2] + margin)))
+            limit = -OCCUPANT_CONTACT_TOLERANCE_M if soft else 0.
+            if gap < limit:
+                return False
+        return True
 
-        def clearance(xy):
-            """Smallest per-object AABB separation; >= 0 means no contact."""
-            if not occupants:
-                return float('inf')
-            return min(float(np.max(np.abs(xy - c) - (h + mine + margin)))
-                       for c, h, _t, _soft in occupants)
+    def _free_destination_xy(self, seat_allowed):
+        """Find an unoccupied seat, or return None. Never accept overlap as fallback."""
+        mine = self.half[:2]
 
         def acceptable(xy):
-            """Clear enough: hard blockers need gap>=0; soft platforms allow a graze."""
-            if seat_allowed is not None and not seat_allowed(xy):
-                return False
-            if not occupants:
-                return True
-            for c, h, _t, soft in occupants:
-                gap = float(np.max(np.abs(xy - c) - (h + mine + margin)))
-                limit = -OCCUPANT_CONTACT_TOLERANCE_M if soft else 0.
-                if gap < limit:
-                    return False
-            return True
+            return (seat_allowed is None or seat_allowed(xy)) and self.seat_clear_of_occupants(xy)
 
         anchor = self._slot_xy()
         if anchor is None:
@@ -698,23 +675,17 @@ class _Grounding:
             return anchor
         limit = self.usable_half_xy() - mine
         if np.any(limit <= 0.):
-            return None if seat_allowed is not None else anchor
+            return None
         center_xy = self.region_world[:2]
         xs = np.arange(-limit[0], limit[0] + 1e-9, FREE_SPOT_GRID_M)
         ys = np.arange(-limit[1], limit[1] + 1e-9, FREE_SPOT_GRID_M)
-        best, best_key = anchor, None
         for dx, dy in sorted(((dx, dy) for dx in xs for dy in ys),
                              key=lambda v: (v[0] - (anchor - center_xy)[0]) ** 2
                              + (v[1] - (anchor - center_xy)[1]) ** 2):
             xy = center_xy + np.array([dx, dy])
             if acceptable(xy):
                 return xy
-            # No seat within contact policy: minimize penetration (max gap).
-            # Do not rank by resting on a stacking-forbidden platform.
-            key = (clearance(xy), -float(np.sum((xy - anchor) ** 2)))
-            if best_key is None or key > best_key:
-                best, best_key = xy, key
-        return None if seat_allowed is not None else best
+        return None
 
     def place_xy_away_from(
         self,
@@ -1059,12 +1030,16 @@ def _clear_finger_overhang(g, desired_xy):
         min_shift_m=shortfall,
         current_xy=seat,
     )
-    if shifted is not None:
+    def fingers_clear(xy):
+        return all(float(np.max(np.abs(xy - center) - (np.asarray(half) + mine)))
+                   >= reach + margin - 1e-9 for center, half, _top, _soft in occupants)
+
+    if shifted is not None and g.seat_clear_of_occupants(shifted) and fingers_clear(shifted):
         return shifted
     away = seat - nearest
     norm = float(np.linalg.norm(away))
     if norm <= 1e-9:
-        return desired_xy
+        raise ValueError("PLACEMENT_FINGER_SPACE_EXHAUSTED")
     away /= norm
     limit = g.usable_half_xy() - mine
     for direction in (
@@ -1074,9 +1049,11 @@ def _clear_finger_overhang(g, desired_xy):
     ):
         candidate = seat + direction * shortfall
         offset = candidate - g.region_world[:2]
-        if np.all(np.abs(offset) <= limit + 1e-9):
+        if (np.all(np.abs(offset) <= limit + 1e-9)
+                and g.seat_clear_of_occupants(candidate)
+                and fingers_clear(candidate)):
             return candidate
-    return desired_xy
+    raise ValueError("PLACEMENT_FINGER_SPACE_EXHAUSTED")
 
 
 def _seat_held_place_at(g, desired_xy):

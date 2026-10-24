@@ -113,6 +113,30 @@ def _released(world, names):
     return not remaining, {"still_held": remaining}
 
 
+def evaluate_placement(world, target, region):
+    """A released, contained object resting on its measured destination.
+
+    Shared by task evaluation and live preservation checks; missing measured
+    geometry is unknown and must never be interpreted as success.
+    """
+    checks = []
+    for name, predicate in (
+        ('contained', lambda: _containment(world['objects'], target, region)),
+        ('supported', lambda: _resting(world['objects'], target, region)),
+        ('released', lambda: _released(world, [target])),
+    ):
+        try:
+            passed, evidence = predicate()
+        except (KeyError, ValueError, TypeError, IndexError, ZeroDivisionError) as exc:
+            passed, evidence = None, {'reason': f'insufficient evidence: {exc}'}
+        checks.append({'name': name, 'passed': bool(passed) if passed is not None else None,
+                       'evidence': evidence})
+    values = [c['passed'] for c in checks]
+    return {'target': target, 'region': region,
+            'passed': False if False in values else (None if None in values else True),
+            'checks': checks}
+
+
 def _parallel(objects, a, b):
     axes = []
     for name in (a, b):
