@@ -28,7 +28,7 @@ scripts/run.py 를 task × seed 로 반복 호출하고, 각 실행의 로그/JS
 
 batch_record.json 주요 필드:
   task, seed, method, exit_code, duration_s, started_at
-  failure_stage   : m1 | m2 | independent_assignment | m4 | m5_planning | m5_execution | none | unknown
+  failure_stage   : m1 | vlm_prior | m2 | gk | independent_assignment | m4 | m5 | m5_planning | m5_execution | goal | none | unknown
   plan_status     : without_planner_result.plan_status (M4 대체 할당 결과)
   m5_status       : m5_summary.status
   success         : without_planner_result.success (현재 run.py 기준 = M5 status == SUCCESS)
@@ -78,7 +78,7 @@ CODE_IGNORE = {
 }
 OBJECT_RE = re.compile(r"(?:grasp of|object|held|lost|dropped|slip(?:ped)?)[^'\"]{0,40}['\"]([A-Za-z0-9_]+)['\"]")
 LOG_LINE_RE = re.compile(
-    r"(\[err\]|\[중단\]|Error\b|Exception\b|FAILED|_FAILED|REJECTED|EXHAUSTED|SLIP|VIOLATION|실패)"
+    r"(\[err\]|\[중단\]|Error\b|Exception\b|FAILED|_FAILED|REJECTED|EXHAUSTED|SLIP|VIOLATION|INFEASIBLE|invalid input|실패)"
 )
 
 
@@ -282,7 +282,13 @@ def collect_record(out: Path, *, task: str, seed: int, method: str,
         break
 
     # 7) run.log — traceback 과 에러성 줄
-    log = Path(log) if log else out / "run.log"
+    # Archived runs may contain Windows paths; prefer the run-local copy.
+    log_name = str(log).replace("\\", "/").rsplit("/", 1)[-1] if log else "run.log"
+    candidates = [out / log_name]
+    if log:
+        candidates.append(Path(log))
+    candidates.extend([out / "run.log", out / f"{out.name}.log"])
+    log = next((p for p in candidates if p.is_file()), out / "run.log")
     if log.is_file():
         try:
             lines = log.read_text(encoding="utf-8", errors="replace").splitlines()
@@ -306,27 +312,43 @@ def collect_record(out: Path, *, task: str, seed: int, method: str,
             if len(messages) >= 60:
                 break
 
+    # A timed-out M5-only retry may leave run_result.json from its previous
+    # attempt. It must not inherit that attempt's completion or goal verdict.
+    if exit_code == -9:
+        rec.update(success=False, exec_success=False, goal_success=None,
+                   exec_success_first_try=None, task_goal_status="NOT_EVALUATED")
+        if not failure:
+            rec["failure_stage"] = "unknown"
+
     # 실패 단계 보정
-    m5_ok = rec["m5_status"] == "SUCCESS" and not failure and exit_code in (0, None)
-    if rec["success"] is True or m5_ok:
+    m5_ok = (rec["m5_status"] == "SUCCESS" and not failure
+             and rec.get("goal_success") is not False
+             and rec["success"] is not False and exit_code in (0, None))
+    if (rec["success"] is True or m5_ok) and exit_code in (0, None):
         # 성공한 run 에 남아 있는 m5_failure.json 은 중간에 거절된 전략일 뿐이다
         rec["failure_stage"] = "none"
         rec["planning_rejections_seen"] = dict(codes)
         codes = Counter()
         messages = [m for m in messages if not m.startswith("[m5_failure")]
     if rec["failure_stage"] == "unknown":
-        if rec["success"] is True or (rec["m5_status"] == "SUCCESS" and exit_code == 0):
+        if (rec["success"] is True or m5_ok) and exit_code in (0, None):
             rec["failure_stage"] = "none"
         elif failure.get("stage") == "m5":
             rec["failure_stage"] = "m5_planning"
         elif stages:
-            # 마지막으로 완료되지 않은 단계
-            for st, val in stages.items():
-                if val not in ("completed", "SUCCESS", "skipped") and val is not None:
-                    rec["failure_stage"] = st
+            # prepared/resumed are completed prerequisites, not failures.
+            # Prefer an explicit failure, then the last running stage. M5
+            # without a detailed report stays "m5"; do not guess its substage.
+            for state in ("failed", "running"):
+                active = [st for st, val in stages.items() if str(val).lower() == state]
+                if active:
+                    rec["failure_stage"] = active[-1]
                     break
     if exit_code not in (0, None) and rec["failure_stage"] == "none":
         rec["failure_stage"] = "unknown"
+
+    if exit_code == -9:
+        note("batch", "BATCH_TIMEOUT: run interrupted by the batch time limit")
 
     # 중복 제거 + 상한
     dedup, seen = [], set()
@@ -337,7 +359,7 @@ def collect_record(out: Path, *, task: str, seed: int, method: str,
         dedup.append(m)
     rec["messages"] = dedup[:40]
     rec["reason_codes"] = dict(codes.most_common())
-    rec["reason_code"] = codes.most_common(1)[0][0] if codes else None
+    rec["reason_code"] = "BATCH_TIMEOUT" if exit_code == -9 else (codes.most_common(1)[0][0] if codes else None)
     rec["involved_objects"] = [o for o, _ in objects.most_common(5)]
     rec["sources"] = sorted(set(rec["sources"]))
     return rec
@@ -374,23 +396,31 @@ def write_summaries(method_dir: Path, records: list[dict]) -> None:
         all_codes.update(r.get("reason_codes") or {})
         all_objs.update(r.get("involved_objects") or [])
 
+    report_stages = ["m1", "vlm_prior", "m2", "gk", "independent_assignment", "m4",
+                     "m5", "m5_planning", "m5_execution", "goal", "unknown"]
+    columns = ["task", "runs", "pipeline success", *report_stages,
+               "1차시도 exec 성공", "목표 달성/평가", "목표 미평가", "최빈 원인 코드"]
     lines = [f"# {method_dir.name} 에러 요약", "",
              f"갱신: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  총 {len(records)}회 실행", "",
+             "pipeline success는 목표 미평가 시 실행 완료만 뜻합니다. 목표 달성 여부와 구분하세요.",
+             "m5는 세부 단계가 확인되지 않은 M5 중단입니다.", "",
              "## 태스크별 성공 / 실패 단계", "",
-             "| task | runs | success | " + " | ".join(
-                 ["m1", "m2", "independent_assignment", "m4", "m5_planning", "m5_execution", "goal", "unknown"]) + " | 1차시도 exec 성공 | 최빈 원인 코드 |",
-             "|---|---|---|---|---|---|---|---|---|---|---|---|---|"]
+             "| " + " | ".join(columns) + " |",
+             "|" + "---|" * len(columns)]
     for t in tasks:
         rs = [r for r in records if r["task"] == t]
         succ = sum(1 for r in rs if r.get("success") is True)
+        evaluated = sum(r.get("goal_success") is not None for r in rs)
+        goals = sum(r.get("goal_success") is True for r in rs)
+        goal_result = f"{goals}/{evaluated}" if evaluated else "미평가"
         st = by_task_stage[t]
         top = by_task_code[t].most_common(1)
         first = sum(1 for r in rs if r.get("exec_success_first_try") is True)
         lines.append(
             f"| {t} | {len(rs)} | {succ}/{len(rs)} | "
-            + " | ".join(str(st.get(k, 0)) for k in
-                         ["m1", "m2", "independent_assignment", "m4", "m5_planning", "m5_execution", "goal", "unknown"])
-            + f" | {first}/{len(rs)} | {top[0][0] + ' (' + str(top[0][1]) + ')' if top else '-'} |")
+            + " | ".join(str(st.get(k, 0)) for k in report_stages)
+            + f" | {first}/{len(rs)} | {goal_result} | {len(rs) - evaluated} | "
+            + f"{top[0][0] + ' (' + str(top[0][1]) + ')' if top else '-'} |")
 
     lines += ["", "## 원인 코드 빈도 (전체)", "", "| code | count |", "|---|---|"]
     for code, n in all_codes.most_common(25):
@@ -420,21 +450,33 @@ def write_summaries(method_dir: Path, records: list[dict]) -> None:
 
 def load_all_records(method_dir: Path, method: str) -> list[dict]:
     """errors.jsonl 대신 폴더를 다시 훑어 최신 상태로 집계한다."""
+    def refresh(seed_dir, previous):
+        return {**previous, **collect_record(
+            seed_dir, task=previous["task"], seed=previous["seed"], method=method,
+            exit_code=previous.get("exit_code"), duration_s=previous.get("duration_s"),
+            started_at=previous.get("started_at"), log=previous.get("log"))}
+
     records = []
     for seed_dir in sorted(method_dir.glob("*/seed_*")):
         if not seed_dir.is_dir() or "_prev_" in seed_dir.name:
             continue
         jl = seed_dir / "batch_records.jsonl"
         if jl.is_file():
+            history = []
             for line in jl.read_text(encoding="utf-8").splitlines():
                 try:
-                    records.append(json.loads(line))
+                    history.append(json.loads(line))
                 except json.JSONDecodeError:
                     pass
-            continue
+            if history:
+                # M5-only repeats share a directory. Current artifacts belong
+                # only to the last record; preserve earlier measurements.
+                records.extend(history[:-1])
+                records.append(refresh(seed_dir, history[-1]))
+                continue
         rec = _read_json(seed_dir / "batch_record.json")
         if rec:
-            records.append(rec)
+            records.append(refresh(seed_dir, rec))
     # batch_record 가 없는(수동 실행) 폴더도 수집
     for seed_dir in sorted(method_dir.glob("*/seed_*")):
         if (seed_dir / "batch_record.json").exists() or (seed_dir / "batch_records.jsonl").exists() \
@@ -532,10 +574,6 @@ def run_one(args, task: str, seed: int, out: Path, extra: list[str], *, rep: int
     rec["rep"] = rep
     rec["m5_only"] = bool(args.m5_only)
     rec["log"] = str(log)
-    if exit_code == -9:
-        rec["failure_stage"] = rec["failure_stage"] if rec["failure_stage"] != "none" else "unknown"
-        rec["messages"].insert(0, f"[batch] TIMEOUT after {args.timeout_min} min")
-        rec["reason_code"] = rec["reason_code"] or "BATCH_TIMEOUT"
     _write_json(out / "batch_record.json", rec)
     with (out / "batch_records.jsonl").open("a", encoding="utf-8") as fh:
         fh.write(json.dumps(rec, ensure_ascii=False) + "\n")
