@@ -314,7 +314,7 @@ def test_payload_prefers_matching_rigid_attachment_transform() -> None:
         0.0,
     ]
     assert "must-not-cross-provider-boundary" not in call["input"]
-    assert "Every generated keyframe denotes the EEF/TCP pose" in call[
+    assert "Keyframes normally denote the EEF/TCP pose" in call[
         "instructions"
     ]
 
@@ -1370,3 +1370,82 @@ def test_grounded_tool_home_return_uses_exact_object_space_release_anchor() -> N
         assert keyframe.metadata["pose_subject"] == "ATTACHED_OBJECT"
     assert place.offset_along_approach_m == 0.0
     assert "pose_subject" not in retreat.metadata
+
+
+def _complete_transport_request():
+    request = _held_transport_request()
+    request.task.metadata['held_transport_goal'] = {
+        'frame_ref': 'object:tray', 'anchor': 'held_transport_goal',
+        'start_anchor': 'held_transport_start', 'preserve_grasp_orientation': True,
+        'start_object_orientation_xyzw': [0., 0., 0., 1.],
+        'object_orientation_xyzw': [0., 0., 0.7071067811865476, 0.7071067811865476],
+    }
+    return request
+
+
+def test_start_relative_lift_keeps_measured_orientation_with_nonzero_offset():
+    request = _complete_transport_request()
+    batch = _transfer_batch()
+    batch.candidates[1].keyframes[0].offset_along_approach_m = .2
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model='gpt-test', candidate_count=2),
+        client=_FakeClient(batch),
+    )
+    artifact = provider.generate(request)
+    lift = artifact.candidates[1].keyframes[0]
+    assert lift.offset_along_approach_m == .2
+    assert lift.metadata['packing_orientation_xyzw'] == [0., 0., 0., 1.]
+    assert artifact.candidates[1].keyframes[1].metadata['packing_orientation_xyzw'] == (
+        request.task.metadata['held_transport_goal']['object_orientation_xyzw'])
+
+
+def test_missing_direct_transport_is_repaired_within_candidate_budget():
+    from tuj.m5_motion.schema import StrategyGeneratorKind
+    request = _complete_transport_request()
+    batch = _transfer_batch()
+    for candidate in batch.candidates:
+        candidate.keyframes[0].offset_along_approach_m = .2
+    before_request, before_batch = request.model_dump(), batch.model_dump()
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model='gpt-test', candidate_count=2),
+        client=_FakeClient(batch),
+    )
+    artifact = provider.generate(request)
+    assert len(artifact.candidates) == 2
+    direct = artifact.candidates[0]
+    assert direct.provenance.generator_kind is StrategyGeneratorKind.TASK_GEOMETRY
+    assert direct.metadata['replaced_strategy_id'].endswith(':hover')
+    assert [k.anchor for k in direct.keyframes] == ['held_transport_start', 'held_transport_goal']
+    assert all(k.offset_along_approach_m == 0. and k.planner.value == 'SAMPLING_BASED'
+               and not k.events_after for k in direct.keyframes)
+    assert direct.keyframes[0].metadata['packing_orientation_xyzw'] == [0., 0., 0., 1.]
+    assert direct.keyframes[1].metadata['packing_orientation_xyzw'] == (
+        request.task.metadata['held_transport_goal']['object_orientation_xyzw'])
+    assert request.model_dump() == before_request
+    assert batch.model_dump() == before_batch
+
+
+def test_existing_direct_transport_is_retained_without_extra_candidates():
+    request = _complete_transport_request()
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model='gpt-test', candidate_count=2),
+        client=_FakeClient(_transfer_batch()),
+    )
+    artifact = provider.generate(request)
+    assert len(artifact.candidates) == 2
+    assert all(c.provenance.generator_kind.value == 'VLM' for c in artifact.candidates)
+
+
+def test_direct_transport_requires_complete_grounded_pose_metadata():
+    request = _complete_transport_request()
+    del request.task.metadata['held_transport_goal']['start_object_orientation_xyzw']
+    batch = _transfer_batch()
+    for candidate in batch.candidates:
+        candidate.keyframes[0].offset_along_approach_m = .2
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model='gpt-test', candidate_count=2),
+        client=_FakeClient(batch),
+    )
+    artifact = provider.generate(request)
+    assert all(c.provenance.generator_kind.value == 'VLM' for c in artifact.candidates)
+    assert all(c.keyframes[0].offset_along_approach_m == .2 for c in artifact.candidates)

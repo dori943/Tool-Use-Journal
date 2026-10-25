@@ -63,7 +63,7 @@ from tuj.m5_motion.task_semantics import (
 )
 
 
-_PROMPT_VERSION = "OPENAI_KEYFRAME_STRATEGY_V9"
+_PROMPT_VERSION = "OPENAI_KEYFRAME_STRATEGY_V10"
 _SENSITIVE_KEYS = {
     "api_key",
     "apikey",
@@ -493,6 +493,91 @@ def _held_goal_subject(request: MotionPlanRequest) -> _HeldGoalSubject | None:
     )
 
 
+def _ensure_grounded_transport_direct(
+    request: MotionPlanRequest,
+    strategies: list[KeyframePlanCandidate],
+) -> list[KeyframePlanCandidate]:
+    """Reserve one existing candidate slot for the grounded zero-standoff route.
+
+    A model can ignore the direct-route prompt and add an unreachable lift to
+    every candidate. This is a proposal only: the same downstream IK, RRT and
+    collision checks still have to validate the whole route, including its load.
+    Neither destination geometry nor physical estimates are altered.
+    """
+    goal = request.task.metadata.get("held_transport_goal")
+    subject = _held_goal_subject(request)
+    if (
+        task_operation(request.task) not in {"TRANSPORT", "MOVE"}
+        or not isinstance(goal, dict)
+        or subject is None
+        or subject.start_object_orientation_xyzw is None
+        or subject.object_orientation_xyzw is None
+        or not strategies
+    ):
+        return strategies
+    frame, start, end = (goal.get(k) for k in ("frame_ref", "start_anchor", "anchor"))
+    if not all(isinstance(value, str) and value for value in (frame, start, end)):
+        return strategies
+    for strategy in strategies:
+        if len(strategy.keyframes) == 2 and all(
+            keyframe.keyframe_type is KeyframeType.TRANSFER
+            and keyframe.frame_ref == frame
+            and keyframe.anchor == anchor
+            and abs(keyframe.offset_along_approach_m) <= 1e-12
+            and keyframe.planner is KeyframePlannerType.SAMPLING_BASED
+            and not keyframe.events_after
+            for keyframe, anchor in zip(strategy.keyframes, (start, end))
+        ):
+            return strategies
+    strategy_id = f"{request.task.subgoal_id}:grounded_direct"
+    while any(item.strategy_id == strategy_id for item in strategies):
+        strategy_id += "_fallback"
+    keyframes = [
+        RelativeKeyframeSpec(
+            keyframe_id=f"{strategy_id}:{label}",
+            keyframe_type=KeyframeType.TRANSFER,
+            frame_ref=frame,
+            anchor=anchor,
+            # The explicit object quaternion below is authoritative. The
+            # zero offset means this axis cannot change the grounded point.
+            approach_axis_xyz=(0., 0., 1.),
+            tool_axis_to_align="+z",
+            offset_along_approach_m=0.,
+            roll_rad=0.,
+            planner=KeyframePlannerType.SAMPLING_BASED,
+            metadata={
+                POSE_SUBJECT_KEY: ATTACHED_OBJECT_POSE_SUBJECT,
+                POSE_SUBJECT_OBJECT_ID_KEY: subject.object_id,
+                "packing_orientation_xyzw": list(orientation),
+            },
+        )
+        for label, anchor, orientation in (
+            ("start", start, subject.start_object_orientation_xyzw),
+            ("goal", end, subject.object_orientation_xyzw),
+        )
+    ]
+    # Fail closed on invalid anchors, just as for model-generated proposals.
+    resolver = RelativePoseResolver(request.world)
+    for keyframe in keyframes:
+        resolver.resolve(keyframe)
+    direct = KeyframePlanCandidate(
+        strategy_id=strategy_id,
+        keyframes=keyframes,
+        rationale="Measured start to grounded destination; no additional standoff.",
+        provenance=StrategyGenerationProvenance(
+            generator_kind=StrategyGeneratorKind.TASK_GEOMETRY,
+            generator_id="GROUNDED_TRANSPORT_DIRECT_V1",
+            input_hash=_sha256({"request": request.model_dump(mode="json")}),
+        ),
+        metadata={
+            "canonicalization": "MISSING_ZERO_STANDOFF_ROUTE",
+            "replaced_strategy_id": strategies[-1].strategy_id,
+        },
+    )
+    # Keep the configured candidate budget and retain the other proposed routes.
+    return [direct, *strategies[:-1]]
+
+
 def _held_sweep_working_height_payload(
     request: MotionPlanRequest,
 ) -> dict[str, Any] | None:
@@ -673,21 +758,22 @@ Hard rules:
   target_region_id. This subgoal ONLY transports: use TRANSFER keyframes, keep
   holding, and stop at the destination. Do not emit PLACE, PRE_PLACE, or
   RETREAT for TRANSPORT/MOVE.
-- Every generated keyframe denotes the EEF/TCP pose. When held_object_grasp is
-  present, the deterministic validator projects the held tool from that EEF by
-  the supplied reference transform. Account for the entire held-tool envelope
-  around obstacles; do not reinterpret keyframes as held-object-center poses.
-- When held_transport_goal is supplied (TRANSPORT/MOVE only), its anchor is the
-  measured grasp-offset corrected EEF destination above that region. End every
-  strategy at exactly that frame_ref/anchor with zero offset. Preserve its
-  approach axis, tool axis, and roll on every keyframe (transform the axis if
-  using a different frame). Diversify the transit route and clearance, not the
-  established grasp posture.
+- Keyframes normally denote the EEF/TCP pose. Contact-tool keyframes keep this
+  meaning even when held_object_grasp is present; the validator projects the
+  held tool from the EEF through its measured grasp transform.
+- Exception: held_transport_goal and held_place_goal specify ATTACHED_OBJECT
+  body poses, not EEF poses. Use their supplied frames and anchors; the compiler
+  converts those object poses to EEF targets through the measured grasp.
+- When held_transport_goal is supplied (TRANSPORT/MOVE only), end every
+  strategy at exactly its frame_ref/anchor with zero offset. The start_anchor
+  uses start_object_orientation_xyzw; destination/transit anchors use
+  object_orientation_xyzw. A lift relative to start_anchor keeps the start
+  orientation; it must not rotate the object into its destination attitude.
 - held_transport_goal already includes rim clearance. Include at least one
-  direct SAMPLING_BASED transfer to that anchor with zero extra offset; do not
-  make every candidate add a high standoff that can exceed the arm's reach.
-  The direct strategy's two TRANSFER keyframes are start_anchor then anchor,
-  both in the supplied frame_ref with zero offset and the supplied orientation.
+  direct SAMPLING_BASED strategy with exactly two TRANSFER keyframes:
+  start_anchor then anchor, both in the supplied frame_ref with ZERO offsets.
+  Other candidates may diversify transit clearance. All routes are subject to
+  the same full-pose IK, joint, collision, and carried-object checks.
 - Object-acquire strategies (action_type/operation in ACQUIRE, PICK,
   PICK_OBJECT, GRASP, or any PICK_* except PICK_TOOL) must include a GRASP
   keyframe with a preceding PRE_GRASP keyframe, followed by a LIFT keyframe
@@ -1073,10 +1159,9 @@ class OpenAIKeyframeProvider:
                                 held_goal.start_object_orientation_xyzw is not None
                                 and item.frame_ref == held_goal.start_frame_ref
                                 and item.anchor == held_goal.start_anchor
-                                and abs(item.offset_along_approach_m) <= 1e-12
                             ):
-                                # This anchor is the measured start body pose,
-                                # not a request to rotate at the starting point.
+                                # A start-relative lift keeps the measured grasp
+                                # attitude even when its translation offset is nonzero.
                                 metadata["packing_orientation_xyzw"] = list(
                                     held_goal.start_object_orientation_xyzw
                                 )
@@ -1277,6 +1362,8 @@ class OpenAIKeyframeProvider:
                 f"{self.provider_name} response contained no valid keyframe candidates"
                 + (f": {details}" if details else "")
             )
+
+        strategies = _ensure_grounded_transport_direct(request, strategies)
 
         artifact_hash = _sha256(
             {
