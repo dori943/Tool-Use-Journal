@@ -63,7 +63,7 @@ from tuj.m5_motion.task_semantics import (
 )
 
 
-_PROMPT_VERSION = "OPENAI_KEYFRAME_STRATEGY_V10"
+_PROMPT_VERSION = "OPENAI_KEYFRAME_STRATEGY_V11"
 _SENSITIVE_KEYS = {
     "api_key",
     "apikey",
@@ -795,8 +795,11 @@ Hard rules:
   anchor is the object's resting destination on the region's interior floor
   (release clearance included): put the PLACE keyframe exactly at that
   frame_ref/anchor with zero offset and the supplied orientation. Normally put
-  PRE_PLACE at the same anchor with a positive offset_along_approach_m, and
-  RETREAT at the same anchor with a larger positive offset. TRANSFER /
+  PRE_PLACE at the same anchor with a positive offset_along_approach_m. Use
+  the supplied outward approach_axis_xyz for clearance offsets, including
+  RETREAT, regardless of the gripper orientation. Use CARTESIAN for the final
+  approach to PLACE so the carried object does not
+  detour sideways through the container rim during descent. Put RETREAT at the same anchor with a larger positive offset. TRANSFER /
   PRE_PLACE / PLACE keyframes describe the HELD OBJECT's pose; only RETREAT
   is a gripper motion.
   When entry_eef_anchor is supplied, also include one compact exception with
@@ -1193,6 +1196,28 @@ class OpenAIKeyframeProvider:
                         anchor = str(grounded_home["anchor"])
                         if item.keyframe_type is KeyframeType.PLACE:
                             offset_along_approach_m = 0.0
+                    approach_axis_xyz = item.approach_axis_xyz
+                    if (
+                        held_goal is not None
+                        and isinstance(grounded_home, Mapping)
+                        and grounded_home.get("approach_axis_xyz") is not None
+                        and frame_ref == grounded_home.get("frame_ref")
+                        and anchor in {
+                            grounded_home.get("anchor"),
+                            grounded_home.get("start_anchor"),
+                            grounded_home.get("entry_eef_anchor"),
+                        }
+                        and item.keyframe_type in {
+                            KeyframeType.PRE_PLACE, KeyframeType.PLACE, KeyframeType.RETREAT
+                        }
+                    ):
+                        # These anchors already encode the seat/entry pose. An
+                        # offset is outward clearance, never a side entry into
+                        # the rim or a retreat below the support surface.
+                        if offset_along_approach_m < 0.:
+                            raise ValueError("grounded placement clearance must be nonnegative")
+                        approach_axis_xyz = grounded_home["approach_axis_xyz"]
+                        metadata["grounded_clearance_axis"] = True
                     keyframe = RelativeKeyframeSpec(
                         keyframe_id=(
                             f"{strategy_id}:{keyframe_index}:{item.keyframe_id}"
@@ -1201,12 +1226,18 @@ class OpenAIKeyframeProvider:
                         frame_ref=frame_ref,
                         anchor=anchor,
                         approach_axis_xyz=_normalize_approach_axis_xyz(
-                            item.approach_axis_xyz
+                            approach_axis_xyz
                         ),
                         tool_axis_to_align=item.tool_axis_to_align,
                         offset_along_approach_m=offset_along_approach_m,
                         roll_rad=item.roll_rad,
-                        planner=item.planner,
+                        planner=(
+                            KeyframePlannerType.CARTESIAN
+                            if held_goal is not None
+                            and isinstance(request.task.metadata.get("held_place_goal"), Mapping)
+                            and item.keyframe_type is KeyframeType.PLACE
+                            else item.planner
+                        ),
                         events_after=events,
                         metadata=metadata,
                     )

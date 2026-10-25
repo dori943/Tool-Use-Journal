@@ -782,14 +782,19 @@ def test_region_place_keyframes_describe_the_object_and_retreat_keeps_the_wrist(
     request.task.metadata["held_place_goal"] = {
         "frame_ref": "object:tray",
         "anchor": "held_place_goal",
+        "approach_axis_xyz": [0., 0., 1.],
         "preserve_grasp_orientation": True,
         "object_orientation_xyzw": object_q,
         "eef_orientation_xyzw": eef_q,
         "object_id": "bottle",
     }
+    batch = _place_batch()
+    for candidate in batch.candidates:
+        for keyframe in candidate.keyframes:
+            keyframe.approach_axis_xyz = [0., -1., 0.]
     provider = OpenAIKeyframeProvider(
         OpenAIKeyframeProviderConfig(model="gpt-test", candidate_count=2),
-        client=_FakeClient(_place_batch()),
+        client=_FakeClient(batch),
     )
 
     artifact = provider.generate(request)
@@ -800,6 +805,12 @@ def test_region_place_keyframes_describe_the_object_and_retreat_keeps_the_wrist(
         assert keyframe.metadata["pose_subject_object_id"] == "bottle"
         assert keyframe.metadata["packing_orientation_xyzw"] == object_q
     assert KeyframeEventType.GRIPPER_OPEN in place.events_after
+    assert pre.approach_axis_xyz == (0., 0., 1.)
+    assert place.approach_axis_xyz == (0., 0., 1.)
+    assert retreat.approach_axis_xyz == (0., 0., 1.)
+    assert place.planner.value == "CARTESIAN"
+    assert place.anchor == "held_place_goal"
+    assert place.offset_along_approach_m == 0.
     assert "pose_subject" not in retreat.metadata
     assert retreat.metadata["packing_orientation_xyzw"] == eef_q
 

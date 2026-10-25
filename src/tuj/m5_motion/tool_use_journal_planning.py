@@ -1562,26 +1562,9 @@ class ToolUseJournalCollisionContextFactory:
         region_id = request.task.goal.target_region_id
         if region_id:
             contact_selectors.append(region_id)
-            # Objects already packed into the destination region may be
-            # contacted (or rested upon) by the held object -- the task packs
-            # everything into one region and permits overlap -- so admit each
-            # occupant as an allowed collision pair for the PLACE contact.
-            for occupant in self._region_occupant_ids(request, target):
-                if occupant not in contact_selectors:
-                    contact_selectors.append(occupant)
-        # Packing / kitting: EE and held object may graze any free tabletop body
-        # near the seat (neighbor mug on the tray, prior food on the plate, …).
-        # Do not auto-exempt the support plane / region id for the EE — that
-        # still comes only via held↔allowed_touch so the hand cannot sink into
-        # the table. Free plate/mug/… bodies are enough for packed place.
-        pack_touch = [
-            pose.object_id
-            for pose in base.free_object_poses
-            if pose.object_id and pose.object_id != target
-        ]
-        for oid in pack_touch:
-            if oid not in contact_selectors:
-                contact_selectors.append(oid)
+        # A previously placed neighbor remains an obstacle. Only the explicit
+        # task contact partners and the destination support may touch the load;
+        # being a free body (or a region occupant) is not contact authorization.
         for candidate in bound.candidates:
             place = self._event_keyframe(
                 candidate,
@@ -1621,12 +1604,7 @@ class ToolUseJournalCollisionContextFactory:
                 )
             contact_id = f"place-contact:{target}:{token}"
             detached_id = f"object-detached:{target}:{token}"
-            contact_pairs = sorted(
-                {
-                    *self._contact_pairs(target, contact_selectors),
-                    *self._contact_pairs(active_ee, pack_touch),
-                }
-            )
+            contact_pairs = self._contact_pairs(target, contact_selectors)
             contact = base.model_copy(
                 update={
                     "context_id": contact_id,
@@ -1655,8 +1633,8 @@ class ToolUseJournalCollisionContextFactory:
                     "context_id": release_id,
                     "allowed_collision_pairs": self._contact_pairs(active_ee, [target]),
                 })
-            # Approach uses the same packing ACM as PLACE so descent past a
-            # neighboring free body (mug beside the plate, …) is not filtered.
+            # Approach may touch only the load's declared support/contact
+            # partners. The hand and all unrelated objects remain protected.
             current_id = contact_id
             withdrawal_pending = False
             for keyframe in candidate.keyframes:
@@ -1674,42 +1652,6 @@ class ToolUseJournalCollisionContextFactory:
         from tuj.m5_motion.release_separation import bind_release_separation
 
         bind_release_separation(self.compiler, request, bound, contexts, target)
-        # Withdrawal: empty gripper may graze the same free packing partners
-        # the descent already tolerated (EE ↔ free objects / region).
-        pack_ee_pairs = (
-            self._contact_pairs(active_ee, pack_touch) if pack_touch else []
-        )
-        if pack_ee_pairs:
-            for candidate in bound.candidates:
-                place_kf = next(
-                    (
-                        keyframe
-                        for keyframe in candidate.keyframes
-                        if keyframe.keyframe_type is KeyframeType.PLACE
-                    ),
-                    None,
-                )
-                if place_kf is None:
-                    continue
-                start = candidate.keyframes.index(place_kf) + 1
-                retreat_context_ids = {
-                    context_id
-                    for keyframe in candidate.keyframes[start:]
-                    for context_id in (
-                        keyframe.collision_context_id,
-                        keyframe.collision_context_after_events_id,
-                    )
-                    if context_id in contexts
-                }
-                for context_id in retreat_context_ids:
-                    ctx = contexts[context_id]
-                    merged = list(ctx.allowed_collision_pairs)
-                    for pair in pack_ee_pairs:
-                        if pair not in merged:
-                            merged.append(pair)
-                    contexts[context_id] = ctx.model_copy(
-                        update={"allowed_collision_pairs": merged}
-                    )
         return _stamp_bound_artifact(request, source, bound), contexts
 
     def _bind_ee_exchange(

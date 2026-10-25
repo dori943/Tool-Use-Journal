@@ -50,7 +50,7 @@ class GeminiKeyframeProviderConfig(OpenAIKeyframeProviderConfig):
 
 class GeminiKeyframeProvider(OpenAIKeyframeProvider):
     provider_name = "Gemini"
-    prompt_version = "GEMINI_KEYFRAME_STRATEGY_JSON_V6"
+    prompt_version = "GEMINI_KEYFRAME_STRATEGY_JSON_V7"
 
     def __init__(self, config=None, *, client=None):
         super().__init__(config or GeminiKeyframeProviderConfig.from_environment(), client=client)

@@ -807,7 +807,7 @@ def test_place_binds_detach_and_stationary_target_pose_for_retreat(release_conta
     setup = _factory().prepare(request, source)
     transfer, place, retreat, *clear = setup.keyframe_artifact.candidates[0].keyframes
 
-    # Descent uses place-contact ACM (packing grazes vs free bodies / region).
+    # Descent permits only explicit support contact.
     assert transfer.collision_context_id == place.collision_context_id
     assert place.collision_context_id.startswith("place-contact:bottle:")
     assert place.collision_context_after_events_id.startswith(
@@ -826,8 +826,7 @@ def test_place_binds_detach_and_stationary_target_pose_for_retreat(release_conta
     if release_contact:
         assert detached.allowed_collision_pairs
         assert clear[0].collision_context_id != retreat.collision_context_id
-        # Clear/retreat may keep EE↔free packing partners; support plane stays
-        # held-only (not in pack_touch).
+        # Once clear of the released object, all scene bodies are obstacles.
         clear_pairs = {
             tuple(sorted(p))
             for p in setup.collision_contexts[
@@ -837,14 +836,14 @@ def test_place_binds_detach_and_stationary_target_pose_for_retreat(release_conta
         assert ("2F", "table_collision") not in clear_pairs
     contact = setup.collision_contexts[place.collision_context_id]
     assert ("bottle", "table_collision") in contact.allowed_collision_pairs
-    # Support plane from allowed_touch stays held-only; EE may touch free
-    # packing partners but not the bare table selector.
+    # Support permission belongs only to the load, not the hand.
     contact_pairs = {tuple(sorted(p)) for p in contact.allowed_collision_pairs}
     assert ("2F", "table_collision") not in contact_pairs
     assert ("robot0_right_hand", "table_collision") not in contact_pairs
-    assert ("2F", "other") in contact_pairs
+    assert ("2F", "other") not in contact_pairs
 
-def test_place_contact_allows_ee_against_free_packing_neighbors() -> None:
+@pytest.mark.parametrize("explicit_neighbor", [False, True])
+def test_place_protects_neighbors_unless_explicitly_declared(explicit_neighbor) -> None:
     attached = AttachedObjectTransform(
         object_id="bottle",
         free_joint_name="bottle_free",
@@ -903,16 +902,18 @@ def test_place_contact_allows_ee_against_free_packing_neighbors() -> None:
         )
     )
 
+    if explicit_neighbor:
+        request.task.allowed_touch_objects.append("neighbor")
     setup = _factory().prepare(request, source)
     transfer, place, retreat = setup.keyframe_artifact.candidates[0].keyframes
     assert transfer.collision_context_id == place.collision_context_id
     contact = setup.collision_contexts[place.collision_context_id]
     contact_pairs = {tuple(sorted(p)) for p in contact.allowed_collision_pairs}
-    assert ("bottle", "neighbor") in contact_pairs
+    assert (("bottle", "neighbor") in contact_pairs) is explicit_neighbor
     assert ("bottle", "tray") in contact_pairs
-    # EE may graze free neighbors during packed place (and retreat).
-    assert ("2F", "neighbor") in contact_pairs
-    assert ("2F", "other") in contact_pairs
+    # The EE cannot touch neighbors, even if load contact was explicit.
+    assert ("2F", "neighbor") not in contact_pairs
+    assert ("2F", "other") not in contact_pairs
     # Support / non-free region stays held-only for the hand.
     assert ("2F", "tray") not in contact_pairs
     assert ("neighbor", "robot0_right_hand") not in contact_pairs
@@ -921,7 +922,7 @@ def test_place_contact_allows_ee_against_free_packing_neighbors() -> None:
         tuple(sorted(p))
         for p in setup.collision_contexts[retreat.collision_context_id].allowed_collision_pairs
     }
-    assert ("2F", "neighbor") in retreat_pairs
+    assert ("2F", "neighbor") not in retreat_pairs
 
 
 def test_contact_friction_place_uses_collision_proxy_then_opens_gripper() -> None:
@@ -979,7 +980,7 @@ def test_contact_friction_place_uses_collision_proxy_then_opens_gripper() -> Non
     assert ("bottle", "table_collision") in contact_pairs
     assert ("2F", "table_collision") not in contact_pairs
     assert ("robot0_right_hand", "table_collision") not in contact_pairs
-    assert ("2F", "other") in contact_pairs
+    assert ("2F", "other") not in contact_pairs
 
 def test_default_motion_gets_explicit_context_on_every_keyframe() -> None:
     request = _request(
