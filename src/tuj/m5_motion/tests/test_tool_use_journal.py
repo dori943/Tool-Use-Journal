@@ -2169,3 +2169,41 @@ def test_extract_plan_does_not_arm_tabletop_push_paddle() -> None:
 
     assert _maybe_enable_held_tool_fill_for_plan(runtime, plan) is True
     assert calls == [("drag", ["card"])]
+
+
+@pytest.mark.parametrize('rollback_fault', ['wrong_ee', 'wrong_task', 'reset_failure'])
+def test_failed_ee_rollback_closes_runtime_and_rejected_replacement(rollback_fault):
+    initial = _fake_env('2F')
+    calls, closed, replacements = [], [], []
+    initial.close = lambda: closed.append('initial')
+
+    def factory(active_ee):
+        calls.append(active_ee)
+        # First replacement always fails the requested bare-EE check.
+        physical_ee = '3F' if active_ee is None or rollback_fault == 'wrong_ee' else active_ee
+        replacement = _fake_env(physical_ee)
+        replacement.current_ee_id = 'factory_declared'
+        replacement.close = lambda: closed.append(active_ee)
+        replacements.append(replacement)
+        if active_ee == '2F' and rollback_fault == 'wrong_task':
+            replacement.__class__ = type('DifferentTask', (type(replacement),), {})
+        if active_ee == '2F' and rollback_fault == 'reset_failure':
+            def fail_reset():
+                raise RuntimeError('rollback reset failed')
+            replacement.reset = fail_reset
+        return replacement
+
+    runtime = ToolUseJournalEERuntime(initial, factory)
+    with pytest.raises(ToolUseJournalRuntimeError, match='also failed to restore prior EE'):
+        runtime.unlock('2F')
+    assert calls == [None, '2F']
+    assert closed == ['initial', None, '2F']
+    assert replacements[-1].current_ee_id == 'factory_declared'
+    assert runtime._closed is True and runtime._env is None
+    assert runtime.transitions == ()
+    with pytest.raises(ToolUseJournalRuntimeError, match='runtime is closed'):
+        _ = runtime.env
+    with pytest.raises(ToolUseJournalRuntimeError, match='runtime is closed'):
+        runtime.unlock('2F')
+    runtime.close()  # Already-closed cleanup is safe and does not reopen a model.
+    assert closed == ['initial', None, '2F']

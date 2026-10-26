@@ -3470,15 +3470,40 @@ class ToolUseJournalEERuntime:
                 new_env = None
                 gc.collect()
             if released_old:
+                rebuilt: object | None = None
                 try:
                     rebuilt = self._factory(previous)
                     rebuilt.reset()  # type: ignore[attr-defined]
+                    # Recovery is another physical model construction. Validate
+                    # it before restoring state or relabeling the declared EE.
+                    restored_adapter = ToolUseJournalEnvironmentAdapter(
+                        rebuilt, source_revision=self._source_revision
+                    )
+                    if restored_adapter.environment_name != self._environment_name:
+                        raise ToolUseJournalRuntimeError(
+                            "environment factory changed task during EE rollback"
+                        )
+                    if restored_adapter.physical_active_ee != previous:
+                        raise ToolUseJournalRuntimeError(
+                            f"rollback requested {previous!r} but built "
+                            f"{restored_adapter.physical_active_ee!r}"
+                        )
                     _restore_runtime_state(rebuilt, state)
                     self._set_declared_active_ee(rebuilt, previous)
                     self._apply_rack_visibility(rebuilt, previous)
                     self._env = rebuilt
                 except Exception as restore_error:
                     self._closed = True
+                    self._env = None
+                    if rebuilt is not None:
+                        close = getattr(rebuilt, "close", None)
+                        if callable(close):
+                            try:
+                                close()
+                            except Exception as cleanup_error:
+                                restore_error = ToolUseJournalRuntimeError(
+                                    f"{restore_error}; rollback cleanup failed: {cleanup_error}"
+                                )
                     raise ToolUseJournalRuntimeError(
                         f"failed to build EE runtime state {to_ee!r}: {error}; "
                         f"also failed to restore prior EE {previous!r}: "
