@@ -83,7 +83,8 @@ def test_support_requires_loaded_upward_contact_at_rim(reversed_order):
     assert measured_surface_support(*args)['contact_count'] == 0
 
 
-@pytest.mark.parametrize('failure', ['escaped_contents', 'held', 'hand_contact', 'unsupported', 'moving', 'first_sample'])
+@pytest.mark.parametrize('failure', ['escaped_contents', 'held', 'hand_contact', 'unsupported', 'moving', 'first_sample',
+    'missing_contents', 'missing_cover', 'missing_container', 'missing_previous_contents', 'empty_observations'])
 def test_cover_does_not_hide_contents_or_physical_failure(failure):
     objects, config = fixture()
     poses = {name: deepcopy(record['pose']) for name, record in objects.items()}
@@ -96,10 +97,15 @@ def test_cover_does_not_hide_contents_or_physical_failure(failure):
     if failure == 'unsupported': kwargs['surface_support'] = None
     if failure == 'moving': previous['cover']['position_m'][0] += .02
     if failure == 'first_sample': previous = None
+    if failure == 'missing_contents': poses.pop('contents')
+    if failure == 'missing_cover': poses.pop('cover')
+    if failure == 'missing_container': poses.pop('container')
+    if failure == 'missing_previous_contents': previous.pop('contents')
+    if failure == 'empty_observations': poses = {}; previous = {}
     assert not evaluate_container_settle(config, poses, previous, **kwargs)['succeeded']
 
 
-def test_closing_configuration_includes_already_escaped_packable():
+def test_closing_does_not_assign_unrelated_outside_packable():
     objects, config = fixture(); objects['contents']['pose']['position_m'][0] = .2
     task = NS(action_type='place_on', metadata={'held_place_goal': {'anchor': 'goal'}},
               goal=NS(target_region_id='container', target_object_id='cover'))
@@ -108,8 +114,15 @@ def test_closing_configuration_includes_already_escaped_packable():
     segment = NS(segment_type=NS(value='RETREAT'), metadata={})
     plan = NS(events=[NS(event_type=NS(value='DETACH_OBJECT'), target_id='cover')], segments=[segment])
     configure_container_settle(request, plan)
-    assert segment.metadata['container_settle']['target_ids'] == ['contents', 'cover']
+    assert segment.metadata['container_settle']['target_ids'] == ['cover']
     assert segment.metadata['container_settle']['surface_target_id'] == 'cover'
+    settle_config = segment.metadata['container_settle']
+    poses = {name: deepcopy(record['pose']) for name, record in settle_config['objects'].items()}
+    settle = evaluate_container_settle(settle_config, poses, deepcopy(poses),
+        surface_support={'contact_count': 4, 'upward_force_n': 1.})
+    report = NS(metadata={'segment_tracking': [{'custom_settle': {'container_settle': settle}}]})
+    result = surface_report_result(request, report, request.world)
+    assert result['succeeded'] and result['required_inside_target_ids'] == []
     task.action_type = 'place'
     assert not is_container_surface_task(task, objects)
 
@@ -130,7 +143,7 @@ def test_final_evaluator_requires_same_request_physical_evidence_and_fresh_conte
     assert not surface_report_result(request, report, NS(objects=objects))['succeeded']
 
 
-@pytest.mark.parametrize('failure', [None, 'attached', 'escaped', 'missing_evidence'])
+@pytest.mark.parametrize('failure', [None, 'attached', 'escaped', 'missing_evidence', 'missing_contents'])
 def test_task_evaluator_routes_on_relation_to_cover_and_contents(failure):
     from tuj.m5_motion.contact_evaluation import TaskAwareGoalEvaluator
     from tuj.m5_motion.execution import GoalEvaluationStatus
@@ -139,7 +152,8 @@ def test_task_evaluator_routes_on_relation_to_cover_and_contents(failure):
     request = _request(); report = _report()
     request.task.action_type = 'place_on'; request.task.contact = None
     request.task.target_ids = ['cover']; request.task.goal.target_object_id = 'cover'
-    request.task.goal.target_region_id = 'container'; request.world.objects = objects
+    request.task.goal.target_region_id = 'container'; request.world.objects = deepcopy(objects)
+    initial_objects = deepcopy(request.world.objects)
     request.constraints.position_tolerance_m = .005
     request.constraints.orientation_tolerance_rad = .05
     config['request_id'] = request.request_id
@@ -150,5 +164,10 @@ def test_task_evaluator_routes_on_relation_to_cover_and_contents(failure):
     if failure == 'attached': report.final_robot_state.attached_object_id = 'cover'
     if failure == 'escaped': objects['contents']['pose']['position_m'][0] = .2
     if failure == 'missing_evidence': report.metadata['segment_tracking'] = []
-    outcome = TaskAwareGoalEvaluator().evaluate(request, report, request.world)
-    assert outcome.status == (GoalEvaluationStatus.SATISFIED if failure is None else GoalEvaluationStatus.FAILED)
+    if failure == 'missing_contents': objects.pop('contents')
+    observed_world = request.world.model_copy(update={'objects': objects})
+    outcome = TaskAwareGoalEvaluator().evaluate(request, report, observed_world)
+    expected = (GoalEvaluationStatus.SATISFIED if failure is None else
+                GoalEvaluationStatus.UNKNOWN if failure == 'missing_contents' else GoalEvaluationStatus.FAILED)
+    assert outcome.status == expected
+    assert request.world.objects == initial_objects

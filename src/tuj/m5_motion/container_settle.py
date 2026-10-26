@@ -49,6 +49,15 @@ def configure_container_settle(request, plan):
 
 def evaluate_container_settle(config, poses, previous, *, attached=False, hand_contacts=0,
                               surface_support=None):
+    # Configured poses describe the request's starting geometry, not a fresh
+    # measurement. Never use them to fill gaps in either stability sample.
+    missing = sorted(set(config['objects']) - poses.keys())
+    missing_previous = (sorted(set(config['target_ids']) - previous.keys())
+                        if previous is not None else [])
+    if missing or missing_previous:
+        return {'succeeded': False, 'stable': False,
+                'missing_pose_ids': missing, 'missing_previous_pose_ids': missing_previous,
+                'attached': attached, 'hand_contact_count': hand_contacts}
     objects=deepcopy(config['objects'])
     stable=previous is not None
     max_position=0.;max_angle=0.

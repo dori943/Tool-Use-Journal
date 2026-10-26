@@ -19,6 +19,35 @@ def test_first_observation_does_not_establish_stability():
     assert evaluate_container_settle(config,poses,deepcopy(poses))['succeeded']
 
 
+@pytest.mark.parametrize('missing', [['new'], ['prior'], ['box'], ['box', 'new', 'prior']])
+def test_missing_current_pose_cannot_reuse_starting_geometry(missing):
+    config, poses = fixture(); before = deepcopy(config); previous = deepcopy(poses)
+    for name in missing:
+        poses.pop(name)
+    result = evaluate_container_settle(config, poses, previous)
+    assert not result['succeeded'] and not result['stable']
+    assert result['missing_pose_ids'] == sorted(missing)
+    assert config == before
+
+
+@pytest.mark.parametrize('missing', [['new'], ['prior'], ['new', 'prior']])
+def test_missing_previous_target_pose_cannot_establish_stability(missing):
+    config, poses = fixture(); previous = deepcopy(poses)
+    for name in missing:
+        previous.pop(name)
+    result = evaluate_container_settle(config, poses, previous)
+    assert not result['succeeded'] and not result['stable']
+    assert result['missing_previous_pose_ids'] == sorted(missing)
+
+
+def test_two_empty_observations_do_not_establish_stability():
+    config, _ = fixture()
+    result = evaluate_container_settle(config, {}, {})
+    assert not result['succeeded'] and not result['stable']
+    assert result['missing_pose_ids'] == ['box', 'new', 'prior']
+    assert result['missing_previous_pose_ids'] == ['new', 'prior']
+
+
 @pytest.mark.parametrize('name',['new','prior'])
 def test_every_required_object_must_remain_inside(name):
     config,poses=fixture();poses[name]['position_m'][0]=.6
