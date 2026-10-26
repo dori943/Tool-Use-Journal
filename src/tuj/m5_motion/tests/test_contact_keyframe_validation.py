@@ -1240,10 +1240,19 @@ def test_contact_height_matches_each_candidate_attitude_after_lateral_retarget()
         'orientation_in_reference_xyzw': grasp_rotation.as_quat().tolist(),
     }}
     keyframes = _valid_sweep_sequence()
-    for keyframe, roll in zip(keyframes, [0., 0., .8, -.5, 0.]):
+    for keyframe, roll, tilt in zip(keyframes, [0., 0., .8, -.5, 0.],
+                                    [10., 20., -15., 30., 10.]):
         keyframe.roll_rad = roll
-    corrected = canonicalize_sweep_strategy_heights(request, keyframes)
+        keyframe.approach_axis_xyz = tuple(
+            Rotation.from_euler('y', tilt, degrees=True).apply([0., 0., 1.])
+        )
     resolver = RelativePoseResolver(request.world)
+    proposed_rotations = {
+        keyframe.keyframe_id: Rotation.from_quat(
+            resolver.resolve(keyframe).orientation_xyzw
+        ).as_matrix() for keyframe in keyframes
+    }
+    corrected = canonicalize_sweep_strategy_heights(request, keyframes)
     tcp_heights = []
     for keyframe in corrected:
         if keyframe.keyframe_type not in {KeyframeType.CONTACT_START,
@@ -1252,11 +1261,143 @@ def test_contact_height_matches_each_candidate_attitude_after_lateral_retarget()
             continue
         pose = resolver.resolve(keyframe)
         rotation = Rotation.from_quat(pose.orientation_xyzw).as_matrix()
-        expected_rotation = (live_rotation * Rotation.from_euler('z', keyframe.roll_rad)).as_matrix()
-        assert rotation == pytest.approx(expected_rotation)
+        assert rotation == pytest.approx(proposed_rotations[keyframe.keyframe_id])
         world_points = ((points @ grasp_rotation.as_matrix().T) + translation) @ rotation.T + pose.position_m
         assert np.min(world_points[:, 2]) == pytest.approx(.8575)
         validate_resolved_contact_keyframe(request, keyframe, pose)
         tcp_heights.append(pose.position_m[2])
     assert max(tcp_heights) - min(tcp_heights) > .002
     validate_sweep_keyframe_strategy(request, corrected)
+    # The VLM provider and compiler both canonicalize. A second pass must not
+    # change candidate attitude, its height, or the already-corrected route.
+    repeated = canonicalize_sweep_strategy_heights(request, corrected)
+    assert [item.model_dump() for item in repeated] == [item.model_dump() for item in corrected]
+
+
+@pytest.mark.parametrize('tilt_deg', [15., 30., 45.])
+def test_valid_contact_tilt_and_roll_survive_all_position_rewrites(tilt_deg):
+    from scipy.spatial.transform import Rotation
+    from tuj.m5_motion.contact_keyframe_validation import (
+        canonicalize_held_tool_orientation_for_contact,
+        canonicalize_sweep_strategy_heights,
+    )
+    request = _sweep_request()
+    request.world.robot_state.attached_object_id = 'tool_pusher'
+    request.world.objects['tool_pusher']['pose']['position_m'] = [-.10, -.10, .985]
+    axis = Rotation.from_euler('y', tilt_deg, degrees=True).apply([0., 0., 1.])
+    frames = _valid_sweep_sequence()
+    resolver = RelativePoseResolver(request.world)
+    for frame in frames:
+        frame.approach_axis_xyz = tuple(axis)
+        frame.roll_rad = .7
+    proposed = Rotation.from_quat(resolver.resolve(frames[1]).orientation_xyzw)
+    validate_resolved_contact_keyframe(request, frames[1], resolver.resolve(frames[1]))
+    corrected = canonicalize_sweep_strategy_heights(request, frames)
+    assert corrected[1].metadata.get('sweep_contact_start_tool_center')
+    assert corrected[2].metadata.get('sweep_lateral_canonicalized')
+    for frame in corrected:
+        actual = Rotation.from_quat(resolver.resolve(frame).orientation_xyzw)
+        assert (actual.inv() * proposed).magnitude() == pytest.approx(0., abs=1e-10)
+        # A resolved quaternion already contains roll; rebinding must not add it.
+        rebound = canonicalize_held_tool_orientation_for_contact(request, frame)
+        assert rebound.model_dump() == frame.model_dump()
+    validate_sweep_keyframe_strategy(request, corrected)
+
+
+def test_contact_centroid_uses_candidate_attitude_and_captured_grasp_offset():
+    from scipy.spatial.transform import Rotation
+    from tuj.m5_motion.contact_keyframe_validation import canonicalize_sweep_strategy_heights
+    request = _sweep_request()
+    request.world.robot_state.attached_object_id = 'tool_pusher'
+    offset = np.array([.14, -.03, .08])
+    request.world.metadata['attached_object_transforms'] = {'tool_pusher': {
+        'object_id': 'tool_pusher', 'free_joint_name': 'tool_joint',
+        'reference_kind': 'site', 'reference_name': 'grip_site',
+        'position_in_reference_m': offset.tolist(),
+        'orientation_in_reference_xyzw': Rotation.from_euler('xyz', [7, 28, -13], degrees=True).as_quat().tolist(),
+    }}
+    # This observed body pose intentionally differs from the captured transform.
+    # Compiler collision geometry uses the latter and XY retargeting must agree.
+    request.world.objects['tool_pusher']['pose']['position_m'] = [.4, -.2, .99]
+    frames = _valid_sweep_sequence()
+    for frame in frames:
+        frame.approach_axis_xyz = tuple(Rotation.from_euler('y', 30., degrees=True).apply([0., 0., 1.]))
+        frame.roll_rad = .6
+    corrected = canonicalize_sweep_strategy_heights(request, frames)
+    start = next(frame for frame in corrected if frame.keyframe_type is KeyframeType.CONTACT_START)
+    pose = RelativePoseResolver(request.world).resolve(start)
+    tool_origin = np.asarray(pose.position_m) + Rotation.from_quat(pose.orientation_xyzw).apply(offset)
+    assert tool_origin[:2] == pytest.approx(request.world.objects['block_a']['pose']['position_m'][:2])
+
+
+@pytest.mark.parametrize('tilt_deg', [61., 90., 180.])
+def test_outside_contact_axis_guard_still_requires_attitude_repair(tilt_deg):
+    from scipy.spatial.transform import Rotation
+    from tuj.m5_motion.contact_keyframe_validation import canonicalize_held_tool_orientation_for_contact
+    request = _sweep_request()
+    request.world.robot_state.attached_object_id = 'tool_pusher'
+    keyframe = _keyframe(
+        keyframe_id='invalid-tilt', frame_ref='object:block_a', offset=.01,
+        approach=tuple(Rotation.from_euler('y', tilt_deg, degrees=True).apply([0., 0., 1.])),
+        keyframe_type=KeyframeType.CONTACT_START,
+    )
+    resolver = RelativePoseResolver(request.world)
+    with pytest.raises(ContactKeyframeGeometryError, match='inverted'):
+        validate_resolved_contact_keyframe(request, keyframe, resolver.resolve(keyframe))
+    repaired = canonicalize_held_tool_orientation_for_contact(request, keyframe)
+    assert repaired.metadata['held_tool_orientation_locked'] is True
+    assert Rotation.from_quat(resolver.resolve(repaired).orientation_xyzw).as_matrix() == pytest.approx(
+        Rotation.from_quat(request.world.robot_state.eef_pose.orientation_xyzw).as_matrix()
+    )
+
+
+@pytest.mark.parametrize('provider_canonicalized', [False, True])
+def test_compiler_edges_and_repeated_compilation_use_the_preserved_contact_pose(provider_canonicalized):
+    from scipy.spatial.transform import Rotation
+    from tuj.m5_motion.contact_keyframe_validation import canonicalize_sweep_strategy_heights
+    request = _sweep_request()
+    request.world.robot_state.attached_object_id = 'tool_pusher'
+    frames = _valid_sweep_sequence()
+    for frame in frames:
+        frame.approach_axis_xyz = tuple(Rotation.from_euler('y', 30., degrees=True).apply([0., 0., 1.]))
+        frame.roll_rad = .7
+    resolver = RelativePoseResolver(request.world)
+    canonical = canonicalize_sweep_strategy_heights(request, frames)
+    expected = {frame.keyframe_id: resolver.resolve(frame) for frame in canonical}
+    candidate = KeyframePlanCandidate(
+        strategy_id='tilted-sweep', keyframes=canonical if provider_canonicalized else frames,
+        provenance=_provenance(),
+    )
+    ik_poses = []
+    edge_poses = []
+
+    class RecordingKinematics:
+        def solve_all_ik(self, world_pos, orientation_xyzw, **kwargs):
+            ik_poses.append((tuple(world_pos), tuple(orientation_xyzw)))
+            return IKSolutionSet(
+                solutions=(IKResult(solved=True, qpos=(0., -1., 1., -1., -1.5, 0.),
+                                    branch_id='ok', position_error_m=0., orientation_error_rad=0.),),
+                best_position_error_m=0., best_orientation_error_rad=0.,
+                attempted_seeds=1, enumeration_complete=True,
+            )
+
+    class RecordingEdge:
+        def plan(self, source, target, source_keyframe, target_keyframe):
+            pose = resolver.resolve(target_keyframe)
+            wanted = expected[target_keyframe.keyframe_id]
+            assert pose.position_m == pytest.approx(wanted.position_m)
+            assert pose.orientation_xyzw == pytest.approx(wanted.orientation_xyzw)
+            edge_poses.append((tuple(pose.position_m), tuple(pose.orientation_xyzw)))
+            return EdgePlanResult(valid=True, joint_path=(tuple(source), tuple(target)))
+
+    compiler = FirstFeasibleStrategyCompiler(RecordingKinematics())
+    for _ in range(2):
+        ik_poses.clear()
+        edge_poses.clear()
+        result = compiler.compile(
+            request.world, [candidate], start_joint_config=request.world.robot_state.joint_positions_rad,
+            state_validator=lambda qpos, keyframe: True, edge_planner=RecordingEdge(), request=request,
+        )
+        assert result.solved
+        assert edge_poses == ik_poses
+        candidate = candidate.model_copy(update={'keyframes': [node.keyframe for node in result.connected.nodes]})

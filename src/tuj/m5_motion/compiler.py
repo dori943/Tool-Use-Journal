@@ -332,9 +332,10 @@ class FirstFeasibleStrategyCompiler:
                 )
                 continue
 
+            # Edges must use the same canonicalized poses that were solved by IK.
             selection_strategy = (
                 strategy
-                if adapted_keyframes == strategy_keyframes
+                if adapted_keyframes == strategy.keyframes
                 else strategy.model_copy(update={"keyframes": adapted_keyframes})
             )
             selection = self._selector.select(

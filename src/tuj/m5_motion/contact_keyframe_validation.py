@@ -313,15 +313,16 @@ def canonicalize_held_tool_orientation_for_contact(
     *,
     resolver: RelativePoseResolver | None = None,
 ) -> RelativeKeyframeSpec:
-    """Lock held-tool contact TCP attitude to the live grasp orientation.
+    """Bind a valid proposed attitude before position retargeting changes axes.
 
     Height XY-retarget can rewrite ``approach_axis`` to a near-horizontal delta
     and freeze ``packing_orientation_xyzw`` from that attitude. Full-pose IK then
-    fails even when the XY is reachable. After acquire, vac/gripper sweeps keep
-    tool-z and only apply ``roll_rad`` about that axis.
+    fails even when the XY is reachable. Preserve an already grasp-compatible
+    proposal, including its resolved roll. Only invalid/inverted attitudes use
+    the previous live-axis repair. Binding the quaternion makes repeated height
+    and XY rewrites independent of the symbolic displacement direction.
     """
 
-    del resolver  # API symmetry with sibling canonicalize helpers
     if not is_tool_act_contact_geometry_scope(request):
         return keyframe
     if keyframe.keyframe_type not in _CONTACT_PATH_TYPES:
@@ -330,6 +331,19 @@ def canonicalize_held_tool_orientation_for_contact(
         request, roll_rad=float(keyframe.roll_rad or 0.0)
     )
     if packing is None:
+        return keyframe
+    active_resolver = resolver or RelativePoseResolver(request.world)
+    repaired = True
+    try:
+        proposed = active_resolver.resolve(keyframe).orientation_xyzw
+        proposed_z = _pose_tool_z_world(proposed)
+        live_z = _pose_tool_z_world(packing)
+        if (proposed_z is not None and live_z is not None
+                and float(np.dot(proposed_z, live_z)) >= _MIN_HELD_TOOL_AXIS_DOT):
+            packing = list(proposed)
+            repaired = False
+    except GeometryResolutionError:
+        # Leave frame/anchor errors to the normal resolver/validator.
         return keyframe
     existing = keyframe.metadata.get("packing_orientation_xyzw")
     if (
@@ -348,7 +362,7 @@ def canonicalize_held_tool_orientation_for_contact(
             "metadata": {
                 **keyframe.metadata,
                 "packing_orientation_xyzw": packing,
-                "held_tool_orientation_locked": True,
+                "held_tool_orientation_locked": repaired,
             },
         }
     )
@@ -696,14 +710,21 @@ def canonicalize_contact_tcp_height(
     height_types = _CONTACT_PHASE_TYPES | _HOVER_PHASE_TYPES
     if keyframe.keyframe_type not in height_types:
         return keyframe
+    active_resolver = resolver or RelativePoseResolver(request.world)
+    keyframe = canonicalize_held_tool_orientation_for_contact(
+        request, keyframe, resolver=active_resolver
+    )
+    try:
+        pose = active_resolver.resolve(keyframe)
+        anchor_world, frame_rotation = _frame_anchor_world(active_resolver, keyframe)
+    except GeometryResolutionError:
+        return keyframe
+    packing = list(pose.orientation_xyzw)
 
     floor_z: float
     ceiling_z: float | None
     target_z: float
     if keyframe.keyframe_type in _CONTACT_PHASE_TYPES:
-        packing = _live_held_tool_packing_xyzw(
-            request, roll_rad=float(keyframe.roll_rad or 0.0)
-        )
         limits = _contact_tcp_height_limits_m(request, eef_orientation_xyzw=packing)
         if limits is None:
             return keyframe
@@ -719,12 +740,6 @@ def canonicalize_contact_tcp_height(
         ceiling_z = None
         target_z = hover_floor
 
-    active_resolver = resolver or RelativePoseResolver(request.world)
-    try:
-        pose = active_resolver.resolve(keyframe)
-        anchor_world, frame_rotation = _frame_anchor_world(active_resolver, keyframe)
-    except GeometryResolutionError:
-        return keyframe
     z_m = float(pose.position_m[2])
     if abs(z_m - target_z) <= 1e-4 and (
         floor_z - 1e-6 <= z_m <= (ceiling_z + 1e-6 if ceiling_z is not None else z_m)
@@ -748,9 +763,7 @@ def canonicalize_contact_tcp_height(
         anchor_world=anchor_world,
         frame_rotation=frame_rotation,
         target_z=target_z,
-        preferred_packing_xyzw=_live_held_tool_packing_xyzw(
-            request, roll_rad=float(keyframe.roll_rad or 0.0)
-        ),
+        preferred_packing_xyzw=packing,
     )
     if candidate is None:
         return keyframe
@@ -928,9 +941,7 @@ def canonicalize_sweep_strategy_heights(
                 anchor_world=anchor_world,
                 frame_rotation=frame_rotation,
                 target_z=hover_floor,
-                preferred_packing_xyzw=_live_held_tool_packing_xyzw(
-                    request, roll_rad=float(keyframe.roll_rad or 0.0)
-                ),
+                preferred_packing_xyzw=pose.orientation_xyzw,
             )
             result.append(keyframe if raised is None else raised)
     result = canonicalize_sweep_contact_start_over_targets(
@@ -939,9 +950,8 @@ def canonicalize_sweep_strategy_heights(
     result = canonicalize_sweep_lateral_toward_region(
         request, result, resolver=active_resolver
     )
-    # Lateral retargeting uses one shared height. Recompute each contact height
-    # after its final attitude is bound, since local roll changes the underside
-    # of an asymmetric tool whenever the EEF is tilted.
+    # Check each final height against its own bound attitude: different valid
+    # tilts/rolls change the underside of an asymmetric held tool.
     return [
         canonicalize_contact_tcp_height(
             request, canonicalize_held_tool_orientation_for_contact(
@@ -977,15 +987,26 @@ def _sweep_target_centroid_xy_m(request: MotionPlanRequest) -> np.ndarray | None
 
 
 def _held_tool_xy_offset_from_tcp_m(
-    request: MotionPlanRequest,
+    request: MotionPlanRequest, *, eef_orientation_xyzw: Sequence[float] | None = None,
 ) -> np.ndarray | None:
-    """World XY of held-tool center minus live TCP (vac plate is offset from cup)."""
+    """Held body-origin offset at the candidate attitude, using its grasp."""
 
     eef = request.world.robot_state.eef_pose
     if eef is None:
         return None
-    eef_xy = np.asarray(eef.position_m[:2], dtype=float)
+    eef_position = np.asarray(eef.position_m, dtype=float)
+    rotation = _quaternion_matrix_xyzw(
+        eef.orientation_xyzw if eef_orientation_xyzw is None else eef_orientation_xyzw
+    )
     for object_id in sorted(_held_object_ids(request)):
+        state = request.world.robot_state
+        key = ("attached_object_transforms" if state.attached_object_id == object_id
+               else "contact_friction_held_objects")
+        if request.world.metadata.get(key):
+            from .attachment_retarget import attachment_transform
+
+            grasp = attachment_transform(request.world, object_id)
+            return (rotation @ np.asarray(grasp.position_in_reference_m))[:2]
         record = request.world.objects.get(object_id)
         if not isinstance(record, Mapping):
             continue
@@ -995,7 +1016,10 @@ def _held_tool_xy_offset_from_tcp_m(
         position = _finite_vector(pose.get("position_m"), 3)
         if position is None:
             continue
-        return np.asarray(position[:2], dtype=float) - eef_xy
+        local_offset = _quaternion_matrix_xyzw(eef.orientation_xyzw).T @ (
+            np.asarray(position, dtype=float) - eef_position
+        )
+        return (rotation @ local_offset)[:2]
     return None
 
 
@@ -1018,16 +1042,10 @@ def canonicalize_sweep_contact_start_over_targets(
     centroid = _sweep_target_centroid_xy_m(request)
     if centroid is None:
         return list(keyframes)
-    desired_plate_xy = np.asarray(centroid, dtype=float)
-    tool_offset = _held_tool_xy_offset_from_tcp_m(request)
-    if tool_offset is not None:
-        desired_xy = desired_plate_xy - tool_offset
-        metadata_flag = "sweep_contact_start_tool_center"
-    else:
-        desired_xy = desired_plate_xy
-        metadata_flag = "sweep_contact_start_centroid"
-
     active_resolver = resolver or RelativePoseResolver(request.world)
+    keyframes = [canonicalize_held_tool_orientation_for_contact(
+        request, keyframe, resolver=active_resolver
+    ) for keyframe in keyframes]
     start_index = next(
         (
             index
@@ -1042,26 +1060,29 @@ def canonicalize_sweep_contact_start_over_targets(
         start_pose = active_resolver.resolve(keyframes[start_index])
     except GeometryResolutionError:
         return list(keyframes)
+    packing = list(start_pose.orientation_xyzw)
+    desired_plate_xy = np.asarray(centroid, dtype=float)
+    tool_offset = _held_tool_xy_offset_from_tcp_m(
+        request, eef_orientation_xyzw=packing
+    )
+    if tool_offset is not None:
+        desired_xy = desired_plate_xy - tool_offset
+        metadata_flag = "sweep_contact_start_tool_center"
+    else:
+        desired_xy = desired_plate_xy
+        metadata_flag = "sweep_contact_start_centroid"
     start_xy = np.asarray(start_pose.position_m[:2], dtype=float)
     if float(np.linalg.norm(start_xy - desired_xy)) < _CONTACT_START_CENTROID_SNAP_M:
         return list(keyframes)
 
     engagement = _contact_engagement_tcp_z_m(
-        request, eef_orientation_xyzw=_live_held_tool_packing_xyzw(
-            request, roll_rad=float(keyframes[start_index].roll_rad or 0.0)
-        )
+        request, eef_orientation_xyzw=packing
     )
     start_z = (
         float(engagement)
         if engagement is not None
         else float(start_pose.position_m[2])
     )
-    packing = _live_held_tool_packing_xyzw(
-        request, roll_rad=float(keyframes[start_index].roll_rad or 0.0)
-    )
-    if packing is None:
-        packing = list(start_pose.orientation_xyzw)
-
     result = list(keyframes)
     retargeted = _retarget_tcp_world_xy(
         result[start_index],
@@ -1082,11 +1103,10 @@ def canonicalize_sweep_contact_start_over_targets(
     for index, keyframe in enumerate(result):
         if keyframe.keyframe_type is not KeyframeType.PRE_CONTACT:
             continue
-        packing_pre = _live_held_tool_packing_xyzw(
-            request, roll_rad=float(keyframe.roll_rad or 0.0)
-        )
-        if packing_pre is None:
-            packing_pre = packing
+        try:
+            packing_pre = active_resolver.resolve(keyframe).orientation_xyzw
+        except GeometryResolutionError:
+            continue
         raised = _retarget_tcp_world_xy(
             keyframe,
             resolver=active_resolver,
@@ -1125,6 +1145,9 @@ def canonicalize_sweep_lateral_toward_region(
         return list(keyframes)
 
     active_resolver = resolver or RelativePoseResolver(request.world)
+    keyframes = [canonicalize_held_tool_orientation_for_contact(
+        request, keyframe, resolver=active_resolver
+    ) for keyframe in keyframes]
     start_index = next(
         (
             index
@@ -1176,9 +1199,7 @@ def canonicalize_sweep_lateral_toward_region(
         return list(keyframes)
     end_xy = np.asarray(end_pose.position_m[:2], dtype=float)
     engagement = _contact_engagement_tcp_z_m(
-        request, eef_orientation_xyzw=_live_held_tool_packing_xyzw(
-            request, roll_rad=float(keyframes[start_index].roll_rad or 0.0)
-        )
+        request, eef_orientation_xyzw=start_pose.orientation_xyzw
     )
     contact_z = (
         float(engagement) if engagement is not None else float(start_z)
@@ -1205,10 +1226,20 @@ def canonicalize_sweep_lateral_toward_region(
             ):
                 corridor_ok = False
                 break
-            if abs(float(sweep_pose.position_m[2]) - contact_z) > 1e-3:
+            sweep_z = _contact_engagement_tcp_z_m(
+                request, eef_orientation_xyzw=sweep_pose.orientation_xyzw
+            )
+            if abs(float(sweep_pose.position_m[2]) - (
+                contact_z if sweep_z is None else sweep_z
+            )) > 1e-3:
                 corridor_ok = False
                 break
-        if abs(float(end_pose.position_m[2]) - contact_z) > 1e-3:
+        end_z = _contact_engagement_tcp_z_m(
+            request, eef_orientation_xyzw=end_pose.orientation_xyzw
+        )
+        if abs(float(end_pose.position_m[2]) - (
+            contact_z if end_z is None else end_z
+        )) > 1e-3:
             corridor_ok = False
         if corridor_ok:
             return list(keyframes)
@@ -1222,20 +1253,21 @@ def canonicalize_sweep_lateral_toward_region(
     if not move_indices:
         return list(keyframes)
 
-    packing = _live_held_tool_packing_xyzw(
-        request, roll_rad=float(keyframes[start_index].roll_rad or 0.0)
-    )
-    if packing is None:
-        packing = list(start_pose.orientation_xyzw)
-
     sample_xy = _sample_polyline_by_fraction(path_points, len(move_indices))
     result = list(keyframes)
     for index, target_xy in zip(move_indices, sample_xy):
+        try:
+            packing = active_resolver.resolve(result[index]).orientation_xyzw
+        except GeometryResolutionError:
+            continue
+        candidate_z = _contact_engagement_tcp_z_m(
+            request, eef_orientation_xyzw=packing
+        )
         retargeted = _retarget_tcp_world_xy(
             result[index],
             resolver=active_resolver,
             target_xy=target_xy,
-            target_z=contact_z,
+            target_z=contact_z if candidate_z is None else candidate_z,
             packing_xyzw=packing,
             metadata_flag="sweep_lateral_canonicalized",
         )
@@ -1264,11 +1296,10 @@ def canonicalize_sweep_lateral_toward_region(
     for index, keyframe in enumerate(result):
         if keyframe.keyframe_type is not KeyframeType.RETREAT:
             continue
-        packing_retreat = _live_held_tool_packing_xyzw(
-            request, roll_rad=float(keyframe.roll_rad or 0.0)
-        )
-        if packing_retreat is None:
-            packing_retreat = packing
+        try:
+            packing_retreat = active_resolver.resolve(keyframe).orientation_xyzw
+        except GeometryResolutionError:
+            continue
         retargeted = _retarget_tcp_world_xy(
             keyframe,
             resolver=active_resolver,
