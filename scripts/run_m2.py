@@ -171,8 +171,20 @@ def main():
     # emit an apparently valid DAG without the policy.
     policy_path = os.path.join(_ROOT, "configs", f"{name}_packing_policy.json")
     if os.path.exists(policy_path):
-        for line in apply_task_packing_policy(out, policy_path):
-            print(line)
+        try:
+            for line in apply_task_packing_policy(out, policy_path):
+                print(line)
+        except ValueError as exc:
+            # Preserve the rejected proposal and paid API usage for diagnosis,
+            # separately from m2.json so downstream stages cannot execute it.
+            rejected = copy.deepcopy(out)
+            rejected["m2_validation"] = {
+                "status": "REJECTED", "stage": "packing_policy",
+                "error_type": type(exc).__name__, "error": str(exc),
+            }
+            with open(os.path.join(tdir, "m2_rejected.json"), "w", encoding="utf-8") as f:
+                json.dump(rejected, f, ensure_ascii=False, indent=2)
+            raise
 
     with open(os.path.join(tdir, "m2.json"), "w", encoding="utf-8") as f:
         json.dump(out, f, ensure_ascii=False, indent=2)

@@ -300,3 +300,53 @@ def test_vlm_request_and_response_include_pose_dimensions(tmp_path):
     prompt = requests[0]["messages"][0]["content"][0]["text"]
     assert "height_z_mm" in prompt and "footprint_mm" in prompt
     assert "NOT world x/y/z axes" in prompt
+
+
+def test_rejected_m2_usage_is_counted_without_reusing_stale_artifacts(tmp_path, monkeypatch):
+    runner, args, pipeline = _runner_case(tmp_path, monkeypatch)
+    original_m2 = pipeline.stage_m2
+
+    def reject(task, out, m2_args):
+        (out / 'm2_rejected.json').write_text(json.dumps({
+            'm2_stats': {'llm_usage': {'rough': {
+                'calls': 2, 'tokens': 43, 'prompt_tokens': 30,
+                'completion_tokens': 13, 'seconds': 0.2}}},
+            'm2_validation': {'status': 'REJECTED'},
+        }))
+        raise ValueError('no valid packing alternative')
+
+    pipeline.stage_m2 = reject
+    with pytest.raises(ValueError, match='no valid packing alternative'):
+        runner.run(args, pipeline)
+    timing = json.loads((args.output_dir / 'timing_summary.json').read_text())
+    assert timing['llm_total']['total_tokens'] == 43
+    assert timing['incomplete'] is True
+    assert not (args.output_dir / 'm2.json').exists()
+    pipeline.stage_m2 = original_m2
+    args.start_from = 'm2'
+    runner.run(args, pipeline)
+    assert (args.output_dir / 'm2_rejected.json').exists()
+    timing = json.loads((args.output_dir / 'timing_summary.json').read_text())
+    assert timing['llm_total']['total_tokens'] == 0
+
+    # If the next invocation fails before producing anything, neither the
+    # accepted nor rejected proposal from a previous invocation is new usage.
+    accepted = args.output_dir / 'm2.json'
+    accepted.write_text(json.dumps({'m2_stats': {'llm_usage': {
+        'rough': {'calls': 1, 'tokens': 71, 'seconds': 0.1}}}}))
+
+    def early_failure(*_args):
+        raise ValueError('failed before proposal')
+
+    pipeline.stage_m2 = early_failure
+    with pytest.raises(ValueError, match='failed before proposal'):
+        runner.run(args, pipeline)
+    timing = json.loads((args.output_dir / 'timing_summary.json').read_text())
+    assert timing['llm_total']['total_tokens'] == 0
+    assert accepted.exists()
+
+    # A failed M2 invalidates the old accepted plan's manifest hash. The file
+    # stays available for inspection, but cannot be resumed into execution.
+    args.start_from = args.stop_after = 'm4'
+    with pytest.raises(ValueError, match='accepted m2.json'):
+        runner.run(args, pipeline)

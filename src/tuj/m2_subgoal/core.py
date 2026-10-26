@@ -349,57 +349,115 @@ def add_container_seal_pres(subgoals: list[dict]) -> list[str]:
 def add_container_packing_sequence_pres(
     subgoals: list[dict], target_order: list[str]
 ) -> list[str]:
-    """Encode a task-owned packing sequence as cross-group causal links."""
-    for subgoal in subgoals:
-        for detail in subgoal.get("details", []):
-            detail["pre"] = [
-                condition
-                for condition in detail.get("pre", [])
-                if condition.get("auto") != "container_packing_sequence"
-            ]
+    """Order actual packing effects, without assuming every move is a grasp.
 
-    by_target: dict[str, dict] = {}
-    for subgoal in subgoals:
+    A split sweep keeps one tool acquired across several children. Its packing
+    actions may be reordered, but its shared acquire must remain before all of
+    them. Build and validate the entire DAG before changing caller-owned data.
+    """
+    from copy import deepcopy
+
+    if any(not isinstance(t, str) or not t for t in target_order) or len(
+        set(target_order)
+    ) != len(target_order):
+        raise ValueError("PACKING_SEQUENCE_INVALID_TARGET_ORDER")
+
+    staged = deepcopy(subgoals)
+    details = [d for s in staged for d in s.get("details", [])]
+    for detail in details:
+        detail["pre"] = [
+            p for p in detail.get("pre", [])
+            if p.get("auto") != "container_packing_sequence"
+        ]
+
+    by_target: dict[str, tuple[dict, dict, dict]] = {}
+    requested = set(target_order)
+    for subgoal in staged:
         targets = subgoal.get("target_ids") or []
-        if subgoal.get("kind") == "relocate" and len(targets) == 1:
-            by_target[targets[0]] = subgoal
+        if subgoal.get("kind") not in INSIDE_KINDS or len(targets) != 1:
+            continue
+        target = targets[0]
+        if target not in requested:
+            continue
+        if target in by_target:
+            raise ValueError(f"PACKING_SEQUENCE_AMBIGUOUS_TARGET: {target}")
+        container = subgoal.get("container_id")
+        hits = [
+            (detail, effect)
+            for detail in subgoal.get("details", [])
+            for effect in detail.get("establish", [])
+            if effect.get("head") == "in"
+            and _set_members(_pred_arg(effect.get("expr", ""), 0)) == [target]
+            and _pred_arg(effect.get("expr", ""), 1) == container
+        ]
+        if not container or len(hits) != 1:
+            raise ValueError(f"PACKING_SEQUENCE_INVALID_EFFECT: {target}")
+        producer, effect = hits[0]
+        if subgoal["kind"] in TOOL_KINDS:
+            tool = subgoal.get("selected_tool_id")
+            candidates = subgoal.get("tool_candidate_ids") or []
+            if (not isinstance(tool, str) or not tool or tool.startswith("?")
+                    or tool == target or (candidates and tool not in candidates)):
+                raise ValueError(f"PACKING_SEQUENCE_UNRESOLVED_TOOL: {target}")
+            expected = {"sweep_collect": "tool_act:sweep",
+                        "scoop_transfer": "tool_act:scoop"}[subgoal["kind"]]
+            if producer.get("action_type") != expected:
+                raise ValueError(f"PACKING_SEQUENCE_INVALID_EFFECT: {target}")
+        by_target[target] = (subgoal, producer, effect)
 
-    ordered = [target for target in target_order if target in by_target]
+    missing = requested - set(by_target)
+    if missing:
+        raise ValueError(f"PACKING_SEQUENCE_MISSING_TARGET: {sorted(missing)}")
+    containers = {record[0]["container_id"] for record in by_target.values()}
+    if len(containers) > 1:
+        raise ValueError("PACKING_SEQUENCE_DESTINATION_MISMATCH")
+
+    # Children of a split tool action share the same occupancy group. Starting
+    # the first child at its acquire would add a cycle whenever policy puts a
+    # different child first (acquire -> that action -> acquire).
+    group_counts: dict[str, int] = {}
+    for _, producer, _ in by_target.values():
+        group = producer["group_id"]
+        group_counts[group] = group_counts.get(group, 0) + 1
+
     logs: list[str] = []
     for rank, (previous_id, current_id) in enumerate(
-        zip(ordered, ordered[1:]), start=1
+        zip(target_order, target_order[1:]), start=1
     ):
-        previous = by_target[previous_id]
-        current = by_target[current_id]
-        container = previous.get("container_id")
-        if not container or current.get("container_id") != container:
-            continue
-
-        established_expr = f"in({previous_id}, {container})"
-        if not any(
-            effect.get("expr") == established_expr
-            for detail in previous.get("details", [])
-            for effect in detail.get("establish", [])
-        ):
-            continue
-        if not current.get("details"):
-            continue
-
+        previous, _, effect = by_target[previous_id]
+        current, producer, _ = by_target[current_id]
         first = current["details"][0]
-        first.setdefault("pre", []).append(
-            {
-                "id": f"{first['detail_id']}_p{len(first.get('pre', []))}",
-                "expr": established_expr,
-                "head": "in",
-                "eval_by": "m2",
-                "auto": "container_packing_sequence",
-                "packing_rank": rank,
-            }
-        )
+        if (current["kind"] in TOOL_KINDS
+                and group_counts[producer["group_id"]] > 1):
+            first = producer
+        first.setdefault("pre", []).append({
+            "id": f"{first['detail_id']}_p{len(first.get('pre', []))}",
+            "expr": effect["expr"],
+            "head": "in", "eval_by": "m2",
+            "auto": "container_packing_sequence", "packing_rank": rank,
+        })
         logs.append(
             f"  [적재 순서] {previous_id} -> {current_id}: "
-            f"{previous_id}를 {container}에 넣은 뒤 다음 물체 확보"
+            f"{previous_id}를 {previous['container_id']}에 넣은 뒤 다음 물체 처리"
         )
+
+    edges, _ = partial_order(details)
+    ids = [d["detail_id"] for d in details]
+    if len(set(ids)) != len(ids):
+        raise ValueError("PACKING_SEQUENCE_DUPLICATE_DETAIL")
+    pending = {i: set() for i in ids}
+    for edge in edges:
+        pending[edge["to"]].add(edge["from"])
+    while pending:
+        ready = {i for i, predecessors in pending.items() if not predecessors}
+        if not ready:
+            raise ValueError(f"PACKING_SEQUENCE_CYCLE: {sorted(pending)}")
+        pending = {i: predecessors - ready for i, predecessors in pending.items()
+                   if i not in ready}
+
+    original_details = [d for s in subgoals for d in s.get("details", [])]
+    for original, validated in zip(original_details, details):
+        original["pre"] = validated["pre"]
     return logs
 
 

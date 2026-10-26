@@ -100,6 +100,7 @@ def run(args, pipeline):
     stage_seconds = {n: None for n in STAGE_ORDER}
     stage_status = {n: "not_run" for n in STAGE_ORDER}
     llm_usage = None
+    m2_usage_mtimes_before = {}
 
     def checkpoint(name):
         manifest["artifacts"][name] = _digest(out / name)
@@ -107,8 +108,18 @@ def run(args, pipeline):
 
     def persist_timing(*, incomplete=False):
         usage = llm_usage
-        if usage is None and (out / "m2.json").is_file():
-            usage = _read(out / "m2.json").get("m2_stats", {}).get("llm_usage")
+        if usage is None:
+            for name in ("m2.json", "m2_rejected.json"):
+                path = out / name
+                if not path.is_file():
+                    continue
+                # A failed resumed invocation must not charge old accepted or
+                # rejected proposals as new API calls. Keep those files intact.
+                if (stage_status["m2"] == "failed"
+                        and path.stat().st_mtime_ns == m2_usage_mtimes_before.get(name)):
+                    continue
+                usage = _read(path).get("m2_stats", {}).get("llm_usage")
+                break
         prior = _read(out / "vlm_prior.json").get("usage") if (out / "vlm_prior.json").is_file() else None
         summary = build_timing_summary(
             stage_order=STAGE_ORDER,
@@ -207,6 +218,10 @@ def run(args, pipeline):
 
         stage = "m2"
         if start <= 1:
+            m2_usage_mtimes_before = {
+                name: (out / name).stat().st_mtime_ns
+                for name in ("m2.json", "m2_rejected.json") if (out / name).is_file()
+            }
             for name in ("m2.json", "m4.json", "gk_bundle.json"):
                 manifest["artifacts"].pop(name, None)
             for name in ("m2", "gk", "m4", "m5"):
@@ -222,8 +237,10 @@ def run(args, pipeline):
             stage_status["m2"] = "completed"
             _write(manifest_path, manifest)
         else:
-            if "m2.json" in manifest["artifacts"] and _digest(out / "m2.json") != manifest["artifacts"]["m2.json"]:
-                raise ValueError("resume requires unchanged m2.json from this run")
+            if ("m2.json" not in manifest["artifacts"]
+                    or not (out / "m2.json").is_file()
+                    or _digest(out / "m2.json") != manifest["artifacts"]["m2.json"]):
+                raise ValueError("resume requires unchanged accepted m2.json from this run")
             stage_status["m2"] = "resumed"
         if stop == 1:
             persist_timing()
