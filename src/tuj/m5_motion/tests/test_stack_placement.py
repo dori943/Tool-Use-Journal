@@ -153,3 +153,39 @@ def test_bread_on_a_dish_floor_rests_despite_the_higher_rim():
 def test_bread_sunk_through_the_dish_floor_is_rejected():
     assert not target_resting_on_region(
         _dish_world(sink_m=.015), target_id="bread", region_id="dish")
+
+
+def _tilted_mesh_world(gap_m=0.):
+    import numpy as np
+    from scipy.spatial.transform import Rotation
+    world = _world()
+    # An octahedron and its enclosing box have identical local dimensions.
+    # Rotation makes the box extend below the actual contact surface.
+    points = np.vstack((np.eye(3), -np.eye(3))) * .04
+    rotation = Rotation.from_euler('y', 30., degrees=True)
+    bottom = float(rotation.apply(points)[:, 2].min())
+    top = world.objects['base']['pose']['position_m'][2] + _BASE_SIZE_M[2] / 2
+    record = world.objects['slice']
+    record.update(dimensions_m=[.08]*3, collision_points_m=points.tolist())
+    record['pose'].update(position_m=[0., 0., top - bottom + gap_m],
+                          orientation_xyzw=rotation.as_quat().tolist())
+    return world
+
+
+def test_tilted_irregular_mesh_uses_actual_contact_surface():
+    import copy
+    world = _tilted_mesh_world()
+    before = copy.deepcopy(world.model_dump())
+    assert target_resting_on_region(world, target_id='slice', region_id='base')
+    assert world.model_dump() == before
+    del world.objects['slice']['collision_points_m']
+    assert not target_resting_on_region(world, target_id='slice', region_id='base')
+
+
+def test_correct_mesh_contact_height_keeps_gap_and_penetration_limits():
+    for gap in (.006, -.006, .02, -.02):
+        assert not target_resting_on_region(_tilted_mesh_world(gap),
+            target_id='slice', region_id='base')
+    for gap in (.004, -.004):
+        assert target_resting_on_region(_tilted_mesh_world(gap),
+            target_id='slice', region_id='base')

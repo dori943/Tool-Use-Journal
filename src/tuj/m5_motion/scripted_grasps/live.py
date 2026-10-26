@@ -257,6 +257,9 @@ class ScriptedGraspSession:
             if checks:
                 record['placement_preservation'] = checks
                 save_json(directory / 'placement_preservation.json', checks)
+                from .placement_contacts import placement_contacts
+                record['placement_contacts'] = placement_contacts(self.runtime, self.world, checks)
+                save_json(directory / 'placement_contacts.json', record['placement_contacts'])
             if completed_subgoal and completed_subgoal not in self.world.scene.completed_subgoals:
                 self.world.scene.completed_subgoals.append(completed_subgoal)
             record["status"] = "SUCCESS"
@@ -271,6 +274,9 @@ class ScriptedGraspSession:
             if isinstance(error, PlacementPreservationError):
                 record['placement_preservation'] = error.checks
                 save_json(directory / 'placement_preservation.json', error.checks)
+                from .placement_contacts import placement_contacts
+                record['placement_contacts'] = placement_contacts(self.runtime, self.world, error.checks)
+                save_json(directory / 'placement_contacts.json', record['placement_contacts'])
             if getattr(error, "compilation", None) is not None:
                 from tuj.m5_motion.object_function_runner import _write_planning_failure
                 record["planning_failure"] = str(_write_planning_failure(directory, request, error))

@@ -386,6 +386,13 @@ def target_resting_on_region(
         return False
     target_minimum, target_maximum = bounds
     target_bottom = float(target_minimum[2])
+    # A rotated bounding box contains empty corners below an irregular mesh.
+    # Contact height must use the same measured collision vertices as grasp
+    # support detection; keep the conservative bbox only when none are stored.
+    points = np.asarray(world.objects[target_id].get("collision_points_m"), dtype=float)
+    if (points.ndim == 2 and points.shape[1:] == (3,) and len(points)
+            and np.all(np.isfinite(points))):
+        target_bottom = float((points @ target_rotation.T + target_position)[:, 2].min())
     support_top = _support_surface_under_footprint(
         world.objects.get(region_id),
         target_minimum,
