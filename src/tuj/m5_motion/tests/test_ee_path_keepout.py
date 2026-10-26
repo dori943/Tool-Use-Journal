@@ -155,3 +155,15 @@ def test_place_reports_a_region_entirely_under_the_sweep():
 
 def test_placement_margin_includes_the_planner_collision_margin():
     assert placement_margin_m(.005) > .005
+
+
+def test_column_fallback_layout_still_checks_every_slot_against_ee_sweep():
+    from tuj.m1_scene.tests.test_container_layout import scene, assert_layout_clear
+    members, tray = scene()
+    sweep = _field((-.2, 0.), (.2, .25), .99)
+    layout = container_layout_clear_of_sweep(members, tray, sweep)
+    assert layout['layout_method'] == 'column_shelf_fallback'
+    assert layout['pass']
+    assert layout['ee_sweep']['blocked'] == []
+    assert layout['ee_sweep']['rearranged']
+    assert_layout_clear(layout, members, [196.9, 309.1], 10.)

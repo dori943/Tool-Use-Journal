@@ -261,6 +261,53 @@ def graspable_on_support(node: dict, ee: dict, edges: list[dict],
                    "check": f"height_{round(height_mm, 1)}>={min_grasp_height_mm}"}
 
 
+def _column_shelf_rows(order: list[dict], open_w: float, gap_mm: float) -> list[dict]:
+    """Bounded first-fit fallback that reuses vertical space within a shelf.
+
+    The original shelf method gives every member the tallest member's depth.
+    Two short objects can instead share one column alongside a tall object.
+    Keep the input bbox orientation and exact gap; never rotate, scale, or
+    squeeze an item. This heuristic is not an exhaustive packing solver.
+    """
+    rows: list[dict] = []
+    for member in order:
+        item = (member["id"], float(member["bbox_mm"][0]), float(member["bbox_mm"][1]))
+        _, width, depth = item
+        placed = False
+        for row in rows:
+            for column in row["columns"]:
+                expanded_width = row["width"] - column["width"] + max(column["width"], width)
+                if (column["depth"] + gap_mm + depth <= row["depth"] + 1e-9
+                        and expanded_width <= open_w + 1e-9):
+                    column["items"].append(item)
+                    column["depth"] += gap_mm + depth
+                    column["width"] = max(column["width"], width)
+                    row["width"] = expanded_width
+                    placed = True
+                    break
+            if placed:
+                break
+            if row["width"] + gap_mm + width <= open_w + 1e-9:
+                row["columns"].append({"items": [item], "width": width, "depth": depth})
+                row["width"] += gap_mm + width
+                placed = True
+                break
+        if not placed:
+            rows.append({"columns": [{"items": [item], "width": width, "depth": depth}],
+                         "width": width, "depth": depth})
+    for row in rows:
+        row["items"], row["local_positions"] = [], {}
+        x = -row["width"] / 2.
+        for column in row["columns"]:
+            y = -column["depth"] / 2.
+            for oid, width, depth in column["items"]:
+                row["items"].append((oid, width, depth))
+                row["local_positions"][oid] = (x + column["width"] / 2., y + depth / 2.)
+                y += depth + gap_mm
+            x += column["width"] + gap_mm
+    return rows
+
+
 def container_layout(members: list[dict], container: dict,
                      gap_mm: float = 10.0, wall_mm: float | None = None,
                      row_order: list[int] | None = None,
@@ -273,7 +320,9 @@ def container_layout(members: list[dict], container: dict,
     여기서 배치를 잡아 서브골마다 다른 자리를 실어 준다.
 
     선반(shelf) 채우기: footprint 깊이 내림차순으로 한 줄씩 x를 채우고, 폭이 모자라면
-    다음 줄로 내린다. 한 층에 다 안 들어가면 남는 것은 overflow 로 보고하되(계획은
+    다음 줄로 내린다. 깊이가 넘치면 같은 줄의 짧은 물체들을 한 열에 쌓는
+    결정적 대안을 시도한다. XY 방향과 물체 간격은 그대로 유지한다.
+    한 층에 다 안 들어가면 남는 것은 overflow 로 보고하되(계획은
     적층을 택할 수 있다) 자리는 계속 배정한다 — 겹치더라도 서로 다른 자리가
     영역 중심 한 점보다 낫다.
 
@@ -299,6 +348,15 @@ def container_layout(members: list[dict], container: dict,
         else:
             rows.append({"items": [(m["id"], w, d)], "width": w, "depth": d})
     used_d = sum(r["depth"] for r in rows) + gap_mm * max(0, len(rows) - 1)
+    layout_method = "shelf"
+    if (used_d > open_d and gap_mm >= 0.
+            and all(0. < float(m["bbox_mm"][0]) <= open_w
+                    and 0. < float(m["bbox_mm"][1]) <= open_d for m in order)):
+        fallback = _column_shelf_rows(order, open_w, gap_mm)
+        fallback_depth = sum(r["depth"] for r in fallback) + gap_mm * max(0, len(fallback) - 1)
+        if fallback_depth <= open_d + 1e-9:
+            rows, used_d = fallback, fallback_depth
+            layout_method = "column_shelf_fallback"
     overflow = [m["id"] for m in order
                 if float(m["bbox_mm"][0]) > open_w or float(m["bbox_mm"][1]) > open_d]
     if used_d > open_d:                       # 한 층에 다 못 들어감 — 줄 간격을 눌러 담는다
@@ -320,16 +378,19 @@ def container_layout(members: list[dict], container: dict,
         cy = y + row["depth"] / 2.0
         x = -row["width"] / 2.0
         for oid, w, _d in row["items"]:
-            cx = sign * (x + w / 2.0)
+            local = row.get("local_positions", {}).get(oid)
+            cx = sign * (local[0] if local is not None else x + w / 2.0)
+            item_cy = cy + (local[1] if local is not None else 0.)
             slots[oid] = {
                 "uv": [round(max(-1.0, min(1.0, cx / half[0])), 4),
-                       round(max(-1.0, min(1.0, cy / half[1])), 4)],
-                "offset_mm": [round(cx, 1), round(cy, 1)], "row": r_index}
+                       round(max(-1.0, min(1.0, item_cy / half[1])), 4)],
+                "offset_mm": [round(cx, 1), round(item_cy, 1)], "row": r_index}
             x += w + gap_mm
         y += row["depth"] + step_gap
     ok = not overflow
     return {"type": "container_layout", "container_id": container.get("id"),
             "slots": slots, "rows": len(rows), "overflow": overflow,
+            "layout_method": layout_method,
             "row_order": order_idx, "mirror_x": bool(mirror_x),
             "value_mm": round(open_d - total_d, 1), "pass": bool(ok),
             "check": (f"shelf_fit(open_{round(open_w, 1)}x{round(open_d, 1)}[{src_tag}]"
