@@ -1023,18 +1023,69 @@ def _held_tool_xy_offset_from_tcp_m(
     return None
 
 
+
+def _held_tool_sweep_contact_xy_offset_m(
+    request: MotionPlanRequest, *, eef_orientation_xyzw: Sequence[float]
+) -> np.ndarray:
+    """TCP offset of the collision patch that reaches the target engagement band.
+
+    Height uses the lowest collision points of the captured grasp. Using the
+    body origin for XY instead puts the contact on a different part of an
+    asymmetric tool. Keep both coordinates on the same engaging geometry; the
+    existing engagement depth and support clearance are unchanged.
+    """
+    from .attachment_retarget import attachment_transform
+
+    rotation = _quaternion_matrix_xyzw(eef_orientation_xyzw)
+    state = request.world.robot_state
+    for object_id in sorted(_held_object_ids(request)):
+        key = ("attached_object_transforms" if state.attached_object_id == object_id
+               else "contact_friction_held_objects")
+        if not request.world.metadata.get(key):
+            continue
+        record = request.world.objects.get(object_id)
+        if not isinstance(record, Mapping):
+            continue
+        points = np.asarray(record.get("collision_points_m", []), dtype=float)
+        if (points.ndim != 2 or points.shape[1:] != (3,) or len(points) < 4
+                or not np.isfinite(points).all()):
+            continue
+        grasp = attachment_transform(request.world, object_id)
+        body_rotation = _quaternion_matrix_xyzw(grasp.orientation_in_reference_xyzw)
+        offsets = (points @ body_rotation.T + np.asarray(grasp.position_in_reference_m)) @ rotation.T
+        band = _sweep_engagement_press_m(request)
+        top = _sweep_target_top_z_m(request)
+        support = _support_surface_z_m(request)
+        if top is not None and support is not None:
+            band = min(band, max(0., top - support - max(
+                _CONTACT_SWEEP_SUPPORT_CLEARANCE_M, request.constraints.collision_margin_m)))
+        # Only points that can meet the target at the unchanged working height
+        # contribute. Deduplication avoids weighting a repeated mesh vertex.
+        patch = np.unique(offsets[offsets[:, 2] <= offsets[:, 2].min() + band + 1e-9], axis=0)
+        return np.mean(patch[:, :2], axis=0)
+    offset = _held_tool_xy_offset_from_tcp_m(
+        request, eef_orientation_xyzw=eef_orientation_xyzw
+    )
+    return np.zeros(2) if offset is None else offset
+
+
+def _sweep_contact_xy(request: MotionPlanRequest, pose: Pose) -> np.ndarray:
+    return np.asarray(pose.position_m[:2], dtype=float) + _held_tool_sweep_contact_xy_offset_m(
+        request, eef_orientation_xyzw=pose.orientation_xyzw
+    )
+
+
 def canonicalize_sweep_contact_start_over_targets(
     request: MotionPlanRequest,
     keyframes: Sequence[RelativeKeyframeSpec],
     *,
     resolver: RelativePoseResolver | None = None,
 ) -> list[RelativeKeyframeSpec]:
-    """Snap CONTACT_START so the held-tool footprint covers the target cluster.
+    """Align the engaging tool patch with the target cluster in world XY.
 
-    Targets the held-tool center onto the cluster centroid. Vac plates sit
-    laterally offset from TCP; compensating that offset restores coverage that
-    raw TCP-centroid snaps miss. Avoid rim-plow TCP shifts that push the plate
-    past the cluster.
+    Collision-point geometry uses the same captured grasp and attitude as the
+    working height. Legacy snapshots without collision points keep their
+    body-origin fallback.
     """
 
     if not is_tool_act_contact_geometry_scope(request) or not keyframes:
@@ -1061,16 +1112,12 @@ def canonicalize_sweep_contact_start_over_targets(
     except GeometryResolutionError:
         return list(keyframes)
     packing = list(start_pose.orientation_xyzw)
-    desired_plate_xy = np.asarray(centroid, dtype=float)
-    tool_offset = _held_tool_xy_offset_from_tcp_m(
+    desired_contact_xy = np.asarray(centroid, dtype=float)
+    tool_offset = _held_tool_sweep_contact_xy_offset_m(
         request, eef_orientation_xyzw=packing
     )
-    if tool_offset is not None:
-        desired_xy = desired_plate_xy - tool_offset
-        metadata_flag = "sweep_contact_start_tool_center"
-    else:
-        desired_xy = desired_plate_xy
-        metadata_flag = "sweep_contact_start_centroid"
+    desired_xy = desired_contact_xy - tool_offset
+    metadata_flag = "sweep_contact_start_tool_center"
     start_xy = np.asarray(start_pose.position_m[:2], dtype=float)
     if float(np.linalg.norm(start_xy - desired_xy)) < _CONTACT_START_CENTROID_SNAP_M:
         return list(keyframes)
@@ -1110,7 +1157,9 @@ def canonicalize_sweep_contact_start_over_targets(
         raised = _retarget_tcp_world_xy(
             keyframe,
             resolver=active_resolver,
-            target_xy=desired_xy,
+            target_xy=desired_contact_xy - _held_tool_sweep_contact_xy_offset_m(
+                request, eef_orientation_xyzw=packing_pre
+            ),
             target_z=hover_z,
             packing_xyzw=packing_pre,
             metadata_flag="sweep_pre_contact_follow_start",
@@ -1162,13 +1211,13 @@ def canonicalize_sweep_lateral_toward_region(
         start_pose = active_resolver.resolve(keyframes[start_index])
     except GeometryResolutionError:
         return list(keyframes)
-    start_xy = np.asarray(start_pose.position_m[:2], dtype=float)
+    start_xy = _sweep_contact_xy(request, start_pose)
     start_z = float(start_pose.position_m[2])
 
     translation = _translation_to_fit_targets_in_region(request)
     if translation is None:
         translation = np.asarray(region_xy, dtype=float) - start_xy
-    # Do not drive TCP past the region center along the inbound axis.
+    # Bound the engaging patch, not the offset TCP, along the inbound axis.
     # Full AABB-fit translations often overshoot into distractors that sit on
     # the far side of the goal (utensils, fixtures). Keep the cross-track
     # (herd) component so offset targets still enter the region AABB.
@@ -1197,7 +1246,7 @@ def canonicalize_sweep_lateral_toward_region(
         end_pose = active_resolver.resolve(keyframes[end_index])
     except GeometryResolutionError:
         return list(keyframes)
-    end_xy = np.asarray(end_pose.position_m[:2], dtype=float)
+    end_xy = _sweep_contact_xy(request, end_pose)
     engagement = _contact_engagement_tcp_z_m(
         request, eef_orientation_xyzw=start_pose.orientation_xyzw
     )
@@ -1219,7 +1268,7 @@ def canonicalize_sweep_lateral_toward_region(
             except GeometryResolutionError:
                 corridor_ok = False
                 break
-            sweep_xy = np.asarray(sweep_pose.position_m[:2], dtype=float)
+            sweep_xy = _sweep_contact_xy(request, sweep_pose)
             if (
                 _distance_to_polyline_m(sweep_xy, path_poly)
                 > _SWEEP_CORRIDOR_DEVIATION_M
@@ -1253,7 +1302,7 @@ def canonicalize_sweep_lateral_toward_region(
     if not move_indices:
         return list(keyframes)
 
-    sample_xy = _sample_polyline_by_fraction(path_points, len(move_indices))
+    sample_xy = _sample_polyline_by_fraction(path_poly, len(move_indices))
     result = list(keyframes)
     for index, target_xy in zip(move_indices, sample_xy):
         try:
@@ -1266,7 +1315,9 @@ def canonicalize_sweep_lateral_toward_region(
         retargeted = _retarget_tcp_world_xy(
             result[index],
             resolver=active_resolver,
-            target_xy=target_xy,
+            target_xy=target_xy - _held_tool_sweep_contact_xy_offset_m(
+                request, eef_orientation_xyzw=packing
+            ),
             target_z=contact_z if candidate_z is None else candidate_z,
             packing_xyzw=packing,
             metadata_flag="sweep_lateral_canonicalized",
@@ -1285,7 +1336,7 @@ def canonicalize_sweep_lateral_toward_region(
     # over the pre-sweep cluster.
     try:
         end_pose = active_resolver.resolve(result[end_index])
-        end_xy = np.asarray(end_pose.position_m[:2], dtype=float)
+        end_xy = _sweep_contact_xy(request, end_pose)
         end_z = float(end_pose.position_m[2])
     except GeometryResolutionError:
         return result
@@ -1303,7 +1354,9 @@ def canonicalize_sweep_lateral_toward_region(
         retargeted = _retarget_tcp_world_xy(
             keyframe,
             resolver=active_resolver,
-            target_xy=end_xy,
+            target_xy=end_xy - _held_tool_sweep_contact_xy_offset_m(
+                request, eef_orientation_xyzw=packing_retreat
+            ),
             target_z=hover_z,
             packing_xyzw=packing_retreat,
             metadata_flag="sweep_lateral_retreat_follow",
@@ -1605,8 +1658,8 @@ def _reject_degenerate_sweep_lateral(
             end_pose = resolver.resolve(keyframe)
     if start_pose is None or end_pose is None:
         return
-    start_xy = np.asarray(start_pose.position_m[:2], dtype=float)
-    end_xy = np.asarray(end_pose.position_m[:2], dtype=float)
+    start_xy = _sweep_contact_xy(request, start_pose)
+    end_xy = _sweep_contact_xy(request, end_pose)
     lateral = float(np.linalg.norm(end_xy - start_xy))
     if lateral < _MIN_SWEEP_LATERAL_M:
         raise ContactKeyframeGeometryError(

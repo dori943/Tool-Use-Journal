@@ -1401,3 +1401,76 @@ def test_compiler_edges_and_repeated_compilation_use_the_preserved_contact_pose(
         assert result.solved
         assert edge_poses == ik_poses
         candidate = candidate.model_copy(update={'keyframes': [node.keyframe for node in result.connected.nodes]})
+
+
+def _asymmetric_contact_request(grasp_offset):
+    """A narrow tip is the lowest face; the body origin is not that tip."""
+    request = _sweep_request()
+    request.world.robot_state.attached_object_id = 'tool_pusher'
+    request.world.metadata['attached_object_transforms'] = {'tool_pusher': {
+        'object_id': 'tool_pusher', 'free_joint_name': 'tool_joint',
+        'reference_kind': 'site', 'reference_name': 'grip_site',
+        'position_in_reference_m': list(grasp_offset),
+        'orientation_in_reference_xyzw': [0., 0., 0., 1.],
+    }}
+    # EEF's default packing attitude points local +z down. This high local-z
+    # tip is therefore the engaging patch, separated from the wide handle.
+    request.world.objects['tool_pusher']['collision_points_m'] = [
+        [.08, -.006, .02], [.10, -.006, .02],
+        [.08, .006, .02], [.10, .006, .02],
+        [-.08, -.03, -.01], [-.08, .03, -.01],
+        [.02, -.03, -.01], [.02, .03, -.01],
+    ]
+    request.world.objects['collect_zone'] = _object((-.45, .05, .82), dimensions=(.25, .18, .02))
+    return request
+
+
+def _independent_working_patch_xy(request, frame):
+    from scipy.spatial.transform import Rotation
+    pose = RelativePoseResolver(request.world).resolve(frame)
+    grasp = request.world.metadata['attached_object_transforms']['tool_pusher']
+    points = np.asarray(request.world.objects['tool_pusher']['collision_points_m'])
+    # Fixture's grasp rotation is identity; compute real world collision points
+    # independently of the planner's contact-offset helper.
+    world = Rotation.from_quat(pose.orientation_xyzw).apply(
+        points + np.asarray(grasp['position_in_reference_m'])
+    ) + np.asarray(pose.position_m)
+    tip = world[world[:, 2] <= world[:, 2].min() + .0025 + 1e-9]
+    return tip[:, :2].mean(axis=0)
+
+
+def test_sweep_contact_route_is_invariant_to_tcp_grasp_offset():
+    from tuj.m5_motion.contact_keyframe_validation import canonicalize_sweep_strategy_heights
+    routes = []
+    for offset in ([.03, -.02, .03], [.24, .12, .03]):
+        request = _asymmetric_contact_request(offset)
+        before = request.model_dump_json()
+        frames = canonicalize_sweep_strategy_heights(request, _valid_sweep_sequence())
+        contacts = [f for f in frames if f.keyframe_type in {
+            KeyframeType.CONTACT_START, KeyframeType.CONTACT_SWEEP, KeyframeType.CONTACT_END}]
+        route = np.asarray([_independent_working_patch_xy(request, f) for f in contacts])
+        assert route[0] == pytest.approx(request.world.objects['block_a']['pose']['position_m'][:2])
+        assert route[-1] == pytest.approx([-.45, .05])
+        assert route[1] == pytest.approx((route[0] + route[-1]) / 2.)
+        assert request.model_dump_json() == before  # no estimated input or contract mutation
+        validate_sweep_keyframe_strategy(request, frames)
+        repeated = canonicalize_sweep_strategy_heights(request, frames)
+        assert [f.model_dump() for f in repeated] == [f.model_dump() for f in frames]
+        routes.append(route)
+    assert routes[0] == pytest.approx(routes[1])
+
+
+def test_rotating_contact_attitudes_keep_the_same_world_patch_route():
+    from tuj.m5_motion.contact_keyframe_validation import canonicalize_sweep_strategy_heights
+    from scipy.spatial.transform import Rotation
+    request = _asymmetric_contact_request([.16, -.03, .03])
+    frames = _valid_sweep_sequence()
+    for f, angle in zip(frames, [0., 15., -15., 30., 0.]):
+        f.approach_axis_xyz = tuple(Rotation.from_euler('y', angle, degrees=True).apply([0., 0., 1.]))
+    result = canonicalize_sweep_strategy_heights(request, frames)
+    points = [_independent_working_patch_xy(request, f) for f in result if f.keyframe_type in {
+        KeyframeType.CONTACT_START, KeyframeType.CONTACT_SWEEP, KeyframeType.CONTACT_END}]
+    assert points[0] == pytest.approx([-.10, .05])
+    assert points[-1] == pytest.approx([-.45, .05])
+    assert points[1] == pytest.approx((points[0] + points[-1]) / 2.)
+    validate_sweep_keyframe_strategy(request, result)
