@@ -8,7 +8,9 @@ that replaces containment for ``place_on`` and keep its negative cases.
 """
 from __future__ import annotations
 
-from tuj.m5_motion.contact_evaluation import StackPlacementEvaluator
+import pytest
+
+from tuj.m5_motion.contact_evaluation import StackPlacementEvaluator, TaskAwareGoalEvaluator
 from tuj.m5_motion.execution import GoalEvaluationStatus
 from tuj.m5_motion.push_to_region import (
     target_fully_inside_region,
@@ -16,6 +18,8 @@ from tuj.m5_motion.push_to_region import (
 )
 from tuj.m5_motion.schema import (
     ArtifactProvenance,
+    ExecutionReport,
+    ExecutionStatus,
     GoalType,
     ModuleName,
     MotionGoal,
@@ -23,6 +27,7 @@ from tuj.m5_motion.schema import (
     MotionTask,
     RobotState,
     SceneRef,
+    SimulationMetrics,
     WorldSnapshot,
 )
 
@@ -189,3 +194,57 @@ def test_correct_mesh_contact_height_keeps_gap_and_penetration_limits():
     for gap in (.004, -.004):
         assert target_resting_on_region(_tilted_mesh_world(gap),
             target_id='slice', region_id='base')
+
+
+def _released_report(world, *, attached=None):
+    state = world.robot_state.model_copy(deep=True)
+    state.attached_object_id = attached
+    return ExecutionReport(
+        report_id='stack-report', run_id='stack-run', plan_id='stack-plan',
+        provenance=ArtifactProvenance(
+            artifact_id='stack-report-artifact', artifact_type='ExecutionReport',
+            produced_by=ModuleName.MOTION_PLANNER, invocation_id='stack-test',
+        ),
+        status=ExecutionStatus.SUCCESS, final_robot_state=state,
+        metrics=SimulationMetrics(executed_duration_s=1., max_joint_tracking_error_rad=0.),
+    )
+
+
+@pytest.mark.parametrize('gap, offset, passed', [
+    (0., 0., True), (.05, 0., False), (-.015, 0., False), (0., .06, False),
+])
+def test_task_aware_place_on_routes_to_existing_support_predicate(gap, offset, passed):
+    request = _request()
+    world = _world(gap_m=gap, offset_x_m=offset)
+    result = TaskAwareGoalEvaluator().evaluate(request, _released_report(world), world)
+    assert result.status is (GoalEvaluationStatus.SATISFIED if passed else GoalEvaluationStatus.FAILED)
+    assert result.observed['predicate'] == 'STACK_SUPPORT'
+    # Restore routing only; the original support tolerances remain authoritative.
+    assert result.observed['maximum_gap_m'] == .005
+    assert result.observed['maximum_penetration_m'] == .005
+
+
+@pytest.mark.parametrize('action, expected', [
+    ('place_on', GoalEvaluationStatus.SATISFIED),
+    ('place', GoalEvaluationStatus.FAILED),
+    ('release', GoalEvaluationStatus.FAILED),
+])
+def test_only_explicit_place_on_allows_a_wider_supported_layer(action, expected):
+    request = _request()
+    request.task.action_type = action
+    world = _world()
+    world.objects['slice']['dimensions_m'][:2] = [.16, .15]
+    result = TaskAwareGoalEvaluator().evaluate(request, _released_report(world), world)
+    assert result.status is expected
+    assert (result.observed.get('predicate') == 'STACK_SUPPORT') is (action == 'place_on')
+
+
+def test_place_on_requires_release_before_support_evaluation():
+    request = _request()
+    world = _world()
+    result = TaskAwareGoalEvaluator().evaluate(
+        request, _released_report(world, attached='slice'), world,
+    )
+    assert result.status is GoalEvaluationStatus.FAILED
+    assert result.observed['attached_object_id'] == 'slice'
+    assert 'still attached' in result.detail

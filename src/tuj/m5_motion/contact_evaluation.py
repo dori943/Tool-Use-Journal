@@ -736,7 +736,7 @@ class TaskAwareGoalEvaluator:
                 return _result(request,
                     GoalEvaluationStatus.SATISFIED if evidence['succeeded'] else GoalEvaluationStatus.FAILED,
                     'container opening coverage, physical support and packed contents', observed=evidence)
-            if operation == "PLACE_ON" and region_evaluator is self._region:
+            if operation == "PLACE_ON" and region_evaluator is self._place_region:
                 # place_on names a base object to stack onto, so support is the
                 # success condition rather than containment.  Containers keep
                 # the containment predicate through _container_region above.
