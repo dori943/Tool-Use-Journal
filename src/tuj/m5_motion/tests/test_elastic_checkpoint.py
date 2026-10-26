@@ -44,6 +44,10 @@ def test_elastic_pose_and_break_counters_roundtrip_without_changing_rest_pose(tm
         assert runtime._breakable_runtime.step_count == 42
         assert runtime._breakable_runtime.violation_steps == 2
         assert runtime._breakable_runtime.contact_loss_steps == 1
+        # A restored split-step run must start from the restored state's
+        # solved contacts rather than the dataclass's empty default sample.
+        assert runtime.attachment_contact_metrics.contact_count > 0
+        assert runtime.attachment_contact_metrics == runtime.object_contact_metrics('apple')
     finally:
         runtime.close()
 

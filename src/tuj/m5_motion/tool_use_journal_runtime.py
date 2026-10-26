@@ -1929,8 +1929,13 @@ class ToolUseJournalEERuntime:
         self._last_attachment_break = observation
         raise ToolUseJournalAttachmentBroken(observation)
 
-    def prepare_attachment_step(self) -> None:
-        """Apply a 6-DoF penalty weld and fail if its contract breaks."""
+    def prepare_attachment_step(self, *, contact_forces_resolved: bool = True) -> None:
+        """Apply a 6-DoF penalty weld and fail if its contract breaks.
+
+        After mj_step1, contact addresses have been rebuilt but efc_force still
+        belongs to the preceding solve. In that phase use the last complete
+        contact sample, captured at attachment or after mj_step2, instead.
+        """
 
         attachment = self._attachment
         runtime = self._breakable_runtime
@@ -2058,7 +2063,8 @@ class ToolUseJournalEERuntime:
         required_torque_nm = float(np.linalg.norm(required_torque))
         position_error_m = float(np.linalg.norm(position_error))
         orientation_error_rad = float(np.linalg.norm(orientation_error))
-        contact = self._attachment_contact_metrics(attachment)
+        contact = (self._attachment_contact_metrics(attachment)
+                   if contact_forces_resolved else runtime.latest_contact)
         runtime.latest_contact = contact
         runtime.step_count += 1
         # Opposed contact groups and minimum formation force are checked when
@@ -2135,7 +2141,7 @@ class ToolUseJournalEERuntime:
         runtime.applied_reference_wrench = reference_wrench
 
     def finish_attachment_step(self) -> None:
-        """Refresh contact telemetry after a physics substep."""
+        """Cache solved contacts after a complete physics substep, never step1."""
 
         attachment = self._attachment
         runtime = self._breakable_runtime
@@ -2445,7 +2451,9 @@ class ToolUseJournalEERuntime:
         self._contact_friction_retention = None
         self._last_attachment_break = None
         self._breakable_runtime = (
-            _BreakableAttachmentRuntime()
+            _BreakableAttachmentRuntime(
+                latest_contact=self._attachment_contact_metrics(attachment)
+            )
             if attachment is not None
             and attachment.mode is AttachmentMode.BREAKABLE_WELD
             else None
@@ -5142,13 +5150,16 @@ class ToolUseJournalControllerTrajectoryPlayer(
         policy_step = True
         for _ in range(substeps):
             self.runtime.synchronize_attached_object()
-            if bool(getattr(env, "lite_physics", False)):
+            lite_physics = bool(getattr(env, "lite_physics", False))
+            if lite_physics:
                 sim.step1()
             else:
                 sim.forward()
-            self.runtime.prepare_attachment_step()
+            self.runtime.prepare_attachment_step(
+                contact_forces_resolved=not lite_physics
+            )
             pre_action(action, policy_step)
-            if bool(getattr(env, "lite_physics", False)):
+            if lite_physics:
                 sim.step2()
             else:
                 sim.step()
