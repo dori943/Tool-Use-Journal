@@ -984,7 +984,8 @@ class MotionPlanBuilder:
                     else {}
                 ),
                 **(
-                    {"contact_primitive": request.task.contact.primitive}
+                    {"contact_primitive": request.task.contact.primitive,
+                     "contact_path_pattern": request.task.contact.path_pattern}
                     if request.task.contact is not None
                     else {}
                 ),

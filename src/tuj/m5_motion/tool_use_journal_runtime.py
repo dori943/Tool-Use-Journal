@@ -3671,6 +3671,8 @@ def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
     plans do not arm it.
     """
 
+    if str(plan.metadata.get("contact_path_pattern") or "").upper() == "SIDE_PUSH":
+        return False
     primitive = str(plan.metadata.get("contact_primitive") or "").strip().lower()
     if primitive == "extract":
         return False
@@ -3680,6 +3682,17 @@ def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
 def _maybe_enable_held_tool_fill_for_plan(
     runtime: ToolUseJournalEERuntime, plan: MotionPlan
 ) -> bool:
+    if str(plan.metadata.get("contact_path_pattern") or "").upper() == "SIDE_PUSH":
+        # A native path must not silently inherit or arm object-following.
+        # Clearing active fill can itself reposition targets, so reject such a
+        # state without mutating it rather than trying to clean it up here.
+        if any(bool(getattr(runtime, name, None)) for name in (
+            "_held_tool_push_partner_ids", "_held_tool_fill_geom_backup",
+            "_held_tool_rim_collision_backup", "_held_tool_contact_drag",
+            "_held_tool_drag_offsets",
+        )):
+            raise ToolUseJournalRuntimeError("NATIVE_CONTACT_REQUIRES_UNASSISTED_STATE")
+        return False
     primitive = str(plan.metadata.get("contact_primitive") or "").strip().lower()
     if primitive == "extract":
         targets = plan.metadata.get("target_ids") or []
