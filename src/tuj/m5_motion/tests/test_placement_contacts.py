@@ -27,3 +27,11 @@ def test_contact_evidence_is_measured_and_does_not_mutate_state():
     data.qpos[2] += .1
     mujoco.mj_forward(model, data)
     assert measure_contacts(model, data, objects, checks)[0]['contacts'] == []
+
+
+def test_missing_geometry_evidence_does_not_mask_original_goal_failure():
+    model = mujoco.MjModel.from_xml_string('<mujoco><worldbody/></mujoco>')
+    data = mujoco.MjData(model)
+    result = measure_contacts(model, data, {}, [{'target': 'fruit', 'region': 'plate'}])
+    assert result[0]['available'] is False
+    assert result[0]['reason'] == 'missing measured object'

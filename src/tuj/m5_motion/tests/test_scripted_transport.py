@@ -999,3 +999,56 @@ def test_place_entry_retreat_anchor_is_measured_hand_pose_in_rotated_region():
     np.testing.assert_allclose(
         Rotation.from_quat(hint['eef_orientation_xyzw']).as_matrix(),
         GRIP[:3,:3],atol=1e-10)
+
+
+def _occupied_tray_for_yaw_search():
+    request = _tray_request(.005)
+    oid = ENTRIES[4].object_id
+    _generic_held(request, oid)
+    request.world.robot_state.eef_pose = Pose(frame_id='world', position_m=(0., 0., 1.2),
+                                             orientation_xyzw=(0., 0., 0., 1.))
+    attached = request.world.metadata['contact_friction_held_objects'][oid]
+    attached['position_in_reference_m'] = [0., 0., 0.]
+    attached['orientation_in_reference_xyzw'] = [0., 0., 0., 1.]
+    request.world.objects[oid].update(dimensions_m=[.045, .137, .024],
+                                      anchors={'center': [0., 0., 0.]})
+    request.world.objects['tray'] = {
+        'pose': {'frame_id': 'world', 'position_m': [0., 0., .9],
+                 'orientation_xyzw': [0., 0., 0., 1.]},
+        'dimensions_m': [.219, .364, .06], 'anchors': {'center': [0., 0., 0.]},
+        'collision_points_m': _tray_collision_points(half=(.1095, .182),
+            inner_floor_z=-.02, bottom_z=-.03, rim_z=.03)}
+    request.world.objects['plate'] = {
+        'pose': {'frame_id': 'world', 'position_m': [0., .071, .9],
+                 'orientation_xyzw': [0., 0., 0., 1.]},
+        'dimensions_m': [.167, .167, .01]}
+    request.task.metadata['action_parameters'] = {'placement_slot': {'uv': [-.4855, -.4753]}}
+    return request, oid
+
+
+def test_seat_search_and_published_yaw_agree_in_occupied_tray():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request, oid = _occupied_tray_for_yaw_search()
+    g = _Grounding(request, None, oid)
+    assert g._free_destination_xy(None) is None  # vertical spoon cannot fit
+    ground_held_transport(request)
+    hint = request.task.metadata['held_transport_goal']
+    rotation = Rotation.from_quat(hint['object_orientation_xyzw']).as_matrix()
+    half = np.abs(rotation) @ np.array([.045, .137, .024]) / 2
+    assert half[0] > half[1]  # retained horizontal seat, never re-yawed at publish
+    center = np.asarray(request.world.objects['tray']['anchors'][hint['anchor']])[:2]
+    gap = np.max(np.abs(center - [0., .071]) - (half[:2] + [.0835, .0835]))
+    assert gap >= .005
+    assert request.task.metadata['region_yaw_search']['clearance_policy_changed'] is False
+    assert request.constraints.collision_margin_m == .005
+
+
+def test_explicit_orientation_cannot_be_rotated_to_force_a_seat():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request, oid = _occupied_tray_for_yaw_search()
+    g = _Grounding(request, None, oid)
+    g.preserve_destination_rotation = True
+    before = g.destination_rotation.copy()
+    with pytest.raises(ValueError, match='PLACEMENT_SPACE_EXHAUSTED'):
+        g.free_destination_xy()
+    np.testing.assert_array_equal(g.destination_rotation, before)

@@ -10,6 +10,10 @@ def measure_contacts(model, data, objects, checks):
     result = []
     for check in checks:
         target, region = check['target'], check['region']
+        if target not in objects or region not in objects:
+            result.append({'target': target, 'region': region, 'available': False,
+                           'reason': 'missing measured object', 'diagnostic_only': True})
+            continue
         groups = []
         for name in (target, region):
             ids = {mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_GEOM, n)

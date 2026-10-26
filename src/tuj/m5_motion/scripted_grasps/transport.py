@@ -620,7 +620,73 @@ class _Grounding:
         margin = placement_margin_m(self.request.constraints.collision_margin_m)
         return field.clearance(xy, (r, r), top, margin)
 
+    def _initialize_seat_yaw(self):
+        if (getattr(self, '_seat_yaw_initialized', False)
+                or self.record.get('packing_metadata', {}).get('kind') == 'CONTAINER'):
+            return
+        self._seat_yaw_initialized = True
+        # Choose the ordinary tray-aligned yaw BEFORE computing seat bounds.
+        # Publishing a different yaw after search invalidates its occupancy
+        # checks (a horizontal spoon becomes a blocked vertical spoon).
+        region_rotation = self.T_WR[:3, :3]
+        object_in_region = region_rotation.T @ self.destination_rotation
+        short_axis = int(np.argmin(self.region_dims[:2]))
+        long_axis = 1 - short_axis
+        extent_along_short = float(
+            np.abs(object_in_region[short_axis, :]) @ self.local_size
+        )
+        extent_if_rotated = float(
+            np.abs(object_in_region[long_axis, :]) @ self.local_size
+        )
+        if (
+            not self.preserve_destination_rotation
+            and extent_if_rotated + 1e-6 < extent_along_short
+        ):
+            yaw_about_region_z = np.array(
+                [[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]
+            )
+            self.destination_rotation = region_rotation @ (
+                yaw_about_region_z @ object_in_region
+            )
+        self.half = np.abs(self.destination_rotation) @ self.local_size / 2.
+
     def free_destination_xy(self):
+        """Search the same upright yaw alternatives used by goal publication.
+
+        A preferred long-axis alignment can leave no seat in an occupied tray.
+        Try its orthogonal yaw with the SAME footprint, wall, occupant, and
+        keepout checks. Explicit tool-home and packing orientations stay fixed.
+        Every resulting pose still goes through ordinary IK/collision planning.
+        """
+        self._initialize_seat_yaw()
+        try:
+            return self._free_destination_fixed_orientation()
+        except ValueError as error:
+            if (not str(error).startswith('PLACEMENT_SPACE_EXHAUSTED')
+                    or self.preserve_destination_rotation
+                    or self.record.get('packing_metadata', {}).get('kind') == 'CONTAINER'):
+                raise
+            original_error = error
+        rotation, half = self.destination_rotation.copy(), self.half.copy()
+        region = self.T_WR[:3, :3]
+        yaw = np.array([[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]])
+        self.destination_rotation = region @ yaw @ region.T @ rotation
+        self.half = np.abs(self.destination_rotation) @ self.local_size / 2.
+        self.preserve_destination_rotation = True
+        try:
+            xy = self._free_destination_fixed_orientation()
+        except ValueError:
+            self.destination_rotation, self.half = rotation, half
+            self.preserve_destination_rotation = False
+            raise original_error
+        self.task.metadata['region_yaw_search'] = {
+            'quarter_turns_from_preferred': 1,
+            'reason': 'preferred orientation has no unoccupied seat',
+            'clearance_policy_changed': False,
+        }
+        return xy
+
+    def _free_destination_fixed_orientation(self):
         """Seat search that also keeps clear of the fixed EE-rack arm sweep.
 
         A seat under the stored attach/return trajectories is accepted here
@@ -857,36 +923,11 @@ class _Grounding:
 
     # -- publication ---------------------------------------------------------
     def publish(self, goal_key, start_key, desired_center, extra):
-        # Object-space destination: the body origin translated so the bbox center
-        # lands on desired_center; the grasp orientation is preserved, except for
-        # an optional 90 deg yaw about the region's vertical that puts the held
-        # object's SHORT footprint side along the region's SHORT axis (long side
-        # along the long axis). A narrow region (e.g. a tray) otherwise leaves no
-        # margin when the object's long axis lands across it, so settle drift on
-        # release overhangs the rim (target_fully_inside_region failure). The yaw
-        # is vertical-only, so the object's height/floor geometry is unchanged.
+        # Publish exactly the orientation whose footprint passed seat search.
+        # The preferred tray yaw and its orthogonal alternative are selected
+        # before occupancy checks, never after a free XY has been chosen.
         destination = self.T_WB.copy()
         destination[:3, :3] = self.destination_rotation
-        region_rotation = self.T_WR[:3, :3]
-        object_in_region = region_rotation.T @ destination[:3, :3]
-        short_axis = int(np.argmin(self.region_dims[:2]))
-        long_axis = 1 - short_axis
-        extent_along_short = float(
-            np.abs(object_in_region[short_axis, :]) @ self.local_size
-        )
-        extent_if_rotated = float(
-            np.abs(object_in_region[long_axis, :]) @ self.local_size
-        )
-        if (
-            not self.preserve_destination_rotation
-            and extent_if_rotated + 1e-6 < extent_along_short
-        ):
-            yaw_about_region_z = np.array(
-                [[0., -1., 0.], [1., 0., 0.], [0., 0., 1.]]
-            )
-            destination[:3, :3] = region_rotation @ (
-                yaw_about_region_z @ object_in_region
-            )
         # Re-anchor the (possibly rotated) body so its bbox center lands exactly
         # on desired_center.  Equivalent to the previous translate-only path when
         # no yaw is applied.
