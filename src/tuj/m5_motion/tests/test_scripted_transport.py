@@ -1052,3 +1052,67 @@ def test_explicit_orientation_cannot_be_rotated_to_force_a_seat():
     with pytest.raises(ValueError, match='PLACEMENT_SPACE_EXHAUSTED'):
         g.free_destination_xy()
     np.testing.assert_array_equal(g.destination_rotation, before)
+
+
+@pytest.mark.parametrize('uv', [[0., 1.], [0., -1.]])
+def test_preferred_slot_cannot_bypass_measured_interior_bounds(uv):
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request, oid = _occupied_tray_for_yaw_search()
+    request.world.objects.pop('plate')
+    request.task.metadata['action_parameters']['placement_slot']['uv'] = uv
+    g = _Grounding(request, None, oid)
+    g._initialize_seat_yaw()
+    anchor = g._slot_xy()
+    limit = g.usable_half_xy() - g.half[:2]
+    assert g.seat_clear_of_occupants(anchor)
+    assert np.any(np.abs(anchor - g.region_world[:2]) > limit)
+    selected = g._free_destination_xy(None)
+    assert selected is not None
+    assert np.all(np.abs(selected - g.region_world[:2]) <= limit + 1e-9)
+    assert not np.allclose(selected, anchor)
+
+
+def test_valid_preferred_slot_is_retained_without_grid_rounding():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request, oid = _occupied_tray_for_yaw_search()
+    request.world.objects.pop('plate')
+    request.task.metadata['action_parameters']['placement_slot']['uv'] = [.123, -.123]
+    g = _Grounding(request, None, oid)
+    g._initialize_seat_yaw()
+    anchor = g._slot_xy()
+    np.testing.assert_array_equal(g._free_destination_xy(None), anchor)
+
+
+def test_oversize_object_cannot_bypass_interior_at_clear_center():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request, oid = _occupied_tray_for_yaw_search()
+    request.world.objects.pop('plate')
+    request.world.objects[oid]['dimensions_m'] = [.5, .5, .02]
+    request.task.metadata.pop('action_parameters')
+    g = _Grounding(request, None, oid)
+    assert g.seat_clear_of_occupants(g.region_world[:2])
+    assert g._free_destination_xy(None) is None
+
+
+def test_measured_floor_accepts_broad_plate_without_double_search_inset():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request, oid = _occupied_tray_for_yaw_search()
+    request.world.objects.pop('plate')
+    request.world.objects[oid]['dimensions_m'] = [.1675, .1671, .0102]
+    request.task.metadata['action_parameters']['placement_slot']['uv'] = [0., 0.]
+    g = _Grounding(request, None, oid)
+    assert np.any(g.usable_half_xy() - g.half[:2] < 0.)
+    assert np.all(g.interior_half_xy() - g.half[:2] > request.constraints.collision_margin_m)
+    np.testing.assert_array_equal(g._free_destination_xy(None), g.region_world[:2])
+
+
+def test_missing_floor_geometry_keeps_existing_bbox_slot_preference():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request, oid = _occupied_tray_for_yaw_search()
+    request.world.objects.pop('plate')
+    request.world.objects['tray'].pop('collision_points_m')
+    request.task.metadata['action_parameters']['placement_slot']['uv'] = [0., 1.]
+    g = _Grounding(request, None, oid)
+    g._initialize_seat_yaw()
+    anchor = g._slot_xy()
+    np.testing.assert_array_equal(g._free_destination_xy(None), anchor)

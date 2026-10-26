@@ -730,19 +730,33 @@ class _Grounding:
     def _free_destination_xy(self, seat_allowed):
         """Find an unoccupied seat, or return None. Never accept overlap as fallback."""
         mine = self.half[:2]
+        # The measured floor is a physical boundary; the extra 20 mm inset
+        # in usable_half_xy() is only the existing conservative search domain.
+        # Applying that inset to preferred slots would reject valid broad
+        # plates even when their measured rim clearance exceeds the request's
+        # collision margin. Conversely, outer-bbox slot clipping alone can
+        # overhang a flared tray's narrower floor.
+        physical_limit = (self.interior_half_xy() - mine
+                          - float(self.request.constraints.collision_margin_m))
+        if np.any(physical_limit < -1e-9):
+            return None
+        physical_limit = np.maximum(physical_limit, 0.)
+        center_xy = self.region_world[:2]
 
         def acceptable(xy):
+            if np.any(np.abs(xy - center_xy) > physical_limit + 1e-9):
+                return False
             return (seat_allowed is None or seat_allowed(xy)) and self.seat_clear_of_occupants(xy)
 
         anchor = self._slot_xy()
         if anchor is None:
-            anchor = self.region_world[:2]
+            anchor = center_xy
         if acceptable(anchor):
             return anchor
         limit = self.usable_half_xy() - mine
-        if np.any(limit <= 0.):
+        if np.any(limit < -1e-9):
             return None
-        center_xy = self.region_world[:2]
+        limit = np.maximum(limit, 0.)
         xs = np.arange(-limit[0], limit[0] + 1e-9, FREE_SPOT_GRID_M)
         ys = np.arange(-limit[1], limit[1] + 1e-9, FREE_SPOT_GRID_M)
         for dx, dy in sorted(((dx, dy) for dx in xs for dy in ys),
