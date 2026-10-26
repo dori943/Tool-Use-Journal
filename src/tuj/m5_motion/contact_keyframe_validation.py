@@ -1024,10 +1024,10 @@ def _held_tool_xy_offset_from_tcp_m(
 
 
 
-def _held_tool_sweep_contact_xy_offset_m(
+def _held_tool_engaging_offsets_m(
     request: MotionPlanRequest, *, eef_orientation_xyzw: Sequence[float]
-) -> np.ndarray:
-    """TCP offset of the collision patch that reaches the target engagement band.
+) -> np.ndarray | None:
+    """World-axis TCP offsets reaching the target engagement band.
 
     Height uses the lowest collision points of the captured grasp. Using the
     body origin for XY instead puts the contact on a different part of an
@@ -1062,6 +1062,18 @@ def _held_tool_sweep_contact_xy_offset_m(
         # Only points that can meet the target at the unchanged working height
         # contribute. Deduplication avoids weighting a repeated mesh vertex.
         patch = np.unique(offsets[offsets[:, 2] <= offsets[:, 2].min() + band + 1e-9], axis=0)
+        return patch
+    return None
+
+
+def _held_tool_sweep_contact_xy_offset_m(
+    request: MotionPlanRequest, *, eef_orientation_xyzw: Sequence[float]
+) -> np.ndarray:
+    """XY center of the same physical patch used by the engagement height."""
+    patch = _held_tool_engaging_offsets_m(
+        request, eef_orientation_xyzw=eef_orientation_xyzw
+    )
+    if patch is not None:
         return np.mean(patch[:, :2], axis=0)
     offset = _held_tool_xy_offset_from_tcp_m(
         request, eef_orientation_xyzw=eef_orientation_xyzw
