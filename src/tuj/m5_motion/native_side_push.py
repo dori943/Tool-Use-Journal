@@ -9,6 +9,7 @@ from dataclasses import dataclass
 from collections.abc import Sequence
 
 import numpy as np
+from scipy.spatial import ConvexHull, QhullError
 
 from .contact_keyframe_validation import (
     ContactKeyframeGeometryError,
@@ -36,6 +37,8 @@ class NativeSidePushGeometry:
     target_center_world_m: tuple[float, float, float]
     target_goal_center_world_m: tuple[float, float, float]
     push_direction_xy: tuple[float, float]
+    approach_direction_xy: tuple[float, float]
+    translation_kind: str
     working_patch_offset_xy_m: tuple[float, float]
     patch_start_xy_m: tuple[float, float]
     patch_engage_xy_m: tuple[float, float]
@@ -56,11 +59,63 @@ def _target_points(request: MotionPlanRequest, target_id: str) -> tuple[np.ndarr
     return position + center @ rotation.T, position + points @ rotation.T
 
 
+def _face_normal_translation(
+    points_world: np.ndarray, target_center: np.ndarray,
+    region_rotation: np.ndarray, center_local: np.ndarray,
+    lower: np.ndarray, upper: np.ndarray, goal_direction: np.ndarray,
+) -> tuple[np.ndarray, np.ndarray, float | None]:
+    """Find the shortest face-normal ray that enters the target-fit region.
+
+    A diagonal normal to a box corner has no central face contact. Select an
+    actual observed footprint edge instead. If no normal ray reaches the
+    target-fit region, return a face-normal approach for a subsequent goal
+    translation; this path still requires full IK and collision validation.
+    """
+    try:
+        hull = ConvexHull(points_world[:, :2])
+    except QhullError as error:
+        raise ContactKeyframeGeometryError("side push requires a nondegenerate observed footprint") from error
+    polygon = points_world[hull.vertices, :2]
+    candidates, facing = [], []
+    for index, start in enumerate(polygon):
+        end = polygon[(index + 1) % len(polygon)]
+        edge = end - start
+        length = float(np.linalg.norm(edge))
+        if length <= 1e-12:
+            continue
+        # ConvexHull vertices are counterclockwise; left normal points inward.
+        direction = np.array([-edge[1], edge[0]]) / length
+        facing.append((float(direction @ goal_direction), -index, direction, (start + end) * .5))
+        local_direction = region_rotation[:2, :2].T @ direction
+        minimum, maximum = 0., float("inf")
+        for axis in range(2):
+            velocity = float(local_direction[axis])
+            if abs(velocity) <= 1e-12:
+                if center_local[axis] < lower[axis] - 1e-12 or center_local[axis] > upper[axis] + 1e-12:
+                    maximum = -1.
+                    break
+                continue
+            distances = ((lower[axis] - center_local[axis]) / velocity,
+                         (upper[axis] - center_local[axis]) / velocity)
+            minimum = max(minimum, min(distances))
+            maximum = min(maximum, max(distances))
+        if minimum > 1e-9 and minimum <= maximum + 1e-12:
+            candidates.append((minimum, index, direction, (start + end) * .5))
+    if not candidates:
+        # The five-phase contract can approach the central face normally and
+        # then translate toward the goal. This changes the contact path, never
+        # the target state; the entire turning path must still pass validation.
+        _, _, direction, face_center = max(facing, key=lambda candidate: candidate[:2])
+        return direction, face_center, None
+    distance, _, direction, face_center = min(candidates, key=lambda candidate: (candidate[0], candidate[1]))
+    return direction, face_center, float(distance)
+
+
 def native_side_push_geometry(
     request: MotionPlanRequest, *, eef_orientation_xyzw: Sequence[float],
     profile: PushPlanningProfile | None = None,
 ) -> NativeSidePushGeometry:
-    """Place the observed engaging patch behind the target's trailing face.
+    """Align the actual leading patch feature with an observed face center.
 
     Target/region rotations and actual collision footprints determine the
     destination. Contact height remains the common sweep engagement height.
@@ -99,20 +154,32 @@ def native_side_push_geometry(
     upper = region_size[:2] * .5 - profile.goal_inset_margin_m - relative[:, :2].max(axis=0)
     if np.any(lower > upper):
         raise ContactKeyframeGeometryError("target footprint cannot fit inside region at its current orientation")
+    if np.all(target_center_local[:2] >= lower) and np.all(target_center_local[:2] <= upper):
+        raise ContactKeyframeGeometryError("target already occupies the planned interior footprint")
     goal_local = target_center_local.copy()
     goal_local[:2] = np.clip(target_center_local[:2], lower, upper)
     goal_center = region_origin + region_rotation @ goal_local
     direction = goal_center[:2] - target_center[:2]
-    distance = float(np.linalg.norm(direction))
-    if distance <= 1e-9:
-        raise ContactKeyframeGeometryError("target already occupies the planned interior footprint")
-    direction /= distance
-    patch_offset = patch[:, :2].mean(axis=0)
-    trailing = float(((points_world[:, :2] - target_center[:2]) @ direction).min())
-    leading = float(((patch[:, :2] - patch_offset) @ direction).max())
-    engage = target_center[:2] + direction * (trailing - leading)
-    start = engage - direction * profile.approach_standoff_m
-    end = goal_center[:2] + direction * (trailing - leading)
+    direction /= np.linalg.norm(direction)
+    approach_direction, face_center, distance = _face_normal_translation(
+        points_world, target_center, region_rotation, target_center_local, lower, upper, direction)
+    if distance is not None:
+        direction = approach_direction
+        goal_center = target_center.copy()
+        goal_center[:2] += direction * distance
+        translation_kind = "FACE_NORMAL"
+    else:
+        translation_kind = "FACE_NORMAL_APPROACH_THEN_GOAL_TRANSLATION"
+    projections = patch[:, :2] @ approach_direction
+    # Center the actual leading feature, not the whole patch centroid. A
+    # skewed patch can put its front vertex far to one side of that centroid.
+    leading_feature = patch[np.isclose(projections, projections.max(), atol=1e-9, rtol=0.)]
+    patch_offset = leading_feature[:, :2].mean(axis=0)
+    trailing = float((face_center - target_center[:2]) @ approach_direction)
+    leading = float(((patch[:, :2] - patch[:, :2].mean(axis=0)) @ approach_direction).max())
+    engage = face_center
+    start = engage - approach_direction * profile.approach_standoff_m
+    end = engage + goal_center[:2] - target_center[:2]
     z = _contact_engagement_tcp_z_m(request, eef_orientation_xyzw=eef_orientation_xyzw)
     if z is None or not np.isfinite(z):
         raise ContactKeyframeGeometryError("native side push has no finite common engagement height")
@@ -120,7 +187,7 @@ def native_side_push_geometry(
     hover = max(float(z) + profile.hover_height_m, float(z) if hover is None else hover)
     return NativeSidePushGeometry(
         target_id, region_id, tuple(target_center), tuple(goal_center), tuple(direction),
-        tuple(patch_offset), tuple(start), tuple(engage), tuple(end), float(z), float(hover), trailing, leading,
+        tuple(approach_direction), translation_kind, tuple(patch_offset), tuple(start), tuple(engage), tuple(end), float(z), float(hover), trailing, leading,
     )
 
 

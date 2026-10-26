@@ -67,7 +67,7 @@ def test_start_is_behind_full_target_and_patch_leading_extent_with_asymmetric_gr
     frames = generate_native_side_push_keyframes(request, eef_orientation_xyzw=attitude)
     pose = RelativePoseResolver(request.world).resolve(frames[1])
     cloud = _held_tool_engaging_offsets_m(request, eef_orientation_xyzw=attitude)
-    direction = np.array(geometry.push_direction_xy)
+    direction = np.array(geometry.approach_direction_xy)
     front = ((np.array(pose.position_m[:2])+cloud[:, :2]-np.array(geometry.target_center_world_m[:2])) @ direction).max()
     assert geometry.target_trailing_projection_m-front == pytest.approx(PushPlanningProfile().approach_standoff_m)
     assert not np.allclose(pose.position_m[:2], geometry.patch_start_xy_m)
@@ -103,3 +103,58 @@ def test_changing_attitude_mid_push_is_rejected():
     frames[2].metadata['packing_orientation_xyzw'] = request.world.robot_state.eef_pose.orientation_xyzw
     with pytest.raises(ContactKeyframeGeometryError, match='fixed attitude'):
         canonicalize_native_side_push(request, frames)
+
+
+def test_push_uses_target_face_normal_and_centers_actual_leading_feature():
+    request = _request(); attitude = _attitude(request)
+    frames = generate_native_side_push_keyframes(request, eef_orientation_xyzw=attitude)
+    geometry = native_side_push_geometry(request, eef_orientation_xyzw=attitude)
+    direction = np.array(geometry.approach_direction_xy)
+    target = request.world.objects['block_a']
+    rotation = Rotation.from_quat(target['pose']['orientation_xyzw']).as_matrix()
+    dots = direction @ rotation[:2, :2]
+    assert np.max(np.abs(dots)) == pytest.approx(1., abs=1e-9)
+    axis = int(np.argmax(np.abs(dots)))
+    face_center = np.array(target['pose']['position_m'][:2]) - direction * target['dimensions_m'][axis] * .5
+    cloud = _held_tool_engaging_offsets_m(request, eef_orientation_xyzw=attitude)
+    projections = cloud[:, :2] @ direction
+    leading = cloud[np.isclose(projections, projections.max(), atol=1e-9, rtol=0.)]
+    tcp = np.array(RelativePoseResolver(request.world).resolve(frames[2]).position_m[:2])
+    assert tcp + leading[:, :2].mean(axis=0) == pytest.approx(face_center, abs=1e-9)
+
+
+def test_world_translation_and_grasp_offset_do_not_change_face_contact():
+    request = _request(); attitude = _attitude(request)
+    base = native_side_push_geometry(request, eef_orientation_xyzw=attitude)
+    shifted = request.model_copy(deep=True);delta=np.array([.19, -.07])
+    for record in shifted.world.objects.values():
+        if 'pose' in record:
+            record['pose']['position_m'][:2] = (np.array(record['pose']['position_m'][:2])+delta).tolist()
+    position=list(shifted.world.robot_state.eef_pose.position_m);position[:2]=(np.array(position[:2])+delta).tolist()
+    shifted.world.robot_state.eef_pose.position_m=position
+    moved = native_side_push_geometry(shifted, eef_orientation_xyzw=attitude)
+    assert np.array(moved.patch_engage_xy_m) == pytest.approx(np.array(base.patch_engage_xy_m)+delta)
+    assert np.array(moved.patch_end_xy_m) == pytest.approx(np.array(base.patch_end_xy_m)+delta)
+    translated_grasp=request.model_copy(deep=True)
+    translated_grasp.world.metadata['attached_object_transforms']['tool_pusher']['position_in_reference_m'][0]+=.04
+    transformed=native_side_push_geometry(translated_grasp,eef_orientation_xyzw=attitude)
+    assert transformed.patch_engage_xy_m == pytest.approx(base.patch_engage_xy_m)
+    assert not np.allclose(transformed.working_patch_offset_xy_m,base.working_patch_offset_xy_m)
+
+
+def test_target_yaw_changes_selected_face_and_keeps_contact_centered():
+    request=_request(); target=request.world.objects['block_a'];region=request.world.objects['collect_zone']
+    yaw=117.;rotation=Rotation.from_euler('z',yaw,degrees=True);target['pose']['orientation_xyzw']=rotation.as_quat().tolist()
+    region['pose']['position_m'][:2]=(np.array(target['pose']['position_m'][:2])+.3*rotation.as_matrix()[:2,0]).tolist()
+    geometry=native_side_push_geometry(request,eef_orientation_xyzw=_attitude(request))
+    assert geometry.approach_direction_xy == pytest.approx(rotation.as_matrix()[:2,0])
+
+
+def test_separates_face_normal_approach_when_no_normal_ray_reaches_region():
+    request=_request(); geometry=native_side_push_geometry(request,eef_orientation_xyzw=_attitude(request))
+    assert geometry.translation_kind == "FACE_NORMAL_APPROACH_THEN_GOAL_TRANSLATION"
+    assert not np.allclose(geometry.approach_direction_xy,geometry.push_direction_xy)
+    start=np.array(geometry.patch_start_xy_m);engage=np.array(geometry.patch_engage_xy_m)
+    assert (engage-start)/np.linalg.norm(engage-start) == pytest.approx(geometry.approach_direction_xy)
+    translation=np.array(geometry.target_goal_center_world_m[:2])-np.array(geometry.target_center_world_m[:2])
+    assert np.array(geometry.patch_end_xy_m)-engage == pytest.approx(translation)
