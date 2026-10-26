@@ -19,14 +19,16 @@ from .runtime import save_json
 
 def snapshot(runtime, previous=None):
     from tuj.m5_motion.tool_use_journal import ToolUseJournalEnvironmentAdapter
-    from tuj.m5_motion.tool_use_journal_planning import attached_object_transform_from_state
+    from tuj.m5_motion.planning_attachment import planning_attachment_transform
     from tuj.m5_motion.tool_use_journal_runtime import ToolUseJournalKinematicTrajectoryPlayer
     attachment = runtime.attachment
-    world = ToolUseJournalEnvironmentAdapter(runtime.env).world_snapshot(
+    adapter = ToolUseJournalEnvironmentAdapter(runtime.env)
+    planning_transform, attachment_provenance = planning_attachment_transform(runtime, adapter)
+    world = adapter.world_snapshot(
         completed_subgoals=previous.scene.completed_subgoals if previous else (),
         facts=previous.scene.facts if previous else (),
         attached_object_id=runtime.attached_object_id,
-        attached_object_transform=attached_object_transform_from_state(attachment) if attachment else None)
+        attached_object_transform=planning_transform)
     world.robot_state = ToolUseJournalKinematicTrajectoryPlayer._final_state(runtime)
     if previous is not None:
         world.metadata = {**previous.metadata, **world.metadata}
@@ -36,6 +38,10 @@ def snapshot(runtime, previous=None):
             old = previous.objects.get(identifier, {})
             world.objects[identifier] = {**old, **record,
                 "anchors": {**old.get("anchors", {}), **record.get("anchors", {})}}
+    world.metadata.pop("attachment_planning_geometry", None)
+    if attachment_provenance is not None:
+        world.metadata["attachment_planning_geometry"] = {
+            attachment.object_id: attachment_provenance}
     world.metadata.pop("contact_friction_held_objects", None)
     retention = getattr(runtime, "scripted_grasp_retention", None)
     if retention is not None and attachment is None:

@@ -28,9 +28,7 @@ from tuj.m5_motion.tool_use_journal import (
     ToolUseJournalCollisionModelCompiler,
     ToolUseJournalEnvironmentAdapter,
 )
-from tuj.m5_motion.tool_use_journal_planning import (
-    attached_object_transform_from_state,
-)
+from tuj.m5_motion.planning_attachment import planning_attachment_transform
 from tuj.m5_motion.tool_use_journal_runtime import (
     ToolUseJournalControllerTrajectoryPlayer,
     ToolUseJournalEERuntime,
@@ -260,17 +258,17 @@ class ToolUseJournalExecutionAdapter:
         self, request: MotionPlanRequest, report: ExecutionReport
     ) -> WorldSnapshot:
         completed = list(request.world.scene.completed_subgoals)
-        transform = (
-            attached_object_transform_from_state(self.runtime.attachment)
-            if self.runtime.attachment is not None
-            else None
-        )
-        world = ToolUseJournalEnvironmentAdapter(self.runtime.env).world_snapshot(
+        adapter = ToolUseJournalEnvironmentAdapter(self.runtime.env)
+        transform, attachment_provenance = planning_attachment_transform(self.runtime, adapter)
+        world = adapter.world_snapshot(
             completed_subgoals=completed,
             facts=request.world.scene.facts,
             attached_object_id=self.runtime.attached_object_id,
             attached_object_transform=transform,
         )
+        if attachment_provenance is not None:
+            world.metadata['attachment_planning_geometry'] = {
+                self.runtime.attachment.object_id: attachment_provenance}
         if report.final_robot_state is not None:
             world.robot_state = report.final_robot_state.model_copy(deep=True)
         held: dict[str, dict[str, Any]] = {}
