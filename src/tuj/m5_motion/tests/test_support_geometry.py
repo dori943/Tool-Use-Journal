@@ -33,20 +33,35 @@ def test_only_measured_tiles_join_support_set():
     assert measured_support_geoms(c)=={1,3}
 
 
-@pytest.mark.parametrize('height,released,depth,allowed',[(0.,False,.0012,True),
-    (0.,False,.0021,False),(.006,False,.0012,True),(0.,True,.0012,False),
-    (-.003,False,.0012,False)])
-def test_upstream_physical_separation_and_recontact_gate_remain(monkeypatch,height,released,depth,allowed):
+@pytest.mark.parametrize('height,released,depth,stage,allowed',[
+    (0.,False,.0012,'LIFT',True),
+    (0.,False,.0021,'LIFT',True),
+    (0.,False,.008,'LIFT',True),
+    (0.,False,np.nextafter(.008, np.inf),'LIFT',False),
+    (-.002,False,.0012,'LIFT',True),
+    (np.nextafter(-.002, -np.inf),False,.0012,'LIFT',False),
+    (.005,False,.0012,'LIFT',True),
+    (np.nextafter(.005, np.inf),False,.0012,'LIFT',False),
+    (.006,False,.0012,'LIFT',False),
+    (0.,True,.0012,'LIFT',False),
+    (-.003,False,.0012,'LIFT',False),
+    (0.,False,.0012,'TRANSPORT',False),
+    (0.,False,.0012,'RETREAT',False)])
+def test_existing_early_lift_bounds_and_recontact_gate_remain(monkeypatch,height,released,depth,stage,allowed):
+    # For this 2 mm recipe, the existing 8 mm catalog exception applies only
+    # in the -2..+5 mm initial lift window, before physical separation.
     contacts=[{'geoms':['actual_tile','rod'],'penetration_m':depth},
-              {'geoms':['unverified_tile','rod'],'penetration_m':.0012}]
+              {'geoms':['unverified_tile','rod'],'penetration_m':.0012},
+              {'geoms':['actual_tile','other_object'],'penetration_m':.0012}]
     monkeypatch.setattr(SpoonContext,'bad_contacts',lambda *args:contacts)
     c=CatalogContext();c.support_gid=1;c.support_gids={1};c.object_geoms={0};c.support_released=released
     c.recipe=NS(maximum_support_separation_penetration_m=.002)
     c.model=NS(geom=lambda gid:NS(name={0:'rod',1:'actual_tile'}[gid]));c.initial_body=np.eye(4)
     body=np.eye(4);body[2,3]=height;c.body_pose=lambda *args:body
-    bad=c.bad_contacts(None,'LIFT')
+    bad=c.bad_contacts(None,stage)
     assert (contacts[0] not in bad)==allowed
     assert contacts[1] in bad
+    assert contacts[2] in bad
 
 
 def test_catalog_prefers_measured_support_over_named_fallback(monkeypatch):
