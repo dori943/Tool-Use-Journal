@@ -350,3 +350,5 @@ def test_rejected_m2_usage_is_counted_without_reusing_stale_artifacts(tmp_path, 
     args.start_from = args.stop_after = 'm4'
     with pytest.raises(ValueError, match='accepted m2.json'):
         runner.run(args, pipeline)
+    timing = json.loads((args.output_dir / 'timing_summary.json').read_text())
+    assert timing['llm_total']['total_tokens'] == 0

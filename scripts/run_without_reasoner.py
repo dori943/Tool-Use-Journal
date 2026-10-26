@@ -101,6 +101,7 @@ def run(args, pipeline):
     stage_status = {n: "not_run" for n in STAGE_ORDER}
     llm_usage = None
     m2_usage_mtimes_before = {}
+    m2_invoked = False
 
     def checkpoint(name):
         manifest["artifacts"][name] = _digest(out / name)
@@ -115,8 +116,9 @@ def run(args, pipeline):
                     continue
                 # A failed resumed invocation must not charge old accepted or
                 # rejected proposals as new API calls. Keep those files intact.
-                if (stage_status["m2"] == "failed"
-                        and path.stat().st_mtime_ns == m2_usage_mtimes_before.get(name)):
+                if (stage_status["m2"] == "failed" and (
+                        not m2_invoked
+                        or path.stat().st_mtime_ns == m2_usage_mtimes_before.get(name))):
                     continue
                 usage = _read(path).get("m2_stats", {}).get("llm_usage")
                 break
@@ -229,6 +231,7 @@ def run(args, pipeline):
             t0 = time.monotonic()
             m2_args = copy.deepcopy(args)
             m2_args.m1_json = None  # run_m2 picks <out>/m1.json (the VLM-prior payload)
+            m2_invoked = True
             pipeline.stage_m2(task, out, m2_args)
             stage_seconds["m2"] = time.monotonic() - t0
             llm_usage = _read(out / "m2.json").get("m2_stats", {}).get("llm_usage")
