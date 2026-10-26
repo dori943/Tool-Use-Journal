@@ -109,7 +109,7 @@ def test_ik_probe_equals_published_transport_goal_with_rotated_region(monkeypatc
     c = NS(body_pose=lambda: initial.T_WB.copy(), grip_pose=lambda: initial.T_WE.copy(),
            center_in_body=initial.center_in_body, local_size=initial.local_size,
            kinematics=NS(solve_all_ik=solve), data=NS(qpos=np.zeros(6)), arm_ids=np.arange(6))
-    retention = NS(entry=NS(object_id=oid), context=c,
+    retention = NS(entry=NS(object_id=oid, scene_object_id=oid), context=c,
         packing_transport_state_check=lambda q: NS(valid=True, failure_code=None, detail=''))
     def rim(g, destination, retention):
         raised = destination.copy(); raised[2, 3] += .013
