@@ -1319,3 +1319,70 @@ def test_unknown_slot_frame_cannot_silently_change_placement_direction():
         'uv': [.2, -.2], 'frame': 'unknown'}}
     with pytest.raises(ValueError, match='PLACEMENT_SLOT_FRAME_UNSUPPORTED'):
         _Grounding(request, None, ENTRIES[4].object_id)._slot_xy()
+
+
+@pytest.mark.parametrize('uv', [(1., 1.), (1., -1.), (-1., 1.), (-1., -1.)])
+@pytest.mark.parametrize('explicit_frame', [False, True])
+def test_world_axis_corner_slot_clips_payload_and_eccentric_cup_in_45_degree_tray(
+    uv, explicit_frame,
+):
+    """World-AABB corners are outside a rotated rectangle's physical footprint."""
+    from itertools import product
+    from tuj.m5_motion.scripted_grasps.transport import (
+        _Grounding, REGION_WALL_ALLOWANCE_M, VACUUM_CUP_RADIUS_M,
+    )
+    object_id = 'eccentric_vac_payload'
+    request, body, grip, size = _vacuum_place_request(
+        object_id=object_id, local_size=(.08, .06, .01))
+    rotation = Rotation.from_euler('z', 45., degrees=True).as_matrix()
+    region = request.world.objects['tray']
+    region['pose']['orientation_xyzw'] = Rotation.from_matrix(rotation).as_quat().tolist()
+    region['dimensions_m'] = [.6, .4, .1]
+    region_center = np.array([.02, 0., 0.])
+    # A rectangular floor reaches the declared half extents. Central floor
+    # vertices let the existing floor measurement distinguish it from the rim.
+    points = [region_center + [sx * hx, sy * hy, z]
+              for hx, hy, z in ((.3, .2, -.029), (.06, .04, -.029), (.3, .2, .05))
+              for sx, sy in product((-1., 1.), repeat=2)]
+    region['collision_points_m'] = np.asarray(points).tolist()
+    center_in_body = np.array([.012, -.008, 0.])
+    request.world.objects[object_id]['anchors']['center'] = center_in_body.tolist()
+    body[:3, :3] = rotation @ Rotation.from_euler('x', 180., degrees=True).as_matrix()
+    grip[:3, :3] = body[:3, :3]
+    grip[:3, 3] = body[:3, 3] + body[:3, :3] @ np.array([.05, .02, -.005])
+    request.world.robot_state.eef_pose = Pose(
+        frame_id='world', position_m=tuple(grip[:3, 3]),
+        orientation_xyzw=tuple(Rotation.from_matrix(grip[:3, :3]).as_quat()))
+    captured = inverse(grip) @ body
+    request.world.metadata['attached_object_transforms'][object_id].update({
+        'position_in_reference_m': captured[:3, 3].tolist(),
+        'orientation_in_reference_xyzw': Rotation.from_matrix(captured[:3, :3]).as_quat().tolist(),
+    })
+    slot = {'uv': list(uv), 'source': 'm2_container_layout'}
+    if explicit_frame:
+        slot['frame'] = 'world_xy'
+    request.task.metadata['action_parameters'] = {'placement_slot': slot}
+    grounding = _Grounding(request, None, object_id)
+    grounding._initialize_seat_yaw()
+    # The un-clipped world corner really is outside the local rectangle. This
+    # guards against accidentally testing a harmless interior world-XY slot.
+    raw_offset = np.asarray(uv) * (np.array([.5, .5]) / np.sqrt(2.) - .02)
+    raw_local = rotation[:2, :2].T @ raw_offset
+    assert np.any(np.abs(raw_local) > np.array([.3, .2]))
+    seat = grounding._slot_xy()
+    local_seat = rotation[:2, :2].T @ (seat - grounding.region_world[:2])
+    desired_body = np.eye(4)
+    desired_body[:3, :3] = grounding.destination_rotation
+    center_world = np.r_[seat, grounding.region_world[2]]
+    desired_body[:3, 3] = center_world - grounding.destination_rotation @ center_in_body
+    corners_body = center_in_body + np.asarray(list(product((-1., 1.), repeat=3))) * size / 2.
+    corners_world = corners_body @ desired_body[:3, :3].T + desired_body[:3, 3]
+    corners_local = (corners_world - grounding.region_world) @ rotation
+    interior = np.array([.3, .2]) - REGION_WALL_ALLOWANCE_M
+    assert np.all(np.abs(corners_local[:, :2]) <= interior + 1e-12)
+    tcp_world = desired_body @ inverse(body) @ grip
+    tcp_local = rotation.T @ (tcp_world[:3, 3] - grounding.region_world)
+    pad = max(2. * request.constraints.collision_margin_m, .01) + .001
+    assert np.all(np.abs(tcp_local[:2]) + VACUUM_CUP_RADIUS_M + pad <= interior + 1e-12)
+    np.testing.assert_allclose(grounding._free_destination_xy(None), seat, atol=1e-12)
+    assert np.linalg.norm(local_seat - raw_local) > .1
