@@ -94,3 +94,46 @@ def test_ee_load_prevents_unloaded_success_and_combined_overload_fails():
     assert not flattening_outcome(record)[0]
     record['deformable_metrics']['tool_contact'].update(combined_current_force_n=0., combined_peak_force_n=11.)
     assert not flattening_outcome(record)[0]
+
+
+def test_asymmetric_paddle_uses_broad_face_instead_of_handle_center():
+    from tuj.m5_motion.flatten_contact import contact_face_center
+    handle = list(product([-.008, .008], [-.125, .05], [-.003, .003]))
+    paddle = list(product([-.024, .024], [.07, .125], [-.003, .003]))
+    points = np.asarray(handle + paddle)
+    face = contact_face_center(points, normal_axis=2)
+    assert .07 < face[1] < .125
+    np.testing.assert_allclose(face[[0, 2]], [0., 0.], atol=1e-9)
+    # Vertex ordering and a local-frame translation must not choose a new patch.
+    shift = np.array([.3, -.4, .2])
+    np.testing.assert_allclose(contact_face_center(points[::-1] + shift, 2), face + shift, atol=1e-8)
+
+    r = request()
+    r.world.objects['plate']['collision_points_m'] = points.tolist()
+    artifact = FlattenContactProvider().generate(r)
+    resolver = RelativePoseResolver(r.world)
+    raw = r.world.metadata['attached_object_transforms']['plate']
+    grasp = np.eye(4)
+    grasp[:3, :3] = Rotation.from_quat(raw['orientation_in_reference_xyzw']).as_matrix()
+    grasp[:3, 3] = raw['position_in_reference_m']
+    for candidate in artifact.candidates:
+        for key in candidate.keyframes:
+            pose = resolver.resolve(key)
+            eef = np.eye(4)
+            eef[:3, :3] = Rotation.from_quat(pose.orientation_xyzw).as_matrix()
+            eef[:3, 3] = pose.position_m
+            tool = eef @ grasp
+            face_world = tool[:3, :3] @ face + tool[:3, 3]
+            np.testing.assert_allclose(face_world[:2], [.13, .13], atol=1e-9)
+            # The narrow handle midpoint must no longer occupy the target center.
+            assert np.linalg.norm(tool[:2, 3] - [.13, .13]) > .07
+
+
+def test_uniform_face_keeps_center_and_degenerate_face_is_rejected():
+    import pytest
+    from tuj.m5_motion.flatten_contact import contact_face_center
+    for points, normal in [(list(product([-.03, .03], [-.1, .1], [-.005, .005])), 2),
+                           (list(product([-.005, .005], [-.1, .1], [-.03, .03])), 0)]:
+        np.testing.assert_allclose(contact_face_center(points, normal), [0., 0., 0.], atol=1e-8)
+    with pytest.raises(ValueError, match='nondegenerate'):
+        contact_face_center([[0., 0., 0.], [0., .1, 0.], [0., .2, 0.]], 2)

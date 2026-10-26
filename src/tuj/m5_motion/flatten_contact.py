@@ -7,6 +7,8 @@ Actual contact and residual deformation must be evaluated after unloading.
 import hashlib
 import math
 import numpy as np
+from scipy.optimize import linprog, minimize
+from scipy.spatial import ConvexHull, QhullError
 from scipy.spatial.transform import Rotation
 
 from .geometry import tool_rotation_from_axis
@@ -55,6 +57,40 @@ def _matrix(pose):
     return result
 
 
+def contact_face_center(points, normal_axis):
+    """Center the broad observed footprint, rather than a narrow tool handle.
+
+    The largest inscribed disk of the projected collision hull proposes a
+    contact patch. The hull is only a planning approximation; executed contact
+    and deformation remain the source of success evidence. For uniform faces,
+    choose the disk center nearest the bounding-box center deterministically.
+    """
+    points = np.asarray(points, dtype=float)
+    axes = [axis for axis in range(3) if axis != normal_axis]
+    projected = points[:, axes]
+    center = (points.min(axis=0) + points.max(axis=0)) / 2
+    try:
+        hull = ConvexHull(projected)
+    except QhullError as error:
+        raise ValueError('flatten requires a nondegenerate observed tool face') from error
+    normals, limits = hull.equations[:, :2], -hull.equations[:, 2]
+    disk = linprog([0., 0., -1.],
+        A_ub=np.column_stack((normals, np.ones(len(normals)))), b_ub=limits,
+        bounds=[(None, None), (None, None), (0., None)], method='highs')
+    if not disk.success or disk.x[2] <= 0:
+        raise ValueError('flatten could not locate a supported tool contact patch')
+    radius = disk.x[2]
+    preferred = center[axes]
+    nearest = minimize(lambda x: np.sum((x - preferred) ** 2), disk.x[:2],
+        jac=lambda x: 2 * (x - preferred), method='SLSQP',
+        constraints=[{'type': 'ineq', 'fun': lambda x: limits - radius - normals @ x,
+                      'jac': lambda x: -normals}], options={'ftol': 1e-12})
+    if not nearest.success or np.max(normals @ nearest.x + radius - limits) > 1e-8:
+        raise ValueError('flatten contact-patch center optimization failed')
+    center[axes] = nearest.x
+    return center
+
+
 class FlattenContactProvider:
     def generate(self, request):
         task, world = request.task, request.world
@@ -69,11 +105,11 @@ class FlattenContactProvider:
         points = np.asarray(tool['collision_points_m'], dtype=float)
         if points.ndim != 2 or points.shape[1] != 3 or not np.isfinite(points).all():
             raise ValueError('finite observed tool collision points required')
-        center = (points.min(axis=0) + points.max(axis=0)) / 2
         size = np.ptp(points, axis=0)
         long_axis = int(np.argmax(size))
         normal_axis = min((i for i in range(3) if i != long_axis), key=lambda i: size[i])
         other = next(i for i in range(3) if i not in (long_axis, normal_axis))
+        center = contact_face_center(points, normal_axis)
         current = _matrix(tool['pose'])[:3, :3]
         rotations = []
         for direction in ([1., 0., 0.], [-1., 0., 0.], [0., 1., 0.], [0., -1., 0.]):
@@ -122,8 +158,9 @@ class FlattenContactProvider:
             candidates.append(KeyframePlanCandidate(strategy_id=f'flatten:{index}', keyframes=keys,
                 rationale='Measured tool geometry and actual grasp transform; trial depth from constitutive model.',
                 provenance=StrategyGenerationProvenance(generator_kind='TASK_GEOMETRY',
-                    generator_id='CONTACT_COMPRESSION_V1', input_hash=digest, attempt_index=1),
-                metadata={'trial_compressed_height_m': compressed_height, 'target_id': target_id}))
+                    generator_id='CONTACT_COMPRESSION_V2', input_hash=digest, attempt_index=1),
+                metadata={'trial_compressed_height_m': compressed_height, 'target_id': target_id,
+                          'contact_face_center_local_m': center.tolist()}))
         return KeyframePlanArtifact(artifact_id='flatten:' + digest[:20],
             provenance=ArtifactProvenance(artifact_id='flatten-artifact:' + digest[:20],
                 artifact_type='KeyframePlanArtifact', produced_by='MOTION_PLANNER', invocation_id=digest[:20],
