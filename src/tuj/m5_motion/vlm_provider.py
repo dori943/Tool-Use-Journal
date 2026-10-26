@@ -1293,10 +1293,10 @@ class OpenAIKeyframeProvider:
             if is_tool_act_contact_geometry_scope(request):
                 # Per-keyframe height fixes can still leave PRE_CONTACT below
                 # the lifted CONTACT plane; settle the whole sequence first.
-                keyframes = canonicalize_sweep_strategy_heights(
-                    request, keyframes, resolver=resolver
-                )
                 try:
+                    keyframes = canonicalize_sweep_strategy_heights(
+                        request, keyframes, resolver=resolver
+                    )
                     validate_sweep_keyframe_strategy(
                         request, keyframes, resolver=resolver
                     )

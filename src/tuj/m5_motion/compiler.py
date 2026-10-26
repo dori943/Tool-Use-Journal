@@ -151,17 +151,17 @@ class FirstFeasibleStrategyCompiler:
                 # Contact tool_act (sweep): repair the held-tool attitude and
                 # working height, then reject task-unrelated geometry before
                 # spending an IK search on it.
-                strategy_keyframes = canonicalize_sweep_strategy_heights(
-                    request,
-                    [
-                        canonicalize_held_tool_axis_for_contact(
-                            request, keyframe, resolver=resolver
-                        )
-                        for keyframe in strategy_keyframes
-                    ],
-                    resolver=resolver,
-                )
                 try:
+                    strategy_keyframes = canonicalize_sweep_strategy_heights(
+                        request,
+                        [
+                            canonicalize_held_tool_axis_for_contact(
+                                request, keyframe, resolver=resolver
+                            )
+                            for keyframe in strategy_keyframes
+                        ],
+                        resolver=resolver,
+                    )
                     validate_sweep_keyframe_strategy(
                         request, strategy_keyframes, resolver=resolver
                     )

@@ -944,12 +944,19 @@ def canonicalize_sweep_strategy_heights(
                 preferred_packing_xyzw=pose.orientation_xyzw,
             )
             result.append(keyframe if raised is None else raised)
-    result = canonicalize_sweep_contact_start_over_targets(
-        request, result, resolver=active_resolver
-    )
-    result = canonicalize_sweep_lateral_toward_region(
-        request, result, resolver=active_resolver
-    )
+    contact = request.task.contact
+    if contact is not None and contact.path_pattern.upper() == "SIDE_PUSH":
+        # Explicit contact intent is reconstructed from observed geometry.
+        # Metadata never exempts a path from the normal geometry/IK guards.
+        from .native_side_push import canonicalize_native_side_push
+        result = canonicalize_native_side_push(request, result, resolver=active_resolver)
+    else:
+        result = canonicalize_sweep_contact_start_over_targets(
+            request, result, resolver=active_resolver
+        )
+        result = canonicalize_sweep_lateral_toward_region(
+            request, result, resolver=active_resolver
+        )
     # Check each final height against its own bound attitude: different valid
     # tilts/rolls change the underside of an asymmetric held tool.
     return [

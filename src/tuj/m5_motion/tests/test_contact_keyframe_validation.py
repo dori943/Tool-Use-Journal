@@ -1474,3 +1474,40 @@ def test_rotating_contact_attitudes_keep_the_same_world_patch_route():
     assert points[-1] == pytest.approx([-.45, .05])
     assert points[1] == pytest.approx((points[0] + points[-1]) / 2.)
     validate_sweep_keyframe_strategy(request, result)
+
+
+def test_explicit_side_push_survives_common_canonicalization_without_metadata_exemption():
+    from tuj.m5_motion.tests.test_native_side_push import _request, _attitude
+    from tuj.m5_motion.native_side_push import generate_native_side_push_keyframes
+    from tuj.m5_motion.contact_keyframe_validation import canonicalize_sweep_strategy_heights
+    request = _request()
+    frames = generate_native_side_push_keyframes(request, eef_orientation_xyzw=_attitude(request))
+    resolver = RelativePoseResolver(request.world)
+    before = request.model_dump_json()
+    corrected = canonicalize_sweep_strategy_heights(request, frames)
+    for a, b in zip(frames, corrected):
+        assert resolver.resolve(a).position_m == pytest.approx(resolver.resolve(b).position_m)
+        assert resolver.resolve(a).orientation_xyzw == pytest.approx(resolver.resolve(b).orientation_xyzw)
+    validate_sweep_keyframe_strategy(request, corrected)
+    assert request.model_dump_json() == before
+    again = canonicalize_sweep_strategy_heights(request, corrected)
+    assert [f.model_dump() for f in again] == [f.model_dump() for f in corrected]
+
+
+def test_compiler_records_invalid_side_push_geometry_before_ik():
+    request = _sweep_request()
+    request.task.contact.path_pattern = 'SIDE_PUSH'
+    request.task.target_ids = ['block_a', 'other']
+    strategy = KeyframePlanCandidate(strategy_id='invalid-side-push',
+        keyframes=_valid_sweep_sequence(), provenance=_provenance())
+    class NoIK:
+        def solve_all_ik(self, *args, **kwargs):
+            pytest.fail('invalid contact contract must not reach IK')
+    result = FirstFeasibleStrategyCompiler(NoIK()).compile(
+        request.world, [strategy],
+        start_joint_config=request.world.robot_state.joint_positions_rad,
+        state_validator=lambda *args: True, edge_planner=None, request=request,
+    )
+    assert not result.solved
+    assert result.attempts[0].failure_code == 'KEYFRAME_GEOMETRY_INVALID'
+    assert 'one sweep target' in result.attempts[0].detail
