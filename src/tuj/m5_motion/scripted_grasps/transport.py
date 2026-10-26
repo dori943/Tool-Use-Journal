@@ -543,10 +543,17 @@ class _Grounding:
         uv = slot.get('uv')
         if not (isinstance(uv, (list, tuple)) and len(uv) >= 2):
             return None
-        # ``uv`` is expressed in the region frame.  Using the world-axis AABB
-        # (``region_half``) here inflates a rotated region and then applies the
-        # local offset along the wrong axes.  That placed a bread slot on the
-        # rim of a rotated C3_2 plate even though the planned slot was interior.
+        # M2 packs observed world-axis AABBs and checks each offset against a
+        # world-axis EE sweep. Its slots therefore retain those axes, including
+        # older saved plans identified by the producer tag. Generic untagged
+        # slots retain their historical region-local meaning.
+        slot_frame = slot.get('frame') or (
+            'world_xy' if slot.get('source') == 'm2_container_layout' else 'region_xy')
+        if slot_frame not in {'world_xy', 'region_xy'}:
+            raise ValueError(f'PLACEMENT_SLOT_FRAME_UNSUPPORTED: {slot_frame}')
+        # Boundary/cup clipping always remains region-local. A world AABB is
+        # only the normalization scale for world-axis slots, never a permission
+        # to seat an object outside the rotated region's physical footprint.
         inner = np.maximum(
             self.region_dims[:2] * .5 - REGION_WALL_ALLOWANCE_M, 0.)
         object_in_region = self.T_WR[:3, :3].T @ self.destination_rotation
@@ -604,8 +611,15 @@ class _Grounding:
                 inner - VACUUM_CUP_RADIUS_M - mesh_pad - 0.001, 0.)
             lower = np.maximum(lower, -cup_limit - cup_offset)
             upper = np.minimum(upper, cup_limit - cup_offset)
-        requested = np.clip(
-            np.asarray(uv[:2], dtype=float), -1., 1.) * inner
+        normalized = np.clip(np.asarray(uv[:2], dtype=float), -1., 1.)
+        if slot_frame == 'world_xy':
+            world_inner = np.maximum(self.region_half[:2] - REGION_WALL_ALLOWANCE_M, 0.)
+            axes = self.T_WR[:2, :2]
+            if abs(float(np.linalg.det(axes))) < 1e-9:
+                raise ValueError('PLACEMENT_SLOT_FRAME_SINGULAR')
+            requested = np.linalg.solve(axes, normalized * world_inner)
+        else:
+            requested = normalized * inner
         if np.any(lower > upper):
             # The region cannot contain both footprints; retain the object-safe
             # interval and let ordinary collision validation report infeasibility.

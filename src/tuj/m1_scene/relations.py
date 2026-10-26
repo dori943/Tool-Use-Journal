@@ -327,7 +327,8 @@ def container_layout(members: list[dict], container: dict,
     영역 중심 한 점보다 낫다.
 
     반환 slots[id] = {"uv": [u, v], "offset_mm": [dx, dy], "row": r}
-      · uv 는 내부 반치수 기준 정규화 좌표(-1..1). M1 점군 mm 와 실행계 m 의
+      · frame=world_xy: uv/offset_mm 는 관측 bbox와 같은 월드 XY 축 기준.
+        uv 는 내부 반치수 기준 정규화 좌표(-1..1). M1 점군 mm 와 실행계 m 의
         절대 치수가 어긋나도(같은 물체를 다른 시야로 잰다) 비율은 옮겨 간다.
 
     row_order / mirror_x 는 줄 구성은 그대로 두고 줄을 쌓는 순서(-y 부터)와
@@ -384,7 +385,8 @@ def container_layout(members: list[dict], container: dict,
             slots[oid] = {
                 "uv": [round(max(-1.0, min(1.0, cx / half[0])), 4),
                        round(max(-1.0, min(1.0, item_cy / half[1])), 4)],
-                "offset_mm": [round(cx, 1), round(item_cy, 1)], "row": r_index}
+                "offset_mm": [round(cx, 1), round(item_cy, 1)], "row": r_index,
+                "frame": "world_xy"}
             x += w + gap_mm
         y += row["depth"] + step_gap
     ok = not overflow

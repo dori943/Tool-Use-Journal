@@ -19,6 +19,7 @@ def assert_layout_clear(layout, members, opening, gap):
     tolerance=.101
     by_id={m['id']:m for m in members}
     assert set(layout['slots'])==set(by_id)
+    assert all(slot['frame'] == 'world_xy' for slot in layout['slots'].values())
     for oid,slot in layout['slots'].items():
         center=np.array(slot['offset_mm']);half=np.array(by_id[oid]['bbox_mm'][:2])/2
         assert np.all(np.abs(center)+half<=np.array(opening)/2+tolerance)
@@ -73,3 +74,20 @@ def test_too_wide_item_is_not_rotated_to_fake_a_solution():
     layout=container_layout(members,tray)
     assert not layout['pass'] and 'fork' in layout['overflow']
     assert members[2]['bbox_mm']==[200.,20.1,8.3]
+
+
+def test_m2_ingest_preserves_world_axis_slot_contract():
+    from tuj.m2_subgoal.ingest import assign_container_slots
+    members, tray = scene()
+    m2 = {'m2_subgoals': [
+        {'subgoal_id': member['id'], 'kind': 'relocate', 'split_from': 'parent',
+         'container_id': 'tray', 'target_ids': [member['id']],
+         'details': [{'binding': {'?r': 'tray'}}]}
+        for member in members]}
+    assign_container_slots(m2, {'nodes': [tray, *members]})
+    for subgoal in m2['m2_subgoals']:
+        assert subgoal['placement_slot']['frame'] == 'world_xy'
+        slot = subgoal['details'][0]['action_parameters']['placement_slot']
+        assert slot['source'] == 'm2_container_layout'
+        assert slot['frame'] == 'world_xy'
+        assert slot['uv'] == subgoal['placement_slot']['uv']

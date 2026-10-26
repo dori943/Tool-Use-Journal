@@ -101,7 +101,7 @@ def _slot_request(uv):
     request.world.objects['tray']['dimensions_m'] = [.6, .4, .1]
     _generic_held(request, ENTRIES[4].object_id)
     request.task.metadata['action_parameters'] = {'placement_slot': {
-        'region': 'obj_tray_tray', 'uv': list(uv), 'source': 'm2_container_layout'}}
+        'region': 'obj_tray_tray', 'uv': list(uv), 'frame': 'region_xy'}}
     region_center = (REGION @ np.array([.02, 0, 0]) + REGION_POSITION)[:2]
     inner = np.array([.6, .4]) * .5 - .02
     slot = region_center + (REGION @ np.r_[np.asarray(uv) * inner, 0.])[:2]
@@ -167,3 +167,33 @@ def test_column_fallback_layout_still_checks_every_slot_against_ee_sweep():
     assert layout['ee_sweep']['blocked'] == []
     assert layout['ee_sweep']['rearranged']
     assert_layout_clear(layout, members, [196.9, 309.1], 10.)
+
+
+def test_m2_clear_world_side_stays_clear_for_half_turned_container():
+    """A 180-degree tray must not turn M2's safe -y mug seat into blocked +y."""
+    from scipy.spatial.transform import Rotation
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    members, tray = _members(), _tray()
+    sweep = _field((-.2, .01), (.2, .3), .99)
+    layout = container_layout_clear_of_sweep(members, tray, sweep)
+    assert layout['slots']['mug']['offset_mm'][1] < 0.
+    request = _tray_request(.005)
+    _generic_held(request, ENTRIES[4].object_id)
+    record = request.world.objects['tray']
+    record['pose'] = {'frame_id': 'world', 'position_m': [0., 0., .920],
+                      'orientation_xyzw': Rotation.from_euler('z', 180., degrees=True).as_quat().tolist()}
+    record['dimensions_m'] = [.220, .360, .020]
+    record['anchors']['center'] = [0., 0., 0.]
+    # Frozen observed mug footprint, without any altered safety margins.
+    held = request.world.objects[ENTRIES[4].object_id]
+    held['dimensions_m'] = [.080, .100, .100]
+    held['anchors']['center'] = [0., 0., 0.]
+    request.task.metadata['action_parameters'] = {'placement_slot': {
+        **layout['slots']['mug'], 'source': 'm2_container_layout'}}
+    _bind(request, sweep, 'test:m2-half-turn-world-contract')
+    grounding = _Grounding(request, None, ENTRIES[4].object_id)
+    grounding._initialize_seat_yaw()
+    seat = grounding._slot_xy()
+    assert seat[1] < 0.
+    assert grounding.ee_path_clearance(seat) >= 0.
+    assert grounding.ee_path_clearance(-seat) < 0.

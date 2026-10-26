@@ -665,10 +665,10 @@ def assign_container_slots(m2_out: dict, m1: dict) -> list[str]:
                 d.setdefault("action_parameters", {})["placement_slot"] = {
                     "region": container, "target": mine[0], "uv": list(slot["uv"]),
                     "offset_mm": list(slot["offset_mm"]), "row": slot["row"],
-                    "source": "m2_container_layout"}
+                    "frame": slot["frame"], "source": "m2_container_layout"}
                 placed += 1
             s["placement_slot"] = {"region": container, "uv": list(slot["uv"]),
-                                   "row": slot["row"]}
+                                   "row": slot["row"], "frame": slot["frame"]}
         note = "" if layout.get("pass") else f", 한 층 초과 {layout.get('overflow')}"
         sweep = layout.get("ee_sweep")
         if sweep:

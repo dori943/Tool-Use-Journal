@@ -96,6 +96,8 @@ def _sweep_check(layout: dict, members: list[dict], container: dict, keepout) ->
     """배치의 각 자리에서 놓인 물체 윗면이 고정 EE 궤적의 팔과 margin 이상 떨어지는가.
 
     keepout 은 M1 좌표계(로봇 베이스 기준 xy, 월드 z, 단위 m)의 높이장이다.
+    배치 offset/uv도 관측 bbox의 월드 XY 축 기준이며 컨테이너 몸체 축이 아니다.
+    M5는 이 방향을 유지한 채 실제 region-local 경계 안으로 잘라 낸다.
     물체 발자국은 긴 변 기준 정사각형으로 본다 — M5 가 놓을 때 90도 돌릴 수 있다.
     """
     from tuj.common.ee_keepout import placement_margin_m

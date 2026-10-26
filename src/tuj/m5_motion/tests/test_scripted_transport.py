@@ -383,14 +383,14 @@ def _plate_in_tray(request,half_xy=(.06,.06),thickness=.01):
 
 
 def test_place_uses_the_slot_the_plan_assigned_inside_the_region():
-    """M2 divides a shared container; the place must honour its own slot."""
+    """An explicitly region-local slot retains its historical orientation."""
     from tuj.m5_motion.scripted_grasps.transport import ground_held_place
     request=_tray_request(.005)
     request.task.action_type='place'
     request.world.objects['tray']['dimensions_m']=[.6,.4,.1]
     _generic_held(request,ENTRIES[4].object_id)
     request.task.metadata['action_parameters']={'placement_slot':{
-        'region':'obj_tray_tray','uv':[.5,-.5],'source':'m2_container_layout'}}
+        'region':'obj_tray_tray','uv':[.5,-.5],'frame':'region_xy'}}
     ground_held_place(request)
     hint=request.task.metadata['held_place_goal']
     destination=REGION@request.world.objects['tray']['anchors'][hint['anchor']]+REGION_POSITION
@@ -1285,3 +1285,37 @@ def test_rotated_container_rejects_world_aligned_square_too_wide_locally():
     g = _Grounding(request, None, oid)
     assert np.all(g.half[:2] + .005 < g.region_half[:2])  # world AABB would admit it
     assert g._free_destination_xy(None) is None
+
+
+@pytest.mark.parametrize('yaw', [0., 90., 180.])
+@pytest.mark.parametrize('explicit_frame', [False, True])
+def test_m2_world_axis_slot_is_not_rotated_with_container(yaw, explicit_frame):
+    """M2 observes world AABBs: a +x slot stays +x for a non-square tray."""
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request = _tray_request(.005)
+    record = request.world.objects['tray']
+    rotation = Rotation.from_euler('z', yaw, degrees=True).as_matrix()
+    record['pose']['orientation_xyzw'] = Rotation.from_matrix(rotation).as_quat().tolist()
+    record['dimensions_m'] = [.6, .4, .1]
+    _generic_held(request, ENTRIES[4].object_id)
+    slot = {'uv': [.2, -.2], 'source': 'm2_container_layout'}
+    if explicit_frame:
+        slot['frame'] = 'world_xy'
+    request.task.metadata['action_parameters'] = {'placement_slot': slot}
+    grounding = _Grounding(request, None, ENTRIES[4].object_id)
+    center = (rotation @ np.array([.02, 0., 0.]) + REGION_POSITION)[:2]
+    # Axis-aligned 0/180 and quarter-turn 90 trays have exact swapped widths.
+    world_dims = [.4, .6] if yaw == 90. else [.6, .4]
+    expected = center + np.array([.2, -.2]) * (np.array(world_dims) / 2. - .02)
+    np.testing.assert_allclose(grounding._slot_xy(), expected, atol=1e-12)
+    assert np.all(np.sign(grounding._slot_xy() - center) == [1., -1.])
+
+
+def test_unknown_slot_frame_cannot_silently_change_placement_direction():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request = _tray_request(.005)
+    _generic_held(request, ENTRIES[4].object_id)
+    request.task.metadata['action_parameters'] = {'placement_slot': {
+        'uv': [.2, -.2], 'frame': 'unknown'}}
+    with pytest.raises(ValueError, match='PLACEMENT_SLOT_FRAME_UNSUPPORTED'):
+        _Grounding(request, None, ENTRIES[4].object_id)._slot_xy()
