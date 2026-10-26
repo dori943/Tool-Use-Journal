@@ -558,7 +558,9 @@ def test_runtime_releases_replaced_offscreen_context_before_factory() -> None:
         )
         return _fake_env(active_ee)
 
-    runtime = ToolUseJournalEERuntime(initial, factory)
+    # The keep-old-env mode releases only its renderer. The default mode has
+    # closed/rebuilt environments since 6f9f5f74 to avoid holding two MjModels.
+    runtime = ToolUseJournalEERuntime(initial, factory, close_replaced_environments=False)
     runtime.unlock("2F")
 
     assert observed["old_context_during_factory"] is None
@@ -571,13 +573,46 @@ def test_runtime_model_swap_is_atomic_when_factory_builds_wrong_ee() -> None:
     def wrong_factory(_active_ee):
         return _fake_env("3F")
 
-    runtime = ToolUseJournalEERuntime(initial, wrong_factory)
+    # Object identity is guaranteed only when the old environment is retained.
+    runtime = ToolUseJournalEERuntime(initial, wrong_factory, close_replaced_environments=False)
 
     with pytest.raises(ToolUseJournalRuntimeError, match="requested None"):
         runtime.unlock("2F")
 
     assert runtime.env is initial
     assert runtime.active_ee == "2F"
+    runtime.close()
+
+
+def test_default_failed_model_swap_rebuilds_previous_ee_and_preserves_named_state():
+    initial = _fake_env("2F")
+    initial.sim.data._data.qpos[0] = .37
+    initial.sim.data._data.qvel[0] = .12
+    initial.sim.data._data.time = 1.25
+    apple_before = _joint_qpos(initial, "apple_joint")
+    calls, closed = [], []
+    initial.close = lambda: closed.append("initial")
+
+    def factory(active_ee):
+        assert "initial" in closed
+        calls.append(active_ee)
+        replacement = _fake_env("3F" if active_ee is None else active_ee)
+        replacement.close = lambda: closed.append(active_ee)
+        return replacement
+
+    runtime = ToolUseJournalEERuntime(initial, factory)
+    with pytest.raises(ToolUseJournalRuntimeError, match="requested None"):
+        runtime.unlock("2F")
+    assert calls == [None, "2F"]
+    assert None in closed  # The rejected replacement does not leak.
+    assert runtime.env is not initial
+    assert runtime.active_ee == "2F"
+    assert ToolUseJournalEnvironmentAdapter(runtime.env).physical_active_ee == "2F"
+    assert _joint_qpos(runtime.env, ARM_JOINTS[0]) == pytest.approx([.37])
+    assert _joint_qpos(runtime.env, "apple_joint") == pytest.approx(apple_before)
+    assert runtime.env.sim.data._data.qvel[0] == pytest.approx(.12)
+    assert runtime.env.sim.data._data.time == pytest.approx(1.25)
+    assert runtime.transitions == ()
     runtime.close()
 
 
