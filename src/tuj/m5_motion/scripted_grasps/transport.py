@@ -736,7 +736,18 @@ class _Grounding:
         # plates even when their measured rim clearance exceeds the request's
         # collision margin. Conversely, outer-bbox slot clipping alone can
         # overhang a flared tray's narrower floor.
-        physical_limit = (self.interior_half_xy() - mine
+        support = self.task.metadata.get('support_placement') or {}
+        on_support = (_action(self.task) == 'PLACE_ON' or (
+            support.get('relation') == 'ON'
+            and support.get('source') == 'SELECTED_PLACE_ON'
+            and support.get('object_id') == self.object_id
+            and support.get('region_id') == self.task.goal.target_region_id))
+        # ON permits footprint overhang (e.g. cheese on a narrower sandwich
+        # layer). Keep its centre above the explicit support; full-footprint
+        # containment is reserved for placements IN a region. Collision and
+        # measured post-execution support checks remain unchanged.
+        footprint = 0. if on_support else mine
+        physical_limit = (self.interior_half_xy() - footprint
                           - float(self.request.constraints.collision_margin_m))
         if np.any(physical_limit < -1e-9):
             return None

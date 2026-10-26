@@ -810,6 +810,7 @@ class SelectedPlanMotionOrchestrator:
                 constraints=selected_constraints,
                 options=option,
                 selected_plan_artifact_id=artifact_id,
+                plan_context=selected,
             )[0]
             execute(subgoal_request, subgoal_id)
 

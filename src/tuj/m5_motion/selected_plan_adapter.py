@@ -206,6 +206,34 @@ def _merged_action_parameters(
     return result
 
 
+def _support_placement(selected, assignment, action_type, target_ids, region_id):
+    """Preserve ON semantics without mistaking every region for a container.
+
+    A transport has only an ``above`` effect. Its next action in the same
+    holding group must explicitly place this same object ON this same support.
+    Missing or conflicting context remains subject to containment bounds.
+    """
+    if len(target_ids) != 1 or not region_id:
+        return None
+    source = assignment
+    if action_type.lower() != "place_on":
+        if action_type.lower() not in {"transport", "move"} or not assignment.group_id:
+            return None
+        by_id = {item.subgoal_id: item for item in selected.candidate_assignments}
+        if assignment.subgoal_id not in selected.subgoal_order:
+            return None
+        following = selected.subgoal_order[selected.subgoal_order.index(assignment.subgoal_id) + 1:]
+        source = next((by_id[sid] for sid in following
+                       if sid in by_id and by_id[sid].group_id == assignment.group_id), None)
+        if source is None or str(source.action_type).lower() != "place_on":
+            return None
+        support = source.goal_region_id or source.source_binding.get("?base")
+        if source.target_ids != list(target_ids) or support != region_id:
+            return None
+    return {"relation": "ON", "object_id": target_ids[0], "region_id": region_id,
+            "source": "SELECTED_PLACE_ON", "source_subgoal_id": source.subgoal_id}
+
+
 def _execution_metadata(parameters: Mapping[str, Any]) -> dict[str, Any]:
     """Promote execution-control fields out of the archival parameter bag."""
 
@@ -510,6 +538,7 @@ class SelectedPlanMotionRequestAdapter:
         options: OptionSource | None = None,
         selected_plan_artifact_id: str | None = None,
         planner_invocation_id: str = "task-planner:selected-plan",
+        plan_context: SelectedPlan | None = None,
     ) -> tuple[MotionPlanRequest, ...]:
         order = list(selected.subgoal_order)
         if not order:
@@ -636,6 +665,11 @@ class SelectedPlanMotionRequestAdapter:
             execution_metadata["ee_capabilities"] = ee_capabilities
             explicit_execution_metadata = _execution_metadata(action_parameters)
             execution_metadata.update(explicit_execution_metadata)
+            support_placement = _support_placement(
+                plan_context or selected, assignment, action_type, target_ids,
+                goal.target_region_id)
+            if support_placement is not None:
+                execution_metadata["support_placement"] = support_placement
             is_contact_friction_mode = False
             raw_grasp_mode = str(
                 execution_metadata.get("grasp_execution_mode", "KINEMATIC")

@@ -336,7 +336,7 @@ class ScriptedGraspSession:
             for request in transitions:
                 self.execute_request(request)
             request = adapter.convert(sliced, worlds=self.world, constraints=limits,
-                options=option, selected_plan_artifact_id=artifact)[0]
+                options=option, selected_plan_artifact_id=artifact, plan_context=selected)[0]
             if (request.task.metadata.get("action_parameters", {}).get("target_pose") is None
                     and request.task.grasp is None):
                 request.task.metadata["scripted_m4_implicit_object_pose"] = True

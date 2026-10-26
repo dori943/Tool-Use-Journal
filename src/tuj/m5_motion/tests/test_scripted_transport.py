@@ -1116,3 +1116,45 @@ def test_missing_floor_geometry_keeps_existing_bbox_slot_preference():
     g._initialize_seat_yaw()
     anchor = g._slot_xy()
     np.testing.assert_array_equal(g._free_destination_xy(None), anchor)
+
+
+def _overhanging_support_grounding():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request, oid = _occupied_tray_for_yaw_search()
+    request.world.objects.pop('plate')
+    request.world.objects['tray']['dimensions_m'] = [.08, .05, .003]
+    request.world.objects['tray'].pop('collision_points_m')
+    request.world.objects[oid]['dimensions_m'] = [.0632, .0613, .004]
+    request.task.metadata.pop('action_parameters')
+    return request, oid, _Grounding(request, None, oid)
+
+
+def test_explicit_on_support_allows_footprint_overhang_but_in_region_does_not():
+    request, oid, g = _overhanging_support_grounding()
+    assert g._free_destination_xy(None) is None
+    request.task.metadata['support_placement'] = {
+        'relation': 'ON', 'source': 'SELECTED_PLACE_ON',
+        'object_id': oid, 'region_id': 'tray'}
+    np.testing.assert_array_equal(g._free_destination_xy(None), g.region_world[:2])
+    assert request.constraints.collision_margin_m == .005
+
+
+@pytest.mark.parametrize('field,bad', [('object_id', 'wrong'), ('region_id', 'wrong'),
+                                    ('relation', 'IN'), ('source', 'guessed')])
+def test_support_overhang_permission_requires_matching_explicit_plan(field, bad):
+    request, oid, g = _overhanging_support_grounding()
+    note = {'relation': 'ON', 'source': 'SELECTED_PLACE_ON',
+            'object_id': oid, 'region_id': 'tray'}
+    note[field] = bad
+    request.task.metadata['support_placement'] = note
+    assert g._free_destination_xy(None) is None
+
+
+def test_explicit_on_still_rejects_unsupported_center_and_occupied_support():
+    request, oid, g = _overhanging_support_grounding()
+    request.task.action_type = 'place_on'
+    g._slot_xy = lambda: g.region_world[:2] + [.05, 0.]
+    assert g._free_destination_xy(None) is None
+    g._slot_xy = lambda: g.region_world[:2]
+    g._occupant_cache = [(g.region_world[:2], [.02, .02], 1., False)]
+    assert g._free_destination_xy(None) is None

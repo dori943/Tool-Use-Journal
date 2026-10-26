@@ -706,3 +706,56 @@ def test_joint_target_uses_snapshot_robot_dof() -> None:
 
     assert requests[0].task.goal.goal_type is GoalType.JOINT
     assert requests[0].task.goal.target_joint_positions_rad == [0.5, -0.5]
+
+
+def _support_sequence(*, next_action='place_on', next_object='part', next_base='bin', next_group='hold'):
+    assignments = [
+        CandidateAssignment(subgoal_id='transport', candidate_id='t', ee='vac',
+            action_type='transport', group_id='hold', target_ids=['part'], goal_region_id='bin'),
+        CandidateAssignment(subgoal_id='place', candidate_id='p', ee='vac',
+            action_type=next_action, group_id=next_group, target_ids=[next_object],
+            source_binding={'?o': next_object, '?base': next_base}),
+    ]
+    return SelectedPlan(cost_vector=CostVectorModel(),
+        subgoal_order=['transport', 'place'], candidate_assignments=assignments,
+        steps=[PlanStep(step_index=i, kind='subgoal', action='EXECUTE_SUBGOAL',
+                        subgoal_id=a.subgoal_id, candidate_id=a.candidate_id)
+               for i, a in enumerate(assignments)])
+
+
+def test_stack_transport_retains_on_relation_in_full_and_live_sliced_plans():
+    from tuj.m5_motion.orchestration import _single_subgoal_plan
+    selected = _support_sequence()
+    before = selected.model_dump(mode='json')
+    adapter = SelectedPlanMotionRequestAdapter()
+    world = _world('support', [0., 0.])
+    full = adapter.convert(selected, worlds=lambda *_: world, constraints=MotionConstraints())
+    sliced = adapter.convert(_single_subgoal_plan(selected, 'transport'), worlds=world,
+        constraints=MotionConstraints(), plan_context=selected)
+    relation = full[0].task.metadata['support_placement']
+    assert relation == sliced[0].task.metadata['support_placement']
+    assert relation['object_id'] == 'part' and relation['region_id'] == 'bin'
+    assert relation['source_subgoal_id'] == 'place'
+    assert full[1].task.metadata['support_placement']['relation'] == 'ON'
+    assert selected.model_dump(mode='json') == before
+
+
+@pytest.mark.parametrize('kwargs', [
+    {'next_action': 'place'}, {'next_object': 'other'},
+    {'next_base': 'other'}, {'next_group': 'unrelated'},
+])
+def test_transport_cannot_infer_support_from_wrong_following_action(kwargs):
+    from tuj.m5_motion.orchestration import _single_subgoal_plan
+    selected = _support_sequence(**kwargs)
+    request = SelectedPlanMotionRequestAdapter().convert(
+        _single_subgoal_plan(selected, 'transport'), worlds=_world('support', [0., 0.]),
+        constraints=MotionConstraints(), plan_context=selected)[0]
+    assert 'support_placement' not in request.task.metadata
+
+
+def test_transport_without_full_plan_context_does_not_guess_support():
+    from tuj.m5_motion.orchestration import _single_subgoal_plan
+    request = SelectedPlanMotionRequestAdapter().convert(
+        _single_subgoal_plan(_support_sequence(), 'transport'),
+        worlds=_world('support', [0., 0.]), constraints=MotionConstraints())[0]
+    assert 'support_placement' not in request.task.metadata
