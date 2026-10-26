@@ -87,3 +87,59 @@ def test_plate_vac_contract_is_available_in_all_registered_tasks(environment,too
         'execution_compatibility']
     assert contract['object_id']==tool_id
     assert contract['supported_ee']==expected
+
+
+@pytest.mark.parametrize('target_id', ['cereal', 'obj_cereal_cereal'])
+def test_cereal_empty_feasibility_is_not_revived_by_scripted_recipe(target_id):
+    """A recipe's availability cannot make a rejected grasp physically feasible."""
+    original = TaskPlannerRequest(
+        task_graph=TaskGraph(
+            initial_state=InitialState(),
+            subgoals=[Subgoal(
+                subgoal_id='SG1_s2_d1',
+                action_type='acquire',
+                target_ids=[target_id],
+                feasible_ee=[],
+                feasible_ee_source='gk',
+            )],
+        ),
+        resource_catalog=ResourceCatalog.model_validate({
+            'end_effectors': {ee: {} for ee in ('2F', '3F', 'vac')},
+        }),
+    )
+    before = original.model_dump()
+
+    constrained, changes = constrain_task_request(
+        original, 'C4_2_DiagonalFitPacking')
+
+    assert original.model_dump() == before
+    assert constrained.task_graph.subgoals[0].feasible_ee == []
+    assert len(changes) == 1
+    assert changes[0]['grounded_feasible_ee'] == []
+    assert changes[0]['scripted_feasible_ee'] == []
+    contract = constrained.task_graph.subgoals[0].action_parameters[
+        'execution_compatibility']
+    assert contract['supported_ee'] == ['2F']
+    assert contract['selected_feasible_ee'] == []
+
+    from tuj.m4_taskplanner.diagnostics import PlanStatus, ReasonCode
+    from tuj.m4_taskplanner.planner import plan
+
+    result = plan(constrained)
+    assert result.status is PlanStatus.INFEASIBLE_NO_CANDIDATE
+    assert result.selected_plan is None
+    assert result.search_stats.states_popped == 0
+    assert [(r.subgoal_id, r.reason_code) for r in result.rejections] == [
+        ('SG1_s2_d1', ReasonCode.EMPTY_FEASIBLE_EE)]
+    assert original.model_dump() == before
+
+
+def test_empty_tool_feasibility_stays_empty_for_acquire_and_use():
+    original = make_request([])
+    before = original.model_dump()
+
+    constrained, changes = constrain_task_request(original, 'C1_2_DoughFlatten')
+
+    assert [s.feasible_ee for s in constrained.task_graph.subgoals] == [[], []]
+    assert all(change['scripted_feasible_ee'] == [] for change in changes)
+    assert original.model_dump() == before

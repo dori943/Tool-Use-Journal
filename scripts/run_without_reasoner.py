@@ -12,11 +12,13 @@ Full 코드 그대로 호출한다. 자세한 정책은 tuj.ablations.vlm_prior 
          m1_full.json          Full M1 payload 사본 (사후 비교용)
          m1.json               VLM 추정으로 대체된 payload  ← 이후 단계 입력
          m1_ee_keepout.npz      공유 EE 교체 금지영역 (M1이 생성한 경우에만)
-         vlm_prior.json        VLM 원응답 + feasible_ee 표 + fallback 목록
+         vlm_prior.json        VLM 원응답 + feasible_ee 표 (실패 판정 강제 변경 없음)
          m2.json, gk_*.json, m4.json, m5/, run_result.json
 
-v2는 VLM에 세로 높이와 바닥면 크기를 별도로 요청한다. v1 결과는 새 출력
-폴더에서 M1부터 다시 실행해야 하며, 기존 결과는 재집계용으로 보존할 수 있다.
+v2는 VLM에 세로 높이와 바닥면 크기를 별도로 요청한다. v3는 Full과 동일한 EE
+판정을 보존하며, 모든 EE가 실패한 경우의 강제 fallback을 제거한다. 이전 정책의
+출력 폴더에 이어 쓰지 않는다. 저장된 v2 추정을 재사용할 때도 새 폴더에서 파생
+판정을 재계산하고 M2/G_k/M4를 다시 생성해야 한다.
 """
 
 from __future__ import annotations

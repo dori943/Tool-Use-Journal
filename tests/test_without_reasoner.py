@@ -97,18 +97,52 @@ def test_prior_scene_replaces_measurements_keeps_observation():
     assert full["nodes"][0]["mass_kg"] == 0.147
 
 
-def test_prior_scene_always_yields_a_feasible_ee():
-    """추정값으로는 어떤 EE 도 못 잡는 물체 → margin 최대 EE 하나를 fallback 으로 통과."""
-    from tuj.ablations.vlm_prior import build_prior_scene, feasible_ee_table
-    # 너무 무겁고(페이로드 초과) 너무 넓고(개구 초과) 상면이 울퉁불퉁한(흡착 불가) 물체
+def test_prior_scene_preserves_all_infeasible_ee_verdicts():
+    """All-failed physical checks stay failed, exactly as in Full."""
+    from tuj.ablations.vlm_prior import build_prior_scene, feasible_ee_table, normalize_ee_pool
+    from tuj.m1_scene.ee_rules import evaluate_ee
     est = _estimate(mass_kg=50.0, extents=(400.0, 400.0, 300.0))
-    prior = build_prior_scene(_full_m1(), est, _robot())
+    full = _full_m1()
+    # Rebuilding a payload also removes stale prior-version fallback markers.
+    full["nodes"][0]["ee_fallback"] = "vac"
+    prior = build_prior_scene(full, est, _robot())
     mug = next(n for n in prior["nodes"] if n["id"] == "obj_mug_mug")
-    table = feasible_ee_table(prior)
-    assert len(table["obj_mug_mug"]) == 1
-    assert mug["ee_fallback"] == table["obj_mug_mug"][0]
-    assert prior["ablation"]["ee_fallback"] == {"obj_mug_mug": mug["ee_fallback"]}
-    assert "vlm_prior_fallback" in mug["ee"][mug["ee_fallback"]]["reason"]
+    assert feasible_ee_table(prior)["obj_mug_mug"] == []
+    intrinsic = {k: mug[k] for k in ("geometry", "mass_kg", "mu")}
+    assert mug["ee"] == {e["ee_id"]: evaluate_ee(e, intrinsic)
+                         for e in normalize_ee_pool(_robot())}
+    assert "ee_fallback" not in mug
+    assert prior["ablation"]["ee_fallback"] == {}
+    assert prior["ablation"]["policy_version"] == "vlm-prior-attributes-v3"
+    assert full["nodes"][0]["ee_fallback"] == "vac"
+
+
+def test_cereal_estimate_does_not_force_vac_or_recipe_2f():
+    from tuj.ablations.vlm_prior import build_prior_scene, feasible_ee_table
+    estimate = _estimate(mass_kg=.12, extents=(200., 150., 100.),
+                         height_z_mm=100., footprint_mm=(200., 150.))
+    obj = estimate.objects[0]
+    obj.id = "obj_cereal_cereal"
+    obj.cylinder_like = False
+    obj.surface_rms_mm = 2.
+    obj.seal_patch_rms_mm = 5.
+    full = _full_m1()
+    full["nodes"][0].update(id=obj.id, canonical_id="cereal", source_name="cereal")
+    full["nodes"][0]["class"] = "cereal"
+    full["edges"][0]["from"] = obj.id
+    estimate.edges[0].from_id = obj.id
+    frozen = estimate.model_dump(mode="json")
+    prior = build_prior_scene(full, estimate, _robot())
+    node = prior["nodes"][0]
+    assert feasible_ee_table(prior)[obj.id] == []
+    assert node["geometry"]["footprint_mm"] == [200., 150.]
+    assert node["mass_kg"] == .12
+    assert estimate.model_dump(mode="json") == frozen
+    assert all(not verdict["feasible"] for verdict in node["ee"].values())
+    assert any(c["rule"] == "dim_lt_stroke" and not c["pass"]
+               for c in node["ee"]["2F"]["checks"])
+    assert any(c["rule"] == "seal_patch" and not c["pass"]
+               for c in node["ee"]["vac"]["checks"])
 
 
 def test_estimate_validation_requires_full_coverage():

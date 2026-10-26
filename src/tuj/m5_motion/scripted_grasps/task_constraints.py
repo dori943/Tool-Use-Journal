@@ -48,8 +48,11 @@ def constrain_task_request(request, environment, *, extra_entries=()):
             continue
         before=list(subgoal.feasible_ee)
         supported=list(dict.fromkeys(e.ee for e in entries))
-        allowed=[ee for ee in before if ee in supported] if before else supported
-        if not allowed:
+        # Compatibility only narrows grounded candidates. An empty set means
+        # no EE passed the physical rules, not missing data to fill from recipes.
+        # Preserve it so M4 returns structured EMPTY_FEASIBLE_EE diagnostics.
+        allowed=[ee for ee in before if ee in supported]
+        if before and not allowed:
             raise ValueError(
                 f'SCRIPTED_GRASP_EE_INFEASIBLE: {subgoal.subgoal_id}: '
                 f'{matched_key} supports {supported}, grounded feasible EEs={before}'

@@ -11,8 +11,8 @@ inferred directly by the base VLM". 바뀌는 것은 *측정값의 출처* 하�
   동일 (Full 과 같은 코드) : EE 판정 규칙 `m1_scene.ee_rules.evaluate_ee`, 단항 술어,
       reachability, 그리고 M2 → G_k → M4 → M5 전부
 
-feasible_ee 는 항상 나온다: 추정값 기준 규칙에서 어떤 EE 도 통과하지 못한 물체는 margin 이
-가장 큰 EE 하나를 `ee_fallback` 으로 통과시킨다 (실행까지 가서 파지/충돌로 실패하게).
+추정값 기준 규칙에서 어떤 EE 도 통과하지 못하면 feasible_ee 는 빈 목록이다.
+Full 과 같은 판정을 보존하며, 실행을 강제하기 위해 실패한 EE 를 통과시키지 않는다.
 """
 
 from __future__ import annotations
@@ -30,7 +30,7 @@ from tuj.m1_scene.relations import flat_face, region_clear, top_exposed
 from tuj.m2_subgoal.rough import _image_part, make_llm_client, track_usage
 
 MODE = "without_reasoner"
-POLICY_VERSION = "vlm-prior-attributes-v2"
+POLICY_VERSION = "vlm-prior-attributes-v3"
 PositiveDimension = Annotated[float, Field(gt=0, allow_inf_nan=False)]
 
 # 노드에서 VLM 추정으로 갈아끼우는 키 (geometry 는 통째로 재구성)
@@ -38,6 +38,7 @@ _REPLACED_NODE_KEYS = (
     "material", "density_kgm3", "mass_kg", "youngs_gpa", "mu", "confidence",
     "mass_range_kg", "materials_topk", "caption", "mass_source",
     "geometry_source", "intrinsic_source", "grounding_source", "ee", "predicates",
+    "ee_fallback",
 )
 _CONTAINER_KEYS = ("inner_bbox_mm", "wall_mm", "floor_mm")
 
@@ -213,7 +214,6 @@ def build_prior_scene(full_m1: dict, est: SceneEstimate, robot_spec: dict) -> di
         edges.append(e)
     out["edges"] = edges
 
-    fallbacks: dict[str, str] = {}
     for node in out["nodes"]:
         o = by_id[node["id"]]
         for k in _REPLACED_NODE_KEYS:
@@ -234,13 +234,8 @@ def build_prior_scene(full_m1: dict, est: SceneEstimate, robot_spec: dict) -> di
                 node[k] = [round(float(x), 1) for x in v] if isinstance(v, list) else round(float(v), 1)
         intrinsic = {"geometry": geom, "mass_kg": node["mass_kg"], "mu": node["mu"]}
         verdicts = {e["ee_id"]: evaluate_ee(e, intrinsic) for e in ee_pool}
-        if verdicts and not any(v["feasible"] for v in verdicts.values()):
-            best = max(verdicts, key=lambda k: verdicts[k]["margin"])
-            verdicts[best] = {**verdicts[best], "feasible": True,
-                              "reason": "vlm_prior_fallback(no EE passed; best margin kept): "
-                                        + verdicts[best]["reason"]}
-            node["ee_fallback"] = best
-            fallbacks[node["id"]] = best
+        # Preserve the common EE rules, including an empty feasible set.
+        # A negative margin is diagnostic evidence, not permission to grasp.
         node["ee"] = verdicts
         if reach_mm is not None and "center_mm" in node:
             node["reachability"] = reach_check(reach_mm, node["center_mm"])
@@ -252,7 +247,8 @@ def build_prior_scene(full_m1: dict, est: SceneEstimate, robot_spec: dict) -> di
             "flat_face": flat_face(node["geometry"]),
         }
     out["ablation"] = {"mode": MODE, "policy_version": POLICY_VERSION,
-                       "ee_fallback": fallbacks,
+                       "ee_fallback": {},
+                       "ee_feasibility_policy": "shared_ee_rules_no_override",
                        "replaced": "geometry/material/density/mass/youngs/mu/ee/predicates/edge.gap_mm",
                        "kept_from_observation": "id/class/center_mm/bbox_mm/edge topology"}
     return out
