@@ -1,13 +1,14 @@
 # -*- coding: utf-8 -*-
-"""M5 실패를 '계획 실패'와 '실행(물리) 실패'로 분류한다.
+"""M5 실패를 계획·실행·실행 후 목표 검사로 분류한다.
 
 ablation 표에서 "추론이 없어서 못 푼 것"과 "파지가 풀려서 떨어뜨린 것"을
 구분하기 위한 공통 규칙. 어떤 조건(Full / w/o ...)에서든 같은 함수를 쓴다.
 
-  failure_stage    planning  : 키프레임/IK/충돌 검사 단계에서 궤적을 만들지 못함
+  failure_stage    goal      : 실제 동작 후 배치/기존 배치 유지 검사에서 미달 또는 증거 부족
+                   planning  : 키프레임/IK/충돌 검사 단계에서 궤적을 만들지 못함
                    execution : 시뮬레이터에서 실제로 움직이다 실패 (접촉 상실, 미끄러짐,
                                목표 미달, 상태 발산 등)
-  failure_code     메시지에서 뽑은 대표 원인 코드 (물리 코드가 있으면 그것을 우선)
+  failure_code     메시지에서 뽑은 대표 원인 코드 (배치 검사 코드, 물리 코드 순서로 우선)
   physics_related  접촉/파지 유지 관련 코드가 포함돼 있으면 True.
                    planning 단계라도 controller preview 가 GRASP_RETENTION_FAILED 로
                    거절한 경우가 여기 해당한다 (물리 노이즈로 집계할 수 있게).
@@ -42,6 +43,12 @@ PHYSICS_CODES: tuple[str, ...] = (
     "EXECUTION_FAILED",
     "GOAL_FAILED",
     "STATE_DIVERGED",
+)
+
+# A post-execution predicate failure does not establish physical noise.
+POST_EXECUTION_GOAL_CODES = (
+    "PLACEMENT_GOAL_NOT_SATISFIED",
+    "PLACEMENT_PRESERVATION_FAILED",
 )
 
 # 실행 단계에서 올라오는 예외 타입
@@ -95,6 +102,7 @@ def classify_failure(
     """실패 메시지(+ live manifest 의 steps)로 단계/코드를 결정한다.
 
     우선순위
+      0. 실행 후 배치 검사 코드 → goal (물리 원인 여부는 별도 증거로 판단)
       1. 마지막 FAILED step 이 어댑터 실행까지 갔으면(`execution_status`) → execution
       2. 마지막 FAILED step 의 route 가 SCRIPTED_GRASP 이면 (live 시뮬에서 직접 파지) → execution
       3. 예외 타입이 실행 계열 → execution, 계획 계열 → planning
@@ -116,7 +124,10 @@ def classify_failure(
 
     stage: str
     basis: str
-    if step is not None and step.get("execution_status") not in (None, "SUCCESS"):
+    placement_code = next((code for code in codes if code in POST_EXECUTION_GOAL_CODES), None)
+    if placement_code is not None:
+        stage, basis = "goal", "post_execution_placement_check"
+    elif step is not None and step.get("execution_status") not in (None, "SUCCESS"):
         stage, basis = "execution", "step.execution_status"
     elif step is not None and step.get("route") == "SCRIPTED_GRASP":
         stage, basis = "execution", "step.route=SCRIPTED_GRASP"
@@ -129,8 +140,8 @@ def classify_failure(
     else:
         stage, basis = "planning", "default"
 
-    code = physics[0] if physics else (next((c for c in codes if c not in EXECUTION_ERROR_TYPES
-                                              and c not in PLANNING_ERROR_TYPES), None))
+    code = placement_code or (physics[0] if physics else (next((c for c in codes if c not in EXECUTION_ERROR_TYPES
+                                              and c not in PLANNING_ERROR_TYPES), None)))
     return {
         "failure_stage": stage,
         "failure_code": code,

@@ -56,6 +56,7 @@ from pathlib import Path
 
 ROOT = Path(__file__).resolve().parents[1]
 sys.path.insert(0, str(ROOT))
+sys.path.insert(0, str(ROOT / "src"))
 from task_registry import TASKS  # noqa: E402
 
 ALL_TASKS = list(TASKS)  # c1_1, c2_1, c3_1, c1_2, c2_2, c3_2, c4_1, c4_2
@@ -293,6 +294,17 @@ def collect_record(out: Path, *, task: str, seed: int, method: str,
             last = failed[-1]
             rec["live_failed_step"] = last.get("subgoal_id") or last.get("step_id") or last.get("id")
             note("live.failed_step", f"{rec['live_failed_step']}: {last.get('detail') or last.get('failure') or ''}")
+            # Reclassify archived post-execution checks without changing their
+            # saved verdicts or rewriting any source run files.
+            from tuj.m5_motion.failure_taxonomy import classify_failure
+            classification = classify_failure(live.get("failure"), steps=records)
+            if (exit_code != -9 and live.get("status") == "FAILED"
+                    and rec["failure_stage"] in ("unknown", "m5", "m5_planning", "m5_execution", "goal")
+                    and classification["failure_stage"] == "goal"):
+                rec["failure_stage"] = "goal"
+                rec["failure_basis"] = classification["failure_basis"]
+                codes[classification["failure_code"]] += 3
+
         rec["live_record_count"] = len(records)
         break
 

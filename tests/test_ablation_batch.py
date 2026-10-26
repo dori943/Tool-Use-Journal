@@ -173,3 +173,16 @@ def test_explicit_log_precedes_stale_generic_log(tmp_path):
         log=current,
     )
     assert record["reason_code"] == "SCRIPTED_GRASP_EE_INFEASIBLE"
+
+
+def test_archived_placement_check_is_reclassified_without_rewriting(tmp_path):
+    detail = "PlacementPreservationError: PLACEMENT_GOAL_NOT_SATISFIED: fruit_b -> plate_b"
+    write_json(tmp_path / "run_result.json", {"failure_stage": "planning", "failure_code": "PLACEMENT_GOAL_NOT_SATISFIED", "success": False, "exec_success": False, "goal_success": False, "m5_status": "FAILED"})
+    write_json(tmp_path / "m5/live/live-execution-manifest.json", {"status": "FAILED", "failure": detail, "steps": [{"status": "FAILED", "execution_status": "SUCCESS", "error": detail}]})
+    before = {p: p.read_bytes() for p in tmp_path.rglob("*.json")}
+    record = collect(tmp_path)
+    assert record["failure_stage"] == "goal"
+    assert record["reason_code"] == "PLACEMENT_GOAL_NOT_SATISFIED"
+    assert record["success"] is False
+    assert before == {p: p.read_bytes() for p in tmp_path.rglob("*.json")}
+    assert collect(tmp_path, -9)["reason_code"] == "BATCH_TIMEOUT"
