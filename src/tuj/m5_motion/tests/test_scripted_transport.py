@@ -525,12 +525,16 @@ def _vacuum_place_request(margin=.005, *, object_id='held_vac', support_floor_z=
         'pose': {'frame_id': 'world', 'position_m': REGION_POSITION,
                  'orientation_xyzw': Rotation.from_matrix(REGION).as_quat().tolist()},
         'dimensions_m': [.3, .2, .1], 'anchors': {'center': [.02, 0., 0.]},
-        'collision_points_m': _tray_collision_points(inner_floor_z=support_floor_z),
+        # Keep collision vertices in the declared 300 x 200 mm tray frame.
+        'collision_points_m': (np.asarray(_tray_collision_points(
+            inner_floor_z=support_floor_z, half=(.15, .1))) + [.02, 0., 0.]).tolist(),
     }
-    body = transform([.2, .1, body_z],
-                     rotation=Rotation.from_euler('xyz', [180, 0, 0], degrees=True).as_matrix())
-    grip = transform([.2, .1, grip_z],
-                     rotation=Rotation.from_euler('xyz', [180, 0, 0], degrees=True).as_matrix())
+    # These tests isolate release height/cup clearance. Align the square
+    # payload with the rotated tray so its footprint actually fits the floor.
+    # A world-aligned 160 mm square spans 224 mm in this 200 mm tray's axes.
+    carried_rotation = REGION @ Rotation.from_euler('x', 180, degrees=True).as_matrix()
+    body = transform([.2, .1, body_z], rotation=carried_rotation)
+    grip = transform([.2, .1, grip_z], rotation=carried_rotation)
     size = np.asarray(local_size, dtype=float)
     center = np.zeros(3)
     T_GB = inverse(grip) @ body
@@ -1193,3 +1197,91 @@ def test_on_support_search_can_find_clear_center_for_overhanging_layer():
     chosen = g._free_destination_xy(None)
     assert chosen is not None and g.seat_clear_of_occupants(chosen)
     assert abs(chosen[0]-g.region_world[0]) > .04
+
+
+def _rotated_container(uv, yaw=90):
+    request, oid = _occupied_tray_for_yaw_search()
+    request.world.objects.pop('plate')
+    request.world.objects[oid]['dimensions_m'] = [.02, .02, .02]
+    tray = request.world.objects['tray']
+    tray['dimensions_m'] = [.2, .4, .06]
+    tray['pose']['orientation_xyzw'] = Rotation.from_euler('z', yaw, degrees=True).as_quat().tolist()
+    tray['collision_points_m'] = _tray_collision_points(
+        half=(.07, .18), inner_floor_z=-.02, bottom_z=-.03, rim_z=.03)
+    request.task.metadata['action_parameters']['placement_slot']['uv'] = uv
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    return _Grounding(request, None, oid)
+
+
+def _measured_local_clearance(g, xy):
+    # Read actual stored region-local floor vertices; never call the mixed-axis
+    # interior_half_xy under review as the test oracle.
+    points = np.asarray(g.record['collision_points_m'])
+    band = points[np.isclose(points[:, 2], g.floor_top_local(), atol=1e-10)]
+    half = np.abs(band[:, :2] - g.region_center_local[:2]).max(axis=0)
+    region_rotation = g.T_WR[:3, :3]
+    object_half = np.abs((region_rotation.T @ g.destination_rotation)[:2, :]) @ g.local_size / 2
+    local_center = np.linalg.solve(g.T_WR[:2, :2], np.asarray(xy) - g.region_world[:2])
+    return half - np.abs(local_center) - object_half
+
+
+def test_in_container_does_not_accept_rotated_preferred_slot_outside_floor():
+    g = _rotated_container([1., 0.])
+    anchor = g._slot_xy()
+    assert _measured_local_clearance(g, anchor)[0] < 0  # actual 17mm overhang
+    selected = g._free_destination_xy(None)
+    assert selected is not None
+    assert np.all(_measured_local_clearance(g, selected) >= g.request.constraints.collision_margin_m - 1e-9)
+
+
+def test_in_container_retains_rotated_preferred_slot_with_sufficient_clearance():
+    g = _rotated_container([0., .7])
+    anchor = g._slot_xy()
+    assert np.all(_measured_local_clearance(g, anchor) > g.request.constraints.collision_margin_m)
+    assert g.seat_clear_of_occupants(anchor)
+    np.testing.assert_array_equal(g._free_destination_xy(None), anchor)
+
+
+def test_yaw_180_control_preserves_valid_slot():
+    g = _rotated_container([0., .7], yaw=180)
+    anchor = g._slot_xy()
+    assert np.all(_measured_local_clearance(g, anchor) > g.request.constraints.collision_margin_m)
+    np.testing.assert_array_equal(g._free_destination_xy(None), anchor)
+
+
+def test_rotated_container_uses_object_footprint_in_region_axes():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    g = _rotated_container([0., 0.])
+    request = g.request
+    request.world.objects[g.object_id]['dimensions_m'] = [.12, .02, .02]
+    request.world.objects['tray']['dimensions_m'] = [.1, .3, .06]
+    request.world.objects['tray']['collision_points_m'] = _tray_collision_points(
+        half=(.05, .15), inner_floor_z=-.02, bottom_z=-.03, rim_z=.03)
+    g = _Grounding(request, None, g.object_id)
+    # World X is region Y: the long payload fits the long floor side.
+    np.testing.assert_array_equal(g._free_destination_xy(None), g.region_world[:2])
+    assert np.all(_measured_local_clearance(g, g.region_world[:2]) > .005)
+
+
+def test_rotated_container_search_filters_occupancy_in_world_coordinates():
+    g = _rotated_container([0., 0.])
+    g._occupant_cache = [(g.region_world[:2], [.02, .02], 1., False)]
+    # The callback contract remains world XY, as required by EE-path keepout.
+    selected = g._free_destination_xy(lambda xy: xy[0] < -.1)
+    assert selected is not None and selected[0] < -.1
+    assert g.seat_clear_of_occupants(selected)
+    assert np.all(_measured_local_clearance(g, selected) >= .005)
+
+
+def test_rotated_container_rejects_world_aligned_square_too_wide_locally():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request, oid = _occupied_tray_for_yaw_search()
+    request.world.objects.pop('plate')
+    request.task.metadata.pop('action_parameters')
+    request.world.objects[oid]['dimensions_m'] = [.16, .16, .01]
+    request.world.objects['tray'].update(dimensions_m=[.3, .2, .06])
+    request.world.objects['tray'].pop('collision_points_m')
+    request.world.objects['tray']['pose']['orientation_xyzw'] = Rotation.from_euler('z', 37, degrees=True).as_quat().tolist()
+    g = _Grounding(request, None, oid)
+    assert np.all(g.half[:2] + .005 < g.region_half[:2])  # world AABB would admit it
+    assert g._free_destination_xy(None) is None

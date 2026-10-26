@@ -469,6 +469,18 @@ class _Grounding:
         self._interior_half_cache = half
         return half
 
+    def interior_half_xy_local(self):
+        """Measured floor half extents expressed in the region's own axes."""
+        half = self.region_dims[:2] / 2.
+        points = self.record.get('collision_points_m')
+        if points is not None and len(points) >= 8:
+            points = np.asarray(points, dtype=float)
+            band = points[np.abs(points[:, 2] - self.floor_top_local()) <= _FLOOR_BAND_M]
+            if len(band) >= 4:
+                half = np.minimum(half,
+                    np.abs(band[:, :2] - self.region_center_local[:2]).max(axis=0))
+        return half
+
     def usable_half_xy(self):
         """Interior minus the wall allowance: where a footprint may be centred."""
         return np.maximum(self.interior_half_xy() - REGION_WALL_ALLOWANCE_M, 0.)
@@ -729,7 +741,6 @@ class _Grounding:
 
     def _free_destination_xy(self, seat_allowed):
         """Find an unoccupied seat, or return None. Never accept overlap as fallback."""
-        mine = self.half[:2]
         # The measured floor is a physical boundary; the extra 20 mm inset
         # in usable_half_xy() is only the existing conservative search domain.
         # Applying that inset to preferred slots would reject valid broad
@@ -747,35 +758,28 @@ class _Grounding:
         # containment is reserved for placements IN a region. Collision and
         # measured post-execution support checks remain unchanged.
         center_xy = self.region_world[:2]
-        support_origin = center_xy
-        support_axes = np.eye(2)
+        # Floor measurements, footprint extents and seat offsets must all use
+        # region-local axes. A world AABB mixes the long and short sides when
+        # the region is rotated, accepting overhangs and rejecting valid slots.
+        seat_axes = self.T_WR[:2, :2]
+        if abs(float(np.linalg.det(seat_axes))) < 1e-9:
+            return None
+        seat_origin = center_xy
+        region_half = self.interior_half_xy_local()
+        object_in_region = self.T_WR[:3, :3].T @ self.destination_rotation
+        footprint = np.abs(object_in_region[:2, :]) @ self.local_size / 2.
         if on_support:
-            # A rotated narrow support's world AABB contains unsupported
-            # corners. Test the centre in the support's own floor frame.
-            support_axes = self.T_WR[:2, :2]
-            if abs(float(np.linalg.det(support_axes))) < 1e-9:
-                return None
-            support_half = self.region_dims[:2] / 2.
             floor = self.floor_top_local()
-            points = self.record.get('collision_points_m')
-            if points is not None and len(points) >= 8:
-                points = np.asarray(points, dtype=float)
-                band = points[np.abs(points[:, 2] - floor) <= _FLOOR_BAND_M]
-                if len(band) >= 4:
-                    support_half = np.minimum(support_half,
-                        np.abs(band[:, :2] - self.region_center_local[:2]).max(axis=0))
-            support_origin = (self.T_WR @ np.r_[self.region_center_local[:2], floor, 1.])[:2]
-            physical_limit = support_half - float(self.request.constraints.collision_margin_m)
-        else:
-            physical_limit = (self.interior_half_xy() - mine
-                              - float(self.request.constraints.collision_margin_m))
+            seat_origin = (self.T_WR @ np.r_[self.region_center_local[:2], floor, 1.])[:2]
+            footprint = np.zeros(2)
+        physical_limit = (region_half - footprint
+                          - float(self.request.constraints.collision_margin_m))
         if np.any(physical_limit < -1e-9):
             return None
         physical_limit = np.maximum(physical_limit, 0.)
 
         def acceptable(xy):
-            relative = (np.linalg.solve(support_axes, xy - support_origin)
-                        if on_support else xy - center_xy)
+            relative = np.linalg.solve(seat_axes, xy - seat_origin)
             if np.any(np.abs(relative) > physical_limit + 1e-9):
                 return False
             return (seat_allowed is None or seat_allowed(xy)) and self.seat_clear_of_occupants(xy)
@@ -785,14 +789,14 @@ class _Grounding:
             anchor = center_xy
         if acceptable(anchor):
             return anchor
-        limit = physical_limit if on_support else self.usable_half_xy() - mine
+        limit = (physical_limit if on_support else
+                 np.maximum(region_half - REGION_WALL_ALLOWANCE_M, 0.) - footprint)
         if np.any(limit < -1e-9):
             return None
         limit = np.maximum(limit, 0.)
         xs = np.arange(-limit[0], limit[0] + 1e-9, FREE_SPOT_GRID_M)
         ys = np.arange(-limit[1], limit[1] + 1e-9, FREE_SPOT_GRID_M)
-        origin = support_origin if on_support else center_xy
-        candidates = [origin + support_axes @ np.array([dx, dy])
+        candidates = [seat_origin + seat_axes @ np.array([dx, dy])
                       for dx in xs for dy in ys]
         for xy in sorted(candidates, key=lambda xy: float(np.sum((xy - anchor) ** 2))):
             if acceptable(xy):
