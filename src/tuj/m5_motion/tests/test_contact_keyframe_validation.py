@@ -1180,3 +1180,83 @@ def test_contact_sweep_keyframe_types_map_to_segments() -> None:
     assert _segment_type(KeyframeType.CONTACT_SWEEP) is SegmentType.TRANSFER
     assert _segment_type(KeyframeType.CONTACT_END) is SegmentType.TRANSFER
     assert _segment_type(KeyframeType.RETREAT) is SegmentType.RETREAT
+
+
+def test_held_tool_height_uses_rotated_attachment_and_asymmetric_collision_points():
+    from scipy.spatial.transform import Rotation
+    from tuj.m5_motion.contact_keyframe_validation import _held_tool_below_tcp_m
+    request = _sweep_request()
+    request.world.robot_state.attached_object_id = 'tool_pusher'
+    eef_rotation = Rotation.from_euler('xyz',[175,4,30],degrees=True)
+    request.world.robot_state.eef_pose.orientation_xyzw = tuple(eef_rotation.as_quat())
+    attachment_rotation = Rotation.from_euler('xyz',[7,28,-13],degrees=True)
+    translation = np.array([.012,-.018,.025])
+    points = np.array([[-.025,-.02,-.004],[.06,-.015,-.003],[.055,.035,.008],[-.018,.027,.011]])
+    request.world.objects['tool_pusher']['collision_points_m'] = points.tolist()
+    request.world.metadata['attached_object_transforms'] = {'tool_pusher':{
+        'object_id':'tool_pusher','free_joint_name':'tool_joint','reference_kind':'site','reference_name':'grip_site',
+        'position_in_reference_m':translation.tolist(),
+        'orientation_in_reference_xyzw':attachment_rotation.as_quat().tolist(),
+    }}
+    expected = -np.min(((points @ attachment_rotation.as_matrix().T)+translation) @ eef_rotation.as_matrix()[2])
+    assert _held_tool_below_tcp_m(request) == pytest.approx(expected)
+    # A compliant body's observed drift must not change the compiler's geometry.
+    request.world.objects['tool_pusher']['pose']['position_m'][2] += .028
+    request.world.objects['tool_pusher']['pose']['orientation_xyzw'] = [0,0,0,1]
+    assert _held_tool_below_tcp_m(request) == pytest.approx(expected)
+
+
+def test_thin_sweep_targets_cannot_lower_tool_below_existing_collision_margin():
+    from tuj.m5_motion.contact_keyframe_validation import (
+        _contact_engagement_tcp_z_m, _held_tool_below_tcp_m,
+    )
+    request = _sweep_request()
+    request.world.objects['block_a'] = _object((-.1,.05,.8035), dimensions=(.02,.02,.007))
+    request.constraints.collision_margin_m = .006
+    height = _contact_engagement_tcp_z_m(request)
+    assert height - _held_tool_below_tcp_m(request) == pytest.approx(.806)
+    # Raising above an even shorter target would silently lose native contact.
+    request.world.objects['block_a'] = _object((-.1,.05,.802), dimensions=(.02,.02,.004))
+    with pytest.raises(ContactKeyframeGeometryError, match='support collision clearance'):
+        _contact_engagement_tcp_z_m(request)
+
+
+def test_contact_height_matches_each_candidate_attitude_after_lateral_retarget():
+    from scipy.spatial.transform import Rotation
+    from tuj.m5_motion.contact_keyframe_validation import canonicalize_sweep_strategy_heights
+    request = _sweep_request()
+    request.world.robot_state.attached_object_id = 'tool_pusher'
+    live_rotation = Rotation.from_euler('xyz', [160, 14, 20], degrees=True)
+    request.world.robot_state.eef_pose.orientation_xyzw = tuple(live_rotation.as_quat())
+    grasp_rotation = Rotation.from_euler('xyz', [7, 28, -13], degrees=True)
+    translation = np.array([.012, -.018, .025])
+    points = np.array([[-.025, -.02, -.004], [.06, -.015, -.003],
+                       [.055, .035, .008], [-.018, .027, .011]])
+    request.world.objects['tool_pusher']['collision_points_m'] = points.tolist()
+    request.world.metadata['attached_object_transforms'] = {'tool_pusher': {
+        'object_id': 'tool_pusher', 'free_joint_name': 'tool_joint',
+        'reference_kind': 'site', 'reference_name': 'grip_site',
+        'position_in_reference_m': translation.tolist(),
+        'orientation_in_reference_xyzw': grasp_rotation.as_quat().tolist(),
+    }}
+    keyframes = _valid_sweep_sequence()
+    for keyframe, roll in zip(keyframes, [0., 0., .8, -.5, 0.]):
+        keyframe.roll_rad = roll
+    corrected = canonicalize_sweep_strategy_heights(request, keyframes)
+    resolver = RelativePoseResolver(request.world)
+    tcp_heights = []
+    for keyframe in corrected:
+        if keyframe.keyframe_type not in {KeyframeType.CONTACT_START,
+                                         KeyframeType.CONTACT_SWEEP,
+                                         KeyframeType.CONTACT_END}:
+            continue
+        pose = resolver.resolve(keyframe)
+        rotation = Rotation.from_quat(pose.orientation_xyzw).as_matrix()
+        expected_rotation = (live_rotation * Rotation.from_euler('z', keyframe.roll_rad)).as_matrix()
+        assert rotation == pytest.approx(expected_rotation)
+        world_points = ((points @ grasp_rotation.as_matrix().T) + translation) @ rotation.T + pose.position_m
+        assert np.min(world_points[:, 2]) == pytest.approx(.8575)
+        validate_resolved_contact_keyframe(request, keyframe, pose)
+        tcp_heights.append(pose.position_m[2])
+    assert max(tcp_heights) - min(tcp_heights) > .002
+    validate_sweep_keyframe_strategy(request, corrected)

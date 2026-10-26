@@ -174,7 +174,7 @@ def validate_resolved_contact_keyframe(
 
     _reject_world_origin_pose(keyframe, position)
     _reject_below_support(request, keyframe, position)
-    _reject_contact_height_band(request, keyframe, position)
+    _reject_contact_height_band(request, keyframe, position, pose.orientation_xyzw)
     _reject_inverted_held_tool_orientation(request, keyframe, pose)
     _reject_outside_workspace(request, keyframe, position)
     _reject_task_unrelated(request, keyframe, position)
@@ -412,6 +412,7 @@ def _reject_contact_height_band(
     request: MotionPlanRequest,
     keyframe: RelativeKeyframeSpec,
     position: np.ndarray,
+    eef_orientation_xyzw: Sequence[float],
 ) -> None:
     """Keep CONTACT_* TCP near held-tool ↔ target engagement height.
 
@@ -422,7 +423,7 @@ def _reject_contact_height_band(
 
     if keyframe.keyframe_type not in _CONTACT_PHASE_TYPES:
         return
-    limits = _contact_tcp_height_limits_m(request)
+    limits = _contact_tcp_height_limits_m(request, eef_orientation_xyzw=eef_orientation_xyzw)
     if limits is None:
         return
     floor_z, ceiling_z = limits
@@ -437,10 +438,50 @@ def _reject_contact_height_band(
         )
 
 
-def _held_tool_below_tcp_m(request: MotionPlanRequest) -> float:
-    """Vertical extent from live TCP down to the held-tool underside."""
+def _held_tool_below_tcp_m(
+    request: MotionPlanRequest, *, eef_orientation_xyzw: Sequence[float] | None = None
+) -> float:
+    """TCP-to-tool underside using the compiler's captured grasp transform.
+
+    A compliant weld's observed pose can drift from its planning attachment.
+    Mixing that live bottom-center anchor with the compiler's fixed transform
+    gives a different clearance. Project the same body collision points through
+    the same transform as the compiler; execution still checks real geometry.
+    """
 
     eef = request.world.robot_state.eef_pose
+    if eef is not None:
+        from .attachment_retarget import attachment_transform
+
+        eef_rotation = _quaternion_matrix_xyzw(
+            eef.orientation_xyzw if eef_orientation_xyzw is None else eef_orientation_xyzw
+        )
+        for object_id in sorted(_held_object_ids(request)):
+            state = request.world.robot_state
+            key = ("attached_object_transforms" if state.attached_object_id == object_id
+                   else "contact_friction_held_objects")
+            if not request.world.metadata.get(key):
+                continue
+            record = request.world.objects.get(object_id)
+            if not isinstance(record, Mapping):
+                continue
+            grasp = attachment_transform(request.world, object_id)
+            body_in_tcp = _quaternion_matrix_xyzw(grasp.orientation_in_reference_xyzw)
+            points = np.asarray(record.get("collision_points_m", []), dtype=float)
+            if (points.ndim != 2 or points.shape[1:] != (3,) or len(points) < 4
+                    or not np.isfinite(points).all()):
+                dims = _finite_vector(record.get("dimensions_m"), 3)
+                if dims is None or np.any(dims <= 0.):
+                    continue
+                center = _finite_vector(record.get("anchors", {}).get("center"), 3)
+                center = np.zeros(3) if center is None else center
+                from itertools import product
+                points = center + np.asarray(list(product((-1., 1.), repeat=3))) * dims / 2.
+            points_in_tcp = (points @ body_in_tcp.T
+                             + np.asarray(grasp.position_in_reference_m))
+            below = -float(np.min(points_in_tcp @ eef_rotation[2]))
+            if abs(below) <= _HELD_TOOL_BELOW_TCP_MAX_M:
+                return below
     if eef is not None:
         eef_z = float(eef.position_m[2])
         if math.isfinite(eef_z):
@@ -544,7 +585,9 @@ def _sweep_engagement_press_m(request: MotionPlanRequest) -> float:
     return max(0.0, press)
 
 
-def _contact_engagement_tcp_z_m(request: MotionPlanRequest) -> float | None:
+def _contact_engagement_tcp_z_m(
+    request: MotionPlanRequest, *, eef_orientation_xyzw: Sequence[float] | None = None
+) -> float | None:
     """TCP z for held-tool sweep engagement.
 
     Shallow underside press into target tops. Hollow dishes rely on a temporary
@@ -553,17 +596,24 @@ def _contact_engagement_tcp_z_m(request: MotionPlanRequest) -> float | None:
     the dish mesh).
     """
 
-    tool_below = _held_tool_below_tcp_m(request)
+    tool_below = _held_tool_below_tcp_m(request, eef_orientation_xyzw=eef_orientation_xyzw)
     target_top = _sweep_target_top_z_m(request)
     support_z = _support_surface_z_m(request)
     press = _sweep_engagement_press_m(request)
     if target_top is not None:
         if support_z is not None:
+            support_clearance = max(float(_CONTACT_SWEEP_SUPPORT_CLEARANCE_M),
+                                    float(request.constraints.collision_margin_m))
+            if float(target_top) < float(support_z) + support_clearance - 1e-9:
+                raise ContactKeyframeGeometryError(
+                    "sweep target top is below the required support collision clearance"
+                )
             max_press = max(
                 0.0,
                 float(target_top)
                 - float(support_z)
-                - float(_CONTACT_SWEEP_SUPPORT_CLEARANCE_M),
+                - max(float(_CONTACT_SWEEP_SUPPORT_CLEARANCE_M),
+                      float(request.constraints.collision_margin_m)),
             )
             press = min(press, max_press)
         return float(target_top + tool_below - press)
@@ -575,11 +625,11 @@ def _contact_engagement_tcp_z_m(request: MotionPlanRequest) -> float | None:
 
 
 def _contact_tcp_height_limits_m(
-    request: MotionPlanRequest,
+    request: MotionPlanRequest, *, eef_orientation_xyzw: Sequence[float] | None = None
 ) -> tuple[float, float] | None:
-    tool_below = _held_tool_below_tcp_m(request)
+    tool_below = _held_tool_below_tcp_m(request, eef_orientation_xyzw=eef_orientation_xyzw)
     support_z = _support_surface_z_m(request)
-    engagement = _contact_engagement_tcp_z_m(request)
+    engagement = _contact_engagement_tcp_z_m(request, eef_orientation_xyzw=eef_orientation_xyzw)
     if engagement is None and support_z is None:
         return None
     if engagement is None:
@@ -598,6 +648,7 @@ def _contact_tcp_height_limits_m(
             if _sweep_target_top_z_m(request) is not None
             else _CONTACT_TOOL_ABOVE_SUPPORT_CLEARANCE_M
         )
+        clearance = max(clearance, float(request.constraints.collision_margin_m))
         support_floor = support_z + tool_below + clearance
         floor_z = max(floor_z, support_floor)
         ceiling_z = max(ceiling_z, support_floor + 0.02)
@@ -605,9 +656,10 @@ def _contact_tcp_height_limits_m(
 
 
 def _contact_target_z_m(
-    request: MotionPlanRequest, floor_z: float, ceiling_z: float
+    request: MotionPlanRequest, floor_z: float, ceiling_z: float,
+    *, eef_orientation_xyzw: Sequence[float] | None = None
 ) -> float:
-    engagement = _contact_engagement_tcp_z_m(request)
+    engagement = _contact_engagement_tcp_z_m(request, eef_orientation_xyzw=eef_orientation_xyzw)
     if engagement is not None and math.isfinite(engagement):
         return float(min(max(engagement, floor_z), ceiling_z))
     return float(floor_z)
@@ -649,11 +701,16 @@ def canonicalize_contact_tcp_height(
     ceiling_z: float | None
     target_z: float
     if keyframe.keyframe_type in _CONTACT_PHASE_TYPES:
-        limits = _contact_tcp_height_limits_m(request)
+        packing = _live_held_tool_packing_xyzw(
+            request, roll_rad=float(keyframe.roll_rad or 0.0)
+        )
+        limits = _contact_tcp_height_limits_m(request, eef_orientation_xyzw=packing)
         if limits is None:
             return keyframe
         floor_z, ceiling_z = limits
-        target_z = _contact_target_z_m(request, floor_z, ceiling_z)
+        target_z = _contact_target_z_m(
+            request, floor_z, ceiling_z, eef_orientation_xyzw=packing
+        )
     else:
         hover_floor = _hover_working_floor_z_m(request)
         if hover_floor is None:
@@ -882,9 +939,14 @@ def canonicalize_sweep_strategy_heights(
     result = canonicalize_sweep_lateral_toward_region(
         request, result, resolver=active_resolver
     )
+    # Lateral retargeting uses one shared height. Recompute each contact height
+    # after its final attitude is bound, since local roll changes the underside
+    # of an asymmetric tool whenever the EEF is tilted.
     return [
-        canonicalize_held_tool_orientation_for_contact(
-            request, keyframe, resolver=active_resolver
+        canonicalize_contact_tcp_height(
+            request, canonicalize_held_tool_orientation_for_contact(
+                request, keyframe, resolver=active_resolver
+            ), resolver=active_resolver
         )
         for keyframe in result
     ]
@@ -984,7 +1046,11 @@ def canonicalize_sweep_contact_start_over_targets(
     if float(np.linalg.norm(start_xy - desired_xy)) < _CONTACT_START_CENTROID_SNAP_M:
         return list(keyframes)
 
-    engagement = _contact_engagement_tcp_z_m(request)
+    engagement = _contact_engagement_tcp_z_m(
+        request, eef_orientation_xyzw=_live_held_tool_packing_xyzw(
+            request, roll_rad=float(keyframes[start_index].roll_rad or 0.0)
+        )
+    )
     start_z = (
         float(engagement)
         if engagement is not None
@@ -1109,7 +1175,11 @@ def canonicalize_sweep_lateral_toward_region(
     except GeometryResolutionError:
         return list(keyframes)
     end_xy = np.asarray(end_pose.position_m[:2], dtype=float)
-    engagement = _contact_engagement_tcp_z_m(request)
+    engagement = _contact_engagement_tcp_z_m(
+        request, eef_orientation_xyzw=_live_held_tool_packing_xyzw(
+            request, roll_rad=float(keyframes[start_index].roll_rad or 0.0)
+        )
+    )
     contact_z = (
         float(engagement) if engagement is not None else float(start_z)
     )
