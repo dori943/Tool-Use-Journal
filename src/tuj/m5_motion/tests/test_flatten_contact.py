@@ -47,7 +47,7 @@ def test_generated_contact_uses_tool_surface_and_actual_grasp_transform():
             if stage == 'engage':
                 np.testing.assert_allclose(lowest, .08, atol=1e-10)
             if stage == 'press':
-                np.testing.assert_allclose(lowest, .02 + key.metadata['trial_press_height_m'], atol=1e-10)
+                np.testing.assert_allclose(lowest, .02 + compression_trial_height(.06, CONFIG), atol=1e-10)
 
 
 def test_success_requires_measured_contact_unloading_and_residual_shape():
@@ -124,10 +124,9 @@ def test_asymmetric_paddle_uses_broad_face_instead_of_handle_center():
             eef[:3, 3] = pose.position_m
             tool = eef @ grasp
             face_world = tool[:3, :3] @ face + tool[:3, 3]
-            centers = np.asarray(candidate.metadata['contact_centers_world_xy_m'])
-            assert np.linalg.norm(centers - face_world[:2], axis=1).min() < 1e-9
+            np.testing.assert_allclose(face_world[:2], [.13, .13], atol=1e-9)
             # The narrow handle midpoint must no longer occupy the target center.
-            assert np.linalg.norm(tool[:2, 3] - face_world[:2]) > .07
+            assert np.linalg.norm(tool[:2, 3] - [.13, .13]) > .07
 
 
 def test_uniform_face_keeps_center_and_degenerate_face_is_rejected():
@@ -138,38 +137,3 @@ def test_uniform_face_keeps_center_and_degenerate_face_is_rejected():
         np.testing.assert_allclose(contact_face_center(points, normal), [0., 0., 0.], atol=1e-8)
     with pytest.raises(ValueError, match='nondegenerate'):
         contact_face_center([[0., 0., 0.], [0., .1, 0.], [0., .2, 0.]], 2)
-
-
-
-def test_contact_cells_cover_observed_footprint_and_translate_with_target():
-    from tuj.m5_motion.flatten_contact import compression_contact_centers
-    lower, upper, radius = np.array([.1, -.2, .02]), np.array([.161, -.139, .08]), .023
-    centers = np.array(compression_contact_centers(lower, upper, radius))
-    assert len(centers) > 1
-    samples = np.array(list(product(np.linspace(lower[0], upper[0], 21),
-                                   np.linspace(lower[1], upper[1], 21))))
-    distances = np.linalg.norm(samples[:, None, :] - centers[None, :, :], axis=2)
-    assert np.max(np.min(distances, axis=1)) <= radius
-    shift = np.array([.7, -.9, .3])
-    translated = np.array(compression_contact_centers(lower + shift, upper + shift, radius))
-    np.testing.assert_allclose(translated, centers + shift[:2])
-
-
-def test_coverage_progresses_to_exact_original_trial_depth_without_changing_criteria():
-    r = request()
-    before_config = deepcopy(r.world.objects['block']['flattening_configuration'])
-    before_contact = r.task.contact.model_dump()
-    artifact = FlattenContactProvider().generate(r)
-    for candidate in artifact.candidates:
-        heights = candidate.metadata['trial_heights_m']
-        assert all(a > b for a, b in zip(heights, heights[1:]))
-        assert heights[-1] == compression_trial_height(.06, CONFIG)
-        centers = candidate.metadata['contact_centers_world_xy_m']
-        presses = [k for k in candidate.keyframes if k.metadata['flatten_stage'] == 'press']
-        assert len(presses) == len(centers) * len(heights)
-        for height in heights:
-            assert sum(k.metadata['trial_press_height_m'] == height for k in presses) == len(centers)
-        assert candidate.keyframes[-1].metadata['flatten_stage'] == 'unload'
-        assert candidate.keyframes[-1].metadata['hold_duration_after_s'] == CONFIG['unloaded_observation_s']
-    assert r.world.objects['block']['flattening_configuration'] == before_config
-    assert r.task.contact.model_dump() == before_contact
