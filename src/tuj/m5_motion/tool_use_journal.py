@@ -24,6 +24,7 @@ import sys
 import xml.etree.ElementTree as ET
 from collections.abc import Callable, Iterable, Mapping, Sequence
 from dataclasses import dataclass
+from itertools import product
 from pathlib import Path
 from typing import Any
 
@@ -400,6 +401,10 @@ def _object_record(
         }
     if collision_points is not None:
         record["collision_points_m"] = collision_points.tolist()
+    triangles = _body_local_collision_triangles(model, data, body_id, collision_ids)
+    if triangles is not None:
+        record["collision_surface_triangles_m"] = triangles.tolist()
+        record["collision_surface_source"] = "COMPILED_MUJOCO_COLLISION_FACES"
     if len(collision_ids) == 1 and model.geom_type[collision_ids[0]] == mujoco.mjtGeom.mjGEOM_BOX:
         gid = collision_ids[0]
         body_rotation = data.xmat[body_id].reshape(3, 3)
@@ -419,6 +424,30 @@ def _object_record(
         record["free_joint_name"] = free_joints[0]
     record["object_id"] = object_id
     return record
+
+
+def _body_local_collision_triangles(model, data, body_id, geom_ids):
+    """Measured mesh/box faces, without bridging separate collision geoms."""
+    triangles = []
+    body_rotation = data.xmat[body_id].reshape(3, 3)
+    for gid in geom_ids:
+        if model.geom_type[gid] == mujoco.mjtGeom.mjGEOM_MESH:
+            mesh = int(model.geom_dataid[gid])
+            start, count = int(model.mesh_faceadr[mesh]), int(model.mesh_facenum[mesh])
+            faces = np.asarray(model.mesh_face[start:start + count], dtype=int)
+            local = _geom_local_points(model, gid)[faces]
+        elif model.geom_type[gid] == mujoco.mjtGeom.mjGEOM_BOX:
+            corners = np.asarray(list(product((-1., 1.), repeat=3))) * model.geom_size[gid]
+            quads = ((0, 1, 3, 2), (4, 6, 7, 5), (0, 4, 5, 1),
+                     (2, 3, 7, 6), (0, 2, 6, 4), (1, 5, 7, 3))
+            local = np.asarray([corners[list(face)] for a, b, c, d in quads
+                                for face in ((a, b, c), (a, c, d))])
+        else:
+            continue
+        geom_rotation = data.geom_xmat[gid].reshape(3, 3)
+        world = local @ geom_rotation.T + data.geom_xpos[gid]
+        triangles.append((world - data.xpos[body_id]) @ body_rotation)
+    return np.concatenate(triangles) if triangles else None
 
 
 def _declared_current_ee(env: object) -> str | None:

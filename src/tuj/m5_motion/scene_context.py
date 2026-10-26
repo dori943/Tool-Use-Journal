@@ -12,7 +12,8 @@ def spatial_record(record, *, rack=False):
     """Keep semantic facts, replace dense local meshes with world-space bounds."""
     if not isinstance(record, Mapping):
         return record
-    result = {key: value for key, value in record.items() if key != "collision_points_m"}
+    result = {key: value for key, value in record.items()
+              if key not in {"collision_points_m", "collision_surface_triangles_m"}}
     try:
         position, rotation = _pose_from_record(record, rack=rack)
         if not np.all(np.isfinite(position)):

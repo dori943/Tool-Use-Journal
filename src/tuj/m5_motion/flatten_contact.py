@@ -91,6 +91,39 @@ def contact_face_center(points, normal_axis):
     return center
 
 
+def measured_contact_face(triangles, center, normal_axis, side):
+    """Intersect the proposed patch with an actual collision face on one side.
+
+    A projected hull may bridge a gap between components. Only a triangle
+    containing the patch center can supply its height and normal; a hull alone
+    cannot certify either. Face winding is irrelevant to the outward side.
+    """
+    axes = [axis for axis in range(3) if axis != normal_axis]
+    hits = []
+    for triangle in triangles:
+        edges = triangle[1:] - triangle[0]
+        projected = edges[:, axes].T
+        area = abs(float(np.linalg.det(projected)))
+        if area <= 64 * np.finfo(float).eps:
+            continue
+        coordinates = np.linalg.solve(projected, center[axes] - triangle[0, axes])
+        barycentric = np.r_[1. - coordinates.sum(), coordinates]
+        if np.min(barycentric) < -1e-9:
+            continue
+        point = barycentric @ triangle
+        normal = np.cross(edges[0], edges[1])
+        normal /= np.linalg.norm(normal)
+        if normal[normal_axis] * side < 0:
+            normal *= -1
+        hits.append((point, normal, area))
+    if not hits:
+        raise ValueError('flatten patch has no measured collision face')
+    outer = max(side * point[normal_axis] for point, _, _ in hits)
+    hits = [hit for hit in hits if outer - side * hit[0][normal_axis] <= 1e-9]
+    point, normal, _ = max(hits, key=lambda hit: (hit[2], *hit[1]))
+    return point, normal
+
+
 class FlattenContactProvider:
     def generate(self, request):
         task, world = request.task, request.world
@@ -103,25 +136,30 @@ class FlattenContactProvider:
         grasp = _matrix({'position_m': attachment['position_in_reference_m'],
                          'orientation_xyzw': attachment['orientation_in_reference_xyzw']})
         points = np.asarray(tool['collision_points_m'], dtype=float)
-        if points.ndim != 2 or points.shape[1] != 3 or not np.isfinite(points).all():
+        if points.ndim != 2 or points.shape[1] != 3 or not len(points) or not np.isfinite(points).all():
             raise ValueError('finite observed tool collision points required')
+        triangles = np.asarray(tool.get('collision_surface_triangles_m'), dtype=float)
+        if (tool.get('collision_surface_source') != 'COMPILED_MUJOCO_COLLISION_FACES'
+                or triangles.ndim != 3 or triangles.shape[1:] != (3, 3)
+                or not len(triangles) or not np.isfinite(triangles).all()):
+            raise ValueError('flatten requires measured collision surface triangles')
         size = np.ptp(points, axis=0)
         long_axis = int(np.argmax(size))
         normal_axis = min((i for i in range(3) if i != long_axis), key=lambda i: size[i])
-        other = next(i for i in range(3) if i not in (long_axis, normal_axis))
         center = contact_face_center(points, normal_axis)
         current = _matrix(tool['pose'])[:3, :3]
         rotations = []
         for direction in ([1., 0., 0.], [-1., 0., 0.], [0., 1., 0.], [0., -1., 0.]):
             for sign in (-1., 1.):
-                rotation = np.zeros((3, 3))
-                rotation[:, long_axis] = direction
-                rotation[:, normal_axis] = [0., 0., sign]
-                rotation[:, other] = np.cross(rotation[:, long_axis], rotation[:, normal_axis])
-                if np.linalg.det(rotation) < 0:
-                    rotation[:, other] *= -1
-                rotations.append(rotation)
-        rotations.sort(key=lambda r: Rotation.from_matrix(current.T @ r).magnitude())
+                face, normal = measured_contact_face(triangles, center, normal_axis, sign)
+                along = np.eye(3)[long_axis] - normal[long_axis] * normal
+                along /= np.linalg.norm(along)
+                local_basis = np.column_stack((along, np.cross(normal, along), normal))
+                down = np.array([0., 0., -1.])
+                world_basis = np.column_stack((direction, np.cross(down, direction), down))
+                rotation = world_basis @ local_basis.T
+                rotations.append((rotation, face, normal))
+        rotations.sort(key=lambda item: Rotation.from_matrix(current.T @ item[0]).magnitude())
         lower, upper = np.array(metrics['bounds_min_m']), np.array(metrics['bounds_max_m'])
         target_center = (lower + upper) / 2
         compressed_height = compression_trial_height(metrics['initial_height_m'], config)
@@ -130,16 +168,18 @@ class FlattenContactProvider:
             raise ValueError('compression trial would violate support clearance')
         digest = hashlib.sha256(request.model_dump_json().encode()).hexdigest()
         candidates = []
-        for index, rotation in enumerate(rotations[:4]):
-            lowest = float(np.min((points - center) @ rotation[2, :]))
+        for index, (rotation, face, normal) in enumerate(rotations[:4]):
+            legacy_up = np.eye(3)[normal_axis] * -np.sign(normal[normal_axis])
+            legacy_height_error = float((face - center) @ legacy_up
+                - np.min((points - center) @ legacy_up))
             hover = upper[2] + max(size) + margin
             keys = []
             for stage, work_z in [('hover', hover), ('engage', upper[2]),
                                   ('press', lower[2] + compressed_height), ('unload', hover)]:
                 tool_pose = np.eye(4)
                 tool_pose[:3, :3] = rotation
-                contact_center = np.array([target_center[0], target_center[1], work_z - lowest])
-                tool_pose[:3, 3] = contact_center - rotation @ center
+                contact_center = np.array([target_center[0], target_center[1], work_z])
+                tool_pose[:3, 3] = contact_center - rotation @ face
                 eef = tool_pose @ np.linalg.inv(grasp)
                 frame = f'flatten-frame:{digest[:12]}:{index}:{stage}'
                 world.objects[frame] = {'pose': {'frame_id': 'world',
@@ -158,9 +198,12 @@ class FlattenContactProvider:
             candidates.append(KeyframePlanCandidate(strategy_id=f'flatten:{index}', keyframes=keys,
                 rationale='Measured tool geometry and actual grasp transform; trial depth from constitutive model.',
                 provenance=StrategyGenerationProvenance(generator_kind='TASK_GEOMETRY',
-                    generator_id='CONTACT_COMPRESSION_V2', input_hash=digest, attempt_index=1),
+                    generator_id='CONTACT_COMPRESSION_V3', input_hash=digest, attempt_index=1),
                 metadata={'trial_compressed_height_m': compressed_height, 'target_id': target_id,
-                          'contact_face_center_local_m': center.tolist()}))
+                          'contact_face_center_local_m': face.tolist(),
+                          'contact_face_normal_local': normal.tolist(),
+                          'contact_face_source': tool['collision_surface_source'],
+                          'legacy_contact_face_height_error_m': legacy_height_error}))
         return KeyframePlanArtifact(artifact_id='flatten:' + digest[:20],
             provenance=ArtifactProvenance(artifact_id='flatten-artifact:' + digest[:20],
                 artifact_type='KeyframePlanArtifact', produced_by='MOTION_PLANNER', invocation_id=digest[:20],
