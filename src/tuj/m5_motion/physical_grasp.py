@@ -434,6 +434,8 @@ class ContactFrictionKeyframeProvider:
 
     def generate(self, request: MotionPlanRequest) -> KeyframePlanArtifact:
         artifact = self._provider.generate(request)
+        from tuj.m5_motion.scene_tool_grasp import bind_scene_tool_contact
+        artifact = bind_scene_tool_contact(artifact, request)
         from tuj.m5_motion.grasp_geometry import (
             bind_acquire_world_contact_frames,
             bind_grasp_geometry,
