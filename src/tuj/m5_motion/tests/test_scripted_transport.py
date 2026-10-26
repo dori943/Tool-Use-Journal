@@ -1153,8 +1153,43 @@ def test_support_overhang_permission_requires_matching_explicit_plan(field, bad)
 def test_explicit_on_still_rejects_unsupported_center_and_occupied_support():
     request, oid, g = _overhanging_support_grounding()
     request.task.action_type = 'place_on'
-    g._slot_xy = lambda: g.region_world[:2] + [.05, 0.]
-    assert g._free_destination_xy(None) is None
+    outside = g.region_world[:2] + [.05, 0.]
+    g._slot_xy = lambda: outside
+    selected = g._free_destination_xy(None)
+    assert selected is not None and not np.allclose(selected, outside)
+    assert np.all(np.abs(selected-g.region_world[:2]) <= [.035+1e-9, .02+1e-9])
     g._slot_xy = lambda: g.region_world[:2]
     g._occupant_cache = [(g.region_world[:2], [.02, .02], 1., False)]
     assert g._free_destination_xy(None) is None
+
+
+def test_on_support_rejects_rotated_world_aabb_corner():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request, oid, _ = _overhanging_support_grounding()
+    request.task.action_type = 'place_on'
+    record = request.world.objects['tray']
+    record['dimensions_m'] = [.2, .05, .003]
+    rotation = Rotation.from_euler('z', 45, degrees=True).as_matrix()
+    record['pose']['orientation_xyzw'] = Rotation.from_matrix(rotation).as_quat().tolist()
+    g = _Grounding(request, None, oid)
+    outside = g.region_world[:2] + [.06, -.06]
+    assert np.all(np.abs(outside-g.region_world[:2]) < g.region_half[:2])
+    g._slot_xy = lambda: outside
+    chosen = g._free_destination_xy(None)
+    assert chosen is not None and not np.allclose(chosen, outside)
+    local = rotation[:2, :2].T @ (chosen-g.region_world[:2])
+    assert np.all(np.abs(local) <= np.array([.1, .025])-.005+1e-9)
+
+
+def test_on_support_search_can_find_clear_center_for_overhanging_layer():
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+    request, oid, _ = _overhanging_support_grounding()
+    request.task.action_type = 'place_on'
+    request.world.objects['tray']['dimensions_m'] = [.2, .05, .003]
+    g = _Grounding(request, None, oid)
+    g._occupant_cache = [(g.region_world[:2], [.005, .005], 1., False)]
+    assert not g.seat_clear_of_occupants(g.region_world[:2])
+    assert np.any(g.usable_half_xy()-g.half[:2] < 0.)
+    chosen = g._free_destination_xy(None)
+    assert chosen is not None and g.seat_clear_of_occupants(chosen)
+    assert abs(chosen[0]-g.region_world[0]) > .04
