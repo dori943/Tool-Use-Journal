@@ -34,7 +34,7 @@ from tuj.m5_motion.tool_use_journal_runtime import (
 
 
 CHECKPOINT_FORMAT = "tuj-m5-runtime-checkpoint"
-CHECKPOINT_VERSION = 1
+CHECKPOINT_VERSION = 2
 MODEL_SIGNATURE_KIND = "tuj-m5-model-topology-v1"
 
 
@@ -104,6 +104,60 @@ def _model_signature(runtime: ToolUseJournalEERuntime) -> str:
     return hashlib.sha256(encoded.encode("utf-8")).hexdigest()
 
 
+def _gripper_control_bindings(runtime: ToolUseJournalEERuntime):
+    """Identify action-formatting hands independently of optional hold overrides."""
+    bindings = []
+    for robot_index, robot in enumerate(getattr(runtime.env, "robots", ())):
+        for arm, gripper in sorted(getattr(robot, "gripper", {}).items()):
+            if not callable(getattr(gripper, "format_action", None)):
+                continue
+            identity = {
+                "robot_index": robot_index,
+                "arm": str(arm),
+                "gripper_class": type(gripper).__module__ + "." + type(gripper).__qualname__,
+                "action_is_absolute": bool(getattr(gripper, "action_is_absolute", False)),
+                "dof": int(gripper.dof),
+                "actuator_names": list(gripper.actuators),
+            }
+            bindings.append((identity, gripper))
+    return bindings
+
+
+def _gripper_action_vector(value: object, identity: Mapping[str, Any]) -> np.ndarray:
+    try:
+        action = np.asarray(value, dtype=float)
+        # Robotiq85 starts with one input DOF and expands to two actuator
+        # targets on its first format_action call. Both are valid live states.
+        widths = {identity["dof"], len(identity["actuator_names"])}
+        if action.ndim != 1 or action.size not in widths or not np.isfinite(action).all():
+            raise ValueError("invalid action shape or values")
+        return action.copy()
+    except (TypeError, ValueError) as error:
+        raise RuntimeCheckpointError("invalid checkpoint gripper current_action") from error
+
+
+def _capture_gripper_control_state(runtime: ToolUseJournalEERuntime) -> list[dict[str, Any]]:
+    states = []
+    for identity, gripper in _gripper_control_bindings(runtime):
+        action = _gripper_action_vector(getattr(gripper, "current_action", None), identity)
+        states.append({**identity, "current_action": action.tolist()})
+    return states
+
+
+def _gripper_control_updates(runtime: ToolUseJournalEERuntime, raw: object):
+    bindings = _gripper_control_bindings(runtime)
+    if not isinstance(raw, list) or len(raw) != len(bindings):
+        raise RuntimeCheckpointError("checkpoint gripper control state is missing or incompatible")
+    updates = []
+    for entry, (identity, gripper) in zip(raw, bindings):
+        if not isinstance(entry, Mapping) or set(entry) != set(identity) | {"current_action"}:
+            raise RuntimeCheckpointError("invalid checkpoint gripper control state")
+        if any(entry[key] != value for key, value in identity.items()):
+            raise RuntimeCheckpointError("checkpoint gripper controller identity does not match")
+        updates.append((gripper, _gripper_action_vector(entry["current_action"], identity)))
+    return updates
+
+
 def _attachment_payload(attachment: AttachedObjectState | None) -> dict[str, Any] | None:
     if attachment is None:
         return None
@@ -158,7 +212,11 @@ def capture_runtime_checkpoint(
     *,
     progress: Mapping[str, Any] | None = None,
 ) -> dict[str, Any]:
-    """Capture physical and logical state using stable joint/actuator names."""
+    """Capture named state plus the live hand's incremental command state.
+
+    This is not a complete MuJoCo integration-state or controller-history dump.
+    In particular it does not claim bitwise deterministic replay.
+    """
 
     if runtime.attachment is not None and runtime.attachment.mode is AttachmentMode.KINEMATIC:
         runtime.synchronize_attached_object()
@@ -215,6 +273,7 @@ def capture_runtime_checkpoint(
             "breakable_runtime": breakable_state,
             "held_tool_id": runtime.held_tool_id,
         },
+        "gripper_control_state": _capture_gripper_control_state(runtime),
         "progress": dict(progress or {}),
     }
 
@@ -251,6 +310,11 @@ def restore_runtime_checkpoint(
         raise RuntimeCheckpointError("checkpoint root must be an object")
     if payload.get("format") != CHECKPOINT_FORMAT:
         raise RuntimeCheckpointError("unsupported checkpoint format")
+    if payload.get("version") == 1:
+        raise RuntimeCheckpointError(
+            "checkpoint v1 lacks live gripper controller state; equivalent "
+            "continuation is unavailable. Do not infer it from ctrl or qpos."
+        )
     if payload.get("version") != CHECKPOINT_VERSION:
         raise RuntimeCheckpointError(
             f"unsupported checkpoint version {payload.get('version')!r}"
@@ -382,6 +446,14 @@ def restore_runtime_checkpoint(
     if not all(math.isfinite(value) for value in numeric_values):
         raise RuntimeCheckpointError("checkpoint physical state must be finite")
 
+    # Validate the complete hand payload before mutating physical or logical
+    # state. current_action is not captured_gripper_action: the latter is an
+    # optional hold override and can be None during an ordinary closed grasp.
+    gripper_updates = _gripper_control_updates(runtime, payload.get("gripper_control_state"))
+    previous_gripper_actions = [
+        (gripper, np.asarray(gripper.current_action, dtype=float).copy())
+        for gripper, _action in gripper_updates
+    ]
     previous_logical = {
         "gripper_command": runtime._gripper_command,
         "grasp_engaged": runtime._grasp_engaged,
@@ -398,6 +470,8 @@ def restore_runtime_checkpoint(
     }
     try:
         _restore_runtime_state(runtime.env, state)
+        for gripper, action in gripper_updates:
+            gripper.current_action = action.copy()
         runtime.restore_logical_state(
             gripper_command=float(logical.get("gripper_command", -1.0)),
             grasp_engaged=bool(logical.get("grasp_engaged", False)),
@@ -424,6 +498,8 @@ def restore_runtime_checkpoint(
                 f"{rollback_error}"
             ) from error
         finally:
+            for gripper, action in previous_gripper_actions:
+                gripper.current_action = action.copy()
             runtime._gripper_command = previous_logical["gripper_command"]
             runtime._grasp_engaged = previous_logical["grasp_engaged"]
             runtime._captured_gripper_action = previous_logical[
