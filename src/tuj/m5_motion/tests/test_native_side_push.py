@@ -158,3 +158,96 @@ def test_separates_face_normal_approach_when_no_normal_ray_reaches_region():
     assert (engage-start)/np.linalg.norm(engage-start) == pytest.approx(geometry.approach_direction_xy)
     translation=np.array(geometry.target_goal_center_world_m[:2])-np.array(geometry.target_center_world_m[:2])
     assert np.array(geometry.patch_end_xy_m)-engage == pytest.approx(translation)
+
+
+def _occupied_region_request(*, obstacle_center=None, obstacle_size=(.02, .02, .012)):
+    request = _request()
+    target = request.world.objects['block_a']
+    target['pose']['position_m'] = [-.10, 0., .8058]
+    target['pose']['orientation_xyzw'] = [0., 0., 0., 1.]
+    target['dimensions_m'] = [.02, .02, .012]
+    region = request.world.objects['collect_zone']
+    region['pose']['position_m'] = [.20, 0., .801]
+    region['pose']['orientation_xyzw'] = [0., 0., 0., 1.]
+    region['dimensions_m'] = [.20, .20, .001]
+    original = native_side_push_geometry(request, eef_orientation_xyzw=_attitude(request))
+    center = list(original.target_goal_center_world_m) if obstacle_center is None else list(obstacle_center)
+    request.world.objects['already_collected'] = {
+        'pose': {'frame_id': 'world', 'position_m': center, 'orientation_xyzw': [0., 0., 0., 1.]},
+        'dimensions_m': list(obstacle_size), 'collision_enabled': True,
+        'anchors': {'center': [0., 0., 0.]},
+    }
+    return request, original
+
+
+def _minimum_axis_box_sweep_gap(request, geometry):
+    start = np.array(geometry.target_center_world_m[:2])
+    end = np.array(geometry.target_goal_center_world_m[:2])
+    centers = start + np.linspace(0., 1., 1001)[:, None] * (end-start)
+    obstacle = request.world.objects['already_collected']
+    half_sum = (np.array(request.world.objects['block_a']['dimensions_m'][:2])
+                +np.array(obstacle['dimensions_m'][:2]))*.5
+    separation = np.maximum(np.abs(centers-np.array(obstacle['pose']['position_m'][:2]))-half_sum, 0.)
+    return np.linalg.norm(separation, axis=1).min()
+
+
+def test_occupied_goal_uses_free_region_endpoint_and_preserves_existing_object():
+    request, original = _occupied_region_request()
+    before = request.model_dump_json()
+    geometry = native_side_push_geometry(request, eef_orientation_xyzw=_attitude(request))
+    assert not np.allclose(geometry.target_goal_center_world_m, original.target_goal_center_world_m)
+    assert _minimum_axis_box_sweep_gap(request, geometry) >= request.constraints.collision_margin_m
+    assert request.model_dump_json() == before
+    frames = generate_native_side_push_keyframes(request, eef_orientation_xyzw=_attitude(request))
+    again = canonicalize_native_side_push(request, frames)
+    resolver = RelativePoseResolver(request.world)
+    for a, b in zip(frames, again):
+        assert resolver.resolve(a).position_m == pytest.approx(resolver.resolve(b).position_m)
+    assert geometry.contact_tcp_z_m == original.contact_tcp_z_m
+
+
+def test_free_endpoint_also_avoids_obstacle_in_middle_of_target_translation():
+    request, original = _occupied_region_request(obstacle_center=[-.01, 0., .8058])
+    assert _minimum_axis_box_sweep_gap(request, original) == 0.
+    geometry = native_side_push_geometry(request, eef_orientation_xyzw=_attitude(request))
+    assert _minimum_axis_box_sweep_gap(request, geometry) >= request.constraints.collision_margin_m
+
+
+def test_all_finite_target_paths_blocked_reject_without_changing_world():
+    request, _ = _occupied_region_request(obstacle_center=[.04, 0., .8058], obstacle_size=(.04, 1., .012))
+    before = request.model_dump_json()
+    with pytest.raises(ContactKeyframeGeometryError, match='no free nominal target path'):
+        native_side_push_geometry(request, eef_orientation_xyzw=_attitude(request))
+    assert request.model_dump_json() == before
+
+
+def test_occupied_goal_selection_is_equivariant_to_world_yaw_and_translation():
+    request, _ = _occupied_region_request()
+    attitude = _attitude(request)
+    original = native_side_push_geometry(request, eef_orientation_xyzw=attitude)
+    rotation = Rotation.from_euler('z', 43., degrees=True)
+    delta = np.array([.23, -.17, 0.])
+    moved = request.model_copy(deep=True)
+    for record in moved.world.objects.values():
+        if 'pose' not in record:
+            continue
+        pose = record['pose']
+        pose['position_m'] = (rotation.apply(pose['position_m'])+delta).tolist()
+        pose['orientation_xyzw'] = (rotation*Rotation.from_quat(pose['orientation_xyzw'])).as_quat().tolist()
+    eef = moved.world.robot_state.eef_pose
+    eef.position_m = (rotation.apply(eef.position_m)+delta).tolist()
+    eef.orientation_xyzw = (rotation*Rotation.from_quat(eef.orientation_xyzw)).as_quat().tolist()
+    geometry = native_side_push_geometry(moved, eef_orientation_xyzw=(rotation*Rotation.from_quat(attitude)).as_quat())
+    assert geometry.target_goal_center_world_m == pytest.approx(rotation.apply(original.target_goal_center_world_m)+delta)
+
+
+@pytest.mark.parametrize('nonblocking', ['above', 'noncolliding'])
+def test_goal_occupancy_respects_vertical_band_and_collision_semantics(nonblocking):
+    request, original = _occupied_region_request()
+    obstacle = request.world.objects['already_collected']
+    if nonblocking == 'above':
+        obstacle['pose']['position_m'][2] += .20
+    else:
+        obstacle['collision_enabled'] = False
+    geometry = native_side_push_geometry(request, eef_orientation_xyzw=_attitude(request))
+    assert geometry.target_goal_center_world_m == pytest.approx(original.target_goal_center_world_m)

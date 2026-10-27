@@ -111,6 +111,100 @@ def _face_normal_translation(
     return direction, face_center, float(distance)
 
 
+def _convex_xy(points: np.ndarray) -> np.ndarray:
+    try:
+        return points[ConvexHull(points).vertices]
+    except QhullError as error:
+        raise ContactKeyframeGeometryError("side push requires finite nondegenerate obstacle footprints") from error
+
+
+def _convex_polygon_distance(a: np.ndarray, b: np.ndarray) -> float:
+    """Euclidean distance between closed convex XY footprints, including edges."""
+    def cross(p, q):
+        return float(p[0] * q[1] - p[1] * q[0])
+
+    def inside(point, polygon):
+        return all(cross(end-start, point-start) >= -1e-12
+                   for start, end in zip(polygon, np.roll(polygon, -1, axis=0)))
+
+    if inside(a[0], b) or inside(b[0], a):
+        return 0.
+    for start, end in zip(a, np.roll(a, -1, axis=0)):
+        for other_start, other_end in zip(b, np.roll(b, -1, axis=0)):
+            direction, other_direction = end-start, other_end-other_start
+            denominator = cross(direction, other_direction)
+            if abs(denominator) > 1e-12:
+                delta = other_start-start
+                if (-1e-12 <= cross(delta, other_direction)/denominator <= 1.+1e-12
+                        and -1e-12 <= cross(delta, direction)/denominator <= 1.+1e-12):
+                    return 0.
+
+    def point_edge_distance(point, start, end):
+        edge = end-start
+        fraction = np.clip(np.dot(point-start, edge)/np.dot(edge, edge), 0., 1.)
+        return float(np.linalg.norm(point-start-fraction*edge))
+
+    return min(point_edge_distance(point, start, end)
+               for first, second in ((a, b), (b, a)) for point in first
+               for start, end in zip(second, np.roll(second, -1, axis=0)))
+
+
+def _free_nominal_target_goal(
+    request: MotionPlanRequest, *, target_center: np.ndarray,
+    target_points: np.ndarray, original_goal: np.ndarray,
+    region_origin: np.ndarray, region_rotation: np.ndarray,
+    lower: np.ndarray, upper: np.ndarray,
+) -> np.ndarray:
+    """Keep a clear original path; otherwise try nine target-fit region anchors.
+
+    The convex hull of the initial and translated footprints bounds the whole
+    nominal rigid target translation, not just its final position. Obstacles
+    are observed non-target scene objects in the target's vertical band. The
+    region itself is the designated destination surface. This only filters
+    nominal target occupancy: the ordinary compiler must still validate the
+    entire robot and held-tool path using their full collision geometry.
+    """
+    margin = request.constraints.collision_margin_m
+    excluded = {request.task.tool, *request.task.target_ids, request.task.goal.target_region_id}
+    obstacles = []
+    for object_id, record in request.world.objects.items():
+        if object_id in excluded or record.get("collision_enabled") is False:
+            continue
+        try:
+            _, points = _target_points(request, object_id)
+        except (KeyError, TypeError, ValueError) as error:
+            raise ContactKeyframeGeometryError(f"side push obstacle {object_id!r} has no usable observed geometry") from error
+        # Objects above or below the entire target sweep do not occupy its
+        # plane. Keep the unchanged requested clearance in this broad phase.
+        if (points[:, 2].max() < target_points[:, 2].min()-margin
+                or points[:, 2].min() > target_points[:, 2].max()+margin):
+            continue
+        obstacles.append(_convex_xy(points[:, :2]))
+
+    def clear(goal):
+        sweep = _convex_xy(np.vstack((target_points[:, :2],
+            target_points[:, :2]+goal[:2]-target_center[:2])))
+        return all(_convex_polygon_distance(sweep, obstacle) >= margin-1e-9
+                   for obstacle in obstacles)
+
+    if clear(original_goal):
+        return original_goal
+    local = region_rotation.T @ (target_center-region_origin)
+    candidates = []
+    for ix, x in enumerate((0., .5, 1.)):
+        for iy, y in enumerate((0., .5, 1.)):
+            candidate = local.copy()
+            candidate[:2] = lower+(upper-lower)*np.array((x, y))
+            goal = region_origin+region_rotation @ candidate
+            # Rounded distance only breaks numerically equivalent ordering;
+            # no coordinates, fit margins or collision distances are rounded.
+            candidates.append((round(float(np.linalg.norm(goal[:2]-target_center[:2])), 12), ix*3+iy, goal))
+    for _, _, goal in sorted(candidates, key=lambda item: item[:2]):
+        if clear(goal):
+            return goal
+    raise ContactKeyframeGeometryError("side push has no free nominal target path among the original and nine region endpoints")
+
+
 def native_side_push_geometry(
     request: MotionPlanRequest, *, eef_orientation_xyzw: Sequence[float],
     profile: PushPlanningProfile | None = None,
@@ -170,6 +264,15 @@ def native_side_push_geometry(
         translation_kind = "FACE_NORMAL"
     else:
         translation_kind = "FACE_NORMAL_APPROACH_THEN_GOAL_TRANSLATION"
+    free_goal = _free_nominal_target_goal(
+        request, target_center=target_center, target_points=points_world,
+        original_goal=goal_center, region_origin=region_origin,
+        region_rotation=region_rotation, lower=lower, upper=upper)
+    if not np.allclose(free_goal, goal_center, atol=1e-12, rtol=0.):
+        goal_center = free_goal
+        direction = goal_center[:2]-target_center[:2]
+        direction /= np.linalg.norm(direction)
+        translation_kind = "FACE_NORMAL_APPROACH_THEN_FREE_REGION_TRANSLATION"
     projections = patch[:, :2] @ approach_direction
     # Center the actual leading feature, not the whole patch centroid. A
     # skewed patch can put its front vertex far to one side of that centroid.
