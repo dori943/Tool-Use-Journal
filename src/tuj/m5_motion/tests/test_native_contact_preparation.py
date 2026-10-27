@@ -145,3 +145,65 @@ def test_preparation_still_rejects_invalid_ik_states_and_final_collisions():
     assert result.attempts[-1].failure_code=='NO_VALID_IK_BRANCH'
     with pytest.raises(MotionPlanBuildError):
         _build_preparation_plan(final_valid=False)
+
+
+@pytest.mark.parametrize('live_height', [.85, 1.2])
+def test_local_preparation_moves_to_tool_contact_start_hover_without_changing_task(live_height):
+    from tuj.m5_motion import native_contact_preparation as preparation
+    source = _request()
+    source.world.robot_state.eef_pose.position_m = (.31, -.24, live_height)
+    source.constraints.position_tolerance_m = .003
+    source.constraints.orientation_tolerance_rad = .027
+    source.task.metadata.update(ee_capabilities=['multi_finger_contact'], attach_target=True)
+    before = source.model_dump_json(); attitude = _attitude(source)
+    geometry = native_side_push_geometry(source, eef_orientation_xyzw=attitude)
+    prepared, frames = preparation.build_native_contact_local_preparation(source, eef_orientation_xyzw=attitude)
+    poses = [RelativePoseResolver(prepared.world).resolve(f) for f in frames]
+    expected_xy = np.asarray(geometry.patch_start_xy_m) - geometry.working_patch_offset_xy_m
+    expected_z = max(live_height, geometry.hover_tcp_z_m)
+    assert poses[0].position_m == pytest.approx((.31, -.24, expected_z))
+    assert poses[-1].position_m == pytest.approx((*expected_xy, expected_z))
+    assert poses[-1].position_m == pytest.approx(prepared.task.goal.target_pose.position_m)
+    assert Rotation.from_quat(poses[-1].orientation_xyzw).as_matrix() == pytest.approx(Rotation.from_quat(attitude).as_matrix())
+    assert source.model_dump_json() == before
+    assert prepared.world == source.world and prepared.world is not source.world
+    assert prepared.constraints == source.constraints and prepared.options == source.options
+    assert prepared.task.action_type == 'MOVE' and prepared.task.contact is None
+    assert prepared.task.target_ids == prepared.task.allowed_touch_objects == []
+    assert prepared.task.goal.target_region_id is prepared.task.goal.target_object_id is None
+    assert prepared.task.metadata['native_contact_preparation'] is True
+    assert prepared.task.metadata['requires_measured_replanning_after_execution'] is True
+    assert 'attach_target' not in prepared.task.metadata
+    assert frames[-1].metadata['hold_duration_after_s'] == GraspExecutionProfile().hold_duration_s
+    assert frames[-1].metadata['tracking_settle'] == {'eef_tolerance_m': .003, 'eef_orientation_tolerance_rad': .027}
+    assert all(frame.events_after == [] and frame.collision_context_id is None for frame in frames)
+
+
+def test_local_preparation_uses_supplied_observation_and_never_predicts_post_move_world():
+    from tuj.m5_motion import native_contact_preparation as preparation
+    source = _request(); attitude = _attitude(source)
+    first, _ = preparation.build_native_contact_local_preparation(source, eef_orientation_xyzw=attitude)
+    measured = source.model_copy(deep=True)
+    measured.world.metadata['attached_object_transforms']['tool_pusher']['position_in_reference_m'][0] += .004
+    second, _ = preparation.build_native_contact_local_preparation(measured, eef_orientation_xyzw=attitude)
+    assert second.world == measured.world
+    assert first.world == source.world
+    assert not np.allclose(first.task.goal.target_pose.position_m, second.task.goal.target_pose.position_m)
+    assert second.task.metadata['requires_measured_replanning_after_execution'] is True
+    # The returned MOVE has no contact keyframes. Its caller must observe the
+    # executed state and request a fresh SIDE_PUSH, not treat this as collection.
+    assert second.task.contact is None and second.task.action_type == 'MOVE'
+
+
+def test_local_preparation_keeps_normal_ik_collision_validation_and_native_contract():
+    from tuj.m5_motion import native_contact_preparation as preparation
+    source = _request(); attitude = _attitude(source)
+    prepared, frames = preparation.build_native_contact_local_preparation(source, eef_orientation_xyzw=attitude)
+    valid, valid_calls = _compile_preparation(prepared, frames)
+    assert valid.solved and len(valid_calls) == 2
+    compiled, calls = _compile_preparation(prepared, frames, valid=False)
+    assert calls and not compiled.solved
+    assert compiled.attempts[-1].failure_code == 'NO_VALID_IK_BRANCH'
+    source.task.contact.path_pattern = 'AUTO'
+    with pytest.raises(ContactKeyframeGeometryError):
+        preparation.build_native_contact_local_preparation(source, eef_orientation_xyzw=attitude)
