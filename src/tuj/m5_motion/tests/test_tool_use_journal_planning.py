@@ -1032,7 +1032,8 @@ def test_initial_ee_attach_binds_bare_flange_as_initial_context() -> None:
     assert compiler.calls[0][1]["default_active_ee"] is None
 
 
-def test_held_tool_sweep_allows_ee_and_tool_to_touch_targets() -> None:
+@pytest.mark.parametrize("path_pattern", ["AUTO", "SIDE_PUSH"])
+def test_held_tool_sweep_allows_ee_and_tool_to_touch_targets(path_pattern) -> None:
     """CONTACT_* must allow vac/EE↔target as well as attached-tool↔target."""
 
     attachment = AttachedObjectTransform(
@@ -1135,6 +1136,8 @@ def test_held_tool_sweep_allows_ee_and_tool_to_touch_targets() -> None:
             contact=ContactManipulationSpec(
                 primitive="sweep",
                 contact_surface="AUTO",
+                path_pattern=path_pattern,
+                target_grouping="SINGLE",
             ),
             goal=MotionGoal(
                 goal_type=GoalType.POSE,
@@ -1166,25 +1169,31 @@ def test_held_tool_sweep_allows_ee_and_tool_to_touch_targets() -> None:
         )
     )
 
+    original = request.model_dump_json()
     setup = _factory().prepare(request, source)
+    assert request.model_dump_json() == original
     context = setup.collision_contexts[setup.initial_collision_context_id]
     pairs = {tuple(pair) for pair in context.allowed_collision_pairs}
 
     assert ("block_a", "plate") in pairs
     assert ("block_a", "vac") in pairs
-    assert ("block_10", "plate") in pairs
-    assert ("block_10", "vac") in pairs
-    assert ("block_settled", "plate") in pairs
-    assert ("block_settled", "vac") in pairs
-    assert ("ladle", "plate") in pairs
-    assert ("ladle", "vac") in pairs
+    # AUTO sweep retains the existing incidental-contact policy. Explicit
+    # native SIDE_PUSH must honor its declared touch list at every phase.
+    for neighbor in ("block_10", "block_settled", "ladle"):
+        for held in ("plate", "vac"):
+            assert ((neighbor, held) in pairs) is (path_pattern == "AUTO")
+    if path_pattern == "SIDE_PUSH":
+        assert pairs == {("block_a", "plate"), ("block_a", "vac")}
+        assert all(set(context.allowed_collision_pairs) == pairs
+                   for context in setup.collision_contexts.values())
     assert ("block_far", "plate") not in pairs
     assert ("block_far", "vac") not in pairs
     assert ("bottle", "plate") not in pairs
     assert ("other", "vac") not in pairs
 
 
-def test_held_tool_transport_allows_breakaway_under_tool_footprint() -> None:
+@pytest.mark.parametrize("native_preparation", [False, True])
+def test_held_tool_transport_allows_breakaway_under_tool_footprint(native_preparation) -> None:
     """Post-sweep TRANSPORT start must allow residual held-tool↔under-tool contact."""
 
     attachment = AttachedObjectTransform(
@@ -1247,11 +1256,12 @@ def test_held_tool_transport_allows_breakaway_under_tool_footprint() -> None:
         task=MotionTask(
             task_id="transport-rest-1",
             subgoal_id="sg-transport",
-            action_type="transport",
+            action_type="MOVE" if native_preparation else "transport",
             ee="vac",
             tool="plate",
-            target_ids=["plate"],
+            target_ids=[] if native_preparation else ["plate"],
             allowed_touch_objects=[],
+            metadata={"native_contact_preparation": True} if native_preparation else {},
             goal=MotionGoal(
                 goal_type=GoalType.POSE,
                 target_region_id="tool_rest",
@@ -1286,10 +1296,82 @@ def test_held_tool_transport_allows_breakaway_under_tool_footprint() -> None:
     context = setup.collision_contexts[setup.initial_collision_context_id]
     pairs = {tuple(pair) for pair in context.allowed_collision_pairs}
 
-    assert ("block_6", "plate") in pairs
-    assert ("block_6", "vac") in pairs
+    assert (("block_6", "plate") in pairs) is not native_preparation
+    assert (("block_6", "vac") in pairs) is not native_preparation
+    if native_preparation:
+        assert not pairs
+        assert all(not context.allowed_collision_pairs
+                   for context in setup.collision_contexts.values())
     assert ("block_far", "plate") not in pairs
     assert ("block_far", "vac") not in pairs
+
+
+@pytest.mark.parametrize("mode", ["AUTO", "SIDE_PUSH", "native_preparation"])
+def test_native_touch_policy_rejects_actual_undeclared_overlap(mode):
+    """The bound policy must reach the physical collision validator unchanged."""
+    import mujoco
+    from tuj.m5_motion.mujoco_collision import MuJoCoCollisionValidator
+
+    attachment = AttachedObjectTransform(
+        object_id="tool", free_joint_name="tool_free",
+        reference_kind="body", reference_name="robot0_right_hand",
+        position_in_reference_m=(.2, 0., 0.),
+        orientation_in_reference_xyzw=(0., 0., 0., 1.),
+    )
+    world = _world(attached=attachment)
+    world.robot_state.held_tool_id = "tool"
+    positions = {"tool": (.2, 0., .8), "block_a": (.25, .1, .8),
+                 "block_neighbor": (.25, 0., .8)}
+    world.objects = {name: {
+        "object_id": name, "free_joint_name": name + "_free",
+        "pose": {"frame_id": "world", "position_m": position,
+                 "orientation_xyzw": [0., 0., 0., 1.]},
+        "dimensions_m": [.08, .08, .08],
+    } for name, position in positions.items()}
+    world.obstacles = [{"obstacle_id": "table_collision",
+                        "aabb_min_m": [-1., -1., .75],
+                        "aabb_max_m": [1., 1., .8]}]
+    preparation = mode == "native_preparation"
+    request = MotionPlanRequest(
+        request_id="request-native-touch-physical", provenance=_provenance("touch", "MotionPlanRequest"),
+        world=world, constraints=_constraints(),
+        task=MotionTask(task_id="touch", subgoal_id="touch", ee="2F", tool="tool",
+            action_type="MOVE" if preparation else "tool_act",
+            target_ids=[] if preparation else ["block_a"],
+            allowed_touch_objects=[] if preparation else ["block_a"],
+            contact=None if preparation else ContactManipulationSpec(
+                primitive="sweep", path_pattern=mode, target_grouping="SINGLE"),
+            metadata={"native_contact_preparation": True} if preparation else {},
+            goal=MotionGoal(goal_type=GoalType.POSE, target_object_id="tool")),
+    )
+    artifact = _artifact(tuple(RelativeKeyframeSpec(
+        keyframe_id=name, keyframe_type=KeyframeType.TRANSFER,
+        frame_ref="object:tool", anchor="center", approach_axis_xyz=(0., 0., 1.),
+        offset_along_approach_m=offset, planner=KeyframePlannerType.CARTESIAN)
+        for name, offset in (("held", 0.), ("clear", .1))))
+    setup = _factory().prepare(request, artifact)
+    context = setup.collision_contexts[setup.initial_collision_context_id]
+    bodies = "".join(
+        f'<body name="{name}" pos="{x} {y} {z}"><freejoint name="{name}_free"/>'
+        f'<geom name="{name}_geom" type="box" size=".04 .04 .04"/></body>'
+        for name, (x, y, z) in positions.items())
+    model = mujoco.MjModel.from_xml_string(
+        '<mujoco><worldbody><body name="robot0_right_hand" pos="0 0 .8">'
+        '<joint name="j1" type="slide" axis="1 0 0"/>'
+        '<joint name="j2" type="slide" axis="0 1 0"/>'
+        '<geom name="hand_geom" size=".01"/></body>' + bodies + '</worldbody></mujoco>')
+    validator = MuJoCoCollisionValidator(
+        model, joint_names=("j1", "j2"), robot_root_body_name="robot0_right_hand",
+        baseline_qpos=model.qpos0, collision_model_version=context.collision_model_version,
+        collision_margin_m=request.constraints.collision_margin_m,
+        entity_geoms={**{name: (name,) for name in positions}, "2F": ("robot0_right_hand",)},
+    )
+    result = validator.check((0., 0.), context=context)
+    assert result.valid is (mode == "AUTO")
+    if mode != "AUTO":
+        assert result.failure_code == "COLLISION_MARGIN_VIOLATION"
+        assert result.min_clearance_m < 0.
+        assert "block_neighbor" in result.detail
 
 
 def test_exchange_entry_uses_only_the_current_attached_ee_for_motion() -> None:

@@ -1118,6 +1118,18 @@ class ToolUseJournalCollisionContextFactory:
     ) -> list[str]:
         """Free tabletop partners near a held tool for sweep contact or transport lift-off."""
 
+        # SIDE_PUSH declares the bodies it may contact. The generic sweep
+        # halo below is intentionally broader, but must not turn a native
+        # single-target push into incidental pushes of neighboring objects.
+        # Its preparation MOVE likewise carries no implicit touch permission;
+        # an existing overlap must fail the normal collision check.
+        contact = request.task.contact
+        if (
+            contact is not None
+            and str(contact.path_pattern).strip().upper() == "SIDE_PUSH"
+        ) or request.task.metadata.get("native_contact_preparation") is True:
+            return []
+
         from tuj.m5_motion.task_semantics import task_operation
 
         operation = task_operation(request.task)
