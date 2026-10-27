@@ -2460,7 +2460,7 @@ class ToolUseJournalEERuntime:
         )
         if attachment is not None and attachment.mode is AttachmentMode.KINEMATIC:
             self.synchronize_attached_object()
-        elif held_tool_id is not None:
+        elif attachment is None and held_tool_id is not None:
             from tuj.m5_motion.physical_grasp import (
                 ContactFrictionRetentionMonitor,
             )
