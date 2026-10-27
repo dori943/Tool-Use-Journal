@@ -251,3 +251,90 @@ def test_goal_occupancy_respects_vertical_band_and_collision_semantics(nonblocki
         obstacle['collision_enabled'] = False
     geometry = native_side_push_geometry(request, eef_orientation_xyzw=_attitude(request))
     assert geometry.target_goal_center_world_m == pytest.approx(original.target_goal_center_world_m)
+
+
+def _narrow_approach_request(*, obstacle_x=-.16, obstacle_z=.8058):
+    request = _request()
+    request.world.robot_state.eef_pose.orientation_xyzw = (1., 0., 0., 0.)
+    request.world.metadata['attached_object_transforms']['tool_pusher'].update(
+        position_in_reference_m=[0., 0., 0.],
+        orientation_in_reference_xyzw=[0., 0., 0., 1.])
+    request.world.objects['tool_pusher']['collision_points_m'] = list(
+        product((-.01, .01), (-.005, .005), (-.004, .004)))
+    target = request.world.objects['block_a']
+    target['pose'].update(position_m=[-.10, 0., .8058], orientation_xyzw=[0., 0., 0., 1.])
+    target['dimensions_m'] = [.02, .02, .012]
+    region = request.world.objects['collect_zone']
+    region['pose'].update(position_m=[.20, 0., .801], orientation_xyzw=[0., 0., 0., 1.])
+    region['dimensions_m'] = [.20, .20, .001]
+    if obstacle_x is not None:
+        request.world.objects['approach_obstacle'] = {
+            'pose': {'frame_id': 'world', 'position_m': [obstacle_x, 0., obstacle_z],
+                     'orientation_xyzw': [0., 0., 0., 1.]},
+            'dimensions_m': [.01, .01, .012], 'collision_enabled': True,
+            'anchors': {'center': [0., 0., 0.]},
+        }
+    return request
+
+
+def test_observed_approach_interval_avoids_intermediate_obstacle_without_height_change():
+    request = _narrow_approach_request(); before = request.model_dump_json()
+    attitude = request.world.robot_state.eef_pose.orientation_xyzw
+    geometry = native_side_push_geometry(request, eef_orientation_xyzw=attitude)
+    distance = np.linalg.norm(np.array(geometry.patch_engage_xy_m)-geometry.patch_start_xy_m)
+    # Tool at engagement spans[-.13,-.11]; obstacle spans[-.165,-.155].
+    #5mm non-target margin gives a20mm connected safe interval, centered at10mm.
+    assert distance == pytest.approx(.01, abs=1e-9)
+    for travel in np.linspace(0., distance, 101):
+        tool_left = -.13-travel
+        assert tool_left-(-.155) >= request.constraints.collision_margin_m
+    assert geometry.contact_tcp_z_m == pytest.approx(
+        _contact_engagement_tcp_z_m(request, eef_orientation_xyzw=attitude))
+    assert request.model_dump_json() == before
+    frames = generate_native_side_push_keyframes(request, eef_orientation_xyzw=attitude)
+    again = canonicalize_native_side_push(request, frames)
+    resolver = RelativePoseResolver(request.world)
+    for a, b in zip(frames, again):
+        assert resolver.resolve(a).position_m == pytest.approx(resolver.resolve(b).position_m)
+
+
+@pytest.mark.parametrize('obstacle_x,obstacle_z', [(None, .8058), (-.16, 1.2)])
+def test_clear_or_z_separated_approach_preserves_original_sixty_mm(obstacle_x, obstacle_z):
+    request = _narrow_approach_request(obstacle_x=obstacle_x, obstacle_z=obstacle_z)
+    geometry = native_side_push_geometry(request, eef_orientation_xyzw=request.world.robot_state.eef_pose.orientation_xyzw)
+    assert np.linalg.norm(np.array(geometry.patch_engage_xy_m)-geometry.patch_start_xy_m) == pytest.approx(.06)
+
+
+def test_no_safe_approach_interval_is_rejected_instead_of_contact_permission_expansion():
+    request = _narrow_approach_request(obstacle_x=-.1375)
+    before = request.model_dump_json()
+    with pytest.raises(ContactKeyframeGeometryError, match='safe approach interval'):
+        native_side_push_geometry(request, eef_orientation_xyzw=request.world.robot_state.eef_pose.orientation_xyzw)
+    assert request.model_dump_json() == before
+
+
+def test_target_separation_beyond_maximum_approach_rejects_reversed_interval():
+    request = _narrow_approach_request(obstacle_x=None)
+    # A higher forward part is outside the shallow engaging patch but still
+    # occupies the target height band.60mm cannot separate this whole tool.
+    request.world.objects['tool_pusher']['collision_points_m'] += [
+        (.08, -.005, -.003), (.08, .005, -.003)]
+    with pytest.raises(ContactKeyframeGeometryError, match='separation.*maximum'):
+        native_side_push_geometry(request, eef_orientation_xyzw=request.world.robot_state.eef_pose.orientation_xyzw)
+
+
+def test_adaptive_approach_is_equivariant_to_world_yaw_and_translation():
+    request = _narrow_approach_request()
+    base = native_side_push_geometry(request, eef_orientation_xyzw=request.world.robot_state.eef_pose.orientation_xyzw)
+    angle = Rotation.from_euler('z', 41, degrees=True); rotation = angle.as_matrix(); delta = np.array([.19, -.07, 0.])
+    shifted = request.model_copy(deep=True)
+    for record in shifted.world.objects.values():
+        record['pose']['position_m'] = (rotation@np.asarray(record['pose']['position_m'])+delta).tolist()
+        record['pose']['orientation_xyzw'] = (angle*Rotation.from_quat(record['pose']['orientation_xyzw'])).as_quat().tolist()
+    state = shifted.world.robot_state
+    state.eef_pose.position_m = (rotation@np.asarray(state.eef_pose.position_m)+delta).tolist()
+    state.eef_pose.orientation_xyzw = (angle*Rotation.from_quat(state.eef_pose.orientation_xyzw)).as_quat().tolist()
+    changed = native_side_push_geometry(shifted, eef_orientation_xyzw=state.eef_pose.orientation_xyzw)
+    for field in ('patch_start_xy_m','patch_engage_xy_m','patch_end_xy_m'):
+        expected = rotation[:2,:2]@np.asarray(getattr(base,field))+delta[:2]
+        assert getattr(changed,field) == pytest.approx(expected, abs=1e-9)

@@ -205,6 +205,114 @@ def _free_nominal_target_goal(
     raise ContactKeyframeGeometryError("side push has no free nominal target path among the original and nine region endpoints")
 
 
+def _clip_polygon_z(points: np.ndarray, z: float, *, above: bool) -> np.ndarray:
+    clipped = []
+    for start, end in zip(points, np.roll(points, -1, axis=0)):
+        start_inside = start[2] >= z if above else start[2] <= z
+        end_inside = end[2] >= z if above else end[2] <= z
+        if start_inside:
+            clipped.append(start)
+        if start_inside != end_inside:
+            clipped.append(start + (end-start) * ((z-start[2])/(end[2]-start[2])))
+    return np.asarray(clipped)
+
+
+def _surface_in_z_band(triangles: np.ndarray, lower: float, upper: float) -> np.ndarray:
+    points = []
+    overlapping = ((triangles[:, :, 2].max(axis=1) >= lower)
+                   & (triangles[:, :, 2].min(axis=1) <= upper))
+    for triangle in triangles[overlapping]:
+        polygon = _clip_polygon_z(triangle, lower, above=True)
+        if len(polygon):
+            polygon = _clip_polygon_z(polygon, upper, above=False)
+        if len(polygon):
+            points.extend(polygon)
+    return np.asarray(points)
+
+
+def _observed_approach_standoff_m(
+    request: MotionPlanRequest, *, eef_orientation_xyzw: Sequence[float],
+    engage_xy: np.ndarray, patch_offset_xy: np.ndarray,
+    direction: np.ndarray, contact_z: float, maximum: float,
+) -> float:
+    """Fit the low approach inside a connected observed free interval.
+
+    The profile distance is a preferred maximum, not a physical clearance.
+    Keep it when the entire low approach is clear. Otherwise descend closer
+    from the same hover height, at the midpoint of the safe interval between
+    target separation and the first non-target obstruction. Only the intended
+    target may be contacted; every other object keeps the requested margin.
+    Z-clipped full-tool surfaces are conservatively convexified in XY. This
+    geometric filter never replaces the compiler's full robot/tool checks.
+    """
+    from .attachment_retarget import attachment_transform
+
+    record = request.world.objects[request.task.tool]
+    triangles = np.asarray(record.get("collision_surface_triangles_m", []), dtype=float)
+    if not (triangles.ndim == 3 and triangles.shape[1:] == (3, 3)
+            and len(triangles) and np.isfinite(triangles).all()):
+        points = np.asarray(record.get("collision_points_m", []), dtype=float)
+        if not (points.ndim == 2 and points.shape[1:] == (3,)
+                and len(points) >= 4 and np.isfinite(points).all()):
+            raise ContactKeyframeGeometryError("side push approach requires observed full-tool geometry")
+        try:
+            triangles = points[ConvexHull(points).simplices]
+        except QhullError as error:
+            raise ContactKeyframeGeometryError("side push approach requires nondegenerate tool geometry") from error
+    grasp = attachment_transform(request.world, request.task.tool)
+    triangles = (triangles @ quaternion_matrix_xyzw(grasp.orientation_in_reference_xyzw).T
+                 + np.asarray(grasp.position_in_reference_m)) @ quaternion_matrix_xyzw(eef_orientation_xyzw).T
+    triangles[:, :, 2] += contact_z
+    triangles[:, :, :2] += engage_xy-patch_offset_xy
+    if not np.isfinite(triangles).all():
+        raise ContactKeyframeGeometryError("side push approach has nonfinite transformed tool geometry")
+    margin = request.constraints.collision_margin_m
+    obstacles, minimum = [], None
+    for object_id, obstacle in request.world.objects.items():
+        if (object_id in {request.task.tool, request.task.goal.target_region_id}
+                or obstacle.get("collision_enabled") is False):
+            continue
+        _, points = _target_points(request, object_id)
+        surface = _surface_in_z_band(triangles, points[:, 2].min()-margin,
+                                    points[:, 2].max()+margin)
+        if len(surface) < 3:
+            continue
+        tool_xy, obstacle_xy = _convex_xy(surface[:, :2]), _convex_xy(points[:, :2])
+        if object_id == request.task.target_ids[0]:
+            # The target is the intended contact; require initial separation,
+            # not the non-target margin which would forbid engagement itself.
+            minimum = max(0., float((tool_xy @ direction).max()
+                                   - (obstacle_xy @ direction).min()))
+        else:
+            obstacles.append((tool_xy, obstacle_xy))
+    if minimum is None:
+        raise ContactKeyframeGeometryError("side push tool does not meet the target height band")
+    if minimum >= maximum:
+        raise ContactKeyframeGeometryError("side push target separation exceeds maximum approach distance")
+
+    def clear(distance: float) -> bool:
+        return all(_convex_polygon_distance(
+            _convex_xy(np.vstack((tool, tool-direction*distance))), obstacle) >= margin
+            for tool, obstacle in obstacles)
+
+    if clear(maximum):
+        return maximum
+    if not clear(minimum):
+        raise ContactKeyframeGeometryError("side push has no safe approach interval")
+    lower, upper = minimum, maximum
+    # These swept volumes are nested as distance grows, so the predicate is
+    # monotone. Bisection locates a geometric boundary, not a relaxed margin.
+    for _ in range(40):
+        middle = (lower+upper)*.5
+        if clear(middle):
+            lower = middle
+        else:
+            upper = middle
+    if lower <= minimum+1e-9:
+        raise ContactKeyframeGeometryError("side push has no positive safe approach interval")
+    return (minimum+lower)*.5
+
+
 def native_side_push_geometry(
     request: MotionPlanRequest, *, eef_orientation_xyzw: Sequence[float],
     profile: PushPlanningProfile | None = None,
@@ -281,11 +389,15 @@ def native_side_push_geometry(
     trailing = float((face_center - target_center[:2]) @ approach_direction)
     leading = float(((patch[:, :2] - patch[:, :2].mean(axis=0)) @ approach_direction).max())
     engage = face_center
-    start = engage - approach_direction * profile.approach_standoff_m
     end = engage + goal_center[:2] - target_center[:2]
     z = _contact_engagement_tcp_z_m(request, eef_orientation_xyzw=eef_orientation_xyzw)
     if z is None or not np.isfinite(z):
         raise ContactKeyframeGeometryError("native side push has no finite common engagement height")
+    standoff = _observed_approach_standoff_m(
+        request, eef_orientation_xyzw=eef_orientation_xyzw, engage_xy=engage,
+        patch_offset_xy=patch_offset, direction=approach_direction,
+        contact_z=float(z), maximum=profile.approach_standoff_m)
+    start = engage - approach_direction * standoff
     hover = _hover_working_floor_z_m(request)
     hover = max(float(z) + profile.hover_height_m, float(z) if hover is None else hover)
     return NativeSidePushGeometry(
