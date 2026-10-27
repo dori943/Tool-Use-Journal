@@ -236,7 +236,24 @@ def validate_sweep_keyframe_strategy(
                     f"z={hover_z:.3f}m must stay at/above the contact working "
                     f"height (floor={hover_floor:.3f}m)"
                 )
-    _reject_degenerate_sweep_lateral(request, keyframes, active_resolver)
+    if request.task.contact is not None and request.task.contact.path_pattern.upper() == "SIDE_PUSH":
+        # A single-target correction can be shorter than the herd sweep's
+        # 80 mm minimum. Validate its complete observed-geometry construction
+        # instead: the actual leading feature must approach the target face
+        # and translate its footprint into the unchanged region inset.
+        # Metadata never grants an exemption for a collapsed or forged path.
+        from .native_side_push import canonicalize_native_side_push
+
+        expected = canonicalize_native_side_push(request, keyframes, resolver=active_resolver)
+        for actual_frame, expected_frame in zip(keyframes, expected):
+            actual_pose = active_resolver.resolve(actual_frame)
+            expected_pose = active_resolver.resolve(expected_frame)
+            if not np.allclose(actual_pose.position_m, expected_pose.position_m, atol=1e-7, rtol=0.):
+                raise ContactKeyframeGeometryError(
+                    f"{actual_frame.keyframe_id}: SIDE_PUSH does not match the observed contact-to-goal geometry"
+                )
+    else:
+        _reject_degenerate_sweep_lateral(request, keyframes, active_resolver)
 
 
 def canonicalize_held_tool_axis_for_contact(
