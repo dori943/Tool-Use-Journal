@@ -124,6 +124,51 @@ def measured_contact_face(triangles, center, normal_axis, side):
     return point, normal
 
 
+def planar_contact_center(triangles, seed, normal):
+    """Center a disk on the selected connected, convex planar collision patch.
+
+    The whole-tool silhouette only locates an initial face. Beveled panels and
+    the handle must not enlarge the planar area supporting that contact disk.
+    Nonconvex patches fail closed instead of bridging their gaps with a hull.
+    """
+    axis = np.eye(3)[int(np.argmin(abs(normal)))]
+    along = axis - (axis @ normal) * normal
+    along /= np.linalg.norm(along)
+    basis = np.column_stack((along, np.cross(normal, along), normal))
+    flat = np.asarray(triangles)[np.max(abs((triangles - seed) @ normal), axis=1) <= 1e-9]
+    projected = (flat - seed) @ basis
+    containing = []
+    for index, triangle in enumerate(projected):
+        edges = (triangle[1:] - triangle[0])[:, :2].T
+        if abs(np.linalg.det(edges)) <= 1e-14:
+            continue
+        uv = np.linalg.solve(edges, -triangle[0, :2])
+        if min(1. - uv.sum(), *uv) >= -1e-9:
+            containing.append(index)
+    if not containing:
+        raise ValueError('flatten contact seed is outside its measured planar patch')
+    _, indices = np.unique(flat.reshape(-1, 3), axis=0, return_inverse=True)
+    vertices = [set(row) for row in indices.reshape(-1, 3)]
+    connected = {containing[0]}
+    pending = list(connected)
+    while pending:
+        current = pending.pop()
+        for index, corners in enumerate(vertices):
+            if index not in connected and len(corners & vertices[current]) >= 2:
+                connected.add(index)
+                pending.append(index)
+    patch = projected[sorted(connected)]
+    points = patch.reshape(-1, 3)
+    hull = ConvexHull(points[:, :2])
+    area = sum(abs(np.linalg.det((tri[1:] - tri[0])[:, :2])) * .5 for tri in patch)
+    if not np.isclose(area, hull.volume, rtol=1e-8, atol=1e-12):
+        raise ValueError('flatten requires a connected convex planar contact patch')
+    center = contact_face_center(points, 2)
+    center[2] = 0.
+    radius = float(np.min(-hull.equations[:, 2] - hull.equations[:, :2] @ center[:2]))
+    return seed + basis @ center, radius
+
+
 class FlattenContactProvider:
     def generate(self, request):
         task, world = request.task, request.world
@@ -152,13 +197,14 @@ class FlattenContactProvider:
         for direction in ([1., 0., 0.], [-1., 0., 0.], [0., 1., 0.], [0., -1., 0.]):
             for sign in (-1., 1.):
                 face, normal = measured_contact_face(triangles, center, normal_axis, sign)
+                face, radius = planar_contact_center(triangles, face, normal)
                 along = np.eye(3)[long_axis] - normal[long_axis] * normal
                 along /= np.linalg.norm(along)
                 local_basis = np.column_stack((along, np.cross(normal, along), normal))
                 down = np.array([0., 0., -1.])
                 world_basis = np.column_stack((direction, np.cross(down, direction), down))
                 rotation = world_basis @ local_basis.T
-                rotations.append((rotation, face, normal))
+                rotations.append((rotation, face, normal, radius))
         rotations.sort(key=lambda item: Rotation.from_matrix(current.T @ item[0]).magnitude())
         lower, upper = np.array(metrics['bounds_min_m']), np.array(metrics['bounds_max_m'])
         target_center = (lower + upper) / 2
@@ -168,7 +214,7 @@ class FlattenContactProvider:
             raise ValueError('compression trial would violate support clearance')
         digest = hashlib.sha256(request.model_dump_json().encode()).hexdigest()
         candidates = []
-        for index, (rotation, face, normal) in enumerate(rotations[:4]):
+        for index, (rotation, face, normal, radius) in enumerate(rotations[:4]):
             legacy_up = np.eye(3)[normal_axis] * -np.sign(normal[normal_axis])
             legacy_height_error = float((face - center) @ legacy_up
                 - np.min((points - center) @ legacy_up))
@@ -198,10 +244,11 @@ class FlattenContactProvider:
             candidates.append(KeyframePlanCandidate(strategy_id=f'flatten:{index}', keyframes=keys,
                 rationale='Measured tool geometry and actual grasp transform; trial depth from constitutive model.',
                 provenance=StrategyGenerationProvenance(generator_kind='TASK_GEOMETRY',
-                    generator_id='CONTACT_COMPRESSION_V3', input_hash=digest, attempt_index=1),
+                    generator_id='CONTACT_COMPRESSION_V4', input_hash=digest, attempt_index=1),
                 metadata={'trial_compressed_height_m': compressed_height, 'target_id': target_id,
                           'contact_face_center_local_m': face.tolist(),
                           'contact_face_normal_local': normal.tolist(),
+                          'contact_planar_patch_radius_m': radius,
                           'contact_face_source': tool['collision_surface_source'],
                           'legacy_contact_face_height_error_m': legacy_height_error}))
         return KeyframePlanArtifact(artifact_id='flatten:' + digest[:20],

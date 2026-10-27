@@ -139,7 +139,8 @@ def test_asymmetric_paddle_uses_broad_face_instead_of_handle_center():
             eef[:3, :3] = Rotation.from_quat(pose.orientation_xyzw).as_matrix()
             eef[:3, 3] = pose.position_m
             tool = eef @ grasp
-            face_world = tool[:3, :3] @ face + tool[:3, 3]
+            measured_face = np.asarray(candidate.metadata['contact_face_center_local_m'])
+            face_world = tool[:3, :3] @ measured_face + tool[:3, 3]
             np.testing.assert_allclose(face_world[:2], [.13, .13], atol=1e-9)
             # The narrow handle midpoint must no longer occupy the target center.
             assert np.linalg.norm(tool[:2, 3] - [.13, .13]) > .07
@@ -250,11 +251,40 @@ def test_actual_spatula_face_height_and_normal_are_measured_not_axis_assumed():
     for candidate in FlattenContactProvider().generate(r).candidates:
         face = np.asarray(candidate.metadata['contact_face_center_local_m'])
         normal = np.asarray(candidate.metadata['contact_face_normal_local'])
-        assert abs(face[2]) == pytest.approx(.001561107, abs=1e-8)
+        # The full tool silhouette includes beveled panels. Its disk center
+        # (y=.101716) is not the center of this exposed planar load face.
+        assert face[1] == pytest.approx(.089654283, abs=1e-8)
+        assert abs(face[2]) == pytest.approx(.001961371, abs=1e-8)
         assert np.degrees(np.arccos(abs(normal[2]))) == pytest.approx(1.90071, abs=1e-4)
-        assert candidate.metadata['legacy_contact_face_height_error_m'] == pytest.approx(.000992556, abs=1e-8)
+        assert candidate.metadata['legacy_contact_face_height_error_m'] == pytest.approx(.000592292, abs=1e-8)
+        assert candidate.metadata['contact_planar_patch_radius_m'] == pytest.approx(.017857544, abs=1e-7)
         press = next(key for key in candidate.keyframes if key.metadata['flatten_stage'] == 'press')
         tool = tool_pose_for_key(r, press)
         np.testing.assert_allclose(tool[:3, :3] @ normal, [0., 0., -1.], atol=1e-9)
         np.testing.assert_allclose((tool[:3, :3] @ face + tool[:3, 3])[2],
                                    .02 + compression_trial_height(.06, CONFIG), atol=1e-9)
+
+
+def test_planar_patch_center_excludes_disconnected_coplanar_handle_and_is_rigid_invariant():
+    from tuj.m5_motion.flatten_contact import planar_contact_center
+    paddle = np.array([[[-.02, 0., 0.], [.02, 0., 0.], [.02, .06, 0.]],
+                       [[-.02, 0., 0.], [.02, .06, 0.], [-.02, .06, 0.]]])
+    handle = paddle + [0., -.2, 0.]
+    triangles = np.concatenate((handle, paddle))
+    for rotation, shift in [(np.eye(3), np.zeros(3)),
+                            (Rotation.from_rotvec([.3, -.4, .8]).as_matrix(), np.array([2., -3., 4.]))]:
+        transformed = triangles @ rotation.T + shift
+        center, radius = planar_contact_center(transformed[::-1],
+            rotation @ [0., .04, 0.] + shift, rotation @ [0., 0., -1.])
+        np.testing.assert_allclose(center, rotation @ [0., .03, 0.] + shift, atol=1e-10)
+        assert radius == pytest.approx(.02, abs=1e-10)
+
+
+def test_planar_patch_hull_cannot_fill_a_concavity():
+    from tuj.m5_motion.flatten_contact import planar_contact_center
+    # Three unit squares joined by full edges make a connected L, not a rectangle.
+    vertices = np.array([[x, y, 0.] for x, y in [(0, 0), (1, 0), (2, 0),
+                                               (0, 1), (1, 1), (2, 1), (0, 2), (1, 2)]])
+    faces = [(0, 1, 4), (0, 4, 3), (1, 2, 5), (1, 5, 4), (3, 4, 7), (3, 7, 6)]
+    with pytest.raises(ValueError, match='connected convex planar'):
+        planar_contact_center(vertices[faces], np.array([.5, .5, 0.]), np.array([0., 0., -1.]))
