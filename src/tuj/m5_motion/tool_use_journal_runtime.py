@@ -365,6 +365,14 @@ def _restore_runtime_state(env: object, state: _RuntimeState) -> None:
             data.ctrl[actuator_id] = state.ctrl_by_actuator[name]
     data.time = state.simulation_time_s
     mujoco.mj_forward(model, data)
+    # Named-state transfer bypasses the controllers' normal update cycle.
+    # Their cached joints/Jacobians/mass matrix may still describe the old
+    # model state. Read fresh measurements on the next set_goal/run_controller
+    # without resetting goals, interpolation history, gains or actuator limits.
+    for robot in getattr(env, "robots", ()):
+        for controller in (getattr(robot, "part_controllers", None) or {}).values():
+            if hasattr(controller, "new_update"):
+                controller.new_update = True
 
 
 def _release_offscreen_render_context(env: object) -> bool:
