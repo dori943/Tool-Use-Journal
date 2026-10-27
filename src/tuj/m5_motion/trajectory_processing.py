@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import math
+from bisect import bisect_right
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass
 
@@ -16,6 +17,68 @@ MotionValidator = Callable[[JointConfig, JointConfig], bool]
 
 class TrajectoryProcessingError(ValueError):
     pass
+
+
+
+# Existing timing resolution, also used to check the commanded interpolation.
+DEFAULT_TRAJECTORY_SAMPLE_DT_S = 0.02
+
+
+def interpolate_trajectory_joint_position(
+    timeline: Sequence[TrajectoryWaypoint], time_s: float,
+) -> np.ndarray:
+    """The controller's exact linear / cubic-Hermite position contract."""
+    times = [waypoint.time_from_start_s for waypoint in timeline]
+    if time_s <= times[0]:
+        return np.asarray(timeline[0].joint_positions_rad, dtype=float)
+    if time_s >= times[-1]:
+        return np.asarray(timeline[-1].joint_positions_rad, dtype=float)
+    right_index = bisect_right(times, time_s)
+    left = timeline[right_index - 1]
+    right = timeline[right_index]
+    duration = right.time_from_start_s - left.time_from_start_s
+    ratio = (time_s - left.time_from_start_s) / duration
+    q0 = np.asarray(left.joint_positions_rad, dtype=float)
+    q1 = np.asarray(right.joint_positions_rad, dtype=float)
+    if left.joint_velocities_rad_s is None or right.joint_velocities_rad_s is None:
+        return q0 + ratio * (q1 - q0)
+    v0 = np.asarray(left.joint_velocities_rad_s, dtype=float)
+    v1 = np.asarray(right.joint_velocities_rad_s, dtype=float)
+    u2, u3 = ratio * ratio, ratio * ratio * ratio
+    return (
+        (2 * u3 - 3 * u2 + 1) * q0
+        + (u3 - 2 * u2 + ratio) * duration * v0
+        + (-2 * u3 + 3 * u2) * q1
+        + (u3 - u2) * duration * v1
+    )
+
+
+def playback_collision_waypoints(
+    waypoints: Sequence[TrajectoryWaypoint],
+) -> tuple[TrajectoryWaypoint, ...]:
+    """Sample the executed interpolation, retaining every original knot.
+
+    Include the existing 20-ms absolute grid and each knot interval midpoint.
+    The latter also checks off-grid/short intervals and holds after settling.
+    This is bounded sampling, not a continuous-collision proof for every phase.
+    These validation-only samples never modify the executable trajectory.
+    """
+    if len(waypoints) < 2:
+        return tuple(waypoints)
+    by_time = {point.time_from_start_s: point for point in waypoints}
+    times = [point.time_from_start_s for point in waypoints]
+    if any(right <= left for left, right in zip(times, times[1:])):
+        raise TrajectoryProcessingError('playback waypoint times must increase')
+    samples = set(times)
+    samples.update((left + right) * 0.5 for left, right in zip(times, times[1:]))
+    first = math.ceil(times[0] / DEFAULT_TRAJECTORY_SAMPLE_DT_S)
+    last = math.floor(times[-1] / DEFAULT_TRAJECTORY_SAMPLE_DT_S)
+    samples.update(index * DEFAULT_TRAJECTORY_SAMPLE_DT_S for index in range(first, last + 1)
+                   if times[0] <= index * DEFAULT_TRAJECTORY_SAMPLE_DT_S <= times[-1])
+    return tuple(by_time[stamp] if stamp in by_time else TrajectoryWaypoint(
+        time_from_start_s=stamp,
+        joint_positions_rad=interpolate_trajectory_joint_position(waypoints, stamp).tolist(),
+    ) for stamp in sorted(samples))
 
 
 def unwrap_joint_path(
@@ -269,7 +332,7 @@ class QuinticTimeParameterizer:
     _MAX_H2 = 5.773502691896258
     _MAX_H3 = 60.0
 
-    def __init__(self, *, sample_dt_s: float = 0.02, min_segment_duration_s: float = 0.05) -> None:
+    def __init__(self, *, sample_dt_s: float = DEFAULT_TRAJECTORY_SAMPLE_DT_S, min_segment_duration_s: float = 0.05) -> None:
         if sample_dt_s <= 0 or min_segment_duration_s <= 0:
             raise ValueError("trajectory timing intervals must be positive")
         self._sample_dt_s = sample_dt_s

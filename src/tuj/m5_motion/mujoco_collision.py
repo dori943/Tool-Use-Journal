@@ -23,6 +23,7 @@ from typing import Protocol
 import mujoco
 import numpy as np
 
+from tuj.m5_motion.trajectory_processing import playback_collision_waypoints
 from tuj.m5_motion.runtime_collision_state import copy_runtime_configuration
 from tuj.m5_motion.schema import CollisionContext, RelativeKeyframeSpec, TrajectoryWaypoint
 from tuj.m5_motion.strategy import EdgePlanResult, JointConfig, wrapped_joint_delta
@@ -1149,7 +1150,7 @@ class MuJoCoCollisionValidator:
     ) -> bool:
         """Implement ``MotionPlanBuilder``'s final-validator seam."""
 
-        return self.check_waypoints(waypoints, context).valid
+        return self.check_waypoints(playback_collision_waypoints(waypoints), context).valid
 
 
 class MuJoCoCollisionModelRegistry:
@@ -1348,7 +1349,7 @@ class MuJoCoCollisionModelRegistry:
         extra_clearance_m: float = 0.0,
     ) -> bool:
         self.last_path_collision_check = self.check_waypoints(
-            waypoints, context, extra_clearance_m=extra_clearance_m
+            playback_collision_waypoints(waypoints), context, extra_clearance_m=extra_clearance_m
         )
         return self.last_path_collision_check.valid
 

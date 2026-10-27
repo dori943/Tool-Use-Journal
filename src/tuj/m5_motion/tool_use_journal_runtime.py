@@ -19,7 +19,6 @@ from __future__ import annotations
 import gc
 import math
 import time
-from bisect import bisect_right
 from collections.abc import Callable, Mapping, Sequence
 from dataclasses import dataclass, field
 from enum import Enum
@@ -29,6 +28,7 @@ from typing import Any, Protocol
 import mujoco
 import numpy as np
 
+from tuj.m5_motion.trajectory_processing import interpolate_trajectory_joint_position
 from tuj.m5_motion.event_semantics import requires_endpoint_convergence
 from tuj.m5_motion.geometry import quaternion_matrix_xyzw
 from tuj.m5_motion.mujoco_collision import MuJoCoCollisionModelRegistry
@@ -4754,32 +4754,7 @@ class ToolUseJournalControllerTrajectoryPlayer(
     def _desired_joint_position(
         timeline: Sequence[TrajectoryWaypoint], time_s: float
     ) -> np.ndarray:
-        times = [waypoint.time_from_start_s for waypoint in timeline]
-        if time_s <= times[0]:
-            return np.asarray(timeline[0].joint_positions_rad, dtype=float)
-        if time_s >= times[-1]:
-            return np.asarray(timeline[-1].joint_positions_rad, dtype=float)
-        right_index = bisect_right(times, time_s)
-        left = timeline[right_index - 1]
-        right = timeline[right_index]
-        duration = right.time_from_start_s - left.time_from_start_s
-        ratio = (time_s - left.time_from_start_s) / duration
-        q0 = np.asarray(left.joint_positions_rad, dtype=float)
-        q1 = np.asarray(right.joint_positions_rad, dtype=float)
-        if (
-            left.joint_velocities_rad_s is None
-            or right.joint_velocities_rad_s is None
-        ):
-            return q0 + ratio * (q1 - q0)
-        v0 = np.asarray(left.joint_velocities_rad_s, dtype=float)
-        v1 = np.asarray(right.joint_velocities_rad_s, dtype=float)
-        u2, u3 = ratio * ratio, ratio * ratio * ratio
-        return (
-            (2 * u3 - 3 * u2 + 1) * q0
-            + (u3 - 2 * u2 + ratio) * duration * v0
-            + (-2 * u3 + 3 * u2) * q1
-            + (u3 - u2) * duration * v1
-        )
+        return interpolate_trajectory_joint_position(timeline, time_s)
 
     @staticmethod
     def _tracking_settle_config(

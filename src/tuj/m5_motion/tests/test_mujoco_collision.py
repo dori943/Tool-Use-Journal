@@ -598,3 +598,24 @@ def test_robosuite_rack_scene_adapter_smoke() -> None:
         )
     finally:
         env.close()
+
+
+@pytest.mark.parametrize('use_registry', [False, True])
+@pytest.mark.parametrize('curved', [False, True])
+def test_final_segment_checks_executed_intermediate_states(use_registry, curved):
+    context = CollisionContext(context_id='default', collision_model_version='test-v1')
+    validator = _validator(contexts={'default': context})
+    # Both stored knots are collision-free. A linear crossing, or a Hermite
+    # excursion returning to its start, hits the actual MuJoCo obstacle inside.
+    waypoints = (
+        TrajectoryWaypoint(time_from_start_s=0.003, joint_positions_rad=[0.0],
+                           joint_velocities_rad_s=[2.0] if curved else None),
+        TrajectoryWaypoint(time_from_start_s=1.003,
+                           joint_positions_rad=[0.0 if curved else 0.9],
+                           joint_velocities_rad_s=[-2.0] if curved else None),
+    )
+    assert validator.check_waypoints(waypoints, context).valid
+    subject = (MuJoCoCollisionModelRegistry(
+        {'test-v1': validator}, collision_contexts={'default': context},
+        default_model_version='test-v1') if use_registry else validator)
+    assert not subject.final_segment_validator(waypoints, context)
