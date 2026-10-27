@@ -48,3 +48,26 @@ def test_native_plan_rejects_inherited_assistance_without_moving_targets(active_
     with pytest.raises(ToolUseJournalRuntimeError, match='NATIVE_CONTACT_REQUIRES_UNASSISTED_STATE'):
         _maybe_enable_held_tool_fill_for_plan(runtime, _side_push_plan())
     assert vars(runtime) == before
+
+
+def test_generated_native_preparation_is_unassisted_after_normal_plan_building():
+    from tuj.m5_motion.tests.test_native_contact_preparation import _build_preparation_plan
+    plan = _build_preparation_plan()
+    def forbidden(*args, **kwargs):
+        pytest.fail('native preparation must not enable or clear target-moving assistance')
+    runtime = SimpleNamespace(enable_held_tool_collision_fill=forbidden,
+        enable_held_tool_contact_drag=forbidden, disable_held_tool_collision_fill=forbidden)
+    assert _plan_requests_tabletop_held_tool_push(plan) is False
+    assert _maybe_enable_held_tool_fill_for_plan(runtime, plan) is False
+
+
+@pytest.mark.parametrize('active_state', ['_held_tool_push_partner_ids',
+    '_held_tool_fill_geom_backup','_held_tool_rim_collision_backup',
+    '_held_tool_contact_drag','_held_tool_drag_offsets'])
+def test_native_preparation_rejects_inherited_assist_without_cleanup(active_state):
+    from tuj.m5_motion.tests.test_native_contact_preparation import _build_preparation_plan
+    runtime = SimpleNamespace(**{active_state: {'target': 1}})
+    before = vars(runtime).copy()
+    with pytest.raises(ToolUseJournalRuntimeError, match='NATIVE_CONTACT_REQUIRES_UNASSISTED_STATE'):
+        _maybe_enable_held_tool_fill_for_plan(runtime, _build_preparation_plan())
+    assert vars(runtime) == before

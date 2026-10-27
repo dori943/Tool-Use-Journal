@@ -3696,7 +3696,8 @@ def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
     plans do not arm it.
     """
 
-    if str(plan.metadata.get("contact_path_pattern") or "").upper() == "SIDE_PUSH":
+    if (str(plan.metadata.get("contact_path_pattern") or "").upper() == "SIDE_PUSH"
+            or plan.metadata.get("native_contact_preparation") is True):
         return False
     primitive = str(plan.metadata.get("contact_primitive") or "").strip().lower()
     if primitive == "extract":
@@ -3707,7 +3708,8 @@ def _plan_requests_tabletop_held_tool_push(plan: MotionPlan) -> bool:
 def _maybe_enable_held_tool_fill_for_plan(
     runtime: ToolUseJournalEERuntime, plan: MotionPlan
 ) -> bool:
-    if str(plan.metadata.get("contact_path_pattern") or "").upper() == "SIDE_PUSH":
+    if (str(plan.metadata.get("contact_path_pattern") or "").upper() == "SIDE_PUSH"
+            or plan.metadata.get("native_contact_preparation") is True):
         # A native path must not silently inherit or arm object-following.
         # Clearing active fill can itself reposition targets, so reject such a
         # state without mutating it rather than trying to clean it up here.

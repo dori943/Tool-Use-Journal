@@ -984,6 +984,11 @@ class MotionPlanBuilder:
                     else {}
                 ),
                 **(
+                    {"native_contact_preparation": True}
+                    if request.task.metadata.get("native_contact_preparation") is True
+                    else {}
+                ),
+                **(
                     {"contact_primitive": request.task.contact.primitive,
                      "contact_path_pattern": request.task.contact.path_pattern}
                     if request.task.contact is not None
