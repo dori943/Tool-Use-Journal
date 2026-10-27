@@ -569,10 +569,24 @@ def test_pick_allows_all_coplanar_tiled_supports_on_separation_edge() -> None:
     release = setup.collision_contexts[lift.collision_context_id]
 
     assert lift.collision_context_id.startswith("object-attached-release:bottle:")
-    assert release.allowed_collision_pairs == [
+    # The established lift-off contract bounds both target/support and
+    # EE/support contact until the first separation endpoint. Tiled supports
+    # must retain that same contract for each coplanar tile.
+    expected_pairs = [
         ("bottle", "counter_tile_a"),
         ("bottle", "counter_tile_b"),
+        ("2F", "counter_tile_a"),
+        ("2F", "counter_tile_b"),
     ]
+    assert release.allowed_collision_pairs == expected_pairs
+    assert release.metadata["bounded_collision_allowances"] == [
+        {"selectors": list(pair), "minimum_distance_m": -0.001}
+        for pair in expected_pairs
+    ]
+    assert grasp.collision_context_after_events_id == lift.collision_context_id
+    assert lift.metadata["validate_endpoint_after_context"] is True
+    assert lift.collision_context_after_events_id == transfer.collision_context_id
+    assert release.metadata["post_segment_validation_context_id"] == transfer.collision_context_id
     assert release.metadata["support_separation"]["support_selectors"] == [
         "counter_tile_a",
         "counter_tile_b",
@@ -583,7 +597,9 @@ def test_pick_allows_all_coplanar_tiled_supports_on_separation_edge() -> None:
         for selector in pair
     }
     assert transfer.collision_context_id.startswith("object-attached:bottle:")
-    assert setup.collision_contexts[transfer.collision_context_id].allowed_collision_pairs == []
+    strict = setup.collision_contexts[transfer.collision_context_id]
+    assert strict.allowed_collision_pairs == []
+    assert "bounded_collision_allowances" not in strict.metadata
 
 
 def test_pick_does_not_infer_support_from_a_sliver_overlap() -> None:
