@@ -734,6 +734,12 @@ def binds_tool(details: list[dict]) -> bool:
                for d in details for v in (d.get("binding") or {}).values())
 
 
+def missing_required_tool(subgoal: dict) -> bool:
+    """A tool action with no candidates is not an EE-only transfer."""
+    return (binds_tool(subgoal.get("details", []))
+            and not subgoal.get("tool_candidate_ids"))
+
+
 def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None) -> list[dict]:
     """eval_by == m3 인 술어 인스턴스 → 판정 사양 (술어 1건이 어느 노드/쌍을 보는지).
 
@@ -854,6 +860,10 @@ def plan_evaluations(subgoal: dict, details: list[dict], m1: dict | None = None)
                     if not binds_tool(details):
                         actors.append({"type": "ee_pool"})
                 else:
+                    if binds_tool(details):
+                        # No object can bind ?tool. A direct-grasp partition is
+                        # not evidence that the tool action can be performed.
+                        continue
                     actors = [{"type": "ee_pool"}]
                 call = {"kind": "batch" if head == "batch_feasible" else "swept_space",
                         "action_type": subgoal["kind"], "member_ids": members}

@@ -76,6 +76,27 @@ def _serialized(m1: dict) -> dict:
             "edges": m1["edges"]}
 
 
+def _reject_missing_required_tools(out, tdir, usage):
+    """Retain a failed proposal after the existing bounded feedback loop."""
+    from tuj.m2_subgoal.core import missing_required_tool
+
+    missing = [s["subgoal_id"] for s in out["m2_subgoals"]
+               if missing_required_tool(s)]
+    if not missing:
+        return
+    error = ValueError(f"MISSING_REQUIRED_TOOL: {', '.join(missing)}")
+    rejected = copy.deepcopy(out)
+    rejected["m2_stats"]["llm_usage"] = copy.deepcopy(usage)
+    rejected["m2_validation"] = {
+        "status": "REJECTED", "stage": "tool_binding",
+        "reason_code": "MISSING_REQUIRED_TOOL", "subgoal_ids": missing,
+        "error_type": type(error).__name__, "error": str(error),
+    }
+    with open(os.path.join(tdir, "m2_rejected.json"), "w", encoding="utf-8") as f:
+        json.dump(rejected, f, ensure_ascii=False, indent=2)
+    raise error
+
+
 def main():
     name = sys.argv[1] if len(sys.argv) > 1 else "c1_1"
     m1_json = None
@@ -136,6 +157,8 @@ def main():
             break
     else:
         print(f"[M2] 재분해 상한({MAX_REDECOMPOSE}회) 도달 — 현재 분해로 진행")
+
+    _reject_missing_required_tools(out, tdir, rough.usage)
 
     # 측정 반영 후 자기보고 신뢰도 갱신 + 도구 확정 (LLM, 서브골당 1회)
     if rough._client is None:

@@ -23,7 +23,7 @@ from __future__ import annotations
 
 import json
 
-from .core import TOOL_KINDS, binds_tool
+from .core import TOOL_KINDS, binds_tool, missing_required_tool
 
 def _node_view(responses: list[dict]) -> dict:
     """같은 노드에 대한 응답 여러 건(intrinsic, ee 등)을 노드별 한 뷰로 합친다."""
@@ -300,8 +300,11 @@ def _summarize_for_subgoal(s: dict) -> str:
             # 종전에는 이게 "불충족 조건"으로 들어가 신뢰도 갱신 LLM이 계획이 나빠진 신호로
             # 읽었고, c2_1/c3_1/c3_2/c4_2의 분해 신뢰도가 전부 이 사유로 깎였다
             # ("일괄 조작 불가로 서브골 분해 수정 필요" — 애초에 일괄 조작이 목표가 아니었다).
+            missing_tool = any(e.get("reason_code") == "MISSING_REQUIRED_TOOL"
+                               for e in p.get("evidence", []) if isinstance(e, dict))
             bucket = ("split" if (p["status"] == "unsat"
-                                  and p.get("head") == "batch_feasible")
+                                  and p.get("head") == "batch_feasible"
+                                  and not missing_tool)
                       else p["status"])
             buckets.get(bucket, buckets["unknown"]).append(
                 f"  - {p['expr'][:60]}: ({ev}){tag}")
@@ -413,7 +416,7 @@ def measurement_feedback(m2_out: dict) -> str | None:
     # c1_2에서 M0 캐시 버그로 flat_face가 전부 false가 되자 LLM이 flatten 대신
     # sweep_collect("병으로 반죽을 도마에 쓸어 담기")를 내놓았다. 펴기를 쓸기로 바꾸는 건
     # 어떤 상황에서도 답이 아니므로 kind는 유지하고 도구 후보 확장만 요구한다.
-    kind_lines, tool_lines, adjust_lines = [], [], []
+    kind_lines, tool_lines, adjust_lines, missing_lines = [], [], [], []
     # 0908: 계획 자신이 옮길 물체는 blocker로 세지 않는다. 초기 상태에서 A 위에 B가
     # 있어도 B가 이 태스크의 대상이면 실행 순서가 그것을 해소한다 (c2_2: 빵 두 개가
     # 겹쳐 있는데 아래 빵이 5층, 위 빵이 1층이라 1층을 놓는 순간 노출된다).
@@ -422,10 +425,19 @@ def measurement_feedback(m2_out: dict) -> str | None:
     planned = {t for s in m2_out.get("m2_subgoals", [])
                for t in (s.get("target_ids") or [])}
     for s in m2_out.get("m2_subgoals", []):
+        missing = missing_required_tool(s)
+        if missing:
+            missing_lines.append(
+                f"- MISSING_REQUIRED_TOOL: {s['subgoal_id']} ({s.get('kind')})의 "
+                "필수 ?tool을 바인딩할 후보가 없음. 설비·태스크 대상물 제외 후 "
+                "tool_candidate_ids가 비어 있으며, EE 직접 파지의 분할로는 "
+                "이 도구 액션을 수행할 수 없음.")
         for d in s.get("details", []):
             for p in d.get("pre", []):
                 if p.get("status") != "unsat":
                     continue
+                if missing and "?tool" in p.get("expr", ""):
+                    continue  # The structural failure is reported once above.
                 head = p.get("head")
                 # batch/act_space는 unsat이어도 분할(partition)과 제외 목록으로
                 # 해소되는 신호라 재분해 사유가 아니다 (0831 — kind 진동 방지)
@@ -496,11 +508,14 @@ def measurement_feedback(m2_out: dict) -> str | None:
                     n_f = sum(1 for e in ev if not e.get("pass"))
                     detail = f" (검사 {len(ev)}건 중 {n_f}건 불충족)"
                 kind_lines.append(f"- {p['expr']} -> 불충족{detail}")
-    if not kind_lines and not tool_lines and not adjust_lines:
+    if not kind_lines and not tool_lines and not adjust_lines and not missing_lines:
         return None
     out = ["직전 계획 평가: 아래 조건이 실측에서 충족되지 않았다.",
            "공통: 재분해하더라도 지시문이 요구하는 최종 상태(펴기, 담기, 쌓기, 꺼내기 등)는 "
            "바뀌면 안 된다. 바꿀 수 있는 것은 수행 방식, 도구 후보, 순서, 짝이다."]
+    if missing_lines:
+        out.append("[필수 도구 누락] 아래 계획은 필요한 도구 바인딩이 없어 실행할 수 없다.")
+        out += missing_lines
     if kind_lines:
         out.append("[맨손 수행 불가] 아래 제약은 로봇과 장면의 물리적 사실이므로, 같은 kind의 "
                    "분해를 반복하면 동일하게 실행 불가로 판정된다. 같은 목표를 달성하는 다른 "
@@ -723,6 +738,15 @@ def _apply_responses(m2_out: dict, plan: list[dict], responses: list[dict]) -> l
 
     logs, n_sat = [], {"sat": 0, "unsat": 0, "unknown": 0, "not_queried": 0}
     for s in m2_out["m2_subgoals"]:
+        missing = missing_required_tool(s)
+        if missing:
+            s["tool_validation"] = {
+                "status": "REJECTED", "reason_code": "MISSING_REQUIRED_TOOL",
+                "message": "required ?tool has no candidates after candidate pruning",
+            }
+            s.pop("partition_plan", None)
+        elif (s.get("tool_validation") or {}).get("reason_code") == "MISSING_REQUIRED_TOOL":
+            s.pop("tool_validation")
         for d in s["details"]:
             for p in d["pre"]:
                 if p["eval_by"] != "m3":
@@ -735,7 +759,10 @@ def _apply_responses(m2_out: dict, plan: list[dict], responses: list[dict]) -> l
                 nodes = q_nodes.get(p["id"], []) or answered_nodes
                 # 판정 사양이 대상을 못 잡은 술어(도구 거치 위치 tool_rest 등)는 not_queried.
                 # 나머지는 전부 이번 실행에서 계산된 결과가 있다 (왕복이 없어 미회신 없음).
-                if p["id"] not in q_nodes and not answered_nodes:
+                if missing and "?tool" in p.get("expr", ""):
+                    status, ev = "unsat", [{"reason_code": "MISSING_REQUIRED_TOOL",
+                                            "candidate_ids": []}]
+                elif p["id"] not in q_nodes and not answered_nodes:
                     status, ev = "not_queried", []
                 elif p["head"] in ("batch_feasible", "act_space_clear"):
                     status, ev = _judge_group(p["head"], rs)
@@ -866,7 +893,8 @@ def _apply_responses(m2_out: dict, plan: list[dict], responses: list[dict]) -> l
         if r.get("kind") == "batch" and isinstance(a, dict) and a.get("type") == "ee_pool":
             pool_batch[r.get("subgoal_id")] = r
     for s in m2_out["m2_subgoals"]:
-        if s.get("tool_candidate_ids") or s.get("partition_plan"):
+        if (binds_tool(s.get("details", [])) or s.get("tool_candidate_ids")
+                or s.get("partition_plan")):
             continue                          # 도구 서브골은 위에서 처리, 이미 분할 계획 있음
         targets = s.get("target_ids") or []
         if len(targets) < 2:
