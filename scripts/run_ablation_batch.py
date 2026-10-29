@@ -639,7 +639,7 @@ def build_parser() -> argparse.ArgumentParser:
                    help="run.py --m5-simulate (기본 controller = scripted-grasp live 실행)")
     p.add_argument("--provider", choices=("openai", "gemini"), default=None)
     p.add_argument("--model", default=None)
-    p.add_argument("--timeout-min", type=float, default=90, help="실행 1회 제한 시간(분). 0 = 무제한")
+    p.add_argument("--timeout-min", type=float, default=240, help="실행 1회 제한 시간(분), 기본 240 (c3_2 영상 포함 실행이 90분을 넘김). 0 = 무제한")
     p.add_argument("--skip-done", action="store_true",
                    help="batch_record.json 이 이미 있는 (task, seed) 는 건너뜀")
     p.add_argument("--retry-failed", action="store_true",
