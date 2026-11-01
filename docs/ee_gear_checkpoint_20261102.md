@@ -37,7 +37,7 @@
 - `--registered-only`와 `--experimental-only`가 C3_2의 타입 별칭 12개를 잘못 분류하는 검증 옵션 오류를 수정했다. 실제 등록 우선순위인 정확한 물체 ID, 타입 별칭 순서를 따르며, 정확한 ID가 있으면 다른 EE의 타입 경로로 넘어가지 않는다.
 - 이 수정은 검증 대상 선택에 한정한다. 과거 주 행렬의 원자료와 물리 동작을 바꾸지 않았으며 새 시뮬레이션은 실행하지 않았다. 문서의 소스 불변 확인은 각 실험 실행 당시의 기록이다.
 - 별칭 12개, 정확한 ID 우선순위, 두 선택 옵션의 동작을 추가 검사했다. 해당 검사 파일은 29개 모두 통과했다.
-- 업로드 직전 관련 확대 회귀: **648 PASS, 2 SKIP, 4 FAIL**, NumPy 경고 36개. 실패 4개는 `test_attachment_sync.py::test_projection_uses_current_hand_pose_after_qpos_changes`의 기존 속도 동기화 검사다. 기준 커밋 `6156e34`의 runtime 소스를 메모리에 로드한 대조에서도 동일한 4 FAIL과 1 PASS가 재현됐다. 전체 저장소 테스트가 모두 통과했다고 주장하지 않는다.
+- 업로드 직전 관련 확대 회귀: **648 PASS, 2 SKIP, 4 FAIL**, NumPy 경고 36개. 실패 4개는 `test_attachment_sync.py::test_projection_uses_current_hand_pose_after_qpos_changes`의 기존 속도 동기화 검사다. 기준 커밋 `6156e34`의 runtime 소스를 메모리에 로드한 대조에서도 동일한 4 FAIL과 1 PASS가 재현됐다.
 
 ## 후속 검증과 실행 반영
 
