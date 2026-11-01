@@ -25,7 +25,7 @@
 
 ## 실험 조건
 
-공통 작업 브랜치는 `fix/ee-gear-validation-20261102`, 기준 커밋은 `6156e34`다.
+공통 작업 브랜치는 `fix/subin-ee-gear-validation-20261102`, 기준 커밋은 `6156e34`다.
 새로 검증한 파지 8개가 연결된 공통 코드에서 gpt-4o-mini, seed 0,
 Full planner, controller 실행, task-goals-v1, 물리 재시도 0회로 비교했다.
 실제 Full의 M1은 SiPhy 백엔드와 새 빈 메모리에서 생성했다. 기존 ablation의

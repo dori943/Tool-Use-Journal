@@ -35,7 +35,7 @@
 ## Scope and provenance
 
 Base: `6156e34ef4b8800459e15a7338bfb4e5e5622632` (`fix/dohee-ablation_study`).
-Work branch: `fix/ee-gear-validation-20261102`.
+Work branch: `fix/subin-ee-gear-validation-20261102`.
 This experiment checks grasp, lift and hold for six objects and three EEs.
 It is separate from w/o Reasoner whole-task packing and its `MISSING_REQUIRED_TOOL:SG1` failure.
 

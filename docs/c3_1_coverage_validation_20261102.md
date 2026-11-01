@@ -12,7 +12,7 @@
 - 새 후보는 CatalogRecipe 기본 힘·접촉·충돌·부착·물리 설정, lift 0.18m/minimum 0.10m, hold 5s, slip 5mm/5°를 유지한다. 흡착은 윗면(숟가락 bowl +Y, 머그 handle 방향 upper rim), 접시는 지름이 손 개구보다 커서 두께를 잡는 측면 rim 자세를 제안했다. 실패는 이 후보에 관한 결과다.
 - 기존 레시피의 교정값은 그대로다. 특히 apple 2F는 8N/25°이며 실제 회전 12.900°로 PASS했다. 이를 5° 기준 통과로 해석하지 않는다. 레시피별 전체 설정은 각 배치 `recipe_protocols.json`에 보관했다.
 - seed 0, 각 조합 독립 프로세스·새 환경, 2초 초기 안정화, 최대 동시 2개, 제한 600초/조합, agentview 960×540/20fps, API 호출 0.
-- 작업 branch `fix/ee-gear-validation-20261102`, base commit `6156e34ef4b8800459e15a7338bfb4e5e5622632`. 각 배치의 전체 Python 해시, 압축 tracked patch, hash 기반 untracked 원본 참조를 저장했다. 기존 출력 폴더 전체를 백업하지 않았다. 배치 실행 중 소스 불변 확인.
+- 작업 branch `fix/subin-ee-gear-validation-20261102`, base commit `6156e34ef4b8800459e15a7338bfb4e5e5622632`. 각 배치의 전체 Python 해시, 압축 tracked patch, hash 기반 untracked 원본 참조를 저장했다. 기존 출력 폴더 전체를 백업하지 않았다. 배치 실행 중 소스 불변 확인.
 
 ## 구현 오류와 수정 전후 대조
 
