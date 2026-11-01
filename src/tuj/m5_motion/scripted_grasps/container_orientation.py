@@ -172,7 +172,20 @@ def configure_stable_face(g, record, container):
             rotation = g.T_WR[:3, :3] @ local
             g.destination_rotation = rotation
             g.half = np.ptp(points @ rotation.T, axis=0) / 2.
-            xy = g.free_destination_xy()
+            try:
+                xy = g.free_destination_xy()
+            except ValueError as error:
+                # A blocked footprint rejects this orientation only. Other
+                # declared stable faces can have a narrower footprint and
+                # still satisfy the same occupant/rim/keepout checks.
+                if not str(error).startswith('PLACEMENT_SPACE_EXHAUSTED:'):
+                    raise
+                g.task.metadata.setdefault('stable_face_seat_rejections', []).append({
+                    'object_orientation_xyzw': Rotation.from_matrix(rotation).as_quat().tolist(),
+                    'extents_m': extents.tolist(),
+                    'reason': str(error),
+                })
+                continue
             support, _ = g.support_top_world_z(xy)
             if not stable_face_has_ik(g, xy):
                 continue

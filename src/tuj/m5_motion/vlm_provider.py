@@ -578,6 +578,74 @@ def _ensure_grounded_transport_direct(
     return [direct, *strategies[:-1]]
 
 
+def _ensure_grounded_place_compact(
+    request: MotionPlanRequest,
+    strategies: list[KeyframePlanCandidate],
+) -> list[KeyframePlanCandidate]:
+    """Reserve one candidate for the already specified measured entry/return.
+
+    This is a geometry proposal, not an IK or collision bypass. Preserve the
+    release events and candidate budget; leave all other model routes intact.
+    """
+    goal = request.task.metadata.get("held_place_goal")
+    subject = _held_goal_subject(request)
+    operation = task_operation(request.task)
+    if (not (operation in {"PLACE", "RELEASE"} or operation.startswith("PLACE_"))
+            or not isinstance(goal, dict) or subject is None or not strategies
+            or subject.start_object_orientation_xyzw is None
+            or subject.object_orientation_xyzw is None
+            or subject.eef_orientation_xyzw is None):
+        return strategies
+    frame, start, end, entry = (goal.get(k) for k in
+                                ("frame_ref", "start_anchor", "anchor", "entry_eef_anchor"))
+    if not all(isinstance(value, str) and value for value in (frame, start, end, entry)):
+        return strategies
+    phases = (KeyframeType.PRE_PLACE, KeyframeType.PLACE, KeyframeType.RETREAT)
+    for strategy in strategies:
+        if len(strategy.keyframes) == 3 and all(
+            k.keyframe_type is phase and k.frame_ref == frame and k.anchor == anchor
+            and abs(k.offset_along_approach_m) <= 1e-12
+            for k, phase, anchor in zip(strategy.keyframes, phases, (start, end, entry))
+        ):
+            return strategies
+    release = next((k for strategy in strategies for k in strategy.keyframes
+                    if k.keyframe_type is KeyframeType.PLACE and k.events_after), None)
+    if release is None:
+        return strategies
+    strategy_id = f"{request.task.subgoal_id}:grounded_compact_place"
+    while any(item.strategy_id == strategy_id for item in strategies):
+        strategy_id += "_alternative"
+    keyframes = []
+    for phase, anchor, orientation in zip(phases, (start, end, entry), (
+            subject.start_object_orientation_xyzw, subject.object_orientation_xyzw,
+            subject.eef_orientation_xyzw)):
+        metadata = dict(release.metadata) if phase is KeyframeType.PLACE else {}
+        metadata["packing_orientation_xyzw"] = list(orientation)
+        if phase is not KeyframeType.RETREAT:
+            metadata[POSE_SUBJECT_KEY] = ATTACHED_OBJECT_POSE_SUBJECT
+            metadata[POSE_SUBJECT_OBJECT_ID_KEY] = subject.object_id
+        keyframes.append(RelativeKeyframeSpec(
+            keyframe_id=f"{strategy_id}:{phase.value}", keyframe_type=phase,
+            frame_ref=frame, anchor=anchor, approach_axis_xyz=(0., 0., 1.),
+            tool_axis_to_align="+z", offset_along_approach_m=0., roll_rad=0.,
+            planner=KeyframePlannerType.CARTESIAN,
+            events_after=list(release.events_after) if phase is KeyframeType.PLACE else [],
+            metadata=metadata))
+    resolver = RelativePoseResolver(request.world)
+    for keyframe in keyframes:
+        resolver.resolve(keyframe)
+    compact = KeyframePlanCandidate(
+        strategy_id=strategy_id, keyframes=keyframes,
+        rationale="Measured object entry, grounded release, measured empty-hand return.",
+        provenance=StrategyGenerationProvenance(
+            generator_kind=StrategyGeneratorKind.TASK_GEOMETRY,
+            generator_id="GROUNDED_PLACE_COMPACT_V1",
+            input_hash=_sha256({"request": request.model_dump(mode="json")})),
+        metadata={"canonicalization": "MISSING_MEASURED_ENTRY_RETURN_ROUTE",
+                  "replaced_strategy_id": strategies[-1].strategy_id})
+    return [compact, *strategies[:-1]]
+
+
 def _held_sweep_working_height_payload(
     request: MotionPlanRequest,
 ) -> dict[str, Any] | None:
@@ -1395,6 +1463,7 @@ class OpenAIKeyframeProvider:
             )
 
         strategies = _ensure_grounded_transport_direct(request, strategies)
+        strategies = _ensure_grounded_place_compact(request, strategies)
 
         artifact_hash = _sha256(
             {

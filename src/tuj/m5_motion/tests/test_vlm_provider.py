@@ -1460,3 +1460,58 @@ def test_direct_transport_requires_complete_grounded_pose_metadata():
     artifact = provider.generate(request)
     assert all(c.provenance.generator_kind.value == 'VLM' for c in artifact.candidates)
     assert all(c.keyframes[0].offset_along_approach_m == .2 for c in artifact.candidates)
+
+
+def _measured_place_request():
+    request = _place_request()
+    request.task.goal.target_region_id = 'tray'
+    request.world.robot_state.attached_object_id = 'bottle'
+    request.world.objects['tray'] = {
+        'pose': {'position_m': [.2, .3, .7], 'orientation_xyzw': [0., 0., 0., 1.]},
+        'anchors': {'start': [.1, 0., .2], 'seat': [.1, 0., .18],
+                    'hand_entry': [.1, 0., .21]}}
+    request.task.metadata['held_place_goal'] = {
+        'frame_ref': 'object:tray', 'start_anchor': 'start', 'anchor': 'seat',
+        'entry_eef_anchor': 'hand_entry', 'object_id': 'bottle',
+        'preserve_grasp_orientation': True,
+        'start_object_orientation_xyzw': [1., 0., 0., 0.],
+        'object_orientation_xyzw': [1., 0., 0., 0.],
+        'eef_orientation_xyzw': [0., 0., 0., 1.]}
+    return request
+
+
+@pytest.mark.parametrize('ee,release_event', [('2F', 'GRIPPER_OPEN'), ('vac', 'SUCTION_OFF')])
+def test_missing_measured_place_route_preserves_budget_release_and_pose_subject(ee, release_event):
+    from tuj.m5_motion.vlm_provider import _ensure_grounded_place_compact
+    request = _measured_place_request(); request.task.ee = ee
+    request.task.metadata['ee_capabilities'] = ['suction'] if ee == 'vac' else ['opposed_finger_contact']
+    before = request.model_dump(mode='json')
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model='gpt-test', candidate_count=2),
+        client=_FakeClient(_release_batch()))
+    artifact = provider.generate(request)
+    assert len(artifact.candidates) == 2
+    compact, original = artifact.candidates
+    assert compact.provenance.generator_id == 'GROUNDED_PLACE_COMPACT_V1'
+    assert original.provenance.generator_kind.value == 'VLM'
+    pre, place, retreat = compact.keyframes
+    assert [k.anchor for k in compact.keyframes] == ['start', 'seat', 'hand_entry']
+    assert all(k.offset_along_approach_m == 0. for k in compact.keyframes)
+    assert [e.value for e in place.events_after] == ['DETACH_OBJECT', release_event]
+    assert place.metadata['allow_release_contact'] is True
+    assert pre.metadata['pose_subject'] == place.metadata['pose_subject'] == 'ATTACHED_OBJECT'
+    assert 'pose_subject' not in retreat.metadata
+    assert retreat.metadata['packing_orientation_xyzw'] == [0., 0., 0., 1.]
+    assert pre.events_after == retreat.events_after == []
+    assert request.model_dump(mode='json') == before
+    assert _ensure_grounded_place_compact(request, artifact.candidates) is artifact.candidates
+
+
+def test_missing_measured_hand_entry_does_not_invent_compact_place_route():
+    request = _measured_place_request()
+    del request.task.metadata['held_place_goal']['entry_eef_anchor']
+    provider = OpenAIKeyframeProvider(
+        OpenAIKeyframeProviderConfig(model='gpt-test', candidate_count=2),
+        client=_FakeClient(_release_batch()))
+    artifact = provider.generate(request)
+    assert all(c.provenance.generator_kind.value == 'VLM' for c in artifact.candidates)

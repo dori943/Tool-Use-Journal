@@ -20,4 +20,6 @@ def apple_recipe(environment='C2_1_ObjectSorting'):
 def build_apple_targets(T_WB,center_in_body_m,local_size_m,recipe=None):
     return build_catalog_targets(T_WB,center_in_body_m,local_size_m,recipe or apple_recipe())
 def grasp_apple(context,object_id='apple',recipe=None):
-    return dispatch_grasp(context,object_id,recipe or apple_recipe(),expected_id='apple')
+    # bind_context has already selected the correct environment and geometry.
+    active = recipe or getattr(context, 'recipe', None) or apple_recipe()
+    return dispatch_grasp(context,object_id,active,expected_id='apple')

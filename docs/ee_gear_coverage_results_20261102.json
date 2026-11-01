@@ -1,0 +1,453 @@
+{
+  "schema_version": 1,
+  "checkpoint_date": "2026-11-02",
+  "scope": "Independent simulated grasp, lift and hold; not final paper scores or whole-task ablation success.",
+  "base_commit": "6156e34ef4b8800459e15a7338bfb4e5e5622632",
+  "raw_artifacts_in_git": false,
+  "provenance_note": "Source paths are repository-relative local artifact identifiers. Raw output, video, state arrays and source snapshots remain local and are not part of this upload. SHA-256 refers to the preserved source bytes.",
+  "field_semantics": {
+    "status": "Original primary-summary status, never overwritten.",
+    "reviewed_status": "Present only for an explicit classification correction.",
+    "failure_stage": "Original result.failure_stage; null means absent in the summary.",
+    "reviewed_failure_stage": "HOLD inferred only from the original HOLD_VALIDATION_FAILED reason.",
+    "attachment_null": "Missing original metadata; not evidence that attachment was absent.",
+    "hold": "Original recorded metrics; empty means no hold metrics in the summary. Distances in metres and angles in degrees.",
+    "counts": "Descriptive counts across different task/recipe protocols; do not pool into a common success rate."
+  },
+  "completed_task_count": 6,
+  "primary_case_count": 114,
+  "raw_counts": {
+    "PASS": 64,
+    "FAIL": 49,
+    "ERROR": 1,
+    "TIMEOUT": 0
+  },
+  "reviewed_counts": {
+    "PASS": 64,
+    "FAIL": 50,
+    "ERROR": 0,
+    "TIMEOUT": 0
+  },
+  "pass_attachment_counts": {
+    "free_hold_then_transport_attachment": 26,
+    "acquisition_assisted": 38
+  },
+  "corrections": [
+    {
+      "task": "c3_2",
+      "object": "fork_a",
+      "ee": "vac",
+      "original_status": "ERROR",
+      "reviewed_status": "FAIL",
+      "reason": "Measured attachment penetration blocked acquisition. Classification changed; physical threshold and outcome unchanged.",
+      "control_summary_source": {
+        "path": "output/c3_2-attachment-classification-20261102-a/summary.json",
+        "sha256": "f791ff11bd3ef286acd1285ab52d2087e81ddf3858efd561a98f9576c3afb189"
+      },
+      "control_audit_source": {
+        "path": "output/c3_2-attachment-classification-20261102-a/evidence_audit.json",
+        "sha256": "cec9ddc2ea5cbd27f2418b37a1999af2e4d228483c9b5df34d7edb02e215f4ea"
+      },
+      "same_initial_grasp_final_state_arrays": true,
+      "same_failure_reason": true,
+      "same_metrics": true
+    }
+  ],
+  "superseded_matrix_notes": [
+    {
+      "task": "c3_1",
+      "summary_source": {
+        "path": "output/c3_1-ee-coverage-20261102-a/c3_1/summary.json",
+        "sha256": "c204669eff2b6b324f3f0a58441a1ac3772643605050b60e2b60b4c5738688d7"
+      },
+      "raw_counts": {
+        "PASS": 8,
+        "FAIL": 5,
+        "ERROR": 2,
+        "TIMEOUT": 0
+      },
+      "change": "apple/mug 3F used the bound task recipe after a context mismatch fix. The full corrected 15-case matrix is used below. The other 13 cases retained their saved states and metrics."
+    },
+    {
+      "task": "c4_1",
+      "change": "An interrupted pre-fix run is excluded. The full 15-case post-fix matrix is used below. The 3F fingertip selector was corrected without changing declared friction or force."
+    }
+  ],
+  "integration": {
+    "new_candidates_promoted_to_normal_execution": [
+      {
+        "task": "c4_2",
+        "object": "rolling_pin",
+        "ee": "3F"
+      },
+      {
+        "task": "c4_2",
+        "object": "rolling_pin",
+        "ee": "vac"
+      },
+      {
+        "task": "c4_2",
+        "object": "baguette",
+        "ee": "3F"
+      },
+      {
+        "task": "c4_2",
+        "object": "baguette",
+        "ee": "vac"
+      },
+      {
+        "task": "c4_2",
+        "object": "cereal",
+        "ee": "3F"
+      },
+      {
+        "task": "c4_2",
+        "object": "cereal",
+        "ee": "vac"
+      },
+      {
+        "task": "c4_2",
+        "object": "milk",
+        "ee": "2F"
+      },
+      {
+        "task": "c4_2",
+        "object": "milk",
+        "ee": "vac"
+      }
+    ],
+    "other_new_candidates": "validator-only",
+    "estimated_feasible_ee_sets_changed": false
+  },
+  "tasks": [
+    {
+      "task": "c4_2",
+      "environment": "C4_2_DiagonalFitPacking",
+      "seed": 0,
+      "summary_source": {
+        "path": "output/c4_2-all-ee-20261031-b/c4_2/summary.json",
+        "sha256": "9590d97eeb02d8baebb506f67f818f3f70eac44484caa05a481c10208c999da7"
+      },
+      "manifest_source": {
+        "path": "output/c4_2-all-ee-20261031-b/run_manifest.json",
+        "sha256": "365e487b60aa002344a43fa698e4bc72dbb3c6d2f9e18e2531afad1609943a9a"
+      },
+      "evidence_audit_source": {
+        "path": "output/c4_2-all-ee-20261031-b/evidence_audit.json",
+        "sha256": "9a667aa1f31bde8719b9d1e76be6247e53485b54de99041bc38795763c69b769"
+      },
+      "case_count": 18,
+      "raw_counts": {
+        "PASS": 14,
+        "FAIL": 4,
+        "ERROR": 0,
+        "TIMEOUT": 0
+      },
+      "reviewed_counts": {
+        "PASS": 14,
+        "FAIL": 4,
+        "ERROR": 0,
+        "TIMEOUT": 0
+      },
+      "pass_attachment_counts": {
+        "free_hold_then_transport_attachment": 7,
+        "acquisition_assisted": 7
+      },
+      "cases": [
+        {"object":"rolling_pin","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.20684025734478617,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":0.0002603427676959504,"max_slip_deg":0.05708051745430007}},
+        {"object":"rolling_pin","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.20777936297530497,"hold_s":5.000000000002057,"all_finger_contact_fraction":1.0,"max_slip_m":0.00011011517885382366,"max_slip_deg":0.17241501510280013}},
+        {"object":"rolling_pin","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.19394887727365895,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":5.50052435251995e-16,"max_slip_deg":1.2406437941908316e-14}},
+        {"object":"baguette","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16473121159386672,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":1.3626404732664203e-15,"max_slip_deg":6.930248305246519e-14}},
+        {"object":"baguette","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.1756486640473126,"hold_s":5.00000000000156,"all_finger_contact_fraction":1.0,"max_slip_m":0.0007254259252842048,"max_slip_deg":0.6631257325825392}},
+        {"object":"baguette","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16090438194414192,"hold_s":5.0000000000040465,"all_finger_contact_fraction":0.0,"max_slip_m":1.343614793795399e-16,"max_slip_deg":4.8929156060121374e-14}},
+        {"object":"whisk","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.17983740768054746,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":1.4739229889206566e-15,"max_slip_deg":8.974203064330855e-14}},
+        {"object":"whisk","ee":"3F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"whisk","ee":"vac","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"UNEXPECTED_COLLISION"},
+        {"object":"cereal","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.1792371247552751,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":5.498813130787885e-05,"max_slip_deg":0.0010588701703363966}},
+        {"object":"cereal","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.1794622977633713,"hold_s":5.000000000006111,"all_finger_contact_fraction":1.0,"max_slip_m":0.0001396082922938541,"max_slip_deg":0.16053901644676155}},
+        {"object":"cereal","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16747746912907147,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":2.24923263196661e-16,"max_slip_deg":7.85458357230098e-19}},
+        {"object":"milk","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.17748270007420752,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":0.00013219347734019682,"max_slip_deg":0.004096511043215528}},
+        {"object":"milk","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.17721550085884352,"hold_s":5.000000000005823,"all_finger_contact_fraction":1.0,"max_slip_m":0.0003348694903291013,"max_slip_deg":0.28280239423536724}},
+        {"object":"milk","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16733337271195392,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":6.218854204809959e-16,"max_slip_deg":1.742931258353219e-17}},
+        {"object":"lid","ee":"2F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"lid","ee":"3F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"lid","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16731066996415245,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":5.673765493888205e-17,"max_slip_deg":1.566358540921101e-18}}
+      ]
+    },
+    {
+      "task": "c4_1",
+      "environment": "C4_1_IntervalFitExtraction",
+      "seed": 0,
+      "summary_source": {
+        "path": "output/c4_1-ee-coverage-20261101-b/c4_1/summary.json",
+        "sha256": "5cb0b02546cc783c23e70dbc235d4f74c6d379d2542f84aa762cd295b1d446d1"
+      },
+      "manifest_source": {
+        "path": "output/c4_1-ee-coverage-20261101-b/run_manifest.json",
+        "sha256": "a6d18f59de7f192480a552d8052326f360f67c78e7314078f267a9df9bc9ca8d"
+      },
+      "evidence_audit_source": {
+        "path": "output/c4_1-ee-coverage-20261101-b/evidence_audit.json",
+        "sha256": "20b8b10c527cee53144cb575c3d35696c77887ec7ff52beb2e6432eb06b36ff3"
+      },
+      "case_count": 15,
+      "raw_counts": {
+        "PASS": 7,
+        "FAIL": 8,
+        "ERROR": 0,
+        "TIMEOUT": 0
+      },
+      "reviewed_counts": {
+        "PASS": 7,
+        "FAIL": 8,
+        "ERROR": 0,
+        "TIMEOUT": 0
+      },
+      "pass_attachment_counts": {
+        "free_hold_then_transport_attachment": 3,
+        "acquisition_assisted": 4
+      },
+      "cases": [
+        {"object":"tool_2_spatula_a","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.1635276123556616,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":7.310225697048029e-05,"max_slip_deg":0.02254963445978157}},
+        {"object":"tool_2_spatula_a","ee":"3F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"tool_2_spatula_a","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16725449593952824,"hold_s":5.000000000003194,"all_finger_contact_fraction":0.0,"max_slip_m":1.2738115944464653e-16,"max_slip_deg":5.480248124392103e-14}},
+        {"object":"tool_3_spatula_b","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.16111569550934324,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":0.0005053613042092629,"max_slip_deg":0.315348161121034}},
+        {"object":"tool_3_spatula_b","ee":"3F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"tool_3_spatula_b","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16735594496589334,"hold_s":5.00000000000497,"all_finger_contact_fraction":0.0,"max_slip_m":5.26545014748687e-16,"max_slip_deg":3.9054594965678045e-14}},
+        {"object":"tool_4_spatula_c","ee":"2F","status":"FAIL","failure_stage":"PLAN_GRASP","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"CARTESIAN_COLLISION"},
+        {"object":"tool_4_spatula_c","ee":"3F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"tool_4_spatula_c","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16746199000230533,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":2.67507634463277e-16,"max_slip_deg":1.939381376630723e-14}},
+        {"object":"tool_5_cutting_board","ee":"2F","status":"FAIL","failure_stage":"PLAN_GRASP","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"CARTESIAN_COLLISION"},
+        {"object":"tool_5_cutting_board","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.17580219241519768,"hold_s":5.000000000006111,"all_finger_contact_fraction":1.0,"max_slip_m":6.385451457724414e-05,"max_slip_deg":0.05006720504805285}},
+        {"object":"tool_5_cutting_board","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16737996828479884,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":2.4309120510460227e-16,"max_slip_deg":2.733399274193857e-14}},
+        {"object":"card","ee":"2F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"card","ee":"3F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"card","ee":"vac","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"}
+      ]
+    },
+    {
+      "task": "c3_2",
+      "environment": "C3_2_BreakfastTrayPreparation",
+      "seed": 0,
+      "summary_source": {
+        "path": "output/c3_2-ee-coverage-20261102-a/c3_2/summary.json",
+        "sha256": "2a3ad1fb5381fbad457e1b5f84a52a3e6d5a9393a508139cc2a95dc6f77077f0"
+      },
+      "manifest_source": {
+        "path": "output/c3_2-ee-coverage-20261102-a/run_manifest.json",
+        "sha256": "7f944c4bedd60e2b871f5c95a43a057cc4b9dfe2ba51cf299686805476a28db5"
+      },
+      "evidence_audit_source": {
+        "path": "output/c3_2-ee-coverage-20261102-a/evidence_audit.json",
+        "sha256": "7f194443f7a0f315ef78dfedce1a318b2b9e37a75f9a91cc779ea732012c01cc"
+      },
+      "case_count": 36,
+      "raw_counts": {
+        "PASS": 19,
+        "FAIL": 16,
+        "ERROR": 1,
+        "TIMEOUT": 0
+      },
+      "reviewed_counts": {
+        "PASS": 19,
+        "FAIL": 17,
+        "ERROR": 0,
+        "TIMEOUT": 0
+      },
+      "pass_attachment_counts": {
+        "acquisition_assisted": 16,
+        "free_hold_then_transport_attachment": 3
+      },
+      "cases": [
+        {"object":"plate_a","ee":"2F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"plate_a","ee":"3F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"plate_a","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16403118067490496,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":9.70421392819826e-16,"max_slip_deg":4.194462088294239e-15}},
+        {"object":"plate_b","ee":"2F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"plate_b","ee":"3F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"plate_b","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16402599734670353,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":8.65058764909474e-16,"max_slip_deg":2.8804329089149396e-15}},
+        {"object":"mug_a","ee":"2F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"CONTACT_LOST_BEFORE_LIFT"},
+        {"object":"mug_a","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.13092279206808133,"hold_s":5.000000000006111,"all_finger_contact_fraction":1.0,"max_slip_m":1.1421820368683977e-15,"max_slip_deg":3.4603741109774522e-15}},
+        {"object":"mug_a","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16734027928344597,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":4.388850394221322e-16,"max_slip_deg":3.770790463137335e-18}},
+        {"object":"mug_b","ee":"2F","status":"FAIL","failure_stage":null,"attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{"minimum_hold_lift_m":0.17184427174984962,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":0.013179467761425954,"max_slip_deg":126.1893081850506},"reviewed_failure_stage":"HOLD","failure_stage_basis":"failure_reason=HOLD_VALIDATION_FAILED","failure_reason_code":"HOLD_VALIDATION_FAILED"},
+        {"object":"mug_b","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.1300775938716915,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.784,"max_slip_m":1.0074607276485897e-15,"max_slip_deg":2.8101453930639604e-15}},
+        {"object":"mug_b","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16735123826163545,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":4.423544863740858e-17,"max_slip_deg":1.5451383265746787e-18}},
+        {"object":"fork_a","ee":"2F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"CONTACT_LOST_BEFORE_LIFT"},
+        {"object":"fork_a","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.14570419211939178,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":1.4177191447364891e-15,"max_slip_deg":4.0246406410652975e-14}},
+        {"object":"fork_a","ee":"vac","status":"ERROR","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"reviewed_status":"FAIL","classification_correction":"attachment_geometry_block_is_motion_or_grasp_failure","failure_reason_code":"ATTACHMENT_GEOMETRY_BLOCK"},
+        {"object":"fork_b","ee":"2F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"CONTACT_LOST_BEFORE_LIFT"},
+        {"object":"fork_b","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.14571555509968936,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":1.6853166672394001e-15,"max_slip_deg":3.960085656304296e-14}},
+        {"object":"fork_b","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.1642345116684122,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":2.0990154059319366e-16,"max_slip_deg":2.4947739922601817e-15}},
+        {"object":"spoon_a","ee":"2F","status":"FAIL","failure_stage":"PLAN_GRASP","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"CARTESIAN_COLLISION"},
+        {"object":"spoon_a","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.14417376946143867,"hold_s":5.0,"all_finger_contact_fraction":1.0,"max_slip_m":1.087459945976114e-15,"max_slip_deg":4.473787807169592e-14}},
+        {"object":"spoon_a","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.17775678947349138,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":2.38524477946811e-16,"max_slip_deg":4.0688404691790156e-14}},
+        {"object":"spoon_b","ee":"2F","status":"FAIL","failure_stage":"PLAN_GRASP","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"CARTESIAN_COLLISION"},
+        {"object":"spoon_b","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.14327105746588675,"hold_s":5.0,"all_finger_contact_fraction":1.0,"max_slip_m":1.3448974475153951e-15,"max_slip_deg":3.233359442660328e-14}},
+        {"object":"spoon_b","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.17766090137086332,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":5.497520430515484e-16,"max_slip_deg":8.232324640314776e-15}},
+        {"object":"bread_a","ee":"2F","status":"FAIL","failure_stage":null,"attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{"minimum_hold_lift_m":0.1711736553584604,"hold_s":4.999999999989907,"all_finger_contact_fraction":1.0,"max_slip_m":0.0009118157228145031,"max_slip_deg":10.272807003895487},"reviewed_failure_stage":"HOLD","failure_stage_basis":"failure_reason=HOLD_VALIDATION_FAILED","failure_reason_code":"HOLD_VALIDATION_FAILED"},
+        {"object":"bread_a","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.11361149872413656,"hold_s":5.000000000006111,"all_finger_contact_fraction":1.0,"max_slip_m":0.0021089480318174764,"max_slip_deg":1.6364572090057792}},
+        {"object":"bread_a","ee":"vac","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"bread_b","ee":"2F","status":"FAIL","failure_stage":"PLAN_GRASP","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"CARTESIAN_COLLISION"},
+        {"object":"bread_b","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.11374874420857051,"hold_s":5.000000000006111,"all_finger_contact_fraction":1.0,"max_slip_m":0.002202881142963089,"max_slip_deg":1.7119780770221065}},
+        {"object":"bread_b","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16067456247051692,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":2.021372759734637e-16,"max_slip_deg":2.0882457786681877e-16}},
+        {"object":"fruit_a","ee":"2F","status":"FAIL","failure_stage":"PLAN_LIFT","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"fruit_a","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.09975632296667736,"hold_s":5.000000000005823,"all_finger_contact_fraction":1.0,"max_slip_m":1.4885520155489757e-15,"max_slip_deg":2.0781250674030453e-15}},
+        {"object":"fruit_a","ee":"vac","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"fruit_b","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.1740875835705098,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":0.0005648210093560246,"max_slip_deg":1.10586202901672}},
+        {"object":"fruit_b","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.0997396988922652,"hold_s":5.000000000006111,"all_finger_contact_fraction":1.0,"max_slip_m":1.307015499648413e-15,"max_slip_deg":2.313584000964812e-15}},
+        {"object":"fruit_b","ee":"vac","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"}
+      ]
+    },
+    {
+      "task": "c3_1",
+      "environment": "C3_1_ObjectSorting",
+      "seed": 0,
+      "summary_source": {
+        "path": "output/c3_1-ee-coverage-20261102-b/c3_1/summary.json",
+        "sha256": "520cca92bfaefa987244c3a26c8f0732ede67780f1aaae07b08c49ee9a13c4b7"
+      },
+      "manifest_source": {
+        "path": "output/c3_1-ee-coverage-20261102-b/run_manifest.json",
+        "sha256": "c0e198d85e7f3fd981d92b7295194d2224fe9645fc06d71abc77f5942c001ff6"
+      },
+      "evidence_audit_source": {
+        "path": "output/c3_1-ee-coverage-20261102-b/evidence_audit.json",
+        "sha256": "1c651796918a1136f12316fcdf1900563cad81248f6aab14bfca0ed4b21fee94"
+      },
+      "case_count": 15,
+      "raw_counts": {
+        "PASS": 10,
+        "FAIL": 5,
+        "ERROR": 0,
+        "TIMEOUT": 0
+      },
+      "reviewed_counts": {
+        "PASS": 10,
+        "FAIL": 5,
+        "ERROR": 0,
+        "TIMEOUT": 0
+      },
+      "pass_attachment_counts": {
+        "free_hold_then_transport_attachment": 7,
+        "acquisition_assisted": 3
+      },
+      "cases": [
+        {"object":"apple","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.17594136144074912,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":0.000899665507383422,"max_slip_deg":12.899581620612283}},
+        {"object":"apple","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.17492226951979706,"hold_s":5.000000000006111,"all_finger_contact_fraction":1.0,"max_slip_m":0.0005563638602853685,"max_slip_deg":0.1358019890429281}},
+        {"object":"apple","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16078448267943035,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":8.998878031629687e-18,"max_slip_deg":3.666156319001469e-17}},
+        {"object":"bread","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.16877395752173185,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":0.0009340562702083332,"max_slip_deg":0.7500637772262668}},
+        {"object":"bread","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.16862389118399768,"hold_s":5.000000000006107,"all_finger_contact_fraction":1.0,"max_slip_m":0.0013789463918071124,"max_slip_deg":1.1604934594962044}},
+        {"object":"bread","ee":"vac","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"mug","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.13955710642079244,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":6.715450797239402e-05,"max_slip_deg":0.11047878190547118}},
+        {"object":"mug","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.13891551588948126,"hold_s":5.000000000006111,"all_finger_contact_fraction":1.0,"max_slip_m":0.0006318892276378205,"max_slip_deg":1.3274674881901245}},
+        {"object":"mug","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.1673192653210418,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":1.1892744051811547e-16,"max_slip_deg":4.7759645702137245e-18}},
+        {"object":"plate","ee":"2F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"plate","ee":"3F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"plate","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.1673646109255199,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":1.2888423398670571e-16,"max_slip_deg":3.0206365122407414e-18}},
+        {"object":"spoon","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.14892535060382417,"hold_s":5.0,"all_finger_contact_fraction":1.0,"max_slip_m":0.00012328916531948215,"max_slip_deg":0.05785555004344603}},
+        {"object":"spoon","ee":"3F","status":"FAIL","failure_stage":null,"attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{"minimum_hold_lift_m":0.11702796568375207,"hold_s":5.0,"all_finger_contact_fraction":0.0,"max_slip_m":0.03441391260841711,"max_slip_deg":60.08559126377477},"reviewed_failure_stage":"HOLD","failure_stage_basis":"failure_reason=HOLD_VALIDATION_FAILED","failure_reason_code":"HOLD_VALIDATION_FAILED"},
+        {"object":"spoon","ee":"vac","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"}
+      ]
+    },
+    {
+      "task": "c2_2",
+      "environment": "C2_2_SandwichAssembly",
+      "seed": 0,
+      "summary_source": {
+        "path": "output/c2_2-ee-coverage-20261102-a/c2_2/summary.json",
+        "sha256": "e1c0d874829018e5f1937e062add0a4cf0924ec83bda04d6b09fbfe728fe44d1"
+      },
+      "manifest_source": {
+        "path": "output/c2_2-ee-coverage-20261102-a/run_manifest.json",
+        "sha256": "cc721af0d86db216c0ad7642b3970b73310bf288b4a2432a7f01a34cbbed9ce8"
+      },
+      "evidence_audit_source": {
+        "path": "output/c2_2-ee-coverage-20261102-a/evidence_audit.json",
+        "sha256": "b0f44cc58079771a7c6a652fffcd837b0c9a48c10f562d427d81c0314b9c8861"
+      },
+      "case_count": 15,
+      "raw_counts": {
+        "PASS": 5,
+        "FAIL": 10,
+        "ERROR": 0,
+        "TIMEOUT": 0
+      },
+      "reviewed_counts": {
+        "PASS": 5,
+        "FAIL": 10,
+        "ERROR": 0,
+        "TIMEOUT": 0
+      },
+      "pass_attachment_counts": {
+        "acquisition_assisted": 5
+      },
+      "cases": [
+        {"object":"bread_a","ee":"2F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"bread_a","ee":"3F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"bread_a","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.179957274636531,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":2.668443576214828e-16,"max_slip_deg":1.2915780857287465e-17}},
+        {"object":"bread_b","ee":"2F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"bread_b","ee":"3F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"bread_b","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.17995377773768284,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":6.302731978814665e-16,"max_slip_deg":1.4602807539743135e-17}},
+        {"object":"turkey_1","ee":"2F","status":"FAIL","failure_stage":"PLAN_GRASP","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"CARTESIAN_COLLISION"},
+        {"object":"turkey_1","ee":"3F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"turkey_1","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.17596126831681047,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":5.217344878683175e-16,"max_slip_deg":1.9751877175001384e-16}},
+        {"object":"cheese_1","ee":"2F","status":"FAIL","failure_stage":"PLAN_GRASP","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"CARTESIAN_COLLISION"},
+        {"object":"cheese_1","ee":"3F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"cheese_1","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.17612695615951734,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":5.126129885721504e-16,"max_slip_deg":2.5505015723908755e-16}},
+        {"object":"tomato_slice","ee":"2F","status":"FAIL","failure_stage":"PLAN_GRASP","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"CARTESIAN_COLLISION"},
+        {"object":"tomato_slice","ee":"3F","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"tomato_slice","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.17654176171165203,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":4.620299929763113e-16,"max_slip_deg":1.1775204318622787e-17}}
+      ]
+    },
+    {
+      "task": "c2_1",
+      "environment": "C2_1_ObjectSorting",
+      "seed": 0,
+      "summary_source": {
+        "path": "output/c2_1-ee-coverage-20261102-a/c2_1/summary.json",
+        "sha256": "a0bc80609fc2ff474aafd9c8dc9b34c805437fd4d281a93309deeacea759baf9"
+      },
+      "manifest_source": {
+        "path": "output/c2_1-ee-coverage-20261102-a/run_manifest.json",
+        "sha256": "e720746ef3df237eb30912dd2f05489657e9081e0ba38c78352153f9bf82e412"
+      },
+      "evidence_audit_source": {
+        "path": "output/c2_1-ee-coverage-20261102-a/evidence_audit.json",
+        "sha256": "80a174ff6beacdbe62d301b93dc2c77301402c30ee9b5d2e41bd112770b76932"
+      },
+      "case_count": 15,
+      "raw_counts": {
+        "PASS": 9,
+        "FAIL": 6,
+        "ERROR": 0,
+        "TIMEOUT": 0
+      },
+      "reviewed_counts": {
+        "PASS": 9,
+        "FAIL": 6,
+        "ERROR": 0,
+        "TIMEOUT": 0
+      },
+      "pass_attachment_counts": {
+        "free_hold_then_transport_attachment": 6,
+        "acquisition_assisted": 3
+      },
+      "cases": [
+        {"object":"apple","ee":"2F","status":"FAIL","failure_stage":null,"attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{"minimum_hold_lift_m":0.17615549909588235,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":0.0006878358575702318,"max_slip_deg":15.119470072068937},"reviewed_failure_stage":"HOLD","failure_stage_basis":"failure_reason=HOLD_VALIDATION_FAILED","failure_reason_code":"HOLD_VALIDATION_FAILED"},
+        {"object":"apple","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.17492226951979706,"hold_s":5.000000000006111,"all_finger_contact_fraction":1.0,"max_slip_m":0.0005563638602853685,"max_slip_deg":0.1358019890429281}},
+        {"object":"apple","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.16078448267943035,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":8.998878031629687e-18,"max_slip_deg":3.666156319001469e-17}},
+        {"object":"bread","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.16608714537947067,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":0.0009337251981184347,"max_slip_deg":0.7622878355596852}},
+        {"object":"bread","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.16862389118399768,"hold_s":5.000000000006107,"all_finger_contact_fraction":1.0,"max_slip_m":0.0013789463918071124,"max_slip_deg":1.1604934594962044}},
+        {"object":"bread","ee":"vac","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"},
+        {"object":"mug","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.17959832510416296,"hold_s":4.999999999988347,"all_finger_contact_fraction":1.0,"max_slip_m":5.9454031971082666e-05,"max_slip_deg":0.10424915952612898}},
+        {"object":"mug","ee":"3F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.13891551588948126,"hold_s":5.000000000006111,"all_finger_contact_fraction":1.0,"max_slip_m":0.0006318892276378205,"max_slip_deg":1.3274674881901245}},
+        {"object":"mug","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.1673192653210418,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":1.1892744051811547e-16,"max_slip_deg":4.7759645702137245e-18}},
+        {"object":"plate","ee":"2F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"plate","ee":"3F","status":"FAIL","failure_stage":"PLAN_PRE_CLEARANCE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"IK_FAILED"},
+        {"object":"plate","ee":"vac","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":true,"used":true,"phase":"ACQUISITION"},"hold":{"minimum_hold_lift_m":0.1673646109255199,"hold_s":5.000000000006111,"all_finger_contact_fraction":0.0,"max_slip_m":1.2888423398670571e-16,"max_slip_deg":3.0206365122407414e-18}},
+        {"object":"spoon","ee":"2F","status":"PASS","failure_stage":null,"attachment":{"acquisition_used":false,"used":true,"phase":"POST_VALIDATED_GRASP"},"hold":{"minimum_hold_lift_m":0.14892535060382417,"hold_s":5.0,"all_finger_contact_fraction":1.0,"max_slip_m":0.00012328916531948215,"max_slip_deg":0.05785555004344603}},
+        {"object":"spoon","ee":"3F","status":"FAIL","failure_stage":null,"attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{"minimum_hold_lift_m":0.11702796568375207,"hold_s":5.0,"all_finger_contact_fraction":0.0,"max_slip_m":0.03441391260841711,"max_slip_deg":60.08559126377477},"reviewed_failure_stage":"HOLD","failure_stage_basis":"failure_reason=HOLD_VALIDATION_FAILED","failure_reason_code":"HOLD_VALIDATION_FAILED"},
+        {"object":"spoon","ee":"vac","status":"FAIL","failure_stage":"CLOSE","attachment":{"acquisition_used":null,"used":false,"phase":null},"hold":{},"failure_reason_code":"GRASP_CONTACT_NOT_STABLE"}
+      ]
+    }
+  ]
+}

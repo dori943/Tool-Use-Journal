@@ -119,7 +119,7 @@ def test_cereal_empty_feasibility_is_not_revived_by_scripted_recipe(target_id):
     assert changes[0]['scripted_feasible_ee'] == []
     contract = constrained.task_graph.subgoals[0].action_parameters[
         'execution_compatibility']
-    assert contract['supported_ee'] == ['2F']
+    assert contract['supported_ee'] == ['2F', '3F', 'vac']
     assert contract['selected_feasible_ee'] == []
 
     from tuj.m4_taskplanner.diagnostics import PlanStatus, ReasonCode

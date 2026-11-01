@@ -64,3 +64,38 @@ def test_live_ik_filter_uses_measured_object_to_hand_transform(monkeypatch):
     center=obj[:3,3]+obj[:3,:3]@g.center_in_body
     np.testing.assert_allclose(center[:2],g.stable_face_xy,atol=1e-12)
     assert req.task.metadata['stable_face_ik_candidates'][0]['raw_ik_count']==0
+
+
+def test_blocked_face_does_not_abort_other_stable_faces():
+    req,oid=request()
+    x,y,z=req.world.objects['tray']['pose']['position_m']
+    # A central strip prevents the lowest broad face from occupying the floor,
+    # but a taller face has a smaller footprint and fits beside the strip.
+    req.world.objects['blocker']={
+        'pose':{'frame_id':'world','position_m':[x,y,z+.02],
+                'orientation_xyzw':[0.,0.,0.,1.]},
+        'dimensions_m':[.30,.08,.04]}
+    g=_Grounding(req,None,oid)
+    assert req.task.metadata['stable_face_seat_rejections']
+    assert g.half[2]==pytest.approx(.06)
+    assert g.seat_clear_of_occupants(g.stable_face_xy)
+    assert req.constraints.collision_margin_m==.005
+
+
+def test_every_blocked_face_reports_exhausted_search(monkeypatch):
+    req,oid=request()
+    def no_seat(_self):
+        raise ValueError('PLACEMENT_SPACE_EXHAUSTED: no unoccupied seat')
+    monkeypatch.setattr(_Grounding,'free_destination_xy',no_seat)
+    with pytest.raises(ValueError,match='PACKING_NO_REACHABLE_STABLE_FACE_FITS'):
+        _Grounding(req,None,oid)
+    assert len(req.task.metadata['stable_face_seat_rejections'])==24
+
+
+def test_stable_face_does_not_swallow_other_planning_errors(monkeypatch):
+    req,oid=request()
+    def invalid_frame(_self):
+        raise ValueError('PLACEMENT_SLOT_FRAME_UNSUPPORTED: invalid')
+    monkeypatch.setattr(_Grounding,'free_destination_xy',invalid_frame)
+    with pytest.raises(ValueError,match='PLACEMENT_SLOT_FRAME_UNSUPPORTED'):
+        _Grounding(req,None,oid)

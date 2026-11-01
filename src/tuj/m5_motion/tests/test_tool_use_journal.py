@@ -2207,3 +2207,80 @@ def test_failed_ee_rollback_closes_runtime_and_rejected_replacement(rollback_fau
         runtime.unlock('2F')
     runtime.close()  # Already-closed cleanup is safe and does not reopen a model.
     assert closed == ['initial', None, '2F']
+
+
+@pytest.mark.parametrize('settles_after,arm_blocked', [(1.6,False),(None,False),(None,True)])
+def test_container_wait_does_not_confuse_stationary_arm_with_stalled_objects(monkeypatch, settles_after, arm_blocked):
+    from tuj.m5_motion import container_settle
+    env=_fake_env('2F');env.control_timestep=.02;env.model_timestep=.002
+    runtime=ToolUseJournalEERuntime(env,_fake_env)
+    state=ToolUseJournalEnvironmentAdapter(env).world_snapshot().robot_state
+    q=list(state.joint_positions_rad);target=list(q)
+    if arm_blocked:target[0]+=.1
+    class Player(ToolUseJournalControllerTrajectoryPlayer):
+        def _controller_action(self,plan,desired_joint_positions):return np.zeros(1)
+        def _advance_controller(self,action):
+            data=self.runtime.env.sim.data._data;data.time+=.02;return float(data.time)
+    def measured(runtime,config,settle_state):
+        elapsed=float(runtime.env.sim.data._data.time)-float(settle_state['started_at_execution_s'])
+        return {'succeeded':settles_after is not None and elapsed>=settles_after}
+    monkeypatch.setattr(container_settle,'measured_container_settle',measured)
+    segment=TrajectorySegment(segment_id='wait',segment_type=SegmentType.RETREAT,
+        start_time_s=0.,end_time_s=.04,collision_checked=False,
+        waypoints=[TrajectoryWaypoint(time_from_start_s=0.,joint_positions_rad=q),
+                   TrajectoryWaypoint(time_from_start_s=.04,joint_positions_rad=target)],
+        metadata={'tracking_settle':{'joint_tolerance_rad':.001,'max_wait_s':2.,
+                                    'required_consecutive_ticks':3},'container_settle':{}})
+    plan=MotionPlan(plan_id='wait',request_id='wait',
+        provenance=_provenance('wait','MotionPlan',ModuleName.MOTION_PLANNER),
+        scene_signature='wait',robot_id=state.robot_id,joint_names=list(state.joint_names),
+        duration_s=.04,segments=[segment],events=[],expected_final_state=state)
+    run=SimulationRun(run_id='wait',provenance=_provenance('wait-run','SimulationRun',ModuleName.SIMULATOR),
+        plan=plan,config=SimulationConfig(physics_timestep_s=.002,control_timestep_s=.02,max_duration_s=3.))
+    try:report=Player(runtime).execute(run)
+    finally:runtime.close()
+    if settles_after is not None:
+        assert report.status is ExecutionStatus.SUCCESS
+        assert report.metadata['segment_tracking'][-1]['adaptive_settle_wait_s']>=1.6
+    else:
+        assert report.status is ExecutionStatus.FAILED
+        assert report.failure.code==('TRACKING_NOT_SETTLED' if arm_blocked else 'CONTAINER_NOT_SETTLED')
+        wait=report.failure.observed['wait_duration_s']
+        assert wait<2. if arm_blocked else wait>=2.
+
+
+@pytest.mark.parametrize("placement", ["far", "penetrating"])
+def test_attachment_geometry_rejection_remains_physical_failure(placement):
+    from tuj.m5_motion.tool_use_journal_runtime import ToolUseJournalAttachmentGeometryError
+    from tuj.m5_motion.scripted_grasps.validate import record_controller_result
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    try:
+        model, data = runtime.env.sim.model._model, runtime.env.sim.data._data
+        if placement == "penetrating":
+            qadr = int(model.jnt_qposadr[model.joint("apple_joint").id])
+            gid = model.geom("mounted_2F_collision").id
+            data.qpos[qadr:qadr+3] = data.geom_xpos[gid]
+            data.qpos[qadr+3:qadr+7] = [1., 0., 0., 0.]
+            mujoco.mj_forward(model, data)
+        runtime.command_gripper(engaged=True, suction=False)
+        before = data.qpos.copy()
+        with pytest.raises(ToolUseJournalAttachmentGeometryError) as caught:
+            runtime.attach_object("apple", max_attach_distance_m=.01,
+                                  max_attach_penetration_m=.002)
+        assert isinstance(caught.value, ToolUseJournalRuntimeError)
+        assert runtime.attached_object_id is None
+        assert np.array_equal(data.qpos, before)
+        if placement == "penetrating":
+            assert runtime.last_attachment_geometry_audit["certified"] is False
+        report = {"failures": []}
+        record_controller_result(report, {"status": "FAILED", "failure_stage": "CLOSE",
+                                         "failure_reason": str(caught.value),
+                                         "error_type": type(caught.value).__name__})
+        assert report["controller_status"] == "FAIL"
+        assert report["failure_category"] == "MOTION_OR_GRASP"
+        # Bad API input still raises the implementation/runtime base type.
+        with pytest.raises(ToolUseJournalRuntimeError) as invalid:
+            runtime.attach_object("apple", max_attach_distance_m=-.01)
+        assert type(invalid.value) is ToolUseJournalRuntimeError
+    finally:
+        runtime.close()

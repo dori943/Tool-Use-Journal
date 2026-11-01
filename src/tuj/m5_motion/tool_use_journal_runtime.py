@@ -67,6 +67,14 @@ class ToolUseJournalRuntimeError(RuntimeError):
     """An EE event or state-preserving model transition failed."""
 
 
+class ToolUseJournalAttachmentGeometryError(ToolUseJournalRuntimeError):
+    """A measured distance/penetration gate rejected physical attachment.
+
+    Invalid requests and missing model state keep ToolUseJournalRuntimeError.
+    This subtype changes reporting only; all geometric gates stay unchanged.
+    """
+
+
 class ToolUseJournalAttachmentBroken(ToolUseJournalRuntimeError):
     """A breakable grasp exceeded its force / contact contract."""
 
@@ -1268,8 +1276,17 @@ class ToolUseJournalEERuntime:
                 (name := _name(model, mujoco.mjtObj.mjOBJ_GEOM, geom_id))
                 .startswith("gripper0_right_")
                 and (
-                    "fingertip_collision" in name
-                    or "fingerpad_collision" in name
+                    (self._active_ee == "2F" and (
+                        "fingertip_collision" in name
+                        or "fingerpad_collision" in name
+                    ))
+                    or (self._active_ee == "3F" and name.removeprefix(
+                        "gripper0_right_"
+                    ) in {
+                        f"{finger}_{surface}_collision"
+                        for finger in ("thumb", "index", "pinky")
+                        for surface in ("tip", "pad")
+                    })
                 )
             )
         )
@@ -2234,7 +2251,7 @@ class ToolUseJournalEERuntime:
         distance = self._minimum_ee_object_distance(body_id)
         self.last_attachment_geometry_audit = None
         if distance > max_attach_distance_m:
-            raise ToolUseJournalRuntimeError(
+            raise ToolUseJournalAttachmentGeometryError(
                 f"object {object_id!r} is {distance:.4f} m from the EE; "
                 f"attach limit is {max_attach_distance_m:.4f} m"
                 f"{self._closest_ee_object_pair_detail()}"
@@ -2253,7 +2270,7 @@ class ToolUseJournalEERuntime:
             )
             self.last_attachment_geometry_audit = audit
             if not audit['certified']:
-                raise ToolUseJournalRuntimeError(
+                raise ToolUseJournalAttachmentGeometryError(
                     f"object {object_id!r} penetrates EE geometry by "
                     f"{-distance:.4f} m; limit is "
                     f"{max_attach_penetration_m:.4f} m"
@@ -5816,6 +5833,15 @@ class ToolUseJournalControllerTrajectoryPlayer(
                     stalled = int(
                         settle_state.get("stalled_ticks", 0)
                     ) >= self._SETTLE_STALL_TICKS
+                    waiting_for_container = (
+                        segment.metadata.get('container_settle') is not None
+                        and joint_ok and eef_ok and eef_orientation_ok
+                    )
+                    # Once the arm has converged, unchanged arm error is not
+                    # evidence that free objects have stopped settling. Honor
+                    # their existing bounded observation window.
+                    if waiting_for_container:
+                        stalled = False
                     if int(settle_state["consecutive_ticks"]) >= int(
                         settle_config["required_consecutive_ticks"]
                     ):
@@ -5852,11 +5878,11 @@ class ToolUseJournalControllerTrajectoryPlayer(
                             }
                         )
                         failure = _PlaybackFailure(
-                            code="TRACKING_NOT_SETTLED",
-                            message=(
-                                "controller did not converge before the next "
-                                "contact-sensitive motion"
-                            ),
+                            code=("CONTAINER_NOT_SETTLED" if waiting_for_container
+                                  else "TRACKING_NOT_SETTLED"),
+                            message=("CONTAINER_NOT_SETTLED: container contents did not settle within the observation window"
+                                     if waiting_for_container else
+                                     "controller did not converge before the next contact-sensitive motion"),
                             segment_id=segment.segment_id,
                             observed={
                                 "joint_error_rad": step_joint_error,

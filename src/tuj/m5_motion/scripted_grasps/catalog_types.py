@@ -119,7 +119,7 @@ class CatalogRecipe:
         if self.finger_attachment_policy == 'STABLE_CONTACT' and self.ee_id != '2F':
             raise ValueError('Stable bilateral contact attachment requires 2F')
         if self.ee_id not in {'2F','3F','vac'}: raise ValueError('UNSUPPORTED_EE')
-        if self.task_id not in {'c1_1','c1_2','c2_1','c2_2','c3_1','c3_2','c4_2'}: raise ValueError('UNSUPPORTED_TASK')
+        if self.task_id not in {'c1_1','c1_2','c2_1','c2_2','c3_1','c3_2','c4_1','c4_2'}: raise ValueError('UNSUPPORTED_TASK')
         for name in ('expected_size_m','offset_fraction','offset_m','rotation_xyz_deg','contact_region_min','contact_region_max'):
             value=np.asarray(getattr(self,name),dtype=float)
             if value.shape!=(3,) or not np.isfinite(value).all(): raise ValueError(f'Invalid {name}')

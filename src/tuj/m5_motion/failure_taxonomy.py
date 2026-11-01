@@ -47,6 +47,7 @@ PHYSICS_CODES: tuple[str, ...] = (
 
 # A post-execution predicate failure does not establish physical noise.
 POST_EXECUTION_GOAL_CODES = (
+    "CONTAINER_NOT_SETTLED",
     "PLACEMENT_GOAL_NOT_SATISFIED",
     "PLACEMENT_PRESERVATION_FAILED",
 )

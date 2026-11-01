@@ -46,11 +46,11 @@ def test_plate_instances_resolve_and_bind_independently(instance):
     resolved = resolve_case(instance, "vac")
     assert resolved["status"] == "RESOLVED"
     entry = resolved["entry"]
-    assert entry.object_id == "plate"
+    assert entry.object_id == instance
     assert entry.ee == "vac"
     assert entry.module_name == "plate_vac"
     assert entry.scene_object_id == instance
-    assert entry.body_object_id == instance
+    assert entry.body_object_id is None  # exact instance key
     report = static_validate_case(instance, "vac")
     assert report["static_status"] == "PASS"
     assert report["scene_object_id"] == instance
@@ -90,10 +90,13 @@ def test_fork_c3_2_thin_handle_lateral_and_close_retries():
     assert thin_handle_lateral_retry_schedule(spoon) == ()
 
 
-def test_recipe_ee_mismatch_is_detected():
-    resolved = resolve_case("plate_b", "3F")
+def test_recipe_ee_mismatch_is_detected(monkeypatch):
+    # Exercise an unavailable production EE independently of validator additions.
+    from tuj.m5_motion.scripted_grasps import registry
+    monkeypatch.setattr(registry, "VALIDATOR_EXPERIMENTAL_ENTRIES", ())
+    resolved = resolve_case("plate", "3F", environment="C2_1_ObjectSorting")
     assert resolved["status"] == "EE_MISMATCH"
-    report = static_validate_case("plate_b", "3F")
+    report = static_validate_case("plate", "3F", environment="C2_1_ObjectSorting")
     assert report["static_status"] == "EE_MISMATCH"
 
 
@@ -105,48 +108,25 @@ def test_not_registered_is_reported_without_inventing_recipe():
     assert report.get("recipe_id") is None
 
 
-def test_support_penetration_from_negative_vac_seating_is_detected():
-    # Synthetic thin body whose commanded vac TCP sits below the AABB top.
-    from tuj.m5_motion.scripted_grasps import validate as validate_mod
+def test_support_penetration_from_negative_vac_seating_is_detected(monkeypatch):
+    from dataclasses import replace
     from tuj.m5_motion.scripted_grasps.objects import plate_vac
 
-    original = plate_vac.SEATING_OFFSET_Z_M
-    try:
-        plate_vac.SEATING_OFFSET_Z_M = -0.002
-        # Rebuild recipe path uses module constant inside plate_vac_recipe.
-        size = np.asarray(plate_vac.PLATE_EXPECTED_SIZE_M)
-        body = transform([0.46, 0.19, 0.92], rotation=np.eye(3))
-        report = static_validate_case(
-            "plate_b",
-            "vac",
-            T_WB=body,
-            center_in_body_m=np.zeros(3),
-            local_size_m=size,
-            support_top_z=0.92 - 0.5 * size[2],  # flush support under AABB bottom
-        )
-        # Force rebuild with monkeypatched constant by calling recipe factory after patch.
-        recipe = plate_vac.plate_vac_recipe()
-        assert recipe.offset_m[2] == pytest.approx(-0.002)
-        targets, _ = validate_mod.build_targets_for_entry(
-            resolve_case("plate_b", "vac")["entry"], body, np.zeros(3), size,
-        )
-        # Re-run checks using the patched recipe geometry directly.
-        top = 0.92 + 0.5 * size[2]
-        assert targets["GRASP"][2, 3] < top
-        report = static_validate_case(
-            "plate_b",
-            "vac",
-            T_WB=body,
-            center_in_body_m=np.zeros(3),
-            local_size_m=size,
-            support_top_z=0.92 - 0.5 * size[2],
-        )
-        # static_validate_case calls plate_vac_recipe() which reads the patched constant.
-        assert "GRASP_SEATS_BELOW_AABB_TOP" in report["failures"]
-        assert "GRASP_MAY_PRESS_OBJECT_INTO_SUPPORT" in report["failures"]
-        assert report["static_status"] == "FAIL"
-    finally:
-        plate_vac.SEATING_OFFSET_Z_M = original
+    factory = plate_vac.plate_vac_c3_2_recipe
+    size = np.asarray(plate_vac.PLATE_EXPECTED_SIZE_M)
+    arguments = dict(T_WB=transform([0.46, 0.19, 0.92], rotation=np.eye(3)),
+                     center_in_body_m=np.zeros(3), local_size_m=size,
+                     support_top_z=0.92 - 0.5 * size[2])
+    assert static_validate_case("plate_b", "vac", **arguments)["static_status"] == "PASS"
+    # Inject the negative seat through the factory the exact instance uses.
+    # The old test changed a constant that this factory no longer reads.
+    def negative_seat(object_id="plate"):
+        return replace(factory(object_id), offset_m=(0., 0., -.002))
+    monkeypatch.setattr(plate_vac, "plate_vac_c3_2_recipe", negative_seat)
+    report = static_validate_case("plate_b", "vac", **arguments)
+    assert "GRASP_SEATS_BELOW_AABB_TOP" in report["failures"]
+    assert "GRASP_MAY_PRESS_OBJECT_INTO_SUPPORT" in report["failures"]
+    assert report["static_status"] == "FAIL"
 
 
 def test_attachment_discontinuity_detection():

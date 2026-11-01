@@ -39,6 +39,7 @@ def configure_container_settle(request, plan):
     segment.metadata['container_settle']={
         'region_id':region_id,'target_ids':sorted(targets),
         'objects':{n:deepcopy(request.world.objects[n]) for n in targets|{region_id}},
+        'settle_horizon_s': timeout,
         'position_tolerance_m':request.constraints.position_tolerance_m,
         'orientation_tolerance_rad':request.constraints.orientation_tolerance_rad,
     }
@@ -88,15 +89,62 @@ def evaluate_container_settle(config, poses, previous, *, attached=False, hand_c
     return result
 
 
+def measured_settle_velocity(config, velocities):
+    """Use existing pose tolerances over the declared settling horizon.
+
+    A small displacement between adjacent controller ticks does not imply a
+    settled object. Missing velocity observations must not certify stability.
+    """
+    horizon = float(config['settle_horizon_s'])
+    if not math.isfinite(horizon) or horizon <= 0:
+        raise ValueError('CONTAINER_SETTLE_TIMEOUT_REQUIRED')
+    missing = sorted(set(config['target_ids']) - velocities.keys())
+    if missing:
+        return {'succeeded': False, 'missing_velocity_ids': missing}
+    linear = []; angular = []; per_object = {}
+    for name in config['target_ids']:
+        velocity = np.asarray(velocities[name], dtype=float)
+        if velocity.shape != (6,) or not np.isfinite(velocity).all():
+            return {'succeeded': False, 'invalid_velocity_id': name}
+        angular.append(float(np.linalg.norm(velocity[:3])))
+        linear.append(float(np.linalg.norm(velocity[3:])))
+        per_object[name] = {
+            'angular_velocity_world_rad_s': velocity[:3].tolist(),
+            'linear_velocity_world_m_s': velocity[3:].tolist(),
+            'linear_speed_m_s': linear[-1], 'angular_speed_rad_s': angular[-1],
+            'projected_position_drift_m': linear[-1] * horizon,
+            'projected_orientation_drift_rad': angular[-1] * horizon,
+            'succeeded': linear[-1] * horizon <= config['position_tolerance_m']
+                         and angular[-1] * horizon <= config['orientation_tolerance_rad'],
+        }
+    position_drift = max(linear, default=0.) * horizon
+    angle_drift = max(angular, default=0.) * horizon
+    return {'succeeded': position_drift <= config['position_tolerance_m']
+                        and angle_drift <= config['orientation_tolerance_rad'],
+            'per_object': per_object,
+            'unstable_object_ids': [name for name, row in per_object.items()
+                                    if not row['succeeded']],
+            'horizon_s': horizon, 'max_linear_speed_m_s': max(linear, default=0.),
+            'max_angular_speed_rad_s': max(angular, default=0.),
+            'projected_position_drift_m': position_drift,
+            'projected_orientation_drift_rad': angle_drift,
+            'position_tolerance_m': config['position_tolerance_m'],
+            'orientation_tolerance_rad': config['orientation_tolerance_rad']}
+
+
 def measured_container_settle(runtime, config, state):
     from .tool_use_journal import _raw_model_data
     model,data=_raw_model_data(runtime.env)
-    poses={};target_bodies=set()
+    import mujoco
+    poses={};target_bodies=set();velocities={}
     for name in config['objects']:
         bid=int(runtime.env.obj_body_id[name])
         poses[name]={'frame_id':'world','position_m':data.xpos[bid].tolist(),
                      'orientation_xyzw':Rotation.from_matrix(data.xmat[bid].reshape(3,3)).as_quat().tolist()}
         if name in config['target_ids']:
+            velocity = np.zeros(6)
+            mujoco.mj_objectVelocity(model, data, mujoco.mjtObj.mjOBJ_BODY, bid, velocity, 0)
+            velocities[name] = velocity
             for child in range(model.nbody):
                 ancestor=child
                 while ancestor>0 and ancestor!=bid:ancestor=int(model.body_parentid[ancestor])
@@ -120,5 +168,9 @@ def measured_container_settle(runtime, config, state):
     result=evaluate_container_settle(config,poses,state.get('container_previous_poses'),
         attached=runtime.attached_object_id in config['target_ids'],hand_contacts=hand_contacts,
         surface_support=support)
+    velocity_evidence = measured_settle_velocity(config, velocities)
+    result['velocity_settle'] = velocity_evidence
+    result['stable'] = result['stable'] and velocity_evidence['succeeded']
+    result['succeeded'] = result['succeeded'] and velocity_evidence['succeeded']
     state['container_previous_poses']=poses
     return result

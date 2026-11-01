@@ -259,7 +259,14 @@ class ScriptedGraspSession:
                 save_json(directory / 'flattening_evaluation.json', evidence)
                 if not passed:
                     raise RuntimeError('FLATTEN_PHYSICAL_GOAL_NOT_SATISFIED')
-            checks = self._placement_preservation.observe(task, self.world)
+            from .container_support import measure_container_support
+            support = measure_container_support(self.runtime, self.world)
+            if support is not None:
+                record['container_support'] = support
+                save_json(directory / 'container_support.json', support)
+                save_json(directory / 'container_support_world.json', self.world.model_dump(mode='json'))
+            checks = self._placement_preservation.observe(
+                task, self.world, container_support=support)
             if checks:
                 record['placement_preservation'] = checks
                 save_json(directory / 'placement_preservation.json', checks)

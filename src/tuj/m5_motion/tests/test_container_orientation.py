@@ -124,3 +124,45 @@ def test_ik_probe_equals_published_transport_goal_with_rotated_region(monkeypatc
     expected = body @ inverse(inverse(initial.T_WE) @ initial.T_WB)
     assert len(calls) == 1
     np.testing.assert_allclose(calls[0], expected, rtol=0., atol=1e-12)
+
+
+@pytest.mark.parametrize('action', ['transport', 'place'])
+def test_explicit_volume_packing_uses_bounded_entry_above_occupied_floor(action):
+    from tuj.m5_motion.tests.test_container_stable_face import request
+    from tuj.m5_motion.scripted_grasps.transport import (
+        _Grounding, ground_held_transport, ground_held_place)
+    from tuj.m5_motion.scripted_grasps.packing_position import POSITION_POLICY
+    req,oid=request();req.task.action_type=action
+    obj=req.world.objects[oid]
+    obj['packing_metadata']={
+        'kind':'PACKABLE_OBJECT','orientation_frame':'TARGET_REGION',
+        'orientation_candidates':[{'orientation_xyzw':[0.,0.,0.,1.],
+            'dimensions_m':obj['dimensions_m'],'center_offset_m':obj['anchors']['center']}]}
+    region=req.world.objects['tray'];region['packing_metadata']['position_policy']=POSITION_POLICY
+    x,y,z=region['pose']['position_m']
+    req.world.objects['occupied_floor']={
+        'pose':{'frame_id':'world','position_m':[x,y,z+.02],
+                'orientation_xyzw':region['pose']['orientation_xyzw']},
+        'dimensions_m':[.30,.24,.04]}
+    g=_Grounding(req,None,oid)
+    with pytest.raises(ValueError,match='PLACEMENT_SPACE_EXHAUSTED'):
+        g.free_destination_xy()
+    (ground_held_transport if action=='transport' else ground_held_place)(req)
+    key='held_transport_goal' if action=='transport' else 'held_place_goal'
+    goal=req.task.metadata[key]
+    rotation=Rotation.from_quat(goal['object_orientation_xyzw']).as_matrix()
+    local_anchor=np.array(region['anchors'][goal['anchor']])
+    body=g.T_WR[:3,3]+g.T_WR[:3,:3]@local_anchor
+    world_points=np.asarray(obj['collision_points_m'])@rotation.T+body
+    local_points=(world_points-g.T_WR[:3,3])@g.T_WR[:3,:3]
+    meta=region['packing_metadata'];center=np.asarray(meta['interior_center_m']);half=np.asarray(meta['interior_dimensions_m'])/2
+    assert np.all(local_points.min(0)[:2]>= (center-half+.005)[:2]-1e-9)
+    assert np.all(local_points.max(0)[:2]<= (center+half-.005)[:2]+1e-9)
+    assert local_points[:,2].min()>=meta['opening_top_z_m']+.005-1e-9
+    assert req.constraints.collision_margin_m==.005
+    # Removing the explicit volume policy restores ordinary floor semantics.
+    region['packing_metadata'].pop('position_policy')
+    req.task.metadata.pop(key)
+    req.task.goal.target_pose=None
+    with pytest.raises(ValueError,match='PLACEMENT_SPACE_EXHAUSTED'):
+        (ground_held_transport if action=='transport' else ground_held_place)(req)

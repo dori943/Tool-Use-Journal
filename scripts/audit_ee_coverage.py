@@ -36,7 +36,7 @@ for p in (ROOT, ROOT / "src"):
 from task_registry import TASKS  # noqa: E402
 
 # 태스크별 "파지 대상" 물체 — Table II 분모와 맞춘다 (C1-1 5, C1-2 4, C2-1 5, C2-2 5, C3-1 5,
-# C3-2 12, C4-1 4, C4-2 6). 환경의 obj_body_id 키 이름을 쓴다. 틀리면 여기만 고친다.
+# C3-2 12, C4-1 current scene 5 (historical Table II: 4), C4-2 6). 환경의 obj_body_id 키 이름을 쓴다. 틀리면 여기만 고친다.
 TASK_GRASP_OBJECTS: dict[str, list[str]] = {
     "c1_1": ["plate", "ladle", "fork", "scissors", "bottle_distractor"],
     "c1_2": ["bottle", "spatula", "spoon", "tongs"],
@@ -45,7 +45,9 @@ TASK_GRASP_OBJECTS: dict[str, list[str]] = {
     "c2_2": ["bread_a", "bread_b", "turkey_1", "cheese_1", "tomato_slice"],
     "c3_2": ["plate_a", "plate_b", "mug_a", "mug_b", "fork_a", "fork_b",
              "spoon_a", "spoon_b", "bread_a", "bread_b", "fruit_a", "fruit_b"],
-    "c4_1": ["tool_1_knife", "tool_2_spatula_a", "tool_3_spatula_b", "card"],
+    # Current environment disables the knife and adds spatula_c / cutting_board.
+    "c4_1": ["tool_2_spatula_a", "tool_3_spatula_b", "tool_4_spatula_c",
+             "tool_5_cutting_board", "card"],
     "c4_2": ["rolling_pin", "baguette", "whisk", "cereal", "milk", "lid"],
 }
 

@@ -79,3 +79,39 @@ def test_configuration_preserves_arm_tolerances_and_includes_prior_items():
     assert segment.metadata['tracking_settle']['max_wait_s']==5.
     assert segment.metadata['container_settle']['target_ids']==['new','prior']
     assert segment.metadata['container_settle']['objects']==config['objects']
+
+
+def test_measured_velocity_rejects_slow_drift_hidden_by_adjacent_ticks():
+    from tuj.m5_motion.container_settle import measured_settle_velocity
+    config={'settle_horizon_s':5., 'target_ids':['baguette'],
+            'position_tolerance_m':.005,'orientation_tolerance_rad':.01}
+    # Recorded E-run velocity: the 20 ms displacement is small, but the
+    # object was still rotating/sliding and later left the container.
+    velocity=[-.1589217726,-.0587637727,.0091471992,
+              -.0033192076,.0066145808,-.0148342135]
+    result=measured_settle_velocity(config,{'baguette':velocity})
+    assert result['succeeded'] is False
+    assert result['projected_position_drift_m'] > .08
+    assert result['projected_orientation_drift_rad'] > .8
+    assert measured_settle_velocity(config,{'baguette':[0.,0.,0.,0.,0.,0.]})['succeeded']
+    assert measured_settle_velocity(config,{})['succeeded'] is False
+    assert measured_settle_velocity(config,{'baguette':[float('nan')]*6})['succeeded'] is False
+
+
+def test_velocity_evidence_identifies_distinct_translation_and_rotation_failures():
+    from tuj.m5_motion.container_settle import measured_settle_velocity
+    config = {'settle_horizon_s': 5., 'target_ids': ['still', 'sliding', 'turning'],
+              'position_tolerance_m': .005, 'orientation_tolerance_rad': .05}
+    velocities = {'still': [0.] * 6, 'sliding': [0., 0., 0., .002, 0., 0.],
+                  'turning': [0., -.02, 0., 0., 0., 0.]}
+    before = deepcopy((config, velocities))
+    result = measured_settle_velocity(config, velocities)
+    assert not result['succeeded']
+    assert result['unstable_object_ids'] == ['sliding', 'turning']
+    assert result['per_object']['still']['succeeded']
+    assert result['per_object']['sliding']['projected_position_drift_m'] == pytest.approx(.01)
+    assert result['per_object']['turning']['projected_orientation_drift_rad'] == pytest.approx(.1)
+    assert result['per_object']['turning']['angular_velocity_world_rad_s'] == [0., -.02, 0.]
+    assert result['max_linear_speed_m_s'] == .002
+    assert result['max_angular_speed_rad_s'] == .02
+    assert (config, velocities) == before

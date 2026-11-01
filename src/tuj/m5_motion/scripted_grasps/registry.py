@@ -157,7 +157,24 @@ ENTRIES = tuple(GraspEntry(*row) for row in (
 
 # C1_1 plate+vac is a primary ENTRIES row (flat zero-immersion seating) so M4's
 # EE feasibility check can select it alongside the validated 2F plate entry.
-ALTERNATIVE_ENTRIES: tuple[GraspEntry, ...] = ()
+# 2026-10-31: these eight candidates passed independent C4_2 seed-0 lift/hold
+# validation (c4_2-all-ee-20261031-b). The four finger candidates also passed
+# seeds 1 and 2. Vacuum uses the existing contact-gated attachment model.
+# This expands execution support only: task_constraints still intersects M1's
+# feasible set and never restores an EE rejected by the grounding rules.
+# Scope/evidence: docs/c4_2_coverage_validation_20261031.md. Whole-task packing
+# and arbitrary-pose robustness are not established by this registration.
+C4_2_VALIDATED_ALTERNATIVE_PAIRS = (
+    ("rolling_pin", "3F"), ("rolling_pin", "vac"),
+    ("baguette", "3F"), ("baguette", "vac"),
+    ("cereal", "3F"), ("cereal", "vac"),
+    ("milk", "2F"), ("milk", "vac"),
+)
+ALTERNATIVE_ENTRIES: tuple[GraspEntry, ...] = tuple(
+    GraspEntry(name, "C4_2_DiagonalFitPacking", ee, "catalog", "c4_2_probes",
+               recipe_name={"2F": "probe_2f_recipe", "3F": "probe_3f_recipe", "vac": "probe_vac_recipe"}[ee])
+    for name, ee in C4_2_VALIDATED_ALTERNATIVE_PAIRS
+)
 
 # Explicit validator-only / greedy-only feasibility probes. They do not alter
 # production M4 choices or the normal M5 registry surface unless a caller opts in.
@@ -168,7 +185,63 @@ _C3_2_2F_CORE: tuple[GraspEntry, ...] = (
     GraspEntry("fork", "C3_2_BreakfastTrayPreparation", "2F", "catalog",
                "fork", recipe_name="fork_2f_c3_2_recipe"),
 )
-VALIDATOR_EXPERIMENTAL_ENTRIES: tuple[GraspEntry, ...] = _C3_2_2F_CORE
+# Remaining unsuccessful coverage probes stay validator-only.
+_C4_2_COVERAGE_PROBES: tuple[GraspEntry, ...] = tuple(
+    GraspEntry(name, "C4_2_DiagonalFitPacking", ee, "catalog", "c4_2_probes",
+               recipe_name={"2F": "probe_2f_recipe", "3F": "probe_3f_recipe", "vac": "probe_vac_recipe"}[ee])
+    for name, primary in (("rolling_pin", "2F"), ("baguette", "2F"), ("whisk", "2F"),
+                          ("cereal", "2F"), ("milk", "3F"), ("lid", "vac"))
+    for ee in ("2F", "3F", "vac")
+    if ee != primary and (name, ee) not in C4_2_VALIDATED_ALTERNATIVE_PAIRS
+)
+# Current C4_1 scene: two existing 2F recipes remain unchanged. All other
+# object/EE pairs are validation-only until backed by controller evidence.
+_C4_1_COVERAGE_PROBES: tuple[GraspEntry, ...] = tuple(
+    GraspEntry(name, "C4_1_IntervalFitExtraction", ee, "catalog", "c4_1_probes",
+               recipe_name={"2F": "probe_2f_recipe", "3F": "probe_3f_recipe", "vac": "probe_vac_recipe"}[ee])
+    for name in ("tool_2_spatula_a", "tool_3_spatula_b", "tool_4_spatula_c",
+                 "tool_5_cutting_board", "card")
+    for ee in ("2F", "3F", "vac")
+    if (name, ee) not in (("tool_2_spatula_a", "2F"), ("tool_3_spatula_b", "2F"))
+)
+# Exact plate instance keys are required: existing exact vacuum rows take
+# precedence over the type alias. Other objects keep type-to-instance binding.
+_C3_2_COVERAGE_PROBES: tuple[GraspEntry, ...] = tuple(
+    GraspEntry(name, "C3_2_BreakfastTrayPreparation", ee, "catalog", "c3_2_probes",
+               recipe_name={"2F": "probe_2f_recipe", "3F": "probe_3f_recipe", "vac": "probe_vac_recipe"}[ee])
+    for name, ees in (("plate_a", ("2F", "3F")), ("plate_b", ("2F", "3F")),
+                      ("mug", ("2F", "vac")), ("fork", ("vac",)),
+                      ("spoon", ("vac",)), ("fruit", ("2F", "vac")))
+    for ee in ees
+)
+# Missing C3_1 pairs are independent validation candidates, not M4 support.
+_C3_1_COVERAGE_PROBES: tuple[GraspEntry, ...] = tuple(
+    GraspEntry(name, "C3_1_ObjectSorting", ee, "catalog", "c3_1_probes",
+               recipe_name={"2F": "probe_2f_recipe", "3F": "probe_3f_recipe", "vac": "probe_vac_recipe"}[ee])
+    for name, ees in (("apple", ("vac",)), ("bread", ("vac",)), ("mug", ("vac",)),
+                      ("plate", ("2F", "3F")), ("spoon", ("vac",)))
+    for ee in ees
+)
+# Current sandwich ingredients: add missing finger coverage only on opt-in.
+_C2_2_COVERAGE_PROBES: tuple[GraspEntry, ...] = tuple(
+    GraspEntry(name, "C2_2_SandwichAssembly", ee, "catalog", "c2_2_probes",
+               recipe_name={"2F": "probe_2f_recipe", "3F": "probe_3f_recipe"}[ee])
+    for name in ("bread_a", "bread_b", "turkey_1", "cheese_1", "tomato_slice")
+    for ee in ("2F", "3F")
+)
+# Current sorting scene: preserve six primary recipes, add nine validator pairs.
+_C2_1_COVERAGE_PROBES: tuple[GraspEntry, ...] = tuple(
+    GraspEntry(name, "C2_1_ObjectSorting", ee, "catalog", "c2_1_probes",
+               recipe_name={"2F": "probe_2f_recipe", "3F": "probe_3f_recipe", "vac": "probe_vac_recipe"}[ee])
+    for name, ees in (("apple", ("2F", "vac")), ("bread", ("2F", "vac")),
+                      ("mug", ("2F", "vac")), ("plate", ("2F", "3F")), ("spoon", ("vac",)))
+    for ee in ees
+)
+VALIDATOR_EXPERIMENTAL_ENTRIES: tuple[GraspEntry, ...] = (
+    _C3_2_2F_CORE + _C4_2_COVERAGE_PROBES + _C4_1_COVERAGE_PROBES
+    + _C3_2_COVERAGE_PROBES + _C3_1_COVERAGE_PROBES + _C2_2_COVERAGE_PROBES
+    + _C2_1_COVERAGE_PROBES
+)
 # Greedy EE-order experiment only: same 2F core plus fruit 2F. C3_2 mug AABB
 # (~88 mm) exceeds the Robotiq 85 stroke, so mug stays 3F-only even for greedy.
 GREEDY_EXTRA_ENTRIES: tuple[GraspEntry, ...] = _C3_2_2F_CORE + (

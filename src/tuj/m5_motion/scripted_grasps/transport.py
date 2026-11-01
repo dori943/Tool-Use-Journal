@@ -1043,10 +1043,33 @@ def _grounding_for(request, retention, predicate):
     return _Grounding(request, retention, object_id)
 
 
+def _uses_volume_packing_entry(g):
+    from .packing_position import POSITION_POLICY
+    return (hasattr(g, 'packing_bounds')
+            and g.record.get('packing_metadata', {}).get('kind') == 'CONTAINER'
+            and g.record['packing_metadata'].get('position_policy') == POSITION_POLICY)
+
+
+def _region_destination_xy(g):
+    """Select an entry proposal for explicit 3D packing, or a free floor seat.
+
+    A collision-mesh packing orientation with NEAREST_CLEAR_VOLUME is released
+    above the opening. Requiring a disjoint 2D floor footprint before its 3D
+    volume/IK checks prevents layering over already packed objects. This branch
+    supplies only a preferred XY: packing_destination_center applies the exact
+    vertex bounds, and the existing volume preference, IK, path, release and
+    measured containment gates remain authoritative.
+    """
+    if _uses_volume_packing_entry(g):
+        preferred = g._slot_xy()
+        return g.region_world[:2].copy() if preferred is None else preferred
+    return g.free_destination_xy()
+
+
 def transport_destination_center(g):
     """Shared exact center for transport grounding and orientation IK probes."""
     desired_center = g.region_world.copy()
-    desired_center[:2] = g.free_destination_xy()
+    desired_center[:2] = _region_destination_xy(g)
     # Keep the measured object bbox clear of the rim without an arbitrary 5 cm
     # standoff that can place a reachable kitchen destination outside UR5e reach.
     clearance = max(.02, g.request.constraints.collision_margin_m * 2.)
@@ -1088,7 +1111,13 @@ def ground_held_place(request, retention=None):
     g = _grounding_for(request, retention, _is_region_place)
     if g is None:
         return
-    _seat_held_place_at(g, _clear_finger_overhang(g, g.free_destination_xy()))
+    xy = _region_destination_xy(g)
+    # Floor-level lateral jaw clearance is not the release model for an
+    # explicit above-opening drop. Its open-hand corridor and measured rim
+    # clearance are checked by the packing path and _seat_held_place_at.
+    if not _uses_volume_packing_entry(g):
+        xy = _clear_finger_overhang(g, xy)
+    _seat_held_place_at(g, xy)
 
 
 def _grip_beside_payload(g) -> bool:

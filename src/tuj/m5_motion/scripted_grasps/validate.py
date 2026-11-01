@@ -435,6 +435,31 @@ def format_batch_table(rows: list[dict[str, Any]]) -> str:
     return "\n".join(lines)
 
 
+def record_controller_result(report: dict, result: dict) -> None:
+    """Keep acquisition evidence, including errors hidden by execute_grasp."""
+    keys = ("status", "failure_stage", "failure_reason", "error_type", "metrics",
+            "acquisition_status", "acquisition_attachment_used", "attachment_used",
+            "attachment_mode", "attachment_phase", "vacuum_policy", "vacuum_attachment",
+            "thin_handle_attachment", "finger_attachment", "hand_model_correction")
+    report["result"] = {key: result[key] for key in keys if key in result}
+    error_type = result.get("error_type")
+    report["controller_status"] = (
+        "PASS" if result.get("status") == "SUCCESS" else
+        "ERROR" if error_type and error_type not in {
+            "GraspFailure", "ToolUseJournalAttachmentGeometryError",
+        } else "FAIL"
+    )
+    report["failure_category"] = (
+        None if report["controller_status"] == "PASS" else
+        "IMPLEMENTATION_OR_RUNTIME" if report["controller_status"] == "ERROR" else
+        "MOTION_OR_GRASP"
+    )
+    if result.get("status") != "SUCCESS":
+        detail = f"{result.get('failure_stage')}: {result.get('failure_reason')}"
+        if detail not in report["failures"]:
+            report["failures"].append(detail)
+
+
 def controller_validate_case(
     object_id: str,
     ee: str,
@@ -451,12 +476,22 @@ def controller_validate_case(
     from tuj.m5_motion.scripted_grasps.profiles import settle_tool_use_journal_free_objects
     from tuj.m5_motion.scripted_grasps.runtime import GraspFailure, save_json
     from tuj.m5_motion.scripted_grasps.settings import REPOSITORY
-    from tuj.m5_motion.tool_use_journal_runtime import ToolUseJournalEERuntime
+    from tuj.m5_motion.tool_use_journal_runtime import (
+        ToolUseJournalEERuntime, ToolUseJournalAttachmentGeometryError,
+    )
 
+    output = Path(output)
+    output.mkdir(parents=True, exist_ok=True)
     static = static_validate_case(object_id, ee, environment=environment)
     report = {
         **static,
-        "controller_status": "FAILED",
+        "controller_status": "RUNNING",
+        "static_failures": list(static["failures"]),
+        "static_basis": "EXPECTED_SIZE_SYNTHETIC_POSE",
+        "failures": [],
+        "simulation_started": False,
+        "grasp_attempted": False,
+        "seed": seed,
         "stages": {},
         "camera": camera,
     }
@@ -464,6 +499,8 @@ def controller_validate_case(
         "NOT_REGISTERED", "EE_MISMATCH", "BODY_BINDING_ERROR",
     }:
         report["controller_status"] = static["static_status"]
+        report["failure_category"] = "EXECUTION_UNAVAILABLE"
+        save_json(output / "validation_report.json", report)
         return report
 
     entry = resolve_case(object_id, ee, environment=environment)["entry"]
@@ -493,6 +530,8 @@ def controller_validate_case(
             render_camera=camera,
             **recording,
         )
+        report["simulation_started"] = True
+        save_json(output / "validation_report.json", report)
         settle_tool_use_journal_free_objects(runtime.env, duration_s=2.0)
         if video is not None:
             from tuj.m5_motion.generic_runner import GenericSimulationVideoRecorder
@@ -500,6 +539,7 @@ def controller_validate_case(
                 runtime, Path(video).resolve(), camera=camera,
                 width=960, height=540, fps=20.0,
             )
+            runtime.scripted_render = True
         from tuj.m5_motion.tool_use_journal import ToolUseJournalEnvironmentAdapter
         adapter = ToolUseJournalEnvironmentAdapter(runtime.env)
         body_id = int(runtime.env.obj_body_id[entry.scene_object_id])
@@ -507,6 +547,18 @@ def controller_validate_case(
             adapter.data.xpos[body_id],
             rotation=adapter.data.xmat[body_id].reshape(3, 3),
         )
+        # Capture the settled scene for comparing independent EE trials.
+        from tuj.m5_motion.tool_use_journal import _object_record
+        save_json(output / "initial_scene.json", {
+            "seed": seed, "environment": environment, "active_ee": ee,
+            "objects": {name: _object_record(adapter.model, adapter.data, name, int(bid))
+                        for name, bid in runtime.env.obj_body_id.items()},
+            "hand_profile": runtime.env.scripted_grasp_profile,
+        })
+        np.savez_compressed(output / "initial_state.npz", qpos=adapter.data.qpos,
+                            qvel=adapter.data.qvel, ctrl=adapter.data.ctrl, time=adapter.data.time)
+        report["grasp_attempted"] = True
+        save_json(output / "validation_report.json", report)
         result = execute_grasp(runtime, entry, output / "grasp", seed=seed)
         pose_after = transform(
             adapter.data.xpos[body_id],
@@ -540,33 +592,47 @@ def controller_validate_case(
                 "SUCCESS" if result.get("status") == "SUCCESS" else "FAILED"
             ),
         }
-        report["result"] = {
-            "status": result.get("status"),
-            "failure_stage": result.get("failure_stage"),
-            "failure_reason": result.get("failure_reason"),
-            "metrics": result.get("metrics"),
-        }
-        report["controller_status"] = (
-            "PASS" if result.get("status") == "SUCCESS" else "FAIL"
-        )
-        if result.get("status") != "SUCCESS":
-            report["failures"].append(
-                f"{result.get('failure_stage')}: {result.get('failure_reason')}"
-            )
+        record_controller_result(report, result)
         if recorder is not None:
             recorder.hold_final_frame(1.0)
-    except GraspFailure as error:
+    except (GraspFailure, ToolUseJournalAttachmentGeometryError) as error:
         report["controller_status"] = "FAIL"
         report["failures"].append(str(error))
         report["stages"]["failure"] = str(error)
     except Exception as error:
-        report["controller_status"] = "FAIL"
+        report["controller_status"] = "ERROR"
+        report["failure_category"] = "IMPLEMENTATION_OR_RUNTIME"
+        report["error_type"] = type(error).__name__
         report["failures"].append(f"{type(error).__name__}: {error}")
     finally:
-        if recorder is not None:
-            recorder.close()
-        if runtime is not None:
-            runtime.close()
+        # The driver persists detailed errors before execute_grasp wraps them.
+        import json
+        result_path = output / "grasp" / "result.json"
+        if result_path.is_file() and "result" not in report:
+            try:
+                saved_result = json.loads(result_path.read_text(encoding="utf-8"))
+                # A later infrastructure exception must not be hidden by an
+                # earlier successful grasp result.
+                original_status = report["controller_status"]
+                record_controller_result(report, saved_result)
+                if original_status == "FAIL" and saved_result.get("status") == "SUCCESS":
+                    report["controller_status"] = "FAIL"
+                    report["failure_category"] = "POST_GRASP_INTEGRATION"
+                if original_status == "ERROR":
+                    report["controller_status"] = "ERROR"
+                    report["failure_category"] = "IMPLEMENTATION_OR_RUNTIME"
+            except Exception as error:
+                report["controller_status"] = "ERROR"
+                report["failure_category"] = "IMPLEMENTATION_OR_RUNTIME"
+                report["failures"].append(f"RESULT_READ_ERROR: {error}")
+        if report["controller_status"] == "FAIL":
+            report.setdefault("failure_category", "MOTION_OR_GRASP")
+        for label, resource in (("VIDEO", recorder), ("RUNTIME", runtime)):
+            if resource is not None:
+                try:
+                    resource.close()
+                except Exception as error:
+                    report.setdefault("artifact_errors", []).append(f"{label}_CLOSE: {error}")
         save_json(output / "validation_report.json", report)
     return report
 

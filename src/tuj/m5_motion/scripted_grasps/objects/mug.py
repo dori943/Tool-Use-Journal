@@ -32,4 +32,6 @@ def mug_recipe(environment='C2_1_ObjectSorting'):
 def build_mug_targets(T_WB,center_in_body_m,local_size_m,recipe=None):
     return build_catalog_targets(T_WB,center_in_body_m,local_size_m,recipe or mug_recipe())
 def grasp_mug(context,object_id='mug',recipe=None):
-    return dispatch_grasp(context,object_id,recipe or mug_recipe(),expected_id='mug')
+    # bind_context has already selected the correct environment and geometry.
+    active = recipe or getattr(context, 'recipe', None) or mug_recipe()
+    return dispatch_grasp(context,object_id,active,expected_id='mug')

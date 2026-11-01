@@ -31,11 +31,18 @@ def measure_contacts(model, data, objects, checks):
                 continue
             force = np.zeros(6)
             mujoco.mj_contactForce(model, data, index, force)
-            normal = sign * np.asarray(contact.frame[:3])
+            # MuJoCo stores contact-frame axes as rows. Include tangential
+            # friction: vertical walls can carry load with no upward normal.
+            frame = np.asarray(contact.frame).reshape(3, 3)
+            normal = sign * frame[0]
+            force_world = sign * np.einsum('ij,i->j', frame, force[:3])
             samples.append({'distance_m': float(contact.dist),
                             'normal_on_target_world': normal.tolist(),
                             'normal_force_n': float(force[0]),
-                            'upward_force_n': float(force[0] * normal[2])})
+                            'normal_upward_force_n': float(force[0] * normal[2]),
+                            'force_on_target_world_n': force_world.tolist(),
+                            'force_basis': 'FULL_CONTACT_FORCE_WORLD',
+                            'upward_force_n': float(force_world[2])})
         velocity = None
         body = mujoco.mj_name2id(model, mujoco.mjtObj.mjOBJ_BODY,
                                 objects[target].get('body_name', ''))
