@@ -1693,6 +1693,54 @@ def _raise_held_place_for_mount(request, feedback, shortfall_m: float) -> bool:
     return True
 
 
+def _raise_held_place_for_soft_margin(request, feedback, deficit_m: float) -> bool:
+    """Raise release for a repeated soft-occupant miss without the mount floor.
+
+    Mount repair must clear a hanging finger (~5 cm). Soft co-region misses
+    only need a small vertical budget; using the mount floor drops the object
+    from too high and can settle it past the containment rim by a millimetre.
+    Nudge the seat toward the region center so the drop lands inside the rim.
+    """
+
+    g = _grounding_for(request, None, _is_region_place)
+    if g is None:
+        return False
+    current = _held_place_center_xy(request)
+    if current is None:
+        return False
+    margin = float(request.constraints.collision_margin_m)
+    center = np.asarray(g.region_world[:2], dtype=float)
+    inset = max(0.005, 2.0 * margin)
+    toward = center - np.asarray(current, dtype=float)
+    toward_norm = float(np.linalg.norm(toward))
+    if toward_norm > 1e-9:
+        proposed = current + toward * (min(inset, 0.5 * toward_norm) / toward_norm)
+        limit = g.region_half[:2] - REGION_WALL_ALLOWANCE_M - g.half[:2]
+        if np.all(limit > 0.0) and np.all(
+            np.abs(proposed - center) <= limit + 1e-9
+        ):
+            current = proposed
+    previous = request.task.metadata.get(_HELD_PLACE_MOUNT_RELEASE_LIFT_KEY, 0.0)
+    try:
+        previous = float(previous)
+    except (TypeError, ValueError):
+        previous = 0.0
+    if not math.isfinite(previous) or previous < 0.0:
+        previous = 0.0
+    # Cover the measured deficit with margin; keep a small floor so IK still
+    # changes, but never the multi-finger mount clearance.
+    step = max(2.0 * (float(deficit_m) + margin), 0.02)
+    lift = previous + step
+    request.task.metadata[_HELD_PLACE_MOUNT_RELEASE_LIFT_KEY] = lift
+    _clear_held_place_grounding(request)
+    seated = _seat_held_place_at(g, current)
+    if isinstance(feedback, dict):
+        feedback["reground_mount_release_lift_m"] = lift
+        feedback["reground_place_xy_m"] = [float(seated[0]), float(seated[1])]
+        feedback["reground_place_lift_only"] = True
+    return True
+
+
 def reground_held_place_from_collision_feedback(request, feedback) -> bool:
     """Rewrite ``held_place_goal`` away from a colliding partner for repair.
 
@@ -1732,12 +1780,11 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
     # Already fled this soft/scene partner once: lift instead of marching XY
     # into the next packed occupant.
     if partner["partner_id"] in avoided_ids and not toward_region:
-        raised = _raise_held_place_for_mount(
+        raised = _raise_held_place_for_soft_margin(
             request, feedback, float(partner["deficit_m"])
         )
         if raised and isinstance(feedback, dict):
             feedback["reground_place_partner_id"] = partner["partner_id"]
-            feedback["reground_place_lift_only"] = True
         return raised
     g = _grounding_for(request, None, _is_region_place)
     if g is None:
@@ -1774,12 +1821,11 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
         avoid_partner_xys=avoid,
     )
     if next_xy is None:
-        raised = _raise_held_place_for_mount(
+        raised = _raise_held_place_for_soft_margin(
             request, feedback, float(partner["deficit_m"])
         )
         if raised and isinstance(feedback, dict):
             feedback["reground_place_partner_id"] = partner["partner_id"]
-            feedback["reground_place_lift_only"] = True
         return raised
     _clear_held_place_grounding(request)
     seated = _seat_held_place_at(g, next_xy)

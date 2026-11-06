@@ -1000,7 +1000,8 @@ def test_reground_held_place_moves_away_from_hand_neighbor_margin_partner():
         request.task.metadata['held_place_goal']['destination_center_xy_m'],
         dtype=float,
     )
-    np.testing.assert_allclose(third, second, atol=1e-9)
+    # Soft lift may inset slightly toward the region center for rim clearance.
+    assert float(np.linalg.norm(third - second)) <= 0.02 + 1e-9
     assert float(
         request.task.metadata['held_place_goal']['release_clearance_m']
     ) > second_clearance + 1e-9
@@ -1085,10 +1086,16 @@ def test_reground_held_place_raises_when_same_soft_partner_repeats():
         request.task.metadata['held_place_goal']['destination_center_xy_m'],
         dtype=float,
     )
-    np.testing.assert_allclose(raised_xy, after_xy, atol=1e-9)
+    assert float(np.linalg.norm(raised_xy - after_xy)) <= 0.02 + 1e-9
     assert float(
         request.task.metadata['held_place_goal']['release_clearance_m']
     ) > after_clearance + 1e-9
+    assert feedback2.get('reground_place_lift_only') is True
+    # Soft lift step is deficit-based, not the ~5 cm mount finger floor.
+    assert (
+        float(request.task.metadata['held_place_goal']['release_clearance_m'])
+        - after_clearance
+    ) < 0.05
 
 
 def test_place_margin_partner_prefers_newest_repair_batch_over_deeper_prior():
