@@ -744,14 +744,11 @@ class _Grounding:
         self.task.metadata['ee_path_keepout_seat'] = note
         return xy
 
-    def seat_clear_of_occupants(self, xy, *, ignore_thin_strips=False):
+    def seat_clear_of_occupants(self, xy, *, ignore_occupants=False):
+        if ignore_occupants:
+            return True
         margin = max(.01, float(self.request.constraints.collision_margin_m) * 2.)
         for center, half, _top, soft in self._occupants():
-            # Thin utensils are hard blockers for free-seat search, but M2's
-            # multi-object layout seats may AABB-overlap them (live plate beside
-            # a drifted spoon). Broad nested platforms still use soft graze.
-            if ignore_thin_strips and not soft:
-                continue
             gap = float(np.max(np.abs(xy - center) - (half + self.half[:2] + margin)))
             limit = -OCCUPANT_CONTACT_TOLERANCE_M if soft else 0.
             if gap < limit:
@@ -804,25 +801,26 @@ class _Grounding:
             return None
         physical_limit = np.maximum(physical_limit, 0.)
 
-        def acceptable(xy, *, ignore_thin_strips=False):
+        def acceptable(xy, *, ignore_occupants=False):
             relative = np.linalg.solve(seat_axes, xy - seat_origin)
             if np.any(np.abs(relative) > physical_limit + 1e-9):
                 return False
             if seat_allowed is not None and not seat_allowed(xy):
                 return False
             return self.seat_clear_of_occupants(
-                xy, ignore_thin_strips=ignore_thin_strips)
+                xy, ignore_occupants=ignore_occupants)
 
         anchor = self._slot_xy()
         if anchor is None:
             anchor = center_xy
         if acceptable(anchor):
             return anchor
-        # Honour the planned multi-object seat when only thin utensils block
-        # the AABB clearance band. Free-grid search keeps hard utensil blocking
-        # so objects are not invented on top of forks already on a plate.
+        # M2 assigns non-conflicting seats in its own packing model; runtime
+        # AABBs of already-placed co-region objects (plate, utensils) often
+        # still overlap those seats. Honour the planned seat inside the
+        # measured interior; free-grid search keeps full occupant blocking.
         if self._m2_layout_slot() is not None and acceptable(
-                anchor, ignore_thin_strips=True):
+                anchor, ignore_occupants=True):
             return anchor
         limit = (physical_limit if on_support else
                  np.maximum(region_half - REGION_WALL_ALLOWANCE_M, 0.) - footprint)
