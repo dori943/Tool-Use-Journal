@@ -1032,6 +1032,56 @@ def test_reground_held_place_moves_away_from_held_neighbor_margin_partner():
     assert feedback['avoid_place_partner_xy_m']
 
 
+def test_place_margin_partner_prefers_newest_repair_batch_over_deeper_prior():
+    """Cumulative apple history must not outrank the current plate miss."""
+    from tuj.m5_motion.scripted_grasps.transport import (
+        _place_margin_partner_from_feedback,
+    )
+    request, _slot_xy, _neighbor_xy = _crowded_place_request()
+    object_id = ENTRIES[4].object_id
+    other_xy = np.asarray(
+        request.task.metadata['held_place_goal']['destination_center_xy_m'],
+        dtype=float,
+    ) - np.array([.03, .0])
+    request.world.objects['other'] = {
+        'object_id': 'other',
+        'free_joint_name': 'other_free',
+        'pose': {
+            'frame_id': 'world',
+            'position_m': [float(other_xy[0]), float(other_xy[1]), float(REGION_POSITION[2])],
+            'orientation_xyzw': [0., 0., 0., 1.],
+        },
+        'dimensions_m': [.04, .04, .02],
+        'anchors': {'center': [0., 0., 0.]},
+    }
+    feedback = {
+        'avoid_place_partner_ids': ['neighbor'],
+        'failed_strategies': [
+            {
+                'source_repair_attempt': 0,
+                'collision_observations': [{
+                    'geometry_a': f'{object_id}_g0',
+                    'geometry_b': 'neighbor_g0',
+                    'measured_clearance_m': -0.02,
+                    'required_clearance_m': 0.005,
+                }],
+            },
+            {
+                'source_repair_attempt': 1,
+                'collision_observations': [{
+                    'geometry_a': f'{object_id}_g0',
+                    'geometry_b': 'other_g0',
+                    'measured_clearance_m': -0.01,
+                    'required_clearance_m': 0.005,
+                }],
+            },
+        ],
+    }
+    partner = _place_margin_partner_from_feedback(request, feedback)
+    assert partner is not None
+    assert partner['partner_id'] == 'other'
+
+
 def test_reground_held_place_keeps_prior_partner_distance_on_second_repair():
     """A later soft-partner miss must not walk back into the first partner."""
     from tuj.m5_motion.scripted_grasps.transport import (

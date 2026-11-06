@@ -990,6 +990,13 @@ class MotionPlanningPipeline:
                         item for item in prior_avoid
                         if isinstance(item, (list, tuple)) and len(item) >= 2
                     ]
+                prior_avoid_ids = previous_feedback.get("avoid_place_partner_ids")
+                if isinstance(prior_avoid_ids, list) and prior_avoid_ids:
+                    repair_feedback["avoid_place_partner_ids"] = [
+                        str(item)
+                        for item in prior_avoid_ids
+                        if isinstance(item, str) and item
+                    ]
             retry_request.task.metadata = {
                 **retry_request.task.metadata,
                 _COLLISION_REPAIR_FEEDBACK_KEY: repair_feedback,

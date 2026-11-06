@@ -1428,6 +1428,11 @@ def _place_margin_partner_from_feedback(request, feedback):
     Place-body covers the moving hand/EE and the held payload: both travel
     with the place seat, so a held↔occupant clearance miss needs the same XY
     diversification as a hand↔occupant miss.
+
+    Cumulative repair history may still list an older, deeper miss. Prefer
+    partners from the newest ``source_repair_attempt`` and skip partners the
+    seat already fled, so repair cannot keep marching away from a cleared
+    occupant into the next collision (and eventually the robot mount).
     """
     if not isinstance(feedback, dict):
         return None
@@ -1436,10 +1441,20 @@ def _place_margin_partner_from_feedback(request, feedback):
         return None
     held_id = held_pose_subject(request)
     region_id = request.task.goal.target_region_id
-    best = None
+    avoided_ids = {
+        str(item)
+        for item in (feedback.get("avoid_place_partner_ids") or [])
+        if isinstance(item, str) and item
+    }
+    candidates = []
+    latest_attempt = None
     for strategy in strategies:
         if not isinstance(strategy, dict):
             continue
+        try:
+            source_attempt = int(strategy.get("source_repair_attempt", -1))
+        except (TypeError, ValueError):
+            source_attempt = -1
         observations = strategy.get("collision_observations")
         if not isinstance(observations, list):
             continue
@@ -1490,13 +1505,25 @@ def _place_margin_partner_from_feedback(request, feedback):
                 rotation = Rotation.from_quat(pose["orientation_xyzw"]).as_matrix()
                 center = center + (rotation @ np.asarray(anchor, dtype=float))[:2]
             deficit = max(0.0, required - measured)
-            # Prefer the worst deficit; break ties toward region occupants.
-            rank = (deficit, 1.0 if partner_id == region_id else 0.0)
-            if best is None or rank > best[0]:
-                best = (rank, center, deficit, partner_id)
-    if best is None:
+            if latest_attempt is None or source_attempt > latest_attempt:
+                latest_attempt = source_attempt
+            candidates.append(
+                (source_attempt, deficit, partner_id == region_id, center, partner_id)
+            )
+    if not candidates:
         return None
-    _rank, partner_xy, deficit, partner_id = best
+    preferred = [
+        item for item in candidates if item[0] == latest_attempt
+    ] or candidates
+    # Skip already-fled partners when the newest batch has another option;
+    # if the newest batch only repeats the same partner, allow another flee.
+    active = [
+        item for item in preferred if item[4] not in avoided_ids
+    ] or preferred
+    _source, deficit, _region_tie, partner_xy, partner_id = max(
+        active,
+        key=lambda item: (item[1], 1.0 if item[2] else 0.0),
+    )
     return {
         "partner_xy": partner_xy,
         "deficit_m": float(deficit),
@@ -1603,11 +1630,18 @@ def _shift_held_place_off_mount(request, feedback, shortfall_m: float) -> bool:
         float(multi_finger_finger_below_tcp_m())
         + float(parallel_jaw_inner_finger_extra_below_tcp_m()),
     )
+    avoid = []
+    raw_avoid = feedback.get("avoid_place_partner_xy_m") if isinstance(feedback, dict) else None
+    if isinstance(raw_avoid, list):
+        for item in raw_avoid:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                avoid.append([float(item[0]), float(item[1])])
     next_xy = g.place_xy_away_from(
         base_xy,
         rejected_xys=rejected,
         min_shift_m=min_shift,
         current_xy=current,
+        avoid_partner_xys=avoid,
     )
     if next_xy is None:
         return False
@@ -1724,7 +1758,8 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
         feedback["rejected_place_xy_m"] = rejected
         feedback["reground_place_partner_id"] = partner["partner_id"]
         feedback["reground_place_xy_m"] = [float(seated[0]), float(seated[1])]
-        # Remember this partner so the next repair batch cannot walk back into it.
+        # Remember this partner so the next repair batch cannot re-flee it or
+        # walk back into it while clearing a newer collision.
         partner_xy = [
             float(partner["partner_xy"][0]),
             float(partner["partner_xy"][1]),
@@ -1736,6 +1771,14 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
         ):
             avoid.append(partner_xy)
         feedback["avoid_place_partner_xy_m"] = avoid
+        avoided_ids = [
+            str(item)
+            for item in (feedback.get("avoid_place_partner_ids") or [])
+            if isinstance(item, str) and item
+        ]
+        if partner["partner_id"] not in avoided_ids:
+            avoided_ids.append(str(partner["partner_id"]))
+        feedback["avoid_place_partner_ids"] = avoided_ids
     return True
 
 
