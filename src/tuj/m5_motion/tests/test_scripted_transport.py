@@ -169,6 +169,37 @@ def test_conceptual_tool_rest_transports_to_measured_pregrasp_home():
     )
 
 
+def test_conceptual_tool_home_keeps_measured_xy_despite_underfoot_occupants():
+    """Return-to-home is not packing: debris under the footprint must not exhaust seats."""
+    request=request_for(ENTRIES[4],action='transport')
+    request.task.goal.target_region_id='tool_rest'
+    request.task.metadata['scripted_m4_implicit_object_pose']=True
+    request.world.objects['debris']={
+        'pose':{
+            'frame_id':'world',
+            'position_m':[float(HOME_CENTER[0]),float(HOME_CENTER[1]),float(HOME_BOTTOM)],
+            'orientation_xyzw':[0.,0.,0.,1.],
+        },
+        'dimensions_m':[.04,.04,.02],
+        'anchors':{'center':[0.,0.,0.]},
+    }
+    ground_held_transport(request,_home_retention(request))
+    hint=request.task.metadata['held_transport_goal']
+    record=request.world.objects['tool_rest']
+    origin=np.asarray(record['pose']['position_m'])+np.asarray(
+        record['anchors'][hint['anchor']])
+    np.testing.assert_allclose(origin[:2],HOME[:2,3],atol=1e-10)
+
+    place_request=request_for(ENTRIES[4],action='RETURN_TOOL')
+    place_request.task.goal.target_region_id='tool_rest'
+    place_request.task.metadata['scripted_m4_implicit_object_pose']=True
+    place_request.world.objects['debris']=request.world.objects['debris']
+    ground_held_region_goal(place_request,_home_retention(place_request))
+    goal=place_request.task.goal.target_pose
+    assert goal is not None
+    np.testing.assert_allclose(goal.position_m[:2],HOME[:2,3],atol=1e-10)
+
+
 def test_conceptual_tool_rest_returns_to_measured_pregrasp_home():
     request=request_for(ENTRIES[4],action='RETURN_TOOL')
     request.task.goal.target_region_id='tool_rest'

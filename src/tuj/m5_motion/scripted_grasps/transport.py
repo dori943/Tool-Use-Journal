@@ -1050,6 +1050,12 @@ def _uses_volume_packing_entry(g):
             and g.record['packing_metadata'].get('position_policy') == POSITION_POLICY)
 
 
+def _is_conceptual_tool_home(g):
+    """True when the destination is a measured tool-return pose, not packing."""
+    metadata = g.record.get('metadata') if isinstance(g.record, dict) else None
+    return isinstance(metadata, dict) and metadata.get('conceptual_tool_home') is True
+
+
 def _region_destination_xy(g):
     """Select an entry proposal for explicit 3D packing, or a free floor seat.
 
@@ -1059,7 +1065,14 @@ def _region_destination_xy(g):
     supplies only a preferred XY: packing_destination_center applies the exact
     vertex bounds, and the existing volume preference, IK, path, release and
     measured containment gates remain authoritative.
+
+    Conceptual tool home is a measured return pose, not a shared packing region.
+    Occupants left under that footprint (e.g. after a sweep) must not trigger
+    packing seat search; residual under-tool contact uses the ordinary
+    breakaway / allowed-collision path at execution.
     """
+    if _is_conceptual_tool_home(g):
+        return g.region_world[:2].copy()
     if _uses_volume_packing_entry(g):
         preferred = g._slot_xy()
         return g.region_world[:2].copy() if preferred is None else preferred
@@ -1115,7 +1128,9 @@ def ground_held_place(request, retention=None):
     # Floor-level lateral jaw clearance is not the release model for an
     # explicit above-opening drop. Its open-hand corridor and measured rim
     # clearance are checked by the packing path and _seat_held_place_at.
-    if not _uses_volume_packing_entry(g):
+    # Measured tool-home returns keep the fixed pose; under-footprint debris
+    # is handled by breakaway rather than lateral seat shifts.
+    if not _uses_volume_packing_entry(g) and not _is_conceptual_tool_home(g):
         xy = _clear_finger_overhang(g, xy)
     _seat_held_place_at(g, xy)
 
