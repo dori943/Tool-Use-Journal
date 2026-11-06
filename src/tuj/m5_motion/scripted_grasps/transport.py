@@ -847,9 +847,12 @@ class _Grounding:
     ):
         """Next in-region place XY farther from ``partner_xy`` than rejected seats.
 
-        Used by collision-feedback repair when an EE/hand margin violation is
-        measured against a region occupant: keep the object AABB clear, stay
-        inside the interior, and do not reuse prior place seats.
+        Used by collision-feedback repair when an EE/hand/held-payload margin
+        violation is measured against a region occupant: stay inside the
+        interior, clear hard (thin-strip) blockers and the measured partner,
+        and do not reuse prior place seats. Other soft platforms (plate/mug)
+        keep the M2 packing rule — their inflated AABB must not void a seat
+        that physics already asked us to shift off the colliding partner.
 
         When ``toward_partner`` is set (destination region itself is the
         collision partner), move toward the region center instead of away from
@@ -877,7 +880,24 @@ class _Grounding:
             occupants = self._occupants()
             if not occupants:
                 return True
-            for c, h, _t, soft in occupants:
+            # Fleeing a scene occupant: ``partner`` is that body's center.
+            # Match it only (not every soft footprint that reaches the XY).
+            # Region-rim repairs (``toward_partner``) have no soft partner.
+            partner_idx = (
+                None
+                if toward_partner
+                else min(
+                    range(len(occupants)),
+                    key=lambda i: float(
+                        np.linalg.norm(occupants[i][0] - partner)
+                    ),
+                )
+            )
+            for i, (c, h, _t, soft) in enumerate(occupants):
+                # Soft co-region platforms other than the measured partner do
+                # not void repair seats (same rationale as honouring M2 slots).
+                if soft and i != partner_idx:
+                    continue
                 gap = float(np.max(np.abs(xy - c) - (h + mine + margin)))
                 limit = -OCCUPANT_CONTACT_TOLERANCE_M if soft else 0.
                 if gap < limit:
@@ -1372,7 +1392,12 @@ def _clear_held_place_grounding(request) -> None:
 
 
 def _place_margin_partner_from_feedback(request, feedback):
-    """Pick the scene partner of an EE/hand margin violation, if any."""
+    """Pick the scene partner of a place-body margin violation, if any.
+
+    Place-body covers the moving hand/EE and the held payload: both travel
+    with the place seat, so a held↔occupant clearance miss needs the same XY
+    diversification as a hand↔occupant miss.
+    """
     if not isinstance(feedback, dict):
         return None
     strategies = feedback.get("failed_strategies")
@@ -1406,13 +1431,13 @@ def _place_margin_partner_from_feedback(request, feedback):
                 str(observation.get("geometry_a", "")),
                 str(observation.get("geometry_b", "")),
             )
-            robot_labels = [
+            moving_labels = [
                 label for label in labels
-                if _is_robot_motion_collision_label(label, request)
+                if _place_body_hits_mount(label, request)
             ]
-            if not robot_labels:
+            if not moving_labels:
                 continue
-            scene_labels = [label for label in labels if label not in robot_labels]
+            scene_labels = [label for label in labels if label not in moving_labels]
             partner_id = None
             for label in scene_labels:
                 partner_id = _object_id_for_collision_label(label, request)

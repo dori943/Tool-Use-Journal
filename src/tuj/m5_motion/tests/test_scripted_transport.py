@@ -998,7 +998,40 @@ def test_reground_held_place_moves_away_from_hand_neighbor_margin_partner():
     assert float(np.linalg.norm(third - first)) >= 0.005 - 1e-9
 
 
-def test_reground_held_place_ignores_non_robot_margin_observations():
+def test_reground_held_place_moves_away_from_held_neighbor_margin_partner():
+    """Held payload ↔ occupant misses diversify PLACE XY like hand misses."""
+    from tuj.m5_motion.scripted_grasps.transport import (
+        reground_held_place_from_collision_feedback,
+    )
+    request, _slot_xy, neighbor_xy = _crowded_place_request()
+    object_id = ENTRIES[4].object_id
+    first = np.asarray(
+        request.task.metadata['held_place_goal']['destination_center_xy_m'],
+        dtype=float,
+    )
+    feedback = {
+        'failed_strategies': [{
+            'collision_observations': [{
+                'geometry_a': f'{object_id}_g0',
+                'geometry_b': 'neighbor_g0',
+                'measured_clearance_m': 0.001,
+                'required_clearance_m': 0.005,
+            }],
+        }],
+    }
+    assert reground_held_place_from_collision_feedback(request, feedback) is True
+    second = np.asarray(
+        request.task.metadata['held_place_goal']['destination_center_xy_m'],
+        dtype=float,
+    )
+    assert float(np.linalg.norm(second - first)) >= 0.005 - 1e-9
+    assert float(np.linalg.norm(second - neighbor_xy)) > float(
+        np.linalg.norm(first - neighbor_xy)
+    ) - 1e-9
+    assert feedback['reground_place_partner_id'] == 'neighbor'
+
+
+def test_reground_held_place_ignores_unrelated_scene_margin_observations():
     from tuj.m5_motion.scripted_grasps.transport import (
         reground_held_place_from_collision_feedback,
     )
@@ -1007,7 +1040,7 @@ def test_reground_held_place_ignores_non_robot_margin_observations():
     feedback = {
         'failed_strategies': [{
             'collision_observations': [{
-                'geometry_a': 'held_object_g0',
+                'geometry_a': 'apple_g0',
                 'geometry_b': 'neighbor_g0',
                 'measured_clearance_m': 0.001,
                 'required_clearance_m': 0.005,
