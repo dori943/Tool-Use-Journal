@@ -1702,6 +1702,10 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
     already past the robot-mount tolerance moves away from the robot base at
     the same release height. The same XY is raised only when that seat does
     not fit in the region.
+
+    Soft co-region partners are fled in XY once. A second miss against the same
+    partner raises the release instead: further XY shifts walk into the other
+    packed occupant (apple↔plate) and waste the repair budget on the mount.
     """
     if not _is_region_place(request.task):
         return False
@@ -1713,6 +1717,28 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
     partner = _place_margin_partner_from_feedback(request, feedback)
     if partner is None:
         return False
+    avoided_ids = {
+        str(item)
+        for item in (
+            (feedback.get("avoid_place_partner_ids") or [])
+            if isinstance(feedback, dict)
+            else []
+        )
+        if isinstance(item, str) and item
+    }
+    toward_region = (
+        partner["partner_id"] == request.task.goal.target_region_id
+    )
+    # Already fled this soft/scene partner once: lift instead of marching XY
+    # into the next packed occupant.
+    if partner["partner_id"] in avoided_ids and not toward_region:
+        raised = _raise_held_place_for_mount(
+            request, feedback, float(partner["deficit_m"])
+        )
+        if raised and isinstance(feedback, dict):
+            feedback["reground_place_partner_id"] = partner["partner_id"]
+            feedback["reground_place_lift_only"] = True
+        return raised
     g = _grounding_for(request, None, _is_region_place)
     if g is None:
         return False
@@ -1739,9 +1765,6 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
     # Destination-region partners are rim/floor geoms: move toward the region
     # center. Fleeing the region center pushes an off-centre vac cup deeper
     # into the wall that already failed margin.
-    toward_region = (
-        partner["partner_id"] == request.task.goal.target_region_id
-    )
     next_xy = g.place_xy_away_from(
         partner["partner_xy"],
         rejected_xys=rejected,
@@ -1751,7 +1774,13 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
         avoid_partner_xys=avoid,
     )
     if next_xy is None:
-        return False
+        raised = _raise_held_place_for_mount(
+            request, feedback, float(partner["deficit_m"])
+        )
+        if raised and isinstance(feedback, dict):
+            feedback["reground_place_partner_id"] = partner["partner_id"]
+            feedback["reground_place_lift_only"] = True
+        return raised
     _clear_held_place_grounding(request)
     seated = _seat_held_place_at(g, next_xy)
     if isinstance(feedback, dict):
@@ -1771,14 +1800,14 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
         ):
             avoid.append(partner_xy)
         feedback["avoid_place_partner_xy_m"] = avoid
-        avoided_ids = [
+        avoided_ids_list = [
             str(item)
             for item in (feedback.get("avoid_place_partner_ids") or [])
             if isinstance(item, str) and item
         ]
-        if partner["partner_id"] not in avoided_ids:
-            avoided_ids.append(str(partner["partner_id"]))
-        feedback["avoid_place_partner_ids"] = avoided_ids
+        if partner["partner_id"] not in avoided_ids_list:
+            avoided_ids_list.append(str(partner["partner_id"]))
+        feedback["avoid_place_partner_ids"] = avoided_ids_list
     return True
 
 

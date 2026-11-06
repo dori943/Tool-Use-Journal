@@ -984,18 +984,27 @@ def test_reground_held_place_moves_away_from_hand_neighbor_margin_partner():
     ) - 1e-9
     assert feedback['reground_place_partner_id'] == 'neighbor'
     assert feedback['rejected_place_xy_m']
+    second_clearance = float(
+        request.task.metadata['held_place_goal']['release_clearance_m']
+    )
     feedback2 = {
         **feedback,
         'repair_attempt': 2,
         'rejected_place_xy_m': list(feedback['rejected_place_xy_m']),
+        'avoid_place_partner_xy_m': list(feedback['avoid_place_partner_xy_m']),
+        'avoid_place_partner_ids': list(feedback['avoid_place_partner_ids']),
     }
+    # Same soft partner again: raise release instead of marching XY further.
     assert reground_held_place_from_collision_feedback(request, feedback2) is True
     third = np.asarray(
         request.task.metadata['held_place_goal']['destination_center_xy_m'],
         dtype=float,
     )
-    assert float(np.linalg.norm(third - second)) >= 0.005 - 1e-9
-    assert float(np.linalg.norm(third - first)) >= 0.005 - 1e-9
+    np.testing.assert_allclose(third, second, atol=1e-9)
+    assert float(
+        request.task.metadata['held_place_goal']['release_clearance_m']
+    ) > second_clearance + 1e-9
+    assert feedback2.get('reground_place_lift_only') is True
 
 
 def test_reground_held_place_moves_away_from_held_neighbor_margin_partner():
@@ -1030,6 +1039,56 @@ def test_reground_held_place_moves_away_from_held_neighbor_margin_partner():
     ) - 1e-9
     assert feedback['reground_place_partner_id'] == 'neighbor'
     assert feedback['avoid_place_partner_xy_m']
+
+
+def test_reground_held_place_raises_when_same_soft_partner_repeats():
+    """A second miss against an already-fled soft partner lifts release, not XY."""
+    from tuj.m5_motion.scripted_grasps.transport import (
+        reground_held_place_from_collision_feedback,
+    )
+    request, _slot_xy, _neighbor_xy = _crowded_place_request()
+    object_id = ENTRIES[4].object_id
+    feedback = {
+        'failed_strategies': [{
+            'collision_observations': [{
+                'geometry_a': f'{object_id}_g0',
+                'geometry_b': 'neighbor_g0',
+                'measured_clearance_m': 0.001,
+                'required_clearance_m': 0.005,
+            }],
+        }],
+    }
+    assert reground_held_place_from_collision_feedback(request, feedback) is True
+    after_xy = np.asarray(
+        request.task.metadata['held_place_goal']['destination_center_xy_m'],
+        dtype=float,
+    )
+    after_clearance = float(
+        request.task.metadata['held_place_goal']['release_clearance_m']
+    )
+    feedback2 = {
+        'rejected_place_xy_m': list(feedback['rejected_place_xy_m']),
+        'avoid_place_partner_xy_m': list(feedback['avoid_place_partner_xy_m']),
+        'avoid_place_partner_ids': list(feedback['avoid_place_partner_ids']),
+        'failed_strategies': [{
+            'source_repair_attempt': 1,
+            'collision_observations': [{
+                'geometry_a': f'{object_id}_g0',
+                'geometry_b': 'neighbor_g0',
+                'measured_clearance_m': 0.001,
+                'required_clearance_m': 0.005,
+            }],
+        }],
+    }
+    assert reground_held_place_from_collision_feedback(request, feedback2) is True
+    raised_xy = np.asarray(
+        request.task.metadata['held_place_goal']['destination_center_xy_m'],
+        dtype=float,
+    )
+    np.testing.assert_allclose(raised_xy, after_xy, atol=1e-9)
+    assert float(
+        request.task.metadata['held_place_goal']['release_clearance_m']
+    ) > after_clearance + 1e-9
 
 
 def test_place_margin_partner_prefers_newest_repair_batch_over_deeper_prior():
