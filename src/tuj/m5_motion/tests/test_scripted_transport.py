@@ -1118,6 +1118,50 @@ def test_valid_preferred_slot_is_retained_without_grid_rounding():
     np.testing.assert_array_equal(g._free_destination_xy(None), anchor)
 
 
+def test_m2_layout_slot_keeps_seat_when_only_thin_utensil_aabb_overlaps():
+    """Shared-tray layouts may AABB-overlap utensils; honour the planned seat."""
+    from tuj.m5_motion.scripted_grasps.transport import _Grounding
+
+    request = _tray_request(.005)
+    oid = 'plate'
+    request.task.target_ids = [oid]
+    request.task.goal.target_object_id = oid
+    _generic_held(request, oid)
+    request.world.robot_state.eef_pose = Pose(
+        frame_id='world', position_m=(0., 0., 1.2), orientation_xyzw=(0., 0., 0., 1.))
+    attached = request.world.metadata['contact_friction_held_objects'][oid]
+    attached['position_in_reference_m'] = [0., 0., 0.]
+    attached['orientation_in_reference_xyzw'] = [0., 0., 0., 1.]
+    # Broad plate into a tray that already holds a thin spoon (c2_1 geometry).
+    request.world.objects[oid].update(
+        dimensions_m=[.182, .182, .011], anchors={'center': [0., 0., 0.]})
+    request.world.objects['tray'] = {
+        'pose': {'frame_id': 'world', 'position_m': [-.43, .2, .83],
+                 'orientation_xyzw': [0., 0., 0., 1.]},
+        'dimensions_m': [.237, .393, .063], 'anchors': {'center': [0., 0., 0.]},
+    }
+    request.world.objects['spoon'] = {
+        'pose': {'frame_id': 'world', 'position_m': [-.376, .223, .812],
+                 'orientation_xyzw': [0., 0., 0., 1.]},
+        'dimensions_m': [.056, .172, .030], 'anchors': {'center': [0., 0., 0.]},
+    }
+    request.task.goal.target_region_id = 'tray'
+    request.task.metadata['action_parameters'] = {
+        'placement_slot': {
+            'uv': [-.311, -.2574],
+            'frame': 'world_xy',
+            'source': 'm2_container_layout',
+        },
+    }
+    g = _Grounding(request, None, oid)
+    g._initialize_seat_yaw()
+    assert not g.seat_clear_of_occupants(g._slot_xy())
+    assert g.seat_clear_of_occupants(g._slot_xy(), ignore_thin_strips=True)
+    selected = g._free_destination_xy(None)
+    assert selected is not None
+    np.testing.assert_allclose(selected, g._slot_xy(), atol=1e-9)
+
+
 def test_oversize_object_cannot_bypass_interior_at_clear_center():
     from tuj.m5_motion.scripted_grasps.transport import _Grounding
     request, oid = _occupied_tray_for_yaw_search()
