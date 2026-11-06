@@ -196,6 +196,8 @@ class SiPhyBackend(PropertyBackend):
             self.client = client
         else:                                           # 키 출처에 따라 model 도 조정될 수 있음
             self.client, self.model = self._make_client(api_key, repo_root, model)
+            from tuj.common.api_retry import with_api_retry
+            self.client = with_api_retry(self.client, "m1_siphy")
         # Gemini OpenAI 호환 엔드포인트는 seed 파라미터를 지원하지 않는다(400).
         burl = str(getattr(self.client, "base_url", "") or "")
         self._is_gemini = ("generativelanguage" in burl

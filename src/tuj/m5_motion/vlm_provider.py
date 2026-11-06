@@ -1082,7 +1082,8 @@ class OpenAIKeyframeProvider:
             raise OpenAIKeyframeProviderError(
                 "install motion-planner[vlm] to enable OpenAI keyframe generation"
             ) from error
-        self._client = OpenAI(timeout=self.config.timeout_s)
+        from tuj.common.api_retry import with_api_retry
+        self._client = with_api_retry(OpenAI(timeout=self.config.timeout_s), "m5_openai")
         return self._client
 
     def _cache_path(self, cache_key: str) -> Path | None:

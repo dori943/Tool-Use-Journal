@@ -1208,6 +1208,14 @@ def _classified(summary, error=None):
     return summary
 
 
+def _api_retry_log():
+    try:
+        from tuj.common.api_retry import api_retry_log
+        return list(api_retry_log)
+    except Exception:  # noqa: BLE001
+        return []
+
+
 def write_run_result(out, task, args, *, method, attempts, final_error=None,
                      plan_status=None, extra=None):
     """조건(Full / w/o ...)에 상관없이 같은 필드로 <out>/run_result.json 을 쓴다.
@@ -1243,7 +1251,11 @@ def write_run_result(out, task, args, *, method, attempts, final_error=None,
         "exec_success": exec_success,
         "task_goal_status": goal_status,
         "goal_success": goal_success,
-        "success": goal_success if exec_success else False,
+        # 외부 API 장애로 끝난 시도는 성공/실패 어느 쪽 증거도 아니다 → None (Table III 집계 제외, 재실행 대상)
+        "success": (None if (not exec_success and last.get("failure_stage") == "infrastructure")
+                    else goal_success if exec_success else False),
+        "rerun_required": (not exec_success and last.get("failure_stage") == "infrastructure"),
+        "api_retry_log": _api_retry_log(),
         "failure_stage": (("none" if goal_success is True else "goal" if goal_success is False else "evaluation")
                           if exec_success else last.get("failure_stage") or "unknown"),
         "failure_code": (("GOAL_NOT_ACHIEVED" if goal_success is False else "GOAL_EVIDENCE_MISSING" if goal_success is None else None)
@@ -1283,15 +1295,21 @@ def run_m5_with_retries(task, out, args, *, method="full", plan_status=None, ext
     import shutil
 
     out = Path(out)
+    import time as _time
+
     retries = max(0, int(getattr(args, "exec_retries", 0) or 0))
+    api_reruns = max(0, int(getattr(args, "api_reruns", 2) or 0))
+    api_wait = float(os.environ.get("TUJ_API_RERUN_WAIT_S", "180"))
     attempts = []
     last_error = None
-    for attempt in range(retries + 1):
+    attempt = 0
+    exec_used = api_used = 0
+    while True:
         if attempt > 0:
             prev = out / "m5"
             if prev.exists():
                 shutil.move(str(prev), str(out / f"m5_attempt_{attempt}"))
-            print(f"\n[M5] 실행 실패 재시도 {attempt}/{retries}")
+            print(f"\n[M5] 재시도 #{attempt} (실행 실패 {exec_used}/{retries}, API 장애 {api_used}/{api_reruns})")
         last_error = None
         try:
             stage_m5(task, out, args)
@@ -1315,10 +1333,24 @@ def run_m5_with_retries(task, out, args, *, method="full", plan_status=None, ext
         attempts.append(record)
         write_run_result(out, task, args, method=method, attempts=attempts,
                          final_error=last_error, plan_status=plan_status, extra=extra)
+        attempt += 1
         if last_error is None and summary.get("status") == "SUCCESS":
             break
+        if record["failure_stage"] == "infrastructure":
+            # 요청 단위 재시도(api_retry)를 다 쓰고도 장애 → 잠시 뒤 M5 전체를 다시 돈다.
+            # 실행 실패 재시도 예산(--exec-retries)과 별도로 센다.
+            if api_used >= api_reruns:
+                print(f"[M5] API 장애 지속: {api_reruns}회 재실행 후 중단 → run_result.rerun_required=true")
+                break
+            api_used += 1
+            print(f"[M5] API 장애 → {api_wait:.0f}s 후 M5 재실행 ({api_used}/{api_reruns})")
+            _time.sleep(api_wait)
+            continue
         if record["failure_stage"] != "execution" and not record.get("physics_related"):
             break  # 순수 계획 실패는 재시도 대상이 아니다 (물리 접촉 코드가 있으면 재시도)
+        if exec_used >= retries:
+            break
+        exec_used += 1
     if last_error is not None:
         raise last_error
     return attempts
@@ -1544,6 +1576,17 @@ def build_parser():
         help=(
             "M5 초기 world 캡처에 쓸 환경 이름 "
             "(기본: 태스크 기본값)"
+        ),
+    )
+
+    p.add_argument(
+        "--api-reruns",
+        type=int,
+        default=2,
+        help=(
+            "M5 가 외부 API 장애(503/429/타임아웃, 요청 단위 재시도 소진)로 끝났을 때 "
+            "TUJ_API_RERUN_WAIT_S(기본 180초) 대기 후 M5 를 다시 도는 횟수 (기본 2). "
+            "그래도 실패하면 run_result 에 success=null, rerun_required=true 로 남는다"
         ),
     )
 

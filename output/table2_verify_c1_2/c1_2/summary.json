@@ -1,0 +1,1264 @@
+{
+  "task": "c1_2",
+  "environment": "C1_2_DoughFlatten",
+  "seed": 0,
+  "denominator_source": "reasoner",
+  "inferred_feasible": {
+    "bottle": [
+      "2F",
+      "3F"
+    ],
+    "spatula": [
+      "2F",
+      "3F",
+      "vac"
+    ],
+    "spoon": [
+      "2F",
+      "3F"
+    ],
+    "tongs": [
+      "2F",
+      "3F"
+    ]
+  },
+  "trials": [
+    {
+      "object": "bottle",
+      "ee": "2F",
+      "status": "FAIL",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "EXPERIMENTAL",
+      "failure_category": "MOTION_OR_GRASP",
+      "failures": [
+        "bottle: PLAN_PRE_CLEARANCE: IK_FAILED: PRE_CLEARANCE no full-pose IK solution converged from deterministic seeds",
+        "PLAN_PRE_CLEARANCE: IK_FAILED: PRE_CLEARANCE no full-pose IK solution converged from deterministic seeds"
+      ],
+      "detail": null,
+      "result": {
+        "status": "FAILED",
+        "failure_stage": "PLAN_PRE_CLEARANCE",
+        "failure_reason": "IK_FAILED: PRE_CLEARANCE no full-pose IK solution converged from deterministic seeds",
+        "error_type": "GraspFailure",
+        "attachment_used": false,
+        "hand_model_correction": {
+          "policy": "CALIBRATED_PARALLEL_2F_LINKAGE",
+          "removed_spring_tendons": [
+            "<fixed name=\"gripper0_right_finger2_12_cpl\" range=\"-1 1\" stiffness=\"0.4\" springlength=\"0.001\" limited=\"true\">\n\t\t\t<joint joint=\"gripper0_right_finger_joint\" coef=\"1\" />\n\t\t\t<joint joint=\"gripper0_right_left_inner_finger_joint\" coef=\"-3\" />\n\t\t\t<joint joint=\"gripper0_right_left_inner_knuckle_joint\" coef=\"1\" />\n\t\t</fixed>\n\n\t\t\n        ",
+            "<fixed name=\"gripper0_right_finger1_12_cpl\" range=\"-1 1\" stiffness=\"0.4\" springlength=\"0.001\" limited=\"true\">\n\t\t\t<joint joint=\"gripper0_right_right_outer_knuckle_joint\" coef=\"1\" />\n\t\t\t<joint joint=\"gripper0_right_right_inner_finger_joint\" coef=\"-3\" />\n\t\t\t<joint joint=\"gripper0_right_right_inner_knuckle_joint\" coef=\"1\" />\n\t\t</fixed>\n\t"
+          ],
+          "added_joint_couplings": [
+            {
+              "name": "gripper0_right_left_inner_finger_joint_parallel",
+              "joint1": "gripper0_right_left_inner_finger_joint",
+              "joint2": "gripper0_right_finger_joint",
+              "polycoef": "0 -1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_left_inner_knuckle_joint_parallel",
+              "joint1": "gripper0_right_left_inner_knuckle_joint",
+              "joint2": "gripper0_right_finger_joint",
+              "polycoef": "0 1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_right_inner_finger_joint_parallel",
+              "joint1": "gripper0_right_right_inner_finger_joint",
+              "joint2": "gripper0_right_right_outer_knuckle_joint",
+              "polycoef": "0 -1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_right_inner_knuckle_joint_parallel",
+              "joint1": "gripper0_right_right_inner_knuckle_joint",
+              "joint2": "gripper0_right_right_outer_knuckle_joint",
+              "polycoef": "0 1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            }
+          ],
+          "joint_armature_kg_m2": 0.0001,
+          "critical_damping_actuators": [
+            "gripper0_right_finger_1",
+            "gripper0_right_finger_2"
+          ],
+          "joint_ranges_changed": false,
+          "mass_or_friction_changed": false,
+          "source_assets_changed": false,
+          "object_attachment": false,
+          "scene_collision_masks_changed": false,
+          "excluded_linkage_contacts": [
+            [
+              "gripper0_right_left_inner_finger",
+              "gripper0_right_left_inner_knuckle"
+            ],
+            [
+              "gripper0_right_right_inner_finger",
+              "gripper0_right_right_inner_knuckle"
+            ]
+          ]
+        }
+      },
+      "artifact_errors": [],
+      "seconds": 65.14,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\bottle_2F\\validation_report.json",
+      "inferred_feasible": true
+    },
+    {
+      "object": "bottle",
+      "ee": "3F",
+      "status": "PASS",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "VALIDATED",
+      "failure_category": null,
+      "failures": [],
+      "detail": null,
+      "result": {
+        "status": "SUCCESS",
+        "failure_reason": null,
+        "metrics": {
+          "minimum_hold_lift_m": 0.1404911778739939,
+          "minimum_bottom_clearance_m": 0.1385256309140599,
+          "three_finger_contact_fraction": 1.0,
+          "max_slip_m": 0.0011472842520050739,
+          "max_slip_deg": 1.8781711045683334,
+          "hold_s": 5.0
+        },
+        "acquisition_status": "SUCCESS",
+        "acquisition_attachment_used": false,
+        "attachment_used": true,
+        "attachment_mode": "KINEMATIC",
+        "attachment_phase": "POST_VALIDATED_GRASP"
+      },
+      "artifact_errors": [],
+      "seconds": 180.44,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\bottle_3F\\validation_report.json",
+      "inferred_feasible": true
+    },
+    {
+      "object": "bottle",
+      "ee": "vac",
+      "status": "ERROR",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "EXPERIMENTAL",
+      "failure_category": "IMPLEMENTATION_OR_RUNTIME",
+      "failures": [
+        "bottle: CLOSE: Invalid index -1. Valid indices from 0 to 1409",
+        "CLOSE: Invalid index -1. Valid indices from 0 to 1409"
+      ],
+      "detail": null,
+      "result": {
+        "status": "FAILED",
+        "failure_stage": "CLOSE",
+        "failure_reason": "Invalid index -1. Valid indices from 0 to 1409",
+        "error_type": "IndexError",
+        "attachment_used": true,
+        "vacuum_policy": "CONTACT_GATED_KINEMATIC_ATTACH",
+        "vacuum_attachment": {
+          "policy": "CONTACT_GATED_KINEMATIC_ATTACH",
+          "time_s": 16.440000000007036,
+          "attachment": {
+            "object_id": "bottle",
+            "free_joint_name": "bottle_joint0",
+            "reference_kind": "site",
+            "reference_name": "gripper0_right_grip_site",
+            "position_in_reference_m": [
+              -2.6506874854614892e-05,
+              2.7915747624618348e-06,
+              0.06819726566976958
+            ],
+            "rotation_in_reference": [
+              [
+                0.9999999308123579,
+                -4.7482030281136075e-05,
+                0.00036894543949811403
+              ],
+              [
+                -4.746810234235405e-05,
+                -0.9999999981605064,
+                -3.7759338248410715e-05
+              ],
+              [
+                0.0003689472317094832,
+                3.774182249605041e-05,
+                -0.9999999312267457
+              ]
+            ],
+            "attach_distance_m": -5.4634013873388135e-05,
+            "mode": "KINEMATIC",
+            "breakable_weld": null
+          },
+          "contact_before_attach": {
+            "time_s": 16.440000000007036,
+            "stage": "CLOSE",
+            "q": [
+              0.06791139741906045,
+              -1.0681308804822058,
+              1.2450349115526136,
+              -1.747799815273989,
+              -1.5723407316179507,
+              0.06794738638462205
+            ],
+            "attachment_active": false,
+            "finger_contacts": [
+              "suction"
+            ],
+            "finger_force_n": {
+              "suction": 41.88630876158176
+            },
+            "contact_count": 5,
+            "normal_opposition": 0.0,
+            "contact_span_m": 0.0,
+            "suction_alignment": 0.9999994896421238,
+            "suction_alignment_mean": 0.9999995982698268,
+            "suction_aligned_fraction": 1.0,
+            "lift_m": 0.00011331331757158392,
+            "finger_contact_centers_from_object_center_m": {
+              "suction": [
+                -0.0028350080297691064,
+                -0.00075352406635545,
+                0.06821255778384688
+              ]
+            },
+            "bottom_clearance_m": -1.5770139679349704e-05,
+            "T_GB": [
+              [
+                0.9999999871248884,
+                -5.156079115310139e-05,
+                0.00015195956943153492,
+                -6.058481294868301e-06
+              ],
+              [
+                -5.155184124160874e-05,
+                -0.9999999969366007,
+                -5.8899991034222554e-05,
+                1.9514779264984128e-05
+              ],
+              [
+                0.00015196260589615853,
+                5.889215648027992e-05,
+                -0.9999999867195415,
+                0.06818919722176386
+              ],
+              [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "gripper_q": [],
+            "gripper_ctrl": [
+              0.5226130653266332
+            ],
+            "object_pose": [
+              [
+                0.9999999985266294,
+                -1.5322226143083307e-05,
+                -5.2076616689200276e-05,
+                2.524989138633659
+              ],
+              [
+                1.540516418011549e-05,
+                0.9999987310741852,
+                0.0015929886074983542,
+                -3.0398790872697514
+              ],
+              [
+                5.205214247614948e-05,
+                -0.0015929894074001188,
+                0.9999987298368561,
+                0.9882640339208747
+              ],
+              [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "bad_contacts": []
+          },
+          "T_GB_at_attach": [
+            [
+              0.9999999308123579,
+              -4.7482030281136075e-05,
+              0.00036894543949811403,
+              -2.6506874854614892e-05
+            ],
+            [
+              -4.746810234235405e-05,
+              -0.9999999981605064,
+              -3.7759338248410715e-05,
+              2.7915747624618348e-06
+            ],
+            [
+              0.0003689472317094832,
+              3.774182249605041e-05,
+              -0.9999999312267457,
+              0.06819726566976958
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "grasp_T_GB": [
+            [
+              0.9999999252839803,
+              -6.422998183937907e-05,
+              0.00038119095660833324,
+              -2.1346761376328516e-05
+            ],
+            [
+              -6.420603678020257e-05,
+              -0.9999999959650928,
+              -6.282834579050504e-05,
+              2.01562483259643e-05
+            ],
+            [
+              0.00038119499053377193,
+              6.2803866335641e-05,
+              -0.999999925373025,
+              0.06824578511913404
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "relative_pose_source": "CONTROLLER_GRASP_OBJECT_POSE",
+          "object_pose_before_attach": {
+            "position_m": [
+              2.524989138633659,
+              -3.0398790872697514,
+              0.9882640339208747
+            ],
+            "orientation_xyzw": [
+              -0.0007964947566677298,
+              -2.6032198058391455e-05,
+              7.68185002032743e-06,
+              0.9999996824296579
+            ]
+          },
+          "object_pose_after_attach": {
+            "position_m": [
+              2.524989138043916,
+              -3.039879087214075,
+              0.9882640325418368
+            ],
+            "orientation_xyzw": [
+              -0.0007964959295552752,
+              -2.6037275825321938e-05,
+              7.682713574158989e-06,
+              0.9999996824285848
+            ]
+          },
+          "grip_pose_at_attach": {
+            "position_m": [
+              2.524981284612581,
+              -3.039754964081566,
+              1.0564531207825487
+            ],
+            "orientation_xyzw": [
+              0.9999997004525777,
+              -1.8035015312056757e-05,
+              0.00010203302389601085,
+              0.000767045471391013
+            ]
+          },
+          "grasp_object_pose": {
+            "position_m": [
+              2.524997848733554,
+              -3.0398789600255607,
+              0.9882638377322717
+            ],
+            "orientation_xyzw": [
+              -0.0007942625945559036,
+              4.097620875748515e-05,
+              3.403521484677696e-06,
+              0.9999996837280986
+            ]
+          },
+          "raw_attach_translation_m": [
+            -5.897429211643157e-10,
+            5.567635241732205e-11,
+            -1.3790378838862694e-09
+          ],
+          "raw_attach_translation_norm_m": 1.500880426441573e-09,
+          "grip_pose_before_rebind": {
+            "position_m": [
+              2.525004783105948,
+              -3.039770410522342,
+              1.056461021868864
+            ],
+            "orientation_xyzw": [
+              0.9999996888847946,
+              -2.0188257936371024e-05,
+              0.0001435156942330179,
+              0.0007753876409456179
+            ]
+          },
+          "object_pose_before_rebind": {
+            "position_m": [
+              2.5250182953010496,
+              -3.0398956715153793,
+              0.9882719420554467
+            ],
+            "orientation_xyzw": [
+              -0.0008048385253687533,
+              -6.752379009505344e-05,
+              5.5254778987584485e-06,
+              0.9999996738224244
+            ]
+          },
+          "object_pose_after_grasp_rebind": {
+            "position_m": [
+              2.524997848733554,
+              -3.0398789600255607,
+              0.9882638377322717
+            ],
+            "orientation_xyzw": [
+              -0.0007942625945559035,
+              4.097620875748513e-05,
+              3.403521484677698e-06,
+              0.9999996837280986
+            ]
+          },
+          "attach_rebind_translation_m": [
+            -2.0446567495557844e-05,
+            1.6711489818632685e-05,
+            -8.104323174995542e-06
+          ],
+          "attach_rebind_translation_norm_m": 2.762274549050902e-05,
+          "time_s_rebind": 18.440000000002374
+        },
+        "hand_model_correction": {
+          "policy": "NATIVE_HAND",
+          "source_assets_changed": false
+        }
+      },
+      "artifact_errors": [],
+      "seconds": 220.47,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\bottle_vac\\validation_report.json",
+      "inferred_feasible": false
+    },
+    {
+      "object": "spatula",
+      "ee": "2F",
+      "status": "FAIL",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "EXPERIMENTAL",
+      "failure_category": "MOTION_OR_GRASP",
+      "failures": [
+        "spatula: PLAN_GRASP: CARTESIAN_COLLISION: GRASP invalid swept sample 1/1:  [{'geoms': ['gripper0_right_left_fingertip_collision', 'island_island_group_top_2'], 'penetration_m': 0.0016352155763650492}]",
+        "PLAN_GRASP: CARTESIAN_COLLISION: GRASP invalid swept sample 1/1:  [{'geoms': ['gripper0_right_left_fingertip_collision', 'island_island_group_top_2'], 'penetration_m': 0.0016352155763650492}]"
+      ],
+      "detail": null,
+      "result": {
+        "status": "FAILED",
+        "failure_stage": "PLAN_GRASP",
+        "failure_reason": "CARTESIAN_COLLISION: GRASP invalid swept sample 1/1:  [{'geoms': ['gripper0_right_left_fingertip_collision', 'island_island_group_top_2'], 'penetration_m': 0.0016352155763650492}]",
+        "error_type": "GraspFailure",
+        "attachment_used": false,
+        "hand_model_correction": {
+          "policy": "CALIBRATED_PARALLEL_2F_LINKAGE",
+          "removed_spring_tendons": [
+            "<fixed name=\"gripper0_right_finger2_12_cpl\" range=\"-1 1\" stiffness=\"0.4\" springlength=\"0.001\" limited=\"true\">\n\t\t\t<joint joint=\"gripper0_right_finger_joint\" coef=\"1\" />\n\t\t\t<joint joint=\"gripper0_right_left_inner_finger_joint\" coef=\"-3\" />\n\t\t\t<joint joint=\"gripper0_right_left_inner_knuckle_joint\" coef=\"1\" />\n\t\t</fixed>\n\n\t\t\n        ",
+            "<fixed name=\"gripper0_right_finger1_12_cpl\" range=\"-1 1\" stiffness=\"0.4\" springlength=\"0.001\" limited=\"true\">\n\t\t\t<joint joint=\"gripper0_right_right_outer_knuckle_joint\" coef=\"1\" />\n\t\t\t<joint joint=\"gripper0_right_right_inner_finger_joint\" coef=\"-3\" />\n\t\t\t<joint joint=\"gripper0_right_right_inner_knuckle_joint\" coef=\"1\" />\n\t\t</fixed>\n\t"
+          ],
+          "added_joint_couplings": [
+            {
+              "name": "gripper0_right_left_inner_finger_joint_parallel",
+              "joint1": "gripper0_right_left_inner_finger_joint",
+              "joint2": "gripper0_right_finger_joint",
+              "polycoef": "0 -1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_left_inner_knuckle_joint_parallel",
+              "joint1": "gripper0_right_left_inner_knuckle_joint",
+              "joint2": "gripper0_right_finger_joint",
+              "polycoef": "0 1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_right_inner_finger_joint_parallel",
+              "joint1": "gripper0_right_right_inner_finger_joint",
+              "joint2": "gripper0_right_right_outer_knuckle_joint",
+              "polycoef": "0 -1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_right_inner_knuckle_joint_parallel",
+              "joint1": "gripper0_right_right_inner_knuckle_joint",
+              "joint2": "gripper0_right_right_outer_knuckle_joint",
+              "polycoef": "0 1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            }
+          ],
+          "joint_armature_kg_m2": 0.0001,
+          "critical_damping_actuators": [
+            "gripper0_right_finger_1",
+            "gripper0_right_finger_2"
+          ],
+          "joint_ranges_changed": false,
+          "mass_or_friction_changed": false,
+          "source_assets_changed": false,
+          "object_attachment": false,
+          "scene_collision_masks_changed": false,
+          "excluded_linkage_contacts": [
+            [
+              "gripper0_right_left_inner_finger",
+              "gripper0_right_left_inner_knuckle"
+            ],
+            [
+              "gripper0_right_right_inner_finger",
+              "gripper0_right_right_inner_knuckle"
+            ]
+          ]
+        }
+      },
+      "artifact_errors": [],
+      "seconds": 87.78,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\spatula_2F\\validation_report.json",
+      "inferred_feasible": true
+    },
+    {
+      "object": "spatula",
+      "ee": "3F",
+      "status": "PASS",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "VALIDATED",
+      "failure_category": null,
+      "failures": [],
+      "detail": null,
+      "result": {
+        "status": "SUCCESS",
+        "failure_reason": null,
+        "metrics": {
+          "minimum_hold_lift_m": 0.14297423767214668,
+          "minimum_bottom_clearance_m": 0.13850400609943359,
+          "all_finger_contact_fraction": 1.0,
+          "max_slip_m": 0.0014916439053871684,
+          "max_slip_deg": 1.606016641219579,
+          "hold_s": 5.0
+        },
+        "acquisition_status": "SUCCESS",
+        "acquisition_attachment_used": false,
+        "attachment_used": true,
+        "attachment_mode": "KINEMATIC",
+        "attachment_phase": "POST_VALIDATED_GRASP"
+      },
+      "artifact_errors": [],
+      "seconds": 145.09,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\spatula_3F\\validation_report.json",
+      "inferred_feasible": true
+    },
+    {
+      "object": "spatula",
+      "ee": "vac",
+      "status": "ERROR",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "EXPERIMENTAL",
+      "failure_category": "IMPLEMENTATION_OR_RUNTIME",
+      "failures": [
+        "spatula: CLOSE: Invalid index -1. Valid indices from 0 to 1409",
+        "CLOSE: Invalid index -1. Valid indices from 0 to 1409"
+      ],
+      "detail": null,
+      "result": {
+        "status": "FAILED",
+        "failure_stage": "CLOSE",
+        "failure_reason": "Invalid index -1. Valid indices from 0 to 1409",
+        "error_type": "IndexError",
+        "attachment_used": true,
+        "vacuum_policy": "CONTACT_GATED_KINEMATIC_ATTACH",
+        "vacuum_attachment": {
+          "policy": "CONTACT_GATED_KINEMATIC_ATTACH",
+          "time_s": 19.59999999999967,
+          "attachment": {
+            "object_id": "spatula",
+            "free_joint_name": "spatula_joint0",
+            "reference_kind": "site",
+            "reference_name": "gripper0_right_grip_site",
+            "position_in_reference_m": [
+              0.007859280296903304,
+              0.048738986280205676,
+              0.0026536164307702226
+            ],
+            "rotation_in_reference": [
+              [
+                0.9999995296354934,
+                -5.4626895321464226e-05,
+                -0.000968372187809089
+              ],
+              [
+                -5.4920839157394576e-05,
+                -0.999999952429568,
+                -0.00030352028431879333
+              ],
+              [
+                -0.0009683555613724065,
+                0.0003035733253667959,
+                -0.9999994850652387
+              ]
+            ],
+            "attach_distance_m": -0.00028957612829159235,
+            "mode": "KINEMATIC",
+            "breakable_weld": null
+          },
+          "contact_before_attach": {
+            "time_s": 19.59999999999967,
+            "stage": "CLOSE",
+            "q": [
+              -0.09074491721791446,
+              -0.9042958194249383,
+              1.3314445623976372,
+              -1.9975325230394907,
+              -1.5723145393772524,
+              1.480584780277441
+            ],
+            "attachment_active": false,
+            "finger_contacts": [
+              "suction"
+            ],
+            "finger_force_n": {
+              "suction": 45.9775155644282
+            },
+            "contact_count": 10,
+            "normal_opposition": 0.0,
+            "contact_span_m": 0.0,
+            "suction_alignment": 0.9999994800157929,
+            "suction_alignment_mean": 0.9999996422510004,
+            "suction_aligned_fraction": 1.0,
+            "lift_m": -0.00010607683291241621,
+            "finger_contact_centers_from_object_center_m": {
+              "suction": [
+                -0.004967204262914911,
+                0.05395147395878443,
+                0.00240918362086298
+              ]
+            },
+            "bottom_clearance_m": -0.00027030328648991464,
+            "T_GB": [
+              [
+                0.9999988113392988,
+                0.0015415618134114694,
+                3.0119115102868115e-05,
+                0.00779334494077677
+              ],
+              [
+                0.0015415600892798099,
+                -0.9999988101605667,
+                5.7183374279183836e-05,
+                0.04863727617696556
+              ],
+              [
+                3.020723097210817e-05,
+                -5.713687588178741e-05,
+                -0.9999999979114483,
+                0.002267938891888144
+              ],
+              [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "gripper_q": [],
+            "gripper_ctrl": [
+              0.5226130653266332
+            ],
+            "object_pose": [
+              [
+                -0.0020743720241275243,
+                0.9999977277528493,
+                0.0004913958095979716,
+                2.5249476127444517
+              ],
+              [
+                -0.9999968034342761,
+                -0.0020750800289041083,
+                0.0014447020805290413,
+                -3.1598257322099492
+              ],
+              [
+                0.0014457184834396407,
+                -0.0004883973892399221,
+                0.9999988356823496,
+                0.9223782099109464
+              ],
+              [
+                0.0,
+                0.0,
+                0.0,
+                1.0
+              ]
+            ],
+            "bad_contacts": []
+          },
+          "T_GB_at_attach": [
+            [
+              0.9999995296354934,
+              -5.4626895321464226e-05,
+              -0.000968372187809089,
+              0.007859280296903304
+            ],
+            [
+              -5.4920839157394576e-05,
+              -0.999999952429568,
+              -0.00030352028431879333,
+              0.048738986280205676
+            ],
+            [
+              -0.0009683555613724065,
+              0.0003035733253667959,
+              -0.9999994850652387,
+              0.0026536164307702226
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "grasp_T_GB": [
+            [
+              0.9999994007170531,
+              2.3074230498366074e-05,
+              -0.0010945469904607237,
+              0.007894505440568356
+            ],
+            [
+              2.3009108820098145e-05,
+              -0.9999999979646287,
+              -5.950902140769846e-05,
+              0.04866908402249104
+            ],
+            [
+              -0.001094548361357791,
+              5.948380119414464e-05,
+              -0.9999993992126005,
+              0.002566544481166111
+            ],
+            [
+              0.0,
+              0.0,
+              0.0,
+              1.0
+            ]
+          ],
+          "relative_pose_source": "CONTROLLER_GRASP_OBJECT_POSE",
+          "object_pose_before_attach": {
+            "position_m": [
+              2.5249476127444517,
+              -3.1598257322099492,
+              0.9223782099109464
+            ],
+            "orientation_xyzw": [
+              0.000684164166349521,
+              0.00033775467159761054,
+              0.7078397219242827,
+              -0.7063726678654332
+            ]
+          },
+          "object_pose_after_attach": {
+            "position_m": [
+              2.5249476217135483,
+              -3.1598255566254427,
+              0.9223788653255933
+            ],
+            "orientation_xyzw": [
+              0.0007052029747690286,
+              0.0003520602956393498,
+              0.70784007408854,
+              -0.7063722872937773
+            ]
+          },
+          "grip_pose_at_attach": {
+            "position_m": [
+              2.573590271146099,
+              -3.1520550052132195,
+              0.9246080062381026
+            ],
+            "orientation_xyzw": [
+              -0.7069180222201343,
+              0.70729505220166,
+              -0.00032765034468622316,
+              -0.0007152878277603003
+            ]
+          },
+          "grasp_object_pose": {
+            "position_m": [
+              2.5249892352693952,
+              -3.1599439722627363,
+              0.9225748936504626
+            ],
+            "orientation_xyzw": [
+              0.0005080014956344402,
+              0.0005844931427340123,
+              0.7074124264684895,
+              -0.7068005794990626
+            ]
+          },
+          "raw_attach_translation_m": [
+            8.969096576549873e-09,
+            1.7558450648991197e-07,
+            6.554146468884525e-07
+          ],
+          "raw_attach_translation_norm_m": 6.785858257940703e-07,
+          "grip_pose_before_rebind": {
+            "position_m": [
+              2.5737343333771094,
+              -3.1521279883428415,
+              0.9252440801187113
+            ],
+            "orientation_xyzw": [
+              -0.7067814744874611,
+              0.707431849493084,
+              -0.0003496532665711737,
+              -5.819551659992699e-05
+            ]
+          },
+          "object_pose_before_rebind": {
+            "position_m": [
+              2.5250908280397866,
+              -3.1598779239499617,
+              0.9229612392699159
+            ],
+            "orientation_xyzw": [
+              4.823133227788993e-05,
+              0.0003735743505593876,
+              0.7079768226972128,
+              -0.706235567384922
+            ]
+          },
+          "object_pose_after_grasp_rebind": {
+            "position_m": [
+              2.5249892352693952,
+              -3.1599439722627354,
+              0.9225748936504625
+            ],
+            "orientation_xyzw": [
+              0.0005080014956344399,
+              0.0005844931427340121,
+              0.7074124264684895,
+              -0.7068005794990624
+            ]
+          },
+          "attach_rebind_translation_m": [
+            -0.00010159277039134551,
+            -6.604831277368106e-05,
+            -0.00038634561945338763
+          ],
+          "attach_rebind_translation_norm_m": 0.0004049029615683991,
+          "time_s_rebind": 21.59999999999501
+        },
+        "hand_model_correction": {
+          "policy": "NATIVE_HAND",
+          "source_assets_changed": false
+        }
+      },
+      "artifact_errors": [],
+      "seconds": 233.59,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\spatula_vac\\validation_report.json",
+      "inferred_feasible": true
+    },
+    {
+      "object": "spoon",
+      "ee": "2F",
+      "status": "PASS",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "VALIDATED",
+      "failure_category": null,
+      "failures": [],
+      "detail": null,
+      "result": {
+        "status": "SUCCESS",
+        "failure_reason": null,
+        "metrics": {
+          "minimum_hold_lift_m": 0.1481537732474334,
+          "minimum_bottom_clearance_m": 0.06839604306355596,
+          "all_finger_contact_fraction": 1.0,
+          "max_slip_m": 0.00047020031910618553,
+          "max_slip_deg": 0.15215096478398604,
+          "hold_s": 5.0
+        },
+        "acquisition_status": "SUCCESS",
+        "acquisition_attachment_used": false,
+        "attachment_used": true,
+        "attachment_mode": "KINEMATIC",
+        "attachment_phase": "POST_VALIDATED_GRASP",
+        "hand_model_correction": {
+          "policy": "CALIBRATED_PARALLEL_2F_LINKAGE",
+          "removed_spring_tendons": [
+            "<fixed name=\"gripper0_right_finger2_12_cpl\" range=\"-1 1\" stiffness=\"0.4\" springlength=\"0.001\" limited=\"true\">\n\t\t\t<joint joint=\"gripper0_right_finger_joint\" coef=\"1\" />\n\t\t\t<joint joint=\"gripper0_right_left_inner_finger_joint\" coef=\"-3\" />\n\t\t\t<joint joint=\"gripper0_right_left_inner_knuckle_joint\" coef=\"1\" />\n\t\t</fixed>\n\n\t\t\n        ",
+            "<fixed name=\"gripper0_right_finger1_12_cpl\" range=\"-1 1\" stiffness=\"0.4\" springlength=\"0.001\" limited=\"true\">\n\t\t\t<joint joint=\"gripper0_right_right_outer_knuckle_joint\" coef=\"1\" />\n\t\t\t<joint joint=\"gripper0_right_right_inner_finger_joint\" coef=\"-3\" />\n\t\t\t<joint joint=\"gripper0_right_right_inner_knuckle_joint\" coef=\"1\" />\n\t\t</fixed>\n\t"
+          ],
+          "added_joint_couplings": [
+            {
+              "name": "gripper0_right_left_inner_finger_joint_parallel",
+              "joint1": "gripper0_right_left_inner_finger_joint",
+              "joint2": "gripper0_right_finger_joint",
+              "polycoef": "0 -1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_left_inner_knuckle_joint_parallel",
+              "joint1": "gripper0_right_left_inner_knuckle_joint",
+              "joint2": "gripper0_right_finger_joint",
+              "polycoef": "0 1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_right_inner_finger_joint_parallel",
+              "joint1": "gripper0_right_right_inner_finger_joint",
+              "joint2": "gripper0_right_right_outer_knuckle_joint",
+              "polycoef": "0 -1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_right_inner_knuckle_joint_parallel",
+              "joint1": "gripper0_right_right_inner_knuckle_joint",
+              "joint2": "gripper0_right_right_outer_knuckle_joint",
+              "polycoef": "0 1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            }
+          ],
+          "joint_armature_kg_m2": 0.0001,
+          "critical_damping_actuators": [
+            "gripper0_right_finger_1",
+            "gripper0_right_finger_2"
+          ],
+          "joint_ranges_changed": false,
+          "mass_or_friction_changed": false,
+          "source_assets_changed": false,
+          "object_attachment": false,
+          "scene_collision_masks_changed": false,
+          "excluded_linkage_contacts": [
+            [
+              "gripper0_right_left_inner_finger",
+              "gripper0_right_left_inner_knuckle"
+            ],
+            [
+              "gripper0_right_right_inner_finger",
+              "gripper0_right_right_inner_knuckle"
+            ]
+          ]
+        }
+      },
+      "artifact_errors": [],
+      "seconds": 183.28,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\spoon_2F\\validation_report.json",
+      "inferred_feasible": true
+    },
+    {
+      "object": "spoon",
+      "ee": "3F",
+      "status": "PASS",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "VALIDATED",
+      "failure_category": null,
+      "failures": [],
+      "detail": null,
+      "result": {
+        "status": "SUCCESS",
+        "failure_reason": null,
+        "metrics": {
+          "minimum_hold_lift_m": 0.14541529537054387,
+          "minimum_bottom_clearance_m": 0.1300121019135977,
+          "all_finger_contact_fraction": 1.0,
+          "max_slip_m": 0.001885433600426924,
+          "max_slip_deg": 3.0886391754569695,
+          "hold_s": 5.0
+        },
+        "acquisition_status": "SUCCESS",
+        "acquisition_attachment_used": false,
+        "attachment_used": true,
+        "attachment_mode": "KINEMATIC",
+        "attachment_phase": "POST_VALIDATED_GRASP",
+        "hand_model_correction": {
+          "policy": "NATIVE_HAND",
+          "source_assets_changed": false
+        }
+      },
+      "artifact_errors": [],
+      "seconds": 156.08,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\spoon_3F\\validation_report.json",
+      "inferred_feasible": true
+    },
+    {
+      "object": "spoon",
+      "ee": "vac",
+      "status": "FAIL",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "EXPERIMENTAL",
+      "failure_category": "MOTION_OR_GRASP",
+      "failures": [
+        "spoon: CLOSE: GRASP_CONTACT_NOT_STABLE",
+        "CLOSE: GRASP_CONTACT_NOT_STABLE"
+      ],
+      "detail": null,
+      "result": {
+        "status": "FAILED",
+        "failure_stage": "CLOSE",
+        "failure_reason": "GRASP_CONTACT_NOT_STABLE",
+        "error_type": "GraspFailure",
+        "attachment_used": false,
+        "vacuum_policy": "CONTACT_GATED_KINEMATIC_ATTACH",
+        "vacuum_attachment": null,
+        "hand_model_correction": {
+          "policy": "NATIVE_HAND",
+          "source_assets_changed": false
+        }
+      },
+      "artifact_errors": [],
+      "seconds": 98.08,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\spoon_vac\\validation_report.json",
+      "inferred_feasible": false
+    },
+    {
+      "object": "tongs",
+      "ee": "2F",
+      "status": "FAIL",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "EXPERIMENTAL",
+      "failure_category": "MOTION_OR_GRASP",
+      "failures": [
+        "tongs: PLAN_GRASP: CARTESIAN_COLLISION: GRASP invalid swept sample 1/1:  [{'geoms': ['gripper0_right_left_fingertip_collision', 'island_island_group_top_2'], 'penetration_m': 0.0014439771222479261}]",
+        "PLAN_GRASP: CARTESIAN_COLLISION: GRASP invalid swept sample 1/1:  [{'geoms': ['gripper0_right_left_fingertip_collision', 'island_island_group_top_2'], 'penetration_m': 0.0014439771222479261}]"
+      ],
+      "detail": null,
+      "result": {
+        "status": "FAILED",
+        "failure_stage": "PLAN_GRASP",
+        "failure_reason": "CARTESIAN_COLLISION: GRASP invalid swept sample 1/1:  [{'geoms': ['gripper0_right_left_fingertip_collision', 'island_island_group_top_2'], 'penetration_m': 0.0014439771222479261}]",
+        "error_type": "GraspFailure",
+        "attachment_used": false,
+        "hand_model_correction": {
+          "policy": "CALIBRATED_PARALLEL_2F_LINKAGE",
+          "removed_spring_tendons": [
+            "<fixed name=\"gripper0_right_finger2_12_cpl\" range=\"-1 1\" stiffness=\"0.4\" springlength=\"0.001\" limited=\"true\">\n\t\t\t<joint joint=\"gripper0_right_finger_joint\" coef=\"1\" />\n\t\t\t<joint joint=\"gripper0_right_left_inner_finger_joint\" coef=\"-3\" />\n\t\t\t<joint joint=\"gripper0_right_left_inner_knuckle_joint\" coef=\"1\" />\n\t\t</fixed>\n\n\t\t\n        ",
+            "<fixed name=\"gripper0_right_finger1_12_cpl\" range=\"-1 1\" stiffness=\"0.4\" springlength=\"0.001\" limited=\"true\">\n\t\t\t<joint joint=\"gripper0_right_right_outer_knuckle_joint\" coef=\"1\" />\n\t\t\t<joint joint=\"gripper0_right_right_inner_finger_joint\" coef=\"-3\" />\n\t\t\t<joint joint=\"gripper0_right_right_inner_knuckle_joint\" coef=\"1\" />\n\t\t</fixed>\n\t"
+          ],
+          "added_joint_couplings": [
+            {
+              "name": "gripper0_right_left_inner_finger_joint_parallel",
+              "joint1": "gripper0_right_left_inner_finger_joint",
+              "joint2": "gripper0_right_finger_joint",
+              "polycoef": "0 -1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_left_inner_knuckle_joint_parallel",
+              "joint1": "gripper0_right_left_inner_knuckle_joint",
+              "joint2": "gripper0_right_finger_joint",
+              "polycoef": "0 1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_right_inner_finger_joint_parallel",
+              "joint1": "gripper0_right_right_inner_finger_joint",
+              "joint2": "gripper0_right_right_outer_knuckle_joint",
+              "polycoef": "0 -1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            },
+            {
+              "name": "gripper0_right_right_inner_knuckle_joint_parallel",
+              "joint1": "gripper0_right_right_inner_knuckle_joint",
+              "joint2": "gripper0_right_right_outer_knuckle_joint",
+              "polycoef": "0 1 0 0 0",
+              "solref": ".004 1",
+              "solimp": ".99 .999 .001"
+            }
+          ],
+          "joint_armature_kg_m2": 0.0001,
+          "critical_damping_actuators": [
+            "gripper0_right_finger_1",
+            "gripper0_right_finger_2"
+          ],
+          "joint_ranges_changed": false,
+          "mass_or_friction_changed": false,
+          "source_assets_changed": false,
+          "object_attachment": false,
+          "scene_collision_masks_changed": false,
+          "excluded_linkage_contacts": [
+            [
+              "gripper0_right_left_inner_finger",
+              "gripper0_right_left_inner_knuckle"
+            ],
+            [
+              "gripper0_right_right_inner_finger",
+              "gripper0_right_right_inner_knuckle"
+            ]
+          ]
+        }
+      },
+      "artifact_errors": [],
+      "seconds": 84.09,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\tongs_2F\\validation_report.json",
+      "inferred_feasible": true
+    },
+    {
+      "object": "tongs",
+      "ee": "3F",
+      "status": "FAIL",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "EXPERIMENTAL",
+      "failure_category": "MOTION_OR_GRASP",
+      "failures": [
+        "tongs: CLOSE: GRIPPER_JOINT_LIMIT_EXCEEDED: physics substep 0.010124 rad (stage=CLOSE joint=gripper0_right_joint_index_distal lower q=-0.010124 range=[0.000000,2.000000] command=[-0.1593, -0.1791, -0.195] aperture_m=None)",
+        "CLOSE: GRIPPER_JOINT_LIMIT_EXCEEDED: physics substep 0.010124 rad (stage=CLOSE joint=gripper0_right_joint_index_distal lower q=-0.010124 range=[0.000000,2.000000] command=[-0.1593, -0.1791, -0.195] aperture_m=None)"
+      ],
+      "detail": null,
+      "result": {
+        "status": "FAILED",
+        "failure_stage": "CLOSE",
+        "failure_reason": "GRIPPER_JOINT_LIMIT_EXCEEDED: physics substep 0.010124 rad (stage=CLOSE joint=gripper0_right_joint_index_distal lower q=-0.010124 range=[0.000000,2.000000] command=[-0.1593, -0.1791, -0.195] aperture_m=None)",
+        "error_type": "GraspFailure",
+        "attachment_used": false,
+        "hand_model_correction": {
+          "policy": "NATIVE_HAND",
+          "source_assets_changed": false
+        }
+      },
+      "artifact_errors": [],
+      "seconds": 88.67,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\tongs_3F\\validation_report.json",
+      "inferred_feasible": true
+    },
+    {
+      "object": "tongs",
+      "ee": "vac",
+      "status": "FAIL",
+      "simulation_started": true,
+      "grasp_attempted": true,
+      "integration_status": "EXPERIMENTAL",
+      "failure_category": "MOTION_OR_GRASP",
+      "failures": [
+        "tongs: CLOSE: UNEXPECTED_COLLISION: [{'geoms': ['gripper0_right_vac_mount_col', 'tongs_collision_20'], 'penetration_m': 0.0010383276736439665}]",
+        "CLOSE: UNEXPECTED_COLLISION: [{'geoms': ['gripper0_right_vac_mount_col', 'tongs_collision_20'], 'penetration_m': 0.0010383276736439665}]"
+      ],
+      "detail": null,
+      "result": {
+        "status": "FAILED",
+        "failure_stage": "CLOSE",
+        "failure_reason": "UNEXPECTED_COLLISION: [{'geoms': ['gripper0_right_vac_mount_col', 'tongs_collision_20'], 'penetration_m': 0.0010383276736439665}]",
+        "error_type": "GraspFailure",
+        "attachment_used": false,
+        "vacuum_policy": "CONTACT_GATED_KINEMATIC_ATTACH",
+        "vacuum_attachment": null,
+        "hand_model_correction": {
+          "policy": "NATIVE_HAND",
+          "source_assets_changed": false
+        }
+      },
+      "artifact_errors": [],
+      "seconds": 77.45,
+      "report": "C:\\Users\\user\\Tool-Use-Journal\\output\\table2_verify_c1_2\\c1_2\\tongs_vac\\validation_report.json",
+      "inferred_feasible": false
+    }
+  ],
+  "registered_only": false,
+  "experimental_only": false,
+  "inference_input": {
+    "path": "C:\\Users\\user\\Tool-Use-Journal\\output\\c1_2\\m1.json",
+    "sha256": "69a6be118536ae0b3ce19896b345e415367e87bc3d12d13a64665d0bb4aa5028",
+    "note": "Stored M1; not independently verified as a Full run."
+  },
+  "per_ee": {
+    "2F": {
+      "task_objects": 4,
+      "evaluated_cases": 4,
+      "grasp_attempted": 4,
+      "grasped": 1,
+      "coverage": "1/4",
+      "matrix_complete": true,
+      "inferred": 4,
+      "inferred_grasped": 1,
+      "inference_known_cases": 4,
+      "not_registered": [],
+      "failed": [
+        "bottle",
+        "spatula",
+        "tongs"
+      ],
+      "errors": [],
+      "table2": "3/4",
+      "table2_same_object_count": true
+    },
+    "3F": {
+      "task_objects": 4,
+      "evaluated_cases": 4,
+      "grasp_attempted": 4,
+      "grasped": 3,
+      "coverage": "3/4",
+      "matrix_complete": true,
+      "inferred": 4,
+      "inferred_grasped": 3,
+      "inference_known_cases": 4,
+      "not_registered": [],
+      "failed": [
+        "tongs"
+      ],
+      "errors": [],
+      "table2": "3/4",
+      "table2_same_object_count": true
+    },
+    "vac": {
+      "task_objects": 4,
+      "evaluated_cases": 4,
+      "grasp_attempted": 4,
+      "grasped": 0,
+      "coverage": "0/4",
+      "matrix_complete": true,
+      "inferred": 1,
+      "inferred_grasped": 0,
+      "inference_known_cases": 4,
+      "not_registered": [],
+      "failed": [
+        "spoon",
+        "tongs"
+      ],
+      "errors": [
+        "bottle",
+        "spatula"
+      ],
+      "table2": "0/4",
+      "table2_same_object_count": true
+    }
+  }
+}

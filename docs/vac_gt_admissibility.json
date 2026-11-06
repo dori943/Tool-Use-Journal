@@ -1,0 +1,2802 @@
+[
+  {
+    "task": "c1_1",
+    "environment": "C1_1_LegoSweep",
+    "seed": 0,
+    "rule": "m1_scene.ee_rules.evaluate_ee(vac) on GT surface samples + YCB mass",
+    "vac_spec": {
+      "ee_id": "vac",
+      "type": "vacuum",
+      "capabilities": [
+        "suction"
+      ],
+      "payload_kg": 0.5,
+      "home_slot": "ee-slot-vac",
+      "seal_diameter_mm": 30,
+      "flatness_tol_rms_mm": 1.5,
+      "pass_height_mm": 140,
+      "seal_rms_tol_mm": 1.5
+    },
+    "objects": {
+      "plate": {
+        "geometry": {
+          "length_mm": 184.2,
+          "diameter_mm": null,
+          "extents_mm": [
+            184.2,
+            184.1,
+            11.7
+          ],
+          "height_z_mm": 11.1,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.287,
+          "seal_patch_rms_mm": 0.454,
+          "footprint_mm": [
+            182.2,
+            181.8
+          ],
+          "height_mm": 11.1
+        },
+        "mass_kg": 0.279,
+        "mass_source": "ycb",
+        "material_gt": "rigid_plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.279 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.287,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.279,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 184.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.454,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 29984
+      },
+      "ladle": {
+        "geometry": {
+          "length_mm": 222.1,
+          "diameter_mm": 65.3,
+          "extents_mm": [
+            222.1,
+            66.8,
+            63.7
+          ],
+          "height_z_mm": 110.1,
+          "cylinder_like": true,
+          "surface_rms_mm": 2.922,
+          "seal_patch_rms_mm": 1.634,
+          "footprint_mm": [
+            208.1,
+            63.3
+          ],
+          "height_mm": 110.1
+        },
+        "mass_kg": 0.026,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "metal",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 2.922 vs 허용 1.5; 흡착 패치 RMS 1.634 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 2.922,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.026,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 65.3,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 1.634,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      },
+      "fork": {
+        "geometry": {
+          "length_mm": 220.3,
+          "diameter_mm": null,
+          "extents_mm": [
+            220.3,
+            36.1,
+            28.1
+          ],
+          "height_z_mm": 26.3,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.565,
+          "seal_patch_rms_mm": 99.9,
+          "footprint_mm": [
+            219.5,
+            35.6
+          ],
+          "height_mm": 26.3
+        },
+        "mass_kg": 0.034,
+        "mass_source": "ycb",
+        "material_gt": "metal",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.565,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.034,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 36.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 29984
+      },
+      "scissors": {
+        "geometry": {
+          "length_mm": 178.0,
+          "diameter_mm": null,
+          "extents_mm": [
+            178.0,
+            80.9,
+            11.7
+          ],
+          "height_z_mm": 11.6,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.359,
+          "seal_patch_rms_mm": 0.43,
+          "footprint_mm": [
+            179.1,
+            81.0
+          ],
+          "height_mm": 11.6
+        },
+        "mass_kg": 0.082,
+        "mass_source": "ycb",
+        "material_gt": "metal_plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.082 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.359,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.082,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 80.9,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.43,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 29988
+      },
+      "bottle_distractor": {
+        "geometry": {
+          "length_mm": 136.7,
+          "diameter_mm": 52.2,
+          "extents_mm": [
+            136.7,
+            52.3,
+            52.0
+          ],
+          "height_z_mm": 136.5,
+          "cylinder_like": true,
+          "surface_rms_mm": 5.652,
+          "seal_patch_rms_mm": 2.802,
+          "footprint_mm": [
+            51.7,
+            51.7
+          ],
+          "height_mm": 136.5
+        },
+        "mass_kg": 0.2786,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 5.652 vs 허용 1.5; 흡착 패치 RMS 2.802 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 5.652,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.279,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 52.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 2.802,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      }
+    }
+  },
+  {
+    "task": "c1_2",
+    "environment": "C1_2_DoughFlatten",
+    "seed": 0,
+    "rule": "m1_scene.ee_rules.evaluate_ee(vac) on GT surface samples + YCB mass",
+    "vac_spec": {
+      "ee_id": "vac",
+      "type": "vacuum",
+      "capabilities": [
+        "suction"
+      ],
+      "payload_kg": 0.5,
+      "home_slot": "ee-slot-vac",
+      "seal_diameter_mm": 30,
+      "flatness_tol_rms_mm": 1.5,
+      "pass_height_mm": 140,
+      "seal_rms_tol_mm": 1.5
+    },
+    "objects": {
+      "bottle": {
+        "geometry": {
+          "length_mm": 136.7,
+          "diameter_mm": 52.2,
+          "extents_mm": [
+            136.7,
+            52.3,
+            52.0
+          ],
+          "height_z_mm": 136.5,
+          "cylinder_like": true,
+          "surface_rms_mm": 5.652,
+          "seal_patch_rms_mm": 2.802,
+          "footprint_mm": [
+            51.7,
+            51.7
+          ],
+          "height_mm": 136.5
+        },
+        "mass_kg": 0.2786,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 5.652 vs 허용 1.5; 흡착 패치 RMS 2.802 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 5.652,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.279,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 52.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 2.802,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      },
+      "spatula": {
+        "geometry": {
+          "length_mm": 250.0,
+          "diameter_mm": null,
+          "extents_mm": [
+            250.0,
+            46.8,
+            5.2
+          ],
+          "height_z_mm": 5.1,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.148,
+          "seal_patch_rms_mm": 0.0,
+          "footprint_mm": [
+            250.0,
+            46.8
+          ],
+          "height_mm": 5.1
+        },
+        "mass_kg": 0.0515,
+        "mass_source": "ycb",
+        "material_gt": "metal_plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.0515 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.148,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.051,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 46.8,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.0,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "spoon": {
+        "geometry": {
+          "length_mm": 171.3,
+          "diameter_mm": null,
+          "extents_mm": [
+            171.3,
+            56.2,
+            26.2
+          ],
+          "height_z_mm": 29.8,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.978,
+          "seal_patch_rms_mm": 0.346,
+          "footprint_mm": [
+            171.5,
+            56.2
+          ],
+          "height_mm": 29.8
+        },
+        "mass_kg": 0.03,
+        "mass_source": "ycb",
+        "material_gt": "metal",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.03 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.978,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.03,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 56.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.346,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "tongs": {
+        "geometry": {
+          "length_mm": 258.3,
+          "diameter_mm": null,
+          "extents_mm": [
+            258.3,
+            31.0,
+            25.0
+          ],
+          "height_z_mm": 25.1,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.793,
+          "seal_patch_rms_mm": 1.291,
+          "footprint_mm": [
+            258.3,
+            30.7
+          ],
+          "height_mm": 25.1
+        },
+        "mass_kg": 0.0,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "metal_plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "흡착 패치 RMS 1.291 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.793,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.0,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 31.0,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 1.291,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 29971
+      }
+    }
+  },
+  {
+    "task": "c2_1",
+    "environment": "C2_1_ObjectSorting",
+    "seed": 0,
+    "rule": "m1_scene.ee_rules.evaluate_ee(vac) on GT surface samples + YCB mass",
+    "vac_spec": {
+      "ee_id": "vac",
+      "type": "vacuum",
+      "capabilities": [
+        "suction"
+      ],
+      "payload_kg": 0.5,
+      "home_slot": "ee-slot-vac",
+      "seal_diameter_mm": 30,
+      "flatness_tol_rms_mm": 1.5,
+      "pass_height_mm": 140,
+      "seal_rms_tol_mm": 1.5
+    },
+    "objects": {
+      "apple": {
+        "geometry": {
+          "length_mm": 74.9,
+          "diameter_mm": 75.4,
+          "extents_mm": [
+            74.9,
+            75.6,
+            75.3
+          ],
+          "height_z_mm": 75.5,
+          "cylinder_like": true,
+          "surface_rms_mm": 1.285,
+          "seal_patch_rms_mm": 0.618,
+          "footprint_mm": [
+            75.7,
+            75.4
+          ],
+          "height_mm": 75.5
+        },
+        "mass_kg": 0.068,
+        "mass_source": "ycb",
+        "material_gt": "organic_tissue",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "상면 RMS 1.285 vs 허용 1.5",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.285,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.068,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 75.4,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.618,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "bread": {
+        "geometry": {
+          "length_mm": 128.6,
+          "diameter_mm": null,
+          "extents_mm": [
+            128.6,
+            68.7,
+            85.6
+          ],
+          "height_z_mm": 69.3,
+          "cylinder_like": false,
+          "surface_rms_mm": 2.159,
+          "seal_patch_rms_mm": 1.762,
+          "footprint_mm": [
+            83.4,
+            129.8
+          ],
+          "height_mm": 69.3
+        },
+        "mass_kg": 0.4875,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "bread",
+        "porous_hint": true,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 2.159 vs 허용 1.5; 흡착 패치 RMS 1.762 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 2.159,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.487,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 85.6,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 1.762,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      },
+      "mug": {
+        "geometry": {
+          "length_mm": 115.6,
+          "diameter_mm": null,
+          "extents_mm": [
+            115.6,
+            110.1,
+            87.1
+          ],
+          "height_z_mm": 80.4,
+          "cylinder_like": false,
+          "surface_rms_mm": 2.748,
+          "seal_patch_rms_mm": 2.034,
+          "footprint_mm": [
+            70.6,
+            101.9
+          ],
+          "height_mm": 80.4
+        },
+        "mass_kg": 0.118,
+        "mass_source": "ycb",
+        "material_gt": "ceramic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 2.748 vs 허용 1.5; 흡착 패치 RMS 2.034 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 2.748,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.118,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 110.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 2.034,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 29984
+      },
+      "plate": {
+        "geometry": {
+          "length_mm": 184.2,
+          "diameter_mm": null,
+          "extents_mm": [
+            184.2,
+            184.1,
+            11.7
+          ],
+          "height_z_mm": 11.1,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.287,
+          "seal_patch_rms_mm": 0.454,
+          "footprint_mm": [
+            182.2,
+            181.8
+          ],
+          "height_mm": 11.1
+        },
+        "mass_kg": 0.279,
+        "mass_source": "ycb",
+        "material_gt": "rigid_plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.279 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.287,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.279,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 184.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.454,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 29984
+      },
+      "spoon": {
+        "geometry": {
+          "length_mm": 171.3,
+          "diameter_mm": null,
+          "extents_mm": [
+            171.3,
+            56.2,
+            26.2
+          ],
+          "height_z_mm": 29.8,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.978,
+          "seal_patch_rms_mm": 0.346,
+          "footprint_mm": [
+            171.5,
+            56.2
+          ],
+          "height_mm": 29.8
+        },
+        "mass_kg": 0.03,
+        "mass_source": "ycb",
+        "material_gt": "metal",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.03 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.978,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.03,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 56.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.346,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      }
+    }
+  },
+  {
+    "task": "c2_2",
+    "environment": "C2_2_SandwichAssembly",
+    "seed": 0,
+    "rule": "m1_scene.ee_rules.evaluate_ee(vac) on GT surface samples + YCB mass",
+    "vac_spec": {
+      "ee_id": "vac",
+      "type": "vacuum",
+      "capabilities": [
+        "suction"
+      ],
+      "payload_kg": 0.5,
+      "home_slot": "ee-slot-vac",
+      "seal_diameter_mm": 30,
+      "flatness_tol_rms_mm": 1.5,
+      "pass_height_mm": 140,
+      "seal_rms_tol_mm": 1.5
+    },
+    "objects": {
+      "bread_a": {
+        "geometry": {
+          "length_mm": 132.1,
+          "diameter_mm": null,
+          "extents_mm": [
+            132.1,
+            134.7,
+            23.2
+          ],
+          "height_z_mm": 22.9,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.838,
+          "seal_patch_rms_mm": 0.906,
+          "footprint_mm": [
+            113.1,
+            113.3
+          ],
+          "height_mm": 22.9
+        },
+        "mass_kg": 0.2711,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "bread",
+        "porous_hint": true,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.2710758674933088 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.838,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.271,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 132.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.906,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "bread_b": {
+        "geometry": {
+          "length_mm": 132.1,
+          "diameter_mm": null,
+          "extents_mm": [
+            132.1,
+            134.7,
+            23.2
+          ],
+          "height_z_mm": 22.9,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.838,
+          "seal_patch_rms_mm": 0.906,
+          "footprint_mm": [
+            113.1,
+            113.3
+          ],
+          "height_mm": 22.9
+        },
+        "mass_kg": 0.2711,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "bread",
+        "porous_hint": true,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.2710758674933088 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.838,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.271,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 132.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.906,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "turkey_1": {
+        "geometry": {
+          "length_mm": 79.7,
+          "diameter_mm": null,
+          "extents_mm": [
+            79.7,
+            51.0,
+            2.5
+          ],
+          "height_z_mm": 2.5,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.068,
+          "seal_patch_rms_mm": 0.04,
+          "footprint_mm": [
+            80.0,
+            50.0
+          ],
+          "height_mm": 2.5
+        },
+        "mass_kg": 0.0059,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "processed_meat",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.0059132894836967115 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.068,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.006,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 51.0,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.04,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "cheese_1": {
+        "geometry": {
+          "length_mm": 60.6,
+          "diameter_mm": null,
+          "extents_mm": [
+            60.6,
+            63.3,
+            4.1
+          ],
+          "height_z_mm": 4.0,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.152,
+          "seal_patch_rms_mm": 0.223,
+          "footprint_mm": [
+            63.2,
+            61.3
+          ],
+          "height_mm": 4.0
+        },
+        "mass_kg": 0.0008,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "cheese",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.0008355414954860079 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.152,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.001,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 60.6,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.223,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 29984
+      },
+      "tomato_slice": {
+        "geometry": {
+          "length_mm": 61.2,
+          "diameter_mm": null,
+          "extents_mm": [
+            61.2,
+            61.4,
+            4.8
+          ],
+          "height_z_mm": 4.7,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.064,
+          "seal_patch_rms_mm": 0.0,
+          "footprint_mm": [
+            61.1,
+            60.7
+          ],
+          "height_mm": 4.7
+        },
+        "mass_kg": 0.0137,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "tomato",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.013721118721096338 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.064,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.014,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 61.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.0,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      }
+    }
+  },
+  {
+    "task": "c3_1",
+    "environment": "C3_1_ObjectSorting",
+    "seed": 0,
+    "rule": "m1_scene.ee_rules.evaluate_ee(vac) on GT surface samples + YCB mass",
+    "vac_spec": {
+      "ee_id": "vac",
+      "type": "vacuum",
+      "capabilities": [
+        "suction"
+      ],
+      "payload_kg": 0.5,
+      "home_slot": "ee-slot-vac",
+      "seal_diameter_mm": 30,
+      "flatness_tol_rms_mm": 1.5,
+      "pass_height_mm": 140,
+      "seal_rms_tol_mm": 1.5
+    },
+    "objects": {
+      "apple": {
+        "geometry": {
+          "length_mm": 74.9,
+          "diameter_mm": 75.4,
+          "extents_mm": [
+            74.9,
+            75.6,
+            75.3
+          ],
+          "height_z_mm": 75.5,
+          "cylinder_like": true,
+          "surface_rms_mm": 1.285,
+          "seal_patch_rms_mm": 0.618,
+          "footprint_mm": [
+            75.7,
+            75.4
+          ],
+          "height_mm": 75.5
+        },
+        "mass_kg": 0.068,
+        "mass_source": "ycb",
+        "material_gt": "organic_tissue",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "상면 RMS 1.285 vs 허용 1.5",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.285,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.068,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 75.4,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.618,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "bread": {
+        "geometry": {
+          "length_mm": 128.6,
+          "diameter_mm": null,
+          "extents_mm": [
+            128.6,
+            68.7,
+            85.6
+          ],
+          "height_z_mm": 69.3,
+          "cylinder_like": false,
+          "surface_rms_mm": 2.159,
+          "seal_patch_rms_mm": 1.762,
+          "footprint_mm": [
+            83.4,
+            129.8
+          ],
+          "height_mm": 69.3
+        },
+        "mass_kg": 0.4875,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "bread",
+        "porous_hint": true,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 2.159 vs 허용 1.5; 흡착 패치 RMS 1.762 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 2.159,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.487,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 85.6,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 1.762,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      },
+      "mug": {
+        "geometry": {
+          "length_mm": 115.6,
+          "diameter_mm": null,
+          "extents_mm": [
+            115.6,
+            110.1,
+            87.1
+          ],
+          "height_z_mm": 80.4,
+          "cylinder_like": false,
+          "surface_rms_mm": 2.748,
+          "seal_patch_rms_mm": 2.034,
+          "footprint_mm": [
+            70.6,
+            101.9
+          ],
+          "height_mm": 80.4
+        },
+        "mass_kg": 0.118,
+        "mass_source": "ycb",
+        "material_gt": "ceramic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 2.748 vs 허용 1.5; 흡착 패치 RMS 2.034 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 2.748,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.118,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 110.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 2.034,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 29984
+      },
+      "plate": {
+        "geometry": {
+          "length_mm": 184.2,
+          "diameter_mm": null,
+          "extents_mm": [
+            184.2,
+            184.1,
+            11.7
+          ],
+          "height_z_mm": 11.1,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.287,
+          "seal_patch_rms_mm": 0.454,
+          "footprint_mm": [
+            182.2,
+            181.8
+          ],
+          "height_mm": 11.1
+        },
+        "mass_kg": 0.279,
+        "mass_source": "ycb",
+        "material_gt": "rigid_plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.279 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.287,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.279,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 184.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.454,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 29984
+      },
+      "spoon": {
+        "geometry": {
+          "length_mm": 171.3,
+          "diameter_mm": null,
+          "extents_mm": [
+            171.3,
+            56.2,
+            26.2
+          ],
+          "height_z_mm": 29.8,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.978,
+          "seal_patch_rms_mm": 0.346,
+          "footprint_mm": [
+            171.5,
+            56.2
+          ],
+          "height_mm": 29.8
+        },
+        "mass_kg": 0.03,
+        "mass_source": "ycb",
+        "material_gt": "metal",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.03 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.978,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.03,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 56.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.346,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      }
+    }
+  },
+  {
+    "task": "c3_2",
+    "environment": "C3_2_BreakfastTrayPreparation",
+    "seed": 0,
+    "rule": "m1_scene.ee_rules.evaluate_ee(vac) on GT surface samples + YCB mass",
+    "vac_spec": {
+      "ee_id": "vac",
+      "type": "vacuum",
+      "capabilities": [
+        "suction"
+      ],
+      "payload_kg": 0.5,
+      "home_slot": "ee-slot-vac",
+      "seal_diameter_mm": 30,
+      "flatness_tol_rms_mm": 1.5,
+      "pass_height_mm": 140,
+      "seal_rms_tol_mm": 1.5
+    },
+    "objects": {
+      "plate_a": {
+        "geometry": {
+          "length_mm": 169.3,
+          "diameter_mm": null,
+          "extents_mm": [
+            169.3,
+            169.2,
+            10.8
+          ],
+          "height_z_mm": 10.2,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.264,
+          "seal_patch_rms_mm": 0.424,
+          "footprint_mm": [
+            167.5,
+            167.1
+          ],
+          "height_mm": 10.2
+        },
+        "mass_kg": 0.279,
+        "mass_source": "ycb",
+        "material_gt": "rigid_plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.279 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.264,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.279,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 169.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.424,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 29984
+      },
+      "plate_b": {
+        "geometry": {
+          "length_mm": 169.3,
+          "diameter_mm": null,
+          "extents_mm": [
+            169.3,
+            169.2,
+            10.8
+          ],
+          "height_z_mm": 10.2,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.264,
+          "seal_patch_rms_mm": 0.424,
+          "footprint_mm": [
+            167.5,
+            167.1
+          ],
+          "height_mm": 10.2
+        },
+        "mass_kg": 0.279,
+        "mass_source": "ycb",
+        "material_gt": "rigid_plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.279 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.264,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.279,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 169.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.424,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 29984
+      },
+      "mug_a": {
+        "geometry": {
+          "length_mm": 144.6,
+          "diameter_mm": null,
+          "extents_mm": [
+            144.6,
+            137.6,
+            108.9
+          ],
+          "height_z_mm": 100.5,
+          "cylinder_like": false,
+          "surface_rms_mm": 3.435,
+          "seal_patch_rms_mm": 2.298,
+          "footprint_mm": [
+            88.3,
+            127.4
+          ],
+          "height_mm": 100.5
+        },
+        "mass_kg": 0.118,
+        "mass_source": "ycb",
+        "material_gt": "ceramic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 3.435 vs 허용 1.5; 흡착 패치 RMS 2.298 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 3.435,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.118,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 137.6,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 2.298,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 29984
+      },
+      "mug_b": {
+        "geometry": {
+          "length_mm": 144.6,
+          "diameter_mm": null,
+          "extents_mm": [
+            144.6,
+            137.6,
+            108.9
+          ],
+          "height_z_mm": 100.5,
+          "cylinder_like": false,
+          "surface_rms_mm": 3.435,
+          "seal_patch_rms_mm": 2.298,
+          "footprint_mm": [
+            88.3,
+            127.4
+          ],
+          "height_mm": 100.5
+        },
+        "mass_kg": 0.118,
+        "mass_source": "ycb",
+        "material_gt": "ceramic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 3.435 vs 허용 1.5; 흡착 패치 RMS 2.298 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 3.435,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.118,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 137.6,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 2.298,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 29984
+      },
+      "fork_a": {
+        "geometry": {
+          "length_mm": 154.2,
+          "diameter_mm": null,
+          "extents_mm": [
+            154.2,
+            25.2,
+            19.7
+          ],
+          "height_z_mm": 18.4,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.395,
+          "seal_patch_rms_mm": 99.9,
+          "footprint_mm": [
+            153.6,
+            24.9
+          ],
+          "height_mm": 18.4
+        },
+        "mass_kg": 0.034,
+        "mass_source": "ycb",
+        "material_gt": "metal",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "접촉면 폭 25 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.395,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.034,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 25.2,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 29984
+      },
+      "fork_b": {
+        "geometry": {
+          "length_mm": 154.2,
+          "diameter_mm": null,
+          "extents_mm": [
+            154.2,
+            25.2,
+            19.7
+          ],
+          "height_z_mm": 18.4,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.395,
+          "seal_patch_rms_mm": 99.9,
+          "footprint_mm": [
+            153.6,
+            24.9
+          ],
+          "height_mm": 18.4
+        },
+        "mass_kg": 0.034,
+        "mass_source": "ycb",
+        "material_gt": "metal",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "접촉면 폭 25 vs seal 직경 30mm; 흡착 패치 RMS 99.9 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.395,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.034,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 25.2,
+              "pass": false
+            },
+            {
+              "rule": "seal_patch",
+              "value": 99.9,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 29984
+      },
+      "spoon_a": {
+        "geometry": {
+          "length_mm": 137.0,
+          "diameter_mm": null,
+          "extents_mm": [
+            137.0,
+            45.0,
+            21.0
+          ],
+          "height_z_mm": 23.9,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.783,
+          "seal_patch_rms_mm": 0.283,
+          "footprint_mm": [
+            137.2,
+            45.0
+          ],
+          "height_mm": 23.9
+        },
+        "mass_kg": 0.03,
+        "mass_source": "ycb",
+        "material_gt": "metal",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.03 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.783,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.03,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 45.0,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.283,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "spoon_b": {
+        "geometry": {
+          "length_mm": 137.0,
+          "diameter_mm": null,
+          "extents_mm": [
+            137.0,
+            45.0,
+            21.0
+          ],
+          "height_z_mm": 23.9,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.783,
+          "seal_patch_rms_mm": 0.283,
+          "footprint_mm": [
+            137.2,
+            45.0
+          ],
+          "height_mm": 23.9
+        },
+        "mass_kg": 0.03,
+        "mass_source": "ycb",
+        "material_gt": "metal",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.03 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.783,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.03,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 45.0,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.283,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "bread_a": {
+        "geometry": {
+          "length_mm": 98.9,
+          "diameter_mm": null,
+          "extents_mm": [
+            98.9,
+            52.9,
+            65.9
+          ],
+          "height_z_mm": 53.3,
+          "cylinder_like": false,
+          "surface_rms_mm": 1.661,
+          "seal_patch_rms_mm": 1.894,
+          "footprint_mm": [
+            64.2,
+            99.8
+          ],
+          "height_mm": 53.3
+        },
+        "mass_kg": 0.2219,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "bread",
+        "porous_hint": true,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 1.661 vs 허용 1.5; 흡착 패치 RMS 1.894 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.661,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.222,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 65.9,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 1.894,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      },
+      "bread_b": {
+        "geometry": {
+          "length_mm": 98.9,
+          "diameter_mm": null,
+          "extents_mm": [
+            98.9,
+            52.9,
+            65.9
+          ],
+          "height_z_mm": 53.3,
+          "cylinder_like": false,
+          "surface_rms_mm": 1.661,
+          "seal_patch_rms_mm": 1.894,
+          "footprint_mm": [
+            64.2,
+            99.8
+          ],
+          "height_mm": 53.3
+        },
+        "mass_kg": 0.2219,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "bread",
+        "porous_hint": true,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 1.661 vs 허용 1.5; 흡착 패치 RMS 1.894 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.661,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.222,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 65.9,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 1.894,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      },
+      "fruit_a": {
+        "geometry": {
+          "length_mm": 79.9,
+          "diameter_mm": 80.5,
+          "extents_mm": [
+            79.9,
+            80.6,
+            80.3
+          ],
+          "height_z_mm": 80.5,
+          "cylinder_like": true,
+          "surface_rms_mm": 1.371,
+          "seal_patch_rms_mm": 0.585,
+          "footprint_mm": [
+            80.8,
+            80.4
+          ],
+          "height_mm": 80.5
+        },
+        "mass_kg": 0.2508,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": null,
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "상면 RMS 1.371 vs 허용 1.5",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.371,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.251,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 80.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.585,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "fruit_b": {
+        "geometry": {
+          "length_mm": 79.9,
+          "diameter_mm": 80.5,
+          "extents_mm": [
+            79.9,
+            80.6,
+            80.3
+          ],
+          "height_z_mm": 80.5,
+          "cylinder_like": true,
+          "surface_rms_mm": 1.371,
+          "seal_patch_rms_mm": 0.585,
+          "footprint_mm": [
+            80.8,
+            80.4
+          ],
+          "height_mm": 80.5
+        },
+        "mass_kg": 0.2508,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": null,
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "상면 RMS 1.371 vs 허용 1.5",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.371,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.251,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 80.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.585,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      }
+    }
+  },
+  {
+    "task": "c4_1",
+    "environment": "C4_1_IntervalFitExtraction",
+    "seed": 0,
+    "rule": "m1_scene.ee_rules.evaluate_ee(vac) on GT surface samples + YCB mass",
+    "vac_spec": {
+      "ee_id": "vac",
+      "type": "vacuum",
+      "capabilities": [
+        "suction"
+      ],
+      "payload_kg": 0.5,
+      "home_slot": "ee-slot-vac",
+      "seal_diameter_mm": 30,
+      "flatness_tol_rms_mm": 1.5,
+      "pass_height_mm": 140,
+      "seal_rms_tol_mm": 1.5
+    },
+    "objects": {
+      "tool_2_spatula_a": {
+        "geometry": {
+          "length_mm": 140.0,
+          "diameter_mm": null,
+          "extents_mm": [
+            140.0,
+            36.0,
+            4.1
+          ],
+          "height_z_mm": 4.0,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.118,
+          "seal_patch_rms_mm": 0.013,
+          "footprint_mm": [
+            140.0,
+            36.0
+          ],
+          "height_mm": 4.0
+        },
+        "mass_kg": 0.0515,
+        "mass_source": "ycb",
+        "material_gt": "metal_plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.0515 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.118,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.051,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 36.0,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.013,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "tool_3_spatula_b": {
+        "geometry": {
+          "length_mm": 220.0,
+          "diameter_mm": null,
+          "extents_mm": [
+            220.0,
+            40.0,
+            7.1
+          ],
+          "height_z_mm": 7.0,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.217,
+          "seal_patch_rms_mm": 0.0,
+          "footprint_mm": [
+            220.0,
+            40.0
+          ],
+          "height_mm": 7.0
+        },
+        "mass_kg": 0.0515,
+        "mass_source": "ycb",
+        "material_gt": "metal_plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.0515 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.217,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.051,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 40.0,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.0,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "tool_4_spatula_c": {
+        "geometry": {
+          "length_mm": 220.0,
+          "diameter_mm": null,
+          "extents_mm": [
+            220.0,
+            56.0,
+            11.2
+          ],
+          "height_z_mm": 11.0,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.35,
+          "seal_patch_rms_mm": 0.0,
+          "footprint_mm": [
+            220.0,
+            56.0
+          ],
+          "height_mm": 11.0
+        },
+        "mass_kg": 0.0573,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": null,
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.05732742036562359 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.35,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.057,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 56.0,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.0,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "tool_5_cutting_board": {
+        "geometry": {
+          "length_mm": 220.2,
+          "diameter_mm": null,
+          "extents_mm": [
+            220.2,
+            72.6,
+            16.2
+          ],
+          "height_z_mm": 16.0,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.275,
+          "seal_patch_rms_mm": 0.0,
+          "footprint_mm": [
+            220.0,
+            72.0
+          ],
+          "height_mm": 16.0
+        },
+        "mass_kg": 0.0253,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": null,
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.025344000000000002 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.275,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.025,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 72.6,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.0,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "card": {
+        "geometry": {
+          "length_mm": 54.1,
+          "diameter_mm": null,
+          "extents_mm": [
+            54.1,
+            32.1,
+            1.2
+          ],
+          "height_z_mm": 1.2,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.01,
+          "seal_patch_rms_mm": 0.0,
+          "footprint_mm": [
+            54.0,
+            32.0
+          ],
+          "height_mm": 1.2
+        },
+        "mass_kg": 0.0021,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": null,
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.0020736 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.01,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.002,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 32.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.0,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      }
+    }
+  },
+  {
+    "task": "c4_2",
+    "environment": "C4_2_DiagonalFitPacking",
+    "seed": 0,
+    "rule": "m1_scene.ee_rules.evaluate_ee(vac) on GT surface samples + YCB mass",
+    "vac_spec": {
+      "ee_id": "vac",
+      "type": "vacuum",
+      "capabilities": [
+        "suction"
+      ],
+      "payload_kg": 0.5,
+      "home_slot": "ee-slot-vac",
+      "seal_diameter_mm": 30,
+      "flatness_tol_rms_mm": 1.5,
+      "pass_height_mm": 140,
+      "seal_rms_tol_mm": 1.5
+    },
+    "objects": {
+      "rolling_pin": {
+        "geometry": {
+          "length_mm": 299.9,
+          "diameter_mm": 43.2,
+          "extents_mm": [
+            299.9,
+            43.2,
+            43.3
+          ],
+          "height_z_mm": 43.7,
+          "cylinder_like": true,
+          "surface_rms_mm": 1.519,
+          "seal_patch_rms_mm": 0.532,
+          "footprint_mm": [
+            299.9,
+            43.7
+          ],
+          "height_mm": 43.7
+        },
+        "mass_kg": 0.27,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "wood",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 1.519 vs 허용 1.5",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.519,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.27,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 43.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.532,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      },
+      "baguette": {
+        "geometry": {
+          "length_mm": 260.5,
+          "diameter_mm": null,
+          "extents_mm": [
+            260.5,
+            59.8,
+            41.8
+          ],
+          "height_z_mm": 42.2,
+          "cylinder_like": false,
+          "surface_rms_mm": 1.226,
+          "seal_patch_rms_mm": 0.445,
+          "footprint_mm": [
+            260.5,
+            59.5
+          ],
+          "height_mm": 42.2
+        },
+        "mass_kg": 0.3719,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "bread",
+        "porous_hint": true,
+        "vac_rule": {
+          "feasible": true,
+          "reason": "질량 0.37185632940353036 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.226,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.372,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 59.8,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.445,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": true,
+        "n_points": 30000
+      },
+      "whisk": {
+        "geometry": {
+          "length_mm": 279.8,
+          "diameter_mm": 67.1,
+          "extents_mm": [
+            279.8,
+            67.1,
+            67.1
+          ],
+          "height_z_mm": 67.7,
+          "cylinder_like": true,
+          "surface_rms_mm": 1.388,
+          "seal_patch_rms_mm": 1.563,
+          "footprint_mm": [
+            279.8,
+            67.6
+          ],
+          "height_mm": 67.7
+        },
+        "mass_kg": 0.0002,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "metal_plastic",
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "흡착 패치 RMS 1.563 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 1.388,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.0,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 67.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 1.563,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      },
+      "cereal": {
+        "geometry": {
+          "length_mm": 152.3,
+          "diameter_mm": null,
+          "extents_mm": [
+            152.3,
+            126.1,
+            39.3
+          ],
+          "height_z_mm": 150.0,
+          "cylinder_like": false,
+          "surface_rms_mm": 5.849,
+          "seal_patch_rms_mm": 0.0,
+          "footprint_mm": [
+            39.0,
+            123.3
+          ],
+          "height_mm": 150.0
+        },
+        "mass_kg": 0.072,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "cardboard",
+        "porous_hint": true,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 5.849 vs 허용 1.5",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 5.849,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.072,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 126.1,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.0,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      },
+      "milk": {
+        "geometry": {
+          "length_mm": 145.2,
+          "diameter_mm": 50.3,
+          "extents_mm": [
+            145.2,
+            46.5,
+            54.0
+          ],
+          "height_z_mm": 144.0,
+          "cylinder_like": true,
+          "surface_rms_mm": 4.011,
+          "seal_patch_rms_mm": 2.954,
+          "footprint_mm": [
+            45.7,
+            45.7
+          ],
+          "height_mm": 144.0
+        },
+        "mass_kg": 0.2724,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": "paper_carton",
+        "porous_hint": true,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "상면 RMS 4.011 vs 허용 1.5; 흡착 패치 RMS 2.954 vs 허용 1.5mm",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 4.011,
+              "limit": 1.5,
+              "pass": false
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.272,
+              "limit": 0.5,
+              "pass": true
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 50.3,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 2.954,
+              "limit": 1.5,
+              "pass": false
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      },
+      "lid": {
+        "geometry": {
+          "length_mm": 270.1,
+          "diameter_mm": null,
+          "extents_mm": [
+            270.1,
+            210.2,
+            12.2
+          ],
+          "height_z_mm": 12.0,
+          "cylinder_like": false,
+          "surface_rms_mm": 0.123,
+          "seal_patch_rms_mm": 0.0,
+          "footprint_mm": [
+            210.0,
+            270.0
+          ],
+          "height_mm": 12.0
+        },
+        "mass_kg": 0.6804,
+        "mass_source": "mujoco_subtree(unverified)",
+        "material_gt": null,
+        "porous_hint": false,
+        "vac_rule": {
+          "feasible": false,
+          "reason": "질량 0.6804 vs 페이로드 0.5kg",
+          "checks": [
+            {
+              "rule": "flatness",
+              "value": 0.123,
+              "limit": 1.5,
+              "pass": true
+            },
+            {
+              "rule": "mass_lt_payload",
+              "value": 0.68,
+              "limit": 0.5,
+              "pass": false
+            },
+            {
+              "rule": "seal_contact",
+              "value": 30.0,
+              "limit": 210.2,
+              "pass": true
+            },
+            {
+              "rule": "seal_patch",
+              "value": 0.0,
+              "limit": 1.5,
+              "pass": true
+            }
+          ]
+        },
+        "admissible": false,
+        "n_points": 30000
+      }
+    }
+  }
+]

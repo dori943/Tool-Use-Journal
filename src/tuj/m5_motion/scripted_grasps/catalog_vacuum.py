@@ -49,6 +49,10 @@ def object_support_penetration_m(context):
     for con in data.contact[: int(data.ncon)]:
         if float(con.dist) >= 0.0:
             continue
+        if int(con.geom1) < 0 or int(con.geom2) < 0:
+            # Deformable (flex) contact endpoint: no geom id. Support/object
+            # geoms are rigid, so this contact cannot be a support penetration.
+            continue
         names = {
             context.model.geom(int(con.geom1)).name,
             context.model.geom(int(con.geom2)).name,

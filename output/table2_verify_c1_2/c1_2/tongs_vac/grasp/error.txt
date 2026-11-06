@@ -1,0 +1,14 @@
+Traceback (most recent call last):
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 428, in execute_object
+    acquired,hold_opening,q=self._close_fingers_until_ready(q,opening,recipe)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 280, in _close_fingers_until_ready
+    row=self.step(q,hold_opening);self.engage_feedback(row)
+        ^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 87, in step
+    return self.sample()
+           ^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 232, in sample
+    if row['bad_contacts']:raise GraspFailure('UNEXPECTED_COLLISION: '+str(row['bad_contacts'][:2]))
+                           ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+tuj.m5_motion.scripted_grasps.runtime.GraspFailure: UNEXPECTED_COLLISION: [{'geoms': ['gripper0_right_vac_mount_col', 'tongs_collision_20'], 'penetration_m': 0.0010383276736439665}]

@@ -1,0 +1,9 @@
+Traceback (most recent call last):
+  File "/workspace/Tool-Use-Journal/src/tuj/m5_motion/scripted_grasps/catalog_runtime.py", line 468, in execute_object
+    attach_vacuum(self)
+  File "/workspace/Tool-Use-Journal/src/tuj/m5_motion/scripted_grasps/catalog_vacuum.py", line 613, in attach_vacuum
+    attachment = context.runtime.attach_object(
+                 ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "/workspace/Tool-Use-Journal/src/tuj/m5_motion/tool_use_journal_runtime.py", line 2273, in attach_object
+    raise ToolUseJournalAttachmentGeometryError(
+tuj.m5_motion.tool_use_journal_runtime.ToolUseJournalAttachmentGeometryError: object 'fork' penetrates EE geometry by 0.0022 m; limit is 0.0020 m; closest geom pair 'gripper0_right_vac_cup' <-> 'fork_g29' measured by SIMULATOR_CONTACT; closest pairs: -0.0022 m  'gripper0_right_vac_cup' type=cylinder size=(0.0300, 0.0120, 0.0000) z=0.8191  <->  'fork_g29' type=mesh size=(0.0029, 0.0056, 0.0133) z=0.8064 | -0.0021 m  'gripper0_right_vac_cup' type=cylinder size=(0.0300, 0.0120, 0.0000) z=0.8191  <->  'fork_g20' type=mesh size=(0.0031, 0.0065, 0.0186) z=0.8051 | -0.0018 m  'gripper0_right_vac_cup' type=cylinder size=(0.0300, 0.0120, 0.0000) z=0.8191  <->  'fork_g2' type=mesh size=(0.0033, 0.0020, 0.0056) z=0.8072

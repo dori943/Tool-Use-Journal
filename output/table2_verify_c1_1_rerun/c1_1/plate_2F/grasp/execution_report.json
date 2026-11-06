@@ -1,0 +1,252 @@
+{
+  "schema_version": "3.2.0",
+  "report_id": "scripted:plate:grasp:execution-report",
+  "run_id": "scripted:plate:grasp",
+  "plan_id": "motion-plan:e9df1157f0eeb8e5b58b6f96",
+  "provenance": {
+    "artifact_id": "scripted:plate:grasp:execution-report",
+    "artifact_type": "ExecutionReport",
+    "produced_by": "SIMULATOR",
+    "invocation_id": "scripted:plate:grasp",
+    "input_artifact_ids": [
+      "scripted:plate:grasp:artifact",
+      "motion-plan-artifact:e9df1157f0eeb8e5b58b6f96"
+    ],
+    "attempt": 1,
+    "metadata": {
+      "player": "TOOL_USE_JOURNAL_CONTROLLER_V1"
+    }
+  },
+  "status": "FAILED",
+  "final_robot_state": {
+    "robot_id": "ur5e_0",
+    "joint_names": [
+      "robot0_shoulder_pan_joint",
+      "robot0_shoulder_lift_joint",
+      "robot0_elbow_joint",
+      "robot0_wrist_1_joint",
+      "robot0_wrist_2_joint",
+      "robot0_wrist_3_joint"
+    ],
+    "joint_positions_rad": [
+      -0.3621294802612158,
+      -0.7662842654403944,
+      1.638806330019194,
+      -1.7290687404478116,
+      -1.818649823042567,
+      -3.4070995722614112
+    ],
+    "joint_velocities_rad_s": [
+      -0.00033029029408038543,
+      -0.00006669001600770883,
+      0.0004431664749083188,
+      -0.000022585918126307523,
+      -0.0008927356159118417,
+      -0.00001193915598730488
+    ],
+    "eef_pose": {
+      "frame_id": "world",
+      "position_m": [
+        -0.20527342053789954,
+        -0.10029820448102708,
+        0.8259668177956953
+      ],
+      "orientation_xyzw": [
+        -0.0017371950261752538,
+        -0.930722621702996,
+        0.0030689897596004327,
+        0.36570885264865877
+      ]
+    },
+    "gripper": {
+      "mode": "CLOSED",
+      "command": 0.0
+    },
+    "attached_object_id": null,
+    "held_tool_id": null
+  },
+  "metrics": {
+    "executed_duration_s": 14.680000000003233,
+    "max_joint_tracking_error_rad": 0.06293981628628886,
+    "max_eef_tracking_error_m": 0.026542224523994674,
+    "collision_count": 0,
+    "goal_position_error_m": null,
+    "goal_orientation_error_rad": null
+  },
+  "executed_events": [],
+  "failure": {
+    "code": "TRACKING_NOT_SETTLED",
+    "category": "SIMULATION_RUNTIME",
+    "message": "controller did not converge before the next contact-sensitive motion",
+    "segment_id": "plate_2f_calibrated_center_v5:1:GRASP",
+    "waypoint_index": null,
+    "event_id": null,
+    "expected": {},
+    "observed": {
+      "joint_error_rad": 0.028357070186002198,
+      "eef_position_error_m": 0.026093655787730093,
+      "eef_orientation_error_rad": 0.04354629469354612,
+      "settle_config": {
+        "eef_tolerance_m": 0.008,
+        "eef_orientation_tolerance_rad": 0.08,
+        "max_wait_s": 5.0,
+        "required_consecutive_ticks": 3
+      },
+      "wait_duration_s": 1.0200000000012466,
+      "settle_stalled": true,
+      "best_eef_error_m": 0.026481658051342165,
+      "custom_settle": null,
+      "contacts": [
+        {
+          "geom_a": "table_collision",
+          "geom_b": "gripper0_right_right_fingertip_collision",
+          "penetration_m": 0.0002917238290235753,
+          "normal_force_n": 8.5810858531056
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "gripper0_right_right_fingertip_collision",
+          "penetration_m": 0.00021491221780409355,
+          "normal_force_n": 6.008521337725131
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "bottle_distractor_g3",
+          "penetration_m": 0.0005287485474985989,
+          "normal_force_n": 2.7535794911718225
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "ladle_g9",
+          "penetration_m": 0.00035147539792639384,
+          "normal_force_n": 0.23745258102502761
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "plate_g16",
+          "penetration_m": 0.00021852805087752003,
+          "normal_force_n": 0.20389958957863352
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "plate_g19",
+          "penetration_m": 0.00022090983342115678,
+          "normal_force_n": 0.201974052258296
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "plate_g23",
+          "penetration_m": 0.00021525441269165666,
+          "normal_force_n": 0.20110265172921307
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "plate_g22",
+          "penetration_m": 0.00021241369080993167,
+          "normal_force_n": 0.1990453819920336
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "plate_g32",
+          "penetration_m": 0.00020668227095443914,
+          "normal_force_n": 0.18953560862606683
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "plate_g15",
+          "penetration_m": 0.00021315879426864193,
+          "normal_force_n": 0.1842102771160531
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "plate_g31",
+          "penetration_m": 0.00020514820373838285,
+          "normal_force_n": 0.18394611394425137
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "plate_g2",
+          "penetration_m": 0.00020850486138037058,
+          "normal_force_n": 0.17978059362576598
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "plate_g28",
+          "penetration_m": 0.00018635136458211576,
+          "normal_force_n": 0.1607931669331193
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "plate_g8",
+          "penetration_m": 0.00018574321842388362,
+          "normal_force_n": 0.15742437438501433
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "scissors_g2",
+          "penetration_m": 0.0003395377332647831,
+          "normal_force_n": 0.1551178575940479
+        },
+        {
+          "geom_a": "table_collision",
+          "geom_b": "plate_g26",
+          "penetration_m": 0.00012356129063928464,
+          "normal_force_n": 0.10010675618103847
+        }
+      ]
+    },
+    "evidence_refs": []
+  },
+  "trace_ref": null,
+  "metadata": {
+    "player": "TOOL_USE_JOURNAL_CONTROLLER_V1",
+    "playback_mode": "ROBOSUITE_ABSOLUTE_JOINT_POSITION_CONTROLLER",
+    "controller_tracking_simulated": true,
+    "collision_probe_enabled": true,
+    "final_active_ee": "2F",
+    "final_attached_object_id": null,
+    "final_held_tool_id": null,
+    "final_gripper_command": 0.0,
+    "ee_transition_count": 0,
+    "attachment_mode": null,
+    "attachment_contact": null,
+    "last_attachment_break": null,
+    "collision_check_stride": 25,
+    "collision_check_count": 31,
+    "nominal_plan_duration_s": 28.021807073326247,
+    "final_plan_time_s": 13.651039354457442,
+    "adaptive_settle_extra_duration_s": 1.0289606455457907,
+    "segment_tracking": [
+      {
+        "segment_id": "plate_2f_calibrated_center_v5:0:PRE_GRASP",
+        "keyframe_id": "PRE_GRASP",
+        "target_block_id": null,
+        "nominal_end_time_s": 11.436347318562117,
+        "actual_execution_time_s": 11.439999999999273,
+        "max_joint_error_rad": 0.016974337874850587,
+        "eef_position_error_m": 0.0029909694783935054,
+        "eef_orientation_error_rad": 0.023773623557904282,
+        "adaptive_settle_requested": false,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 0.0,
+        "custom_settle": null
+      },
+      {
+        "segment_id": "plate_2f_calibrated_center_v5:1:GRASP",
+        "keyframe_id": "GRASP",
+        "target_block_id": null,
+        "nominal_end_time_s": 15.151039354457442,
+        "actual_execution_time_s": 14.680000000003233,
+        "max_joint_error_rad": 0.028357070186002198,
+        "eef_position_error_m": 0.026093655787730093,
+        "eef_orientation_error_rad": 0.04354629469354612,
+        "custom_settle": null,
+        "adaptive_settle_requested": true,
+        "adaptive_settle_succeeded": false,
+        "adaptive_settle_wait_s": 1.0200000000012466,
+        "settle_stalled": true
+      }
+    ],
+    "gripper_release_waits": []
+  }
+}

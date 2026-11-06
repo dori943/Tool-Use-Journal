@@ -1,0 +1,150 @@
+{
+  "status": "FAILED",
+  "object_id": "scissors",
+  "task_id": "c1_1",
+  "ee_id": "2F",
+  "recipe": {
+    "object_id": "scissors",
+    "task_id": "c1_1",
+    "ee_id": "2F",
+    "expected_size_m": [
+      0.0811,
+      0.1792,
+      0.0118
+    ],
+    "offset_fraction": [
+      0.46,
+      0.0,
+      0.0
+    ],
+    "offset_m": [
+      0.0,
+      0.0,
+      0.0
+    ],
+    "rotation_xyz_deg": [
+      0.0,
+      90.0,
+      0.0
+    ],
+    "contact_region_min": [
+      -0.6,
+      -0.6,
+      -0.6
+    ],
+    "contact_region_max": [
+      0.6,
+      0.6,
+      0.6
+    ],
+    "preshape_aperture_m": 0.049,
+    "preshape_closure_command": 0.0,
+    "approach_distance_m": 0.12,
+    "lift_distance_m": 0.18,
+    "linear_lift_start": false,
+    "arm_kp": 150.0,
+    "post_grasp_arm_kp": null,
+    "close_duration_s": 8.0,
+    "closure_kp": 20.0,
+    "physics_timestep_s": 0.001,
+    "physics_integrator": "implicitfast",
+    "thin_contact_timeconstant_s": 0.004,
+    "thin_contact_solimp": null,
+    "vacuum_cup_margin_m": null,
+    "two_finger_parallel_linkage": true,
+    "two_finger_force_target_n": 6.0,
+    "two_finger_force_gain": 0.002,
+    "three_finger_force_targets_n": [
+      6.0,
+      3.0,
+      3.0
+    ],
+    "three_finger_force_gain": 0.002,
+    "three_finger_force_deadband_n": 0.5,
+    "prelift_stabilization_s": 0.5,
+    "settle_s": 1.0,
+    "hold_s": 5.0,
+    "joint_speed_rad_s": 0.45,
+    "cartesian_speed_m_s": 0.05,
+    "minimum_lift_m": 0.1,
+    "maximum_slip_m": 0.005,
+    "maximum_slip_deg": 5.0,
+    "contact_ticks": 5,
+    "minimum_normal_opposition": 0.12,
+    "fingerpad_friction": [
+      2.0,
+      0.1,
+      0.02
+    ],
+    "fingertip_support_clearance_tol_m": 0.012,
+    "gripper_support_clearance_tol_m": 0.0025,
+    "minimum_vacuum_contact_count": 3,
+    "maximum_vacuum_attach_penetration_m": 0.002,
+    "maximum_support_separation_penetration_m": 0.002,
+    "maximum_joint_limit_error_rad": 0.01,
+    "suction_command": 1.0,
+    "vacuum_actuator_gain": null,
+    "thin_handle_pinch": false,
+    "hold_finger_positions": false,
+    "thin_handle_close_retries": 0,
+    "thin_handle_lateral_retry_m": 0.002,
+    "vacuum_min_contacts": 3,
+    "finger_attachment_policy": "FREE_HOLD_THEN_ATTACH",
+    "open_hand_clearance_axis": null,
+    "contact_region_endpoint_policy": null,
+    "model_class": "Robotiq85Gripper",
+    "recipe_id": "scissors_2f_center_v1"
+  },
+  "scenario": {
+    "seed": 0,
+    "mode": "BORROWED_M5_RUNTIME",
+    "request_id": null
+  },
+  "runtime_version": "catalog_v2_measured_time",
+  "timing": {
+    "physics_timestep_s": 0.002,
+    "control_timestep_s": 0.02,
+    "clock_source": "MUJOCO_DATA_TIME"
+  },
+  "failure_stage": "PRESHAPE",
+  "failure_reason": "GRIPPER_JOINT_LIMIT_EXCEEDED: physics substep 0.195979 rad (stage=PRESHAPE joint=gripper0_right_left_inner_knuckle_joint lower q=-0.195979 range=[0.000000,0.875700] command=[-1.0, -1.0] aperture_m=0.11039)",
+  "error_type": "GraspFailure",
+  "object_pose_in_gripper": {
+    "position_m": [
+      0.32660310369892603,
+      0.03779723348378744,
+      0.1746019391029674
+    ],
+    "orientation_xyzw": [
+      0.024571489060896932,
+      0.998709502861346,
+      -0.043894431348914485,
+      0.006989257208669341
+    ]
+  },
+  "final_object_pose": {
+    "position_m": [
+      -0.300240103661957,
+      0.3000834920395656,
+      0.8052717923816431
+    ],
+    "orientation_xyzw": [
+      0.009750342081530363,
+      -0.020213365685773255,
+      -0.7068943624149877,
+      0.7069630195864947
+    ]
+  },
+  "attachment_used": false,
+  "object_material_inputs": [],
+  "learned_model_calls": 0,
+  "hand_model_correction": {
+    "policy": "NATIVE_HAND",
+    "source_assets_changed": false
+  },
+  "nominal_joint_limit_diagnostics": {
+    "max_violation_rad": 0.19597852365354917,
+    "allowed_numerical_residual_rad": 0.01,
+    "physics_steps_audited": 1
+  }
+}

@@ -1,0 +1,118 @@
+{
+  "schema_version": "3.2.0",
+  "artifact_id": "scripted:plate:ca61510a4cce9d6a:contact-friction:874a66409702a13a",
+  "provenance": {
+    "artifact_id": "scripted:plate:keyframes:contact-friction:874a66409702a13a",
+    "artifact_type": "KeyframePlanArtifact",
+    "produced_by": "GRASP_PLANNER",
+    "invocation_id": "grasp",
+    "input_artifact_ids": [],
+    "attempt": 1,
+    "metadata": {
+      "generator": "OBJECT_CENTER_SCRIPT",
+      "learned_model_calls": 0,
+      "joint_angle_policy": "NEAREST_EQUIVALENT_WITHIN_UR5E_LIMITS",
+      "pose_policy": "FIXED_OBJECT_CENTER_POSE",
+      "grasp_execution_mode": "CONTACT_FRICTION",
+      "rejected_candidates": []
+    }
+  },
+  "scene_signature": "tool-use-journal:fbf1667177648a728af681bad2d0a56465b9fa48db8e363668dc48e6c1abfcca",
+  "subgoal_id": "scripted:plate:pick",
+  "candidates": [
+    {
+      "strategy_id": "plate_2f_calibrated_center_v5",
+      "keyframes": [
+        {
+          "keyframe_id": "PRE_GRASP",
+          "keyframe_type": "PRE_GRASP",
+          "frame_ref": "object:plate",
+          "anchor": "scripted_pre_grasp",
+          "approach_axis_xyz": [
+            -0.711926888518541,
+            -0.0018220286935527053,
+            -0.7022512268524341
+          ],
+          "tool_axis_to_align": "+z",
+          "offset_along_approach_m": 0.0,
+          "roll_rad": 0.003299649518022265,
+          "planner": "CARTESIAN",
+          "events_after": [],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {
+            "event_target_id": "plate"
+          }
+        },
+        {
+          "keyframe_id": "GRASP",
+          "keyframe_type": "GRASP",
+          "frame_ref": "object:plate",
+          "anchor": "scripted_grasp",
+          "approach_axis_xyz": [
+            -0.711926888518541,
+            -0.0018220286935527053,
+            -0.7022512268524341
+          ],
+          "tool_axis_to_align": "+z",
+          "offset_along_approach_m": 0.0,
+          "roll_rad": 0.003299649518022265,
+          "planner": "CARTESIAN",
+          "events_after": [
+            "GRIPPER_CLOSE"
+          ],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {
+            "event_target_id": "plate",
+            "grasp_execution_mode": "CONTACT_FRICTION",
+            "hold_duration_after_s": 1.5,
+            "event_time_offsets_s": {
+              "GRIPPER_CLOSE": 0.0
+            },
+            "event_parameters": {
+              "GRIPPER_CLOSE": {
+                "command": 1.0
+              }
+            }
+          }
+        },
+        {
+          "keyframe_id": "LIFT",
+          "keyframe_type": "LIFT",
+          "frame_ref": "object:plate",
+          "anchor": "scripted_lift",
+          "approach_axis_xyz": [
+            -0.711926888518541,
+            -0.0018220286935527053,
+            -0.7022512268524341
+          ],
+          "tool_axis_to_align": "+z",
+          "offset_along_approach_m": 0.0,
+          "roll_rad": 0.003299649518022265,
+          "planner": "CARTESIAN",
+          "events_after": [],
+          "collision_context_id": null,
+          "collision_context_after_events_id": null,
+          "metadata": {
+            "event_target_id": "plate",
+            "hold_duration_after_s": 8.0,
+            "physical_retention_hold": true
+          }
+        }
+      ],
+      "rationale": "Fixed plate rim recipe transformed by the current object pose.",
+      "provenance": {
+        "generator_kind": "TEMPLATE",
+        "generator_id": "SCRIPTED_PLATE_CENTER_FRAME",
+        "input_hash": "ca61510a4cce9d6ab11b8c89bed57718392ce081b9c7a34e0dbef59538469b27",
+        "model_id": null,
+        "prompt_hash": null,
+        "temperature": null,
+        "provider_request_id": null,
+        "attempt_index": 1
+      },
+      "metadata": {}
+    }
+  ]
+}

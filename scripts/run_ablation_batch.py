@@ -347,6 +347,16 @@ def collect_record(out: Path, *, task: str, seed: int, method: str,
         if not failure:
             rec["failure_stage"] = "unknown"
 
+    # 외부 API 장애(재시도 소진): 실험 실패가 아니라 재실행 대상
+    from tuj.m5_motion.failure_taxonomy import is_infrastructure_failure
+    if rec.get("success") is not True and (
+            (rr or {}).get("rerun_required") or is_infrastructure_failure(" ".join(messages))
+            or "TransientAPIError" in str(failure.get("type"))):
+        rec["failure_stage"] = "infrastructure"
+        rec["rerun_required"] = True
+        rec["success"] = None
+        codes["API_UNAVAILABLE"] += 10
+
     # 실패 단계 보정
     m5_ok = (rec["m5_status"] == "SUCCESS" and not failure
              and rec.get("goal_success") is True
@@ -705,7 +715,12 @@ def main(argv=None) -> int:
                 write_summaries(args.method_dir, load_all_records(args.method_dir, args.method_name))
                 continue
             if prev and args.skip_done:
-                if args.retry_failed and prev.get("success") is not True:
+                if prev.get("rerun_required") or prev.get("failure_stage") == "infrastructure":
+                    # API 장애로 끝난 run 은 '완료'가 아니다 → 자동으로 다시 돌린다
+                    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+                    shutil.move(str(out), str(out.parent / f"{name}_prev_{stamp}"))
+                    print(f"[batch] rerun {task} {name}: 이전 시도가 API 장애(infrastructure)로 끝남")
+                elif args.retry_failed and prev.get("success") is not True:
                     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
                     shutil.move(str(out), str(out.parent / f"{name}_prev_{stamp}"))
                 else:

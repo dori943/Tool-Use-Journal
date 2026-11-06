@@ -1,0 +1,159 @@
+{
+  "object_id": "fork",
+  "ee": "3F",
+  "environment": "C1_1_LegoSweep",
+  "static_status": "PASS",
+  "controller_status": "FAIL",
+  "failures": [
+    "fork: CLOSE: GRASP_CONTACT_NOT_STABLE",
+    "CLOSE: GRASP_CONTACT_NOT_STABLE"
+  ],
+  "warnings": [],
+  "resolved_type": "fork",
+  "recipe_id": "fork_3f_center_v1",
+  "module_name": "c1_1_probes",
+  "scene_object_id": "fork",
+  "body_object_id": null,
+  "integration_status": "EXPERIMENTAL",
+  "driver": "catalog",
+  "targets": {
+    "PRE_GRASP": {
+      "position_m": [
+        0.4,
+        -0.032924999999999996,
+        1.04
+      ],
+      "orientation_xyzw": [
+        0.7071067811865477,
+        0.7071067811865475,
+        0.0,
+        0.0
+      ]
+    },
+    "GRASP": {
+      "position_m": [
+        0.4,
+        -0.032924999999999996,
+        0.92
+      ],
+      "orientation_xyzw": [
+        0.7071067811865477,
+        0.7071067811865475,
+        0.0,
+        0.0
+      ]
+    },
+    "LIFT": {
+      "position_m": [
+        0.4,
+        -0.032924999999999996,
+        1.1
+      ],
+      "orientation_xyzw": [
+        0.7071067811865477,
+        0.7071067811865475,
+        0.0,
+        0.0
+      ]
+    }
+  },
+  "local_size_m": [
+    0.0357,
+    0.2195,
+    0.0264
+  ],
+  "center_in_body_m": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "object_aabb_top_z": 0.9332,
+  "object_aabb_bottom_z": 0.9068,
+  "grasp_tcp_z": 0.92,
+  "lift_tcp_z": 1.1,
+  "grasp_to_top_m": -0.01319999999999999,
+  "lift_delta_m": 0.18000000000000005,
+  "static_failures": [],
+  "static_basis": "EXPECTED_SIZE_SYNTHETIC_POSE",
+  "simulation_started": true,
+  "grasp_attempted": true,
+  "seed": 0,
+  "stages": {
+    "failure": "fork: CLOSE: GRASP_CONTACT_NOT_STABLE"
+  },
+  "camera": "agentview",
+  "result": {
+    "status": "FAILED",
+    "failure_stage": "CLOSE",
+    "failure_reason": "GRASP_CONTACT_NOT_STABLE",
+    "error_type": "GraspFailure",
+    "attachment_used": false,
+    "hand_model_correction": {
+      "policy": "TENDON_REFERENCE_ALIGNED_TO_DECLARED_REST_AND_INIT",
+      "couplings": [
+        {
+          "name": "gripper0_right_thumb_cpl",
+          "reference_length": 0.6400000000000001,
+          "rest_length": 0.2,
+          "polycoef_constant": -0.4400000000000001,
+          "before": {
+            "name": "gripper0_right_thumb_cpl",
+            "tendon1": "gripper0_right_thumb_cpl"
+          },
+          "after": {
+            "name": "gripper0_right_thumb_cpl",
+            "tendon1": "gripper0_right_thumb_cpl",
+            "polycoef": "-0.44 1 0 0 0",
+            "solref": "0.004 1"
+          }
+        },
+        {
+          "name": "gripper0_right_index_12_cpl",
+          "reference_length": 0.6400000000000001,
+          "rest_length": 0.2,
+          "polycoef_constant": -0.4400000000000001,
+          "before": {
+            "name": "gripper0_right_index_12_cpl",
+            "tendon1": "gripper0_right_index_12_cpl"
+          },
+          "after": {
+            "name": "gripper0_right_index_12_cpl",
+            "tendon1": "gripper0_right_index_12_cpl",
+            "polycoef": "-0.44 1 0 0 0",
+            "solref": "0.004 1"
+          }
+        },
+        {
+          "name": "gripper0_right_pinky_12_cpl",
+          "reference_length": 0.6400000000000001,
+          "rest_length": 0.2,
+          "polycoef_constant": -0.4400000000000001,
+          "before": {
+            "name": "gripper0_right_pinky_12_cpl",
+            "tendon1": "gripper0_right_pinky_12_cpl"
+          },
+          "after": {
+            "name": "gripper0_right_pinky_12_cpl",
+            "tendon1": "gripper0_right_pinky_12_cpl",
+            "polycoef": "-0.44 1 0 0 0",
+            "solref": "0.004 1"
+          }
+        }
+      ],
+      "joint_limit_timeconstant_s": 0.002,
+      "joint_ranges_changed": false,
+      "mass_or_friction_changed": false,
+      "joint_limit_impedance": [
+        0.9999,
+        0.9999,
+        0.001,
+        0.5,
+        2
+      ],
+      "joint_armature_kg_m2": 0.0001,
+      "source_assets_changed": false,
+      "minimum_proximal_command_rad": 0.0
+    }
+  },
+  "failure_category": "MOTION_OR_GRASP"
+}

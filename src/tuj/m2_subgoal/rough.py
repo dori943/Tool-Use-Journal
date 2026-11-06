@@ -545,10 +545,12 @@ def make_llm_client():
         key = os.environ.get("GEMINI_API_KEY")
         if not key:
             raise RuntimeError("GEMINI_API_KEY 가 없습니다 (TUJ_LLM_PROVIDER=openai 로 바꾸면 OPENAI_API_KEY 사용)")
-        return OpenAI(api_key=key, base_url=_GEMINI_BASE_URL)
+        from tuj.common.api_retry import with_api_retry
+        return with_api_retry(OpenAI(api_key=key, base_url=_GEMINI_BASE_URL), "m2")
     if not os.environ.get("OPENAI_API_KEY"):
         raise RuntimeError("OPENAI_API_KEY 가 없습니다")
-    return OpenAI()
+    from tuj.common.api_retry import with_api_retry
+    return with_api_retry(OpenAI(), "m2")
 
 
 class LLMRough:

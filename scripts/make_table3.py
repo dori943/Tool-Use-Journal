@@ -109,8 +109,14 @@ def load_trials(roots: list[Path]) -> list[dict]:
                 fail = (man or {}).get("failure") or {}
                 if not fail and not rec:
                     continue  # 아직 실행 중이거나 빈 폴더
+                fail_text = " ".join(str(v) for v in (fail.get("type"), fail.get("message"),
+                                                      fail.get("failure_code"), (rec or {}).get("reason_code"),
+                                                      " ".join((rec or {}).get("messages") or [])) if v)
+                infra = ("TransientAPIError" in fail_text or "API_UNAVAILABLE" in fail_text
+                         or (rec or {}).get("failure_stage") == "infrastructure")
                 r = {"provider": (rec or {}).get("provider"), "model": None,
-                     "success": False if (fail or (rec or {}).get("success") is False) else None,
+                     "success": None if infra else (False if (fail or (rec or {}).get("success") is False) else None),
+                     "rerun_required": infra,
                      "exec_success": False, "goal_success": None,
                      "failure_stage": fail.get("failure_stage") or fail.get("stage") or (rec or {}).get("failure_stage"),
                      "failure_code": fail.get("failure_code") or (rec or {}).get("reason_code"),
@@ -125,7 +131,8 @@ def load_trials(roots: list[Path]) -> list[dict]:
                 "success": r.get("success"), "exec_success": r.get("exec_success"),
                 "goal_success": r.get("goal_success"), "failure_stage": r.get("failure_stage"),
                 "failure_code": r.get("failure_code"), "plan_status": r.get("plan_status"),
-                "pre_m5_failure": bool(r.get("pre_m5_failure")), "dir": str(seed_dir),
+                "pre_m5_failure": bool(r.get("pre_m5_failure")),
+                "rerun_required": bool(r.get("rerun_required")), "dir": str(seed_dir),
             })
     return trials
 

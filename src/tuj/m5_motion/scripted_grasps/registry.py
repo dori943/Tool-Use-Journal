@@ -237,10 +237,27 @@ _C2_1_COVERAGE_PROBES: tuple[GraspEntry, ...] = tuple(
                       ("mug", ("2F", "vac")), ("plate", ("2F", "3F")), ("spoon", ("vac",)))
     for ee in ees
 )
+# C1_1 sweep scene: keep the two plate routes (2F rim, vac); 13 validator pairs.
+_C1_1_COVERAGE_PROBES: tuple[GraspEntry, ...] = tuple(
+    GraspEntry(name, "C1_1_LegoSweep", ee, "catalog", "c1_1_probes",
+               recipe_name={"2F": "probe_2f_recipe", "3F": "probe_3f_recipe", "vac": "probe_vac_recipe"}[ee])
+    for name, ees in (("plate", ("3F",)), ("ladle", ("2F", "3F", "vac")),
+                      ("fork", ("2F", "3F", "vac")), ("scissors", ("2F", "3F", "vac")),
+                      ("bottle_distractor", ("2F", "3F", "vac")))
+    for ee in ees
+)
+# C1_2 flatten tools: keep bottle 3F, spatula 3F, spoon 2F/3F; 7 validator pairs.
+_C1_2_COVERAGE_PROBES: tuple[GraspEntry, ...] = tuple(
+    GraspEntry(name, "C1_2_DoughFlatten", ee, "catalog", "c1_2_probes",
+               recipe_name={"2F": "probe_2f_recipe", "3F": "probe_3f_recipe", "vac": "probe_vac_recipe"}[ee])
+    for name, ees in (("bottle", ("2F", "vac")), ("spatula", ("2F", "vac")),
+                      ("spoon", ("vac",)), ("tongs", ("2F", "3F", "vac")))
+    for ee in ees
+)
 VALIDATOR_EXPERIMENTAL_ENTRIES: tuple[GraspEntry, ...] = (
     _C3_2_2F_CORE + _C4_2_COVERAGE_PROBES + _C4_1_COVERAGE_PROBES
     + _C3_2_COVERAGE_PROBES + _C3_1_COVERAGE_PROBES + _C2_2_COVERAGE_PROBES
-    + _C2_1_COVERAGE_PROBES
+    + _C2_1_COVERAGE_PROBES + _C1_1_COVERAGE_PROBES + _C1_2_COVERAGE_PROBES
 )
 # Greedy EE-order experiment only: same 2F core plus fruit 2F. C3_2 mug AABB
 # (~88 mm) exceeds the Robotiq 85 stroke, so mug stays 3F-only even for greedy.

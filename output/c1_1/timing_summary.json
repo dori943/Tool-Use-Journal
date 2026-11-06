@@ -1,0 +1,139 @@
+{
+  "llm_calls": [
+    {
+      "call": "서브골 분해",
+      "prompt_tokens": 564,
+      "completion_tokens": 181,
+      "total_tokens": 745,
+      "seconds": 1.59,
+      "calls": 1
+    },
+    {
+      "call": "객체 선택",
+      "prompt_tokens": 762,
+      "completion_tokens": 195,
+      "total_tokens": 957,
+      "seconds": 2.45,
+      "calls": 1
+    },
+    {
+      "call": "confidence_update",
+      "prompt_tokens": 928,
+      "completion_tokens": 93,
+      "total_tokens": 1021,
+      "seconds": 1.66,
+      "calls": 1
+    }
+  ],
+  "llm_total": {
+    "prompt_tokens": 2254,
+    "completion_tokens": 469,
+    "total_tokens": 2723,
+    "seconds": 5.7,
+    "calls": 3
+  },
+  "stages": {
+    "m1": {
+      "seconds": 12.64,
+      "status": "completed"
+    },
+    "m2": {
+      "seconds": null,
+      "status": "not_run"
+    },
+    "gk": {
+      "seconds": null,
+      "status": "not_run"
+    },
+    "m4": {
+      "seconds": null,
+      "status": "not_run"
+    },
+    "m5": {
+      "seconds": null,
+      "status": "not_run"
+    }
+  },
+  "total_seconds": 12.64,
+  "measured_stage_sum_seconds": 12.64,
+  "pipeline": "ours",
+  "plan_metrics": {
+    "subgoal_count": 15,
+    "plan_step_count": 61,
+    "transition_step_count": 46,
+    "subgoal_step_count": 15,
+    "action_counts": {
+      "n_tool_picks": 1,
+      "n_tool_returns": 1,
+      "n_ee_detaches": 0,
+      "n_ee_attaches": 1
+    },
+    "n_ee_attaches": 1,
+    "n_ee_detaches": 0,
+    "planned_ee_switches": 0
+  },
+  "token_totals": {
+    "modules": {
+      "m1_physical": {
+        "c3_density_only": {
+          "calls": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0
+        },
+        "full_siphy": {
+          "calls": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0
+        },
+        "physical_total": {
+          "calls": 0,
+          "input_tokens": 0,
+          "output_tokens": 0,
+          "total_tokens": 0
+        }
+      },
+      "m2_llm": {
+        "calls": [
+          {
+            "call": "서브골 분해",
+            "total_tokens": 745,
+            "prompt_tokens": 564,
+            "completion_tokens": 181,
+            "seconds": 1.59,
+            "calls": 1
+          },
+          {
+            "call": "객체 선택",
+            "total_tokens": 957,
+            "prompt_tokens": 762,
+            "completion_tokens": 195,
+            "seconds": 2.45,
+            "calls": 1
+          },
+          {
+            "call": "confidence_update",
+            "total_tokens": 1021,
+            "prompt_tokens": 928,
+            "completion_tokens": 93,
+            "seconds": 1.66,
+            "calls": 1
+          }
+        ],
+        "total_tokens": 2723
+      },
+      "m4_llm": {
+        "total_tokens": 0,
+        "note": "no_llm"
+      },
+      "m5_llm": {
+        "total_tokens": null,
+        "note": "not_instrumented"
+      }
+    },
+    "total_tokens": 2723,
+    "total_tokens_note": "sum of instrumented modules only (m1 physical + m2 llm; m5 llm not included)"
+  },
+  "session_wall_seconds": 12.66
+}

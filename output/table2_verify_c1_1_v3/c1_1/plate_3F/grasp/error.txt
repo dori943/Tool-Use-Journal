@@ -1,0 +1,23 @@
+Traceback (most recent call last):
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\spoon_runtime.py", line 273, in approach_spoon
+    context.move(targets['PRE_GRASP'],'PRE_GRASP',opening)
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\motion.py", line 142, in move
+    path=self.plan_to(target,stage,cartesian)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\motion.py", line 87, in plan_to
+    raise GraspFailure('IK_FAILED: '+stage+' '+solutions.detail)
+tuj.m5_motion.scripted_grasps.runtime.GraspFailure: IK_FAILED: PRE_GRASP no full-pose IK solution converged from deterministic seeds
+
+During handling of the above exception, another exception occurred:
+
+Traceback (most recent call last):
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 415, in execute_object
+    approach_spoon(self,targets,opening)
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\spoon_runtime.py", line 282, in approach_spoon
+    context.move(clearance,'PRE_CLEARANCE',opening)
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\motion.py", line 142, in move
+    path=self.plan_to(target,stage,cartesian)
+         ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\motion.py", line 87, in plan_to
+    raise GraspFailure('IK_FAILED: '+stage+' '+solutions.detail)
+tuj.m5_motion.scripted_grasps.runtime.GraspFailure: IK_FAILED: PRE_CLEARANCE no full-pose IK solution converged from deterministic seeds

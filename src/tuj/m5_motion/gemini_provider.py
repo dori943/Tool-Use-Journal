@@ -61,8 +61,10 @@ class GeminiKeyframeProvider(OpenAIKeyframeProvider):
             if not key:
                 raise MissingGeminiAPIKeyError("GEMINI_API_KEY is required for Gemini keyframe generation")
             from openai import OpenAI
-            self._client = OpenAI(api_key=key, base_url=GEMINI_BASE_URL,
-                                  timeout=self.config.timeout_s, max_retries=1)
+            from tuj.common.api_retry import with_api_retry
+            self._client = with_api_retry(
+                OpenAI(api_key=key, base_url=GEMINI_BASE_URL,
+                       timeout=self.config.timeout_s, max_retries=1), "m5_gemini")
         return self._client
 
     def _request_response(self, instructions, payload):
@@ -118,6 +120,11 @@ class GeminiKeyframeProvider(OpenAIKeyframeProvider):
         except MissingGeminiAPIKeyError:
             raise
         except Exception as error:
+            from tuj.common.api_retry import TransientAPIError
+            if isinstance(error, TransientAPIError):
+                # Retries exhausted: keep the API_UNAVAILABLE marker for the
+                # failure taxonomy (infrastructure, not a planning failure).
+                raise OpenAIKeyframeProviderError(str(error)) from None
             body = getattr(error, "body", None)
             if isinstance(body, list) and body:
                 body = body[0]

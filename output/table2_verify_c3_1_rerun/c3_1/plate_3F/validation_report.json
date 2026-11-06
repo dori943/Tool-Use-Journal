@@ -1,0 +1,159 @@
+{
+  "object_id": "plate",
+  "ee": "3F",
+  "environment": "C3_1_ObjectSorting",
+  "static_status": "PASS",
+  "controller_status": "FAIL",
+  "failures": [
+    "plate: PLAN_PRE_CLEARANCE: IK_FAILED: PRE_CLEARANCE no full-pose IK solution converged from deterministic seeds",
+    "PLAN_PRE_CLEARANCE: IK_FAILED: PRE_CLEARANCE no full-pose IK solution converged from deterministic seeds"
+  ],
+  "warnings": [],
+  "resolved_type": "plate",
+  "recipe_id": "plate_3f_center_v1",
+  "module_name": "c3_1_probes",
+  "scene_object_id": "plate",
+  "body_object_id": null,
+  "integration_status": "EXPERIMENTAL",
+  "driver": "catalog",
+  "targets": {
+    "PRE_GRASP": {
+      "position_m": [
+        0.60387371498,
+        0.0,
+        0.92
+      ],
+      "orientation_xyzw": [
+        0.7071067811865477,
+        0.0,
+        -0.7071067811865475,
+        0.0
+      ]
+    },
+    "GRASP": {
+      "position_m": [
+        0.48387371498000004,
+        0.0,
+        0.92
+      ],
+      "orientation_xyzw": [
+        0.7071067811865477,
+        0.0,
+        -0.7071067811865475,
+        0.0
+      ]
+    },
+    "LIFT": {
+      "position_m": [
+        0.48387371498000004,
+        0.0,
+        1.1
+      ],
+      "orientation_xyzw": [
+        0.7071067811865477,
+        0.0,
+        -0.7071067811865475,
+        0.0
+      ]
+    }
+  },
+  "local_size_m": [
+    0.182334163,
+    0.181833528,
+    0.011091216
+  ],
+  "center_in_body_m": [
+    0.0,
+    0.0,
+    0.0
+  ],
+  "object_aabb_top_z": 0.9255456080000001,
+  "object_aabb_bottom_z": 0.914454392,
+  "grasp_tcp_z": 0.92,
+  "lift_tcp_z": 1.1,
+  "grasp_to_top_m": -0.005545608000000035,
+  "lift_delta_m": 0.18000000000000005,
+  "static_failures": [],
+  "static_basis": "EXPECTED_SIZE_SYNTHETIC_POSE",
+  "simulation_started": true,
+  "grasp_attempted": true,
+  "seed": 0,
+  "stages": {
+    "failure": "plate: PLAN_PRE_CLEARANCE: IK_FAILED: PRE_CLEARANCE no full-pose IK solution converged from deterministic seeds"
+  },
+  "camera": "agentview",
+  "result": {
+    "status": "FAILED",
+    "failure_stage": "PLAN_PRE_CLEARANCE",
+    "failure_reason": "IK_FAILED: PRE_CLEARANCE no full-pose IK solution converged from deterministic seeds",
+    "error_type": "GraspFailure",
+    "attachment_used": false,
+    "hand_model_correction": {
+      "policy": "TENDON_REFERENCE_ALIGNED_TO_DECLARED_REST_AND_INIT",
+      "couplings": [
+        {
+          "name": "gripper0_right_thumb_cpl",
+          "reference_length": 0.6400000000000001,
+          "rest_length": 0.2,
+          "polycoef_constant": -0.4400000000000001,
+          "before": {
+            "name": "gripper0_right_thumb_cpl",
+            "tendon1": "gripper0_right_thumb_cpl"
+          },
+          "after": {
+            "name": "gripper0_right_thumb_cpl",
+            "tendon1": "gripper0_right_thumb_cpl",
+            "polycoef": "-0.44 1 0 0 0",
+            "solref": "0.004 1"
+          }
+        },
+        {
+          "name": "gripper0_right_index_12_cpl",
+          "reference_length": 0.6400000000000001,
+          "rest_length": 0.2,
+          "polycoef_constant": -0.4400000000000001,
+          "before": {
+            "name": "gripper0_right_index_12_cpl",
+            "tendon1": "gripper0_right_index_12_cpl"
+          },
+          "after": {
+            "name": "gripper0_right_index_12_cpl",
+            "tendon1": "gripper0_right_index_12_cpl",
+            "polycoef": "-0.44 1 0 0 0",
+            "solref": "0.004 1"
+          }
+        },
+        {
+          "name": "gripper0_right_pinky_12_cpl",
+          "reference_length": 0.6400000000000001,
+          "rest_length": 0.2,
+          "polycoef_constant": -0.4400000000000001,
+          "before": {
+            "name": "gripper0_right_pinky_12_cpl",
+            "tendon1": "gripper0_right_pinky_12_cpl"
+          },
+          "after": {
+            "name": "gripper0_right_pinky_12_cpl",
+            "tendon1": "gripper0_right_pinky_12_cpl",
+            "polycoef": "-0.44 1 0 0 0",
+            "solref": "0.004 1"
+          }
+        }
+      ],
+      "joint_limit_timeconstant_s": 0.002,
+      "joint_ranges_changed": false,
+      "mass_or_friction_changed": false,
+      "joint_limit_impedance": [
+        0.9999,
+        0.9999,
+        0.001,
+        0.5,
+        2
+      ],
+      "joint_armature_kg_m2": 0.0001,
+      "source_assets_changed": false,
+      "minimum_proximal_command_rad": 0.0
+    }
+  },
+  "failure_category": "MOTION_OR_GRASP"
+}

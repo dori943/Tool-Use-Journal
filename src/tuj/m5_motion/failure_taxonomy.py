@@ -94,6 +94,19 @@ def _last_failed_step(steps: Iterable[Mapping[str, Any]] | None) -> Mapping[str,
     return failed[-1] if failed else None
 
 
+# 외부 API 일시 장애: 실험 조건과 무관하므로 계획/실행 실패로 세지 않고 재실행 대상으로 둔다.
+_INFRA_PATTERN = re.compile(
+    r"API_UNAVAILABLE|HTTP (?:408|429|500|502|503|504)\b|high demand|overloaded|"
+    r"RESOURCE_EXHAUSTED|rate[ _]limit|too many requests|"
+    r"\b(?:APIConnectionError|APITimeoutError|RateLimitError|InternalServerError)\b",
+    re.IGNORECASE,
+)
+
+
+def is_infrastructure_failure(text: str | None) -> bool:
+    return bool(text) and bool(_INFRA_PATTERN.search(str(text)))
+
+
 def classify_failure(
     detail: str | None,
     *,
@@ -103,6 +116,7 @@ def classify_failure(
     """실패 메시지(+ live manifest 의 steps)로 단계/코드를 결정한다.
 
     우선순위
+      -1. 외부 API 일시 장애(API_UNAVAILABLE, HTTP 429/5xx, high demand …) → infrastructure
       0. 실행 후 배치 검사 코드 → goal (물리 원인 여부는 별도 증거로 판단)
       1. 마지막 FAILED step 이 어댑터 실행까지 갔으면(`execution_status`) → execution
       2. 마지막 FAILED step 의 route 가 SCRIPTED_GRASP 이면 (live 시뮬에서 직접 파지) → execution
@@ -126,7 +140,10 @@ def classify_failure(
     stage: str
     basis: str
     placement_code = next((code for code in codes if code in POST_EXECUTION_GOAL_CODES), None)
-    if placement_code is not None:
+    infra = is_infrastructure_failure(combined)
+    if infra:
+        stage, basis = "infrastructure", "api_unavailable"
+    elif placement_code is not None:
         stage, basis = "goal", "post_execution_placement_check"
     elif step is not None and step.get("execution_status") not in (None, "SUCCESS"):
         stage, basis = "execution", "step.execution_status"
@@ -141,7 +158,7 @@ def classify_failure(
     else:
         stage, basis = "planning", "default"
 
-    code = placement_code or (physics[0] if physics else (next((c for c in codes if c not in EXECUTION_ERROR_TYPES
+    code = "API_UNAVAILABLE" if infra else placement_code or (physics[0] if physics else (next((c for c in codes if c not in EXECUTION_ERROR_TYPES
                                               and c not in PLANNING_ERROR_TYPES), None)))
     return {
         "failure_stage": stage,

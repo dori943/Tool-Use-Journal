@@ -1,0 +1,719 @@
+# -*- coding: utf-8 -*-
+"""M2-1 — 서브골 분해 + 서브골별 객체 선택 (LLM 2회 호출, 0821 결정).
+
+  1차 호출  자연어 task + M1 노드 → planning-level 서브골 분해
+  2차 호출  서브골별로 장면 노드 중 관련 객체 선택 (object_ids)
+            도구가 필요한 서브골이면 도구로 쓸 물체를 tool_candidate_ids로 선별
+            선택 이유를 selection_reason에 남긴다
+
+모든 id는 M1 노드 id 중에서만 고른다 (새 이름 생성 금지). 호출마다 검문 + 1회 재시도.
+
+구현체
+  LLMRough       기본 경로 (GEMINI_API_KEY 또는 OPENAI_API_KEY — TUJ_LLM_PROVIDER 로 선택)
+  TemplateRough  결정론 폴백 — 태스크 키워드 + class→역할 규칙표. 회귀·테스트용.
+
+출력 스키마 (두 구현체 공통, 최소):
+  [{"subgoal_id", "goal",                       # goal: G_k에 실리는 한 줄 (← M2)
+    "kind": relocate | sweep_collect | flatten | stack | scoop_transfer | extract,
+    "target_ids": [...], "container_id": str|None,
+    "tool_candidate_ids": [...]}]               # 도구 후보만 나열 — 선택은 M4
+"""
+from __future__ import annotations
+
+import json
+import os
+import re
+import time
+
+from .core import TOOL_KINDS
+
+
+_FOOD_MARKERS = ("bread", "fruit", "food")
+_PLATE_MARKERS = ("plate",)
+_TRAY_MARKERS = ("tray",)
+_UTENSIL_MARKERS = ("plate", "mug", "fork", "spoon", "cup", "bowl")
+
+
+def _id_has(nid: str, markers: tuple[str, ...]) -> bool:
+    low = nid.lower()
+    return any(m in low for m in markers)
+
+
+def _pair_letter(nid: str) -> str | None:
+    """obj_fork_a_fork_a / tray_b → 'a'/'b'. 페어 접미사가 없으면 None."""
+    m = re.search(r"_([ab])(?:_|$)", nid.lower())
+    return m.group(1) if m else None
+
+
+def _matching_id(ids: list[str], markers: tuple[str, ...], letter: str | None) -> str | None:
+    cands = [i for i in ids if _id_has(i, markers)]
+    if letter is not None:
+        paired = [i for i in cands if _pair_letter(i) == letter]
+        if paired:
+            return paired[0]
+    return cands[0] if len(cands) == 1 else None
+
+
+def _task_wants_food_on_plate(task: str) -> bool:
+    t = task.lower()
+    return (
+        ("접시" in task or "plate" in t)
+        and ("위" in task or "올려" in task or " on " in f" {t} " or t.startswith("on "))
+    )
+
+
+def _task_wants_paired_trays(task: str) -> bool:
+    return any(
+        k in task
+        for k in ("각 트레이", "두 트레이", "같은 구성", "each tray", "both trays", "two trays")
+    ) or ("tray" in task.lower() and ("각" in task or "두" in task or "both" in task.lower() or "each" in task.lower()))
+
+
+def _repair_destination_bindings(subs: list[dict], ids: list[str], task: str) -> None:
+    """약한 모델이 자주 틀리는 목적지 바인딩을 태스크 단서가 있을 때만 고친다.
+
+    - 음식→tray 인데 '접시 위' 지시 → 같은 짝의 plate로
+    - 식기→tray 짝 불일치 / 한쪽 tray로 몰림 → 짝 tray로
+    - 빵·과일만 plate 위에 stack → relocate (나란히 올리기)
+    """
+    if not task:
+        return
+    food_on_plate = _task_wants_food_on_plate(task)
+    paired_trays = _task_wants_paired_trays(task)
+    plates = [i for i in ids if _id_has(i, _PLATE_MARKERS)]
+    trays = [i for i in ids if _id_has(i, _TRAY_MARKERS)]
+
+    for s in subs:
+        targets = list(s.get("target_ids") or [])
+        cid = s.get("container_id")
+        if not targets:
+            continue
+
+        if food_on_plate and cid and plates and _id_has(cid, _TRAY_MARKERS):
+            food_targets = [t for t in targets if _id_has(t, _FOOD_MARKERS)]
+            if food_targets and all(_id_has(t, _FOOD_MARKERS) for t in targets):
+                letter = _pair_letter(food_targets[0])
+                plate = _matching_id(ids, _PLATE_MARKERS, letter)
+                if plate is None:
+                    raise ValueError(
+                        f"{s.get('subgoal_id')}: 빵/과일을 tray({cid})로 보냈지만 "
+                        "태스크는 접시 위를 요구한다. container_id를 짝 plate로 바꿔라."
+                    )
+                s["container_id"] = plate
+                cid = plate
+
+        if food_on_plate and cid and _id_has(cid, _PLATE_MARKERS):
+            food_targets = [t for t in targets if _id_has(t, _FOOD_MARKERS)]
+            if food_targets and all(_id_has(t, _FOOD_MARKERS) for t in targets):
+                letters = {_pair_letter(t) for t in food_targets}
+                letters.discard(None)
+                if len(letters) > 1:
+                    raise ValueError(
+                        f"{s.get('subgoal_id')}: 빵/과일을 한 plate({cid})에 "
+                        f"짝이 다른 대상 {food_targets}로 묶었다. "
+                        "plate_a/plate_b에 맞춰 서브골을 나눠라."
+                    )
+                want = _matching_id(
+                    ids, _PLATE_MARKERS, next(iter(letters)) if letters else None
+                )
+                if want and want != cid:
+                    s["container_id"] = want
+                    cid = want
+
+        # 나란히 올리기: 음식만 plate 위에 stack이면 relocate로 강등
+        # (목적지 교정 이후에 판정 — tray로 나왔다가 plate로 고쳐진 경우 포함)
+        if (
+            s.get("kind") == "stack"
+            and cid
+            and _id_has(cid, _PLATE_MARKERS)
+            and all(_id_has(t, _FOOD_MARKERS) for t in targets)
+        ):
+            s["kind"] = "relocate"
+            s["ordered"] = False
+
+        if paired_trays and cid and len(trays) >= 2 and _id_has(cid, _TRAY_MARKERS):
+            utensil_targets = [
+                t for t in targets
+                if _id_has(t, _UTENSIL_MARKERS) and not _id_has(t, _FOOD_MARKERS)
+            ]
+            if not utensil_targets:
+                continue
+            # 대상 짝 글자와 tray 짝 글자가 다르면 교정
+            letters = {_pair_letter(t) for t in utensil_targets}
+            letters.discard(None)
+            if len(letters) == 1:
+                want = _matching_id(ids, _TRAY_MARKERS, next(iter(letters)))
+                if want and want != cid:
+                    s["container_id"] = want
+            elif len(letters) > 1 and _pair_letter(cid) is not None:
+                # a/b를 한 서브골·한 tray로 묶은 경우 — 재시도로 분리 유도
+                raise ValueError(
+                    f"{s.get('subgoal_id')}: 두 트레이 태스크인데 "
+                    f"짝이 다른 식기 {utensil_targets}를 한 container({cid})로 묶었다. "
+                    "tray_a/tray_b에 맞춰 서브골을 나눠라."
+                )
+
+
+class TemplateRough:
+    """결정론 서브골 생성. category_map: class → container id (분류형 태스크용)."""
+
+    name = "template"
+
+    def __init__(self, category_map: dict | None = None):
+        self.category_map = category_map or {}
+
+    def generate(self, task: str, m1: dict) -> list[dict]:
+        nodes = m1["nodes"]
+        ids = [n["id"] for n in nodes]
+
+        def by_class(*keys):
+            return [n["id"] for n in nodes if any(k in n["class"] for k in keys)]
+
+        # ── 수거/쓸기형: "쓸어" / "sweep" ──
+        if ("쓸어" in task) or ("sweep" in task.lower()):
+            blocks = by_class("block", "lego")
+            zone = (by_class("collection", "zone", "tray") or [None])[0]
+            tools = by_class("plate", "board", "bottle")   # 후보만 — 적합성은 M3, 선택은 M4
+            return [{
+                "subgoal_id": "SG1",
+                "goal": f"흩어진 블록 {len(blocks)}개를 {zone}로 쓸어 담는다",
+                "kind": "sweep_collect",
+                "target_ids": blocks,
+                "container_id": zone,
+                "tool_candidate_ids": tools,
+            }]
+
+        # ── 분류/운반형: category_map이 주어진 경우 ──
+        if self.category_map:
+            out, i = [], 0
+            for n in nodes:
+                dest = self.category_map.get(n["class"])
+                if dest is None:
+                    continue
+                i += 1
+                out.append({
+                    "subgoal_id": f"SG{i}",
+                    "goal": f"{n['id']}를 {dest}로 옮긴다",
+                    "kind": "relocate",
+                    "target_ids": [n["id"]],
+                    "container_id": dest,
+                    "tool_candidate_ids": [],
+                })
+            if out:
+                return out
+
+        raise ValueError(f"TemplateRough가 처리 못 하는 task: {task!r} — LLMRough 사용 또는 규칙 추가")
+
+
+PROMPT = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 분해하라.
+
+태스크: {task}
+장면 노드 id: {ids}
+장면 관계 (on(A, B) = A가 B 위에 놓여 있음, inside(A, B) = A가 B 안에 있음):
+{relations}
+
+규칙:
+- 서브골은 로봇 세부 동작이 아니라 의미 단위 작업이다.
+- 위에 다른 물체가 놓인 물체(on(X, Y)의 Y)는 X를 먼저 치우기 전엔 집을 수 없다.
+  stack에서는 지금 노출된 물체부터 집을 수 있게 순서를 정하고, 밑에 깔린 물체를
+  바닥(첫 target 또는 container)으로 삼지 않는다.
+- 뚜껑을 덮거나 물체를 다른 물체 위에 얹는 것은 stack이다
+  (target_ids=[얹을 물체], container_id=받침). relocate의 target_ids에 섞지 않는다.
+- 단 stack은 위로 층을 쌓는 것이라 target_ids 순서가 아래에서 위다. 여러 물체를
+  같은 받침 위에 나란히 올리는 것(예: 접시 하나에 빵과 과일)은 서로 얹는 것이
+  아니므로 stack이 아니라 relocate이고, container_id를 그 받침으로 둔다.
+- 목적지(container_id)는 지시문의 받침/용기를 따른다. "접시 위에 올려라"면
+  빵·과일의 container_id는 tray가 아니라 plate다. "각 트레이"/"두 트레이를
+  같은 구성"이면 plate/mug/fork/spoon 등 식기는 짝(_a↔tray_a, _b↔tray_b)에
+  맞게 넣고, 한쪽 tray로 몰지 않는다.
+- 태스크에 명시된 목표만 서브골로 만든다. 태스크에 없는 목표(예: 장애물 치우기,
+  정리하기)를 발명하지 않는다.
+- "도구를 골라", "~를 써서", "~로" 처럼 수행 수단을 가리키는 어구는 목표가 아니다.
+  그런 어구에서 별도 서브골을 만들지 않는다. 무엇을 수단으로 쓸지는 뒤 단계가 정한다.
+- 랙(rack) 노드는 엔드이펙터 거치대다. 어떤 서브골의 container_id로도 쓰지 않는다.
+- target_ids / container_id / tool_candidate_ids 에는 위 노드 id만 쓴다.
+- 도구를 '선택'하지 말라. 후보만 나열한다 (선택은 뒤 모듈이 한다).
+- kind는 relocate(옮기기), sweep_collect(모아 담기), flatten(평평하게 펴기),
+  stack(쌓기 — target_ids 순서가 곧 쌓는 순서, 아래→위), scoop_transfer(일부를 떠서 옮기기),
+  extract(좁은 틈에서 빼내기) 중 하나.
+- kind는 지시문의 동사 표현이 아니라 장면 구성과 물리적 제약을 근거로 고른다.
+  직전 계획 평가가 아래에 주어진 경우, 평가에서 실행 불가로 드러난 제약을
+  해소하지 못하는 분해는 무효다. 단 지시문이 요구하는 최종 상태(펴기, 담기, 쌓기,
+  꺼내기)는 재분해에서도 바뀌면 안 된다. 바꾸는 것은 수행 방식, 도구 후보, 순서다.
+- kind와 무관하게, 같은 목적지로 가는 대상 전체를 서브골 하나의 target_ids에 담는다.
+  대상별로 쪼개지 않는다. 몇 그룹으로 나눠 처리할지는 뒤 모듈이 측정값을 보고 정한다.
+- 도구는 여기서 다루지 않는다. 도구 선별은 다음 단계(객체 선택)가 한다.
+- goal은 한국어 한 문장으로 쓴다.
+- confidence: 이 서브골 분해가 옳다는 확신을 0.0~1.0으로 매긴다. 지금은 물체의
+  질량·재질·파지 가능 여부 등 측정값이 없는 상태다. 근거 없이 후하게 주지 말 것.
+  (0.9 이상 = 거의 확실 / 0.7 = 대체로 확신 / 0.5 = 반반 / 0.3 = 실패 가능성 높음)
+- ordered: 지시문이 대상들을 처리하는 순서를 명시하는가 (예: 왼쪽부터, 순서대로,
+  큰 것부터). 순서 요구가 없으면 false. 순서 자체는 여기서 정하지 않는다 (뒤 단계가
+  장면 이미지를 보고 정한다).
+  최종 상태가 겹쳐 쌓인 형태인 태스크는 놓는 차례가 곧 아래에서 위로의 층이 되어
+  결과가 달라지므로 언제나 true다. 대상들이 서로의 위가 아니라 같은 목적지 하나로
+  간다고 적더라도 마찬가지다.
+- JSON 배열만 출력한다.
+
+출력 형식:
+[{{"subgoal_id":"SG1","goal":"...","kind":"relocate","target_ids":["..."],"container_id":"...","ordered":false,"confidence":0.0}}]"""
+
+
+PROMPT_SELECT = """너는 로봇 계획의 객체 선택 단계다. 각 서브골에 대해, 장면 노드 중
+그 서브골 수행에 관련된 객체를 선택하라.
+
+태스크: {task}
+장면 노드 (id: class):
+{nodes}
+장면 관계 (on(A, B) = A가 B 위에 놓여 있음, inside(A, B) = A가 B 안에 있음):
+{relations}
+
+서브골:
+{subgoals}
+
+규칙:
+- object_ids에는 이 서브골에서 물리·기하 추론이 필요한 객체만 담는다.
+  장면 노드를 전부 나열하는 것은 선택이 아니다.
+- 도구 후보(tool_candidate_ids)는 kind와 무관하게 항상 낸다. 대상(target_ids)도
+  목적지(container_id)도 아닌 장면 물체는 전부 담는 것이 기본이다 (object_ids에도 포함).
+  빼려면 uncertain_about에 그 물체를 뺀 이유를 적어라. 이유를 못 적겠으면 담아라.
+  용도 이름으로 판단하지 않는다. 접시/쟁반/뚜껑처럼 평소 용기로 쓰는 물체도 넓고
+  평평하면 쓸어 담는 도구가 되고, 병처럼 담는 물체도 원통이면 펴는 도구가 된다.
+  판단 근거는 이름이 아니라 형상이다.
+  단 로봇 설비는 후보가 아니다. 랙(rack), 영역/구역(zone), 거치대는 장면의 고정
+  설비라 집어서 쓸 수 없으므로 tool_candidate_ids 에 넣지 않는다.
+  너에게는 물체의 크기·질량 정보가 없다. 어느 것을 쓸지, 도구를 쓸지 말지의
+  최종 선택은 뒤 모듈이 측정값을 보고 한다.
+- kind가 relocate나 stack이면 대상과 목적지(받침)를 object_ids에 담는다 (들어가는지·놓이는지 판정에 필요).
+- 위 장면 노드 id만 쓴다. reason에 선택 이유를 한국어 한 문장으로 쓴다.
+- confidence: 이 객체 선택이 옳다는 확신을 0.0~1.0으로 매긴다. 지금은 물체의
+  질량·재질·파지 가능 여부 등 측정값이 없는 상태다. 근거 없이 후하게 주지 말 것.
+  (0.9 이상 = 거의 확실 / 0.7 = 대체로 확신 / 0.5 = 반반 / 0.3 = 실패 가능성 높음)
+- uncertain_about: 지금 가장 불확실한 요소 1~2개를 구체적으로 적는다.
+- JSON 배열만 출력한다.
+
+출력 형식:
+[{{"subgoal_id":"SG1","object_ids":["..."],"tool_candidate_ids":[],"reason":"...",
+  "confidence":0.0,"uncertain_about":["..."]}}]"""
+
+
+PROMPT_COMBINED = """로봇 매니퓰레이션 태스크를 planning-level 서브골로 분해하고,
+각 서브골에서 다룰 객체 선택까지 한 번에 수행하라.
+
+태스크: {task}
+장면 노드 (id: class):
+{nodes}
+장면 관계 (on(A, B) = A가 B 위에 놓여 있음, inside(A, B) = A가 B 안에 있음):
+{relations}
+
+분해 규칙:
+- 서브골은 로봇 세부 동작이 아니라 의미 단위 작업이다.
+- 위에 다른 물체가 놓인 물체(on(X, Y)의 Y)는 X를 먼저 치우기 전엔 집을 수 없다.
+  stack에서는 지금 노출된 물체부터 집을 수 있게 순서를 정하고, 밑에 깔린 물체를
+  바닥(첫 target 또는 container)으로 삼지 않는다.
+- 뚜껑을 덮거나 물체를 다른 물체 위에 얹는 것은 stack이다
+  (target_ids=[얹을 물체], container_id=받침). relocate의 target_ids에 섞지 않는다.
+- 단 stack은 위로 층을 쌓는 것이라 target_ids 순서가 아래에서 위다. 여러 물체를
+  같은 받침 위에 나란히 올리는 것(예: 접시 하나에 빵과 과일)은 서로 얹는 것이
+  아니므로 stack이 아니라 relocate이고, container_id를 그 받침으로 둔다.
+- 목적지(container_id)는 지시문의 받침/용기를 따른다. "접시 위에 올려라"면
+  빵·과일의 container_id는 tray가 아니라 plate다. "각 트레이"/"두 트레이를
+  같은 구성"이면 plate/mug/fork/spoon 등 식기는 짝(_a↔tray_a, _b↔tray_b)에
+  맞게 넣고, 한쪽 tray로 몰지 않는다.
+- 태스크에 명시된 목표만 서브골로 만든다. 태스크에 없는 목표(예: 장애물 치우기,
+  정리하기)를 발명하지 않는다.
+- "도구를 골라", "~를 써서", "~로" 처럼 수행 수단을 가리키는 어구는 목표가 아니다.
+  그런 어구에서 별도 서브골을 만들지 않는다. 무엇을 수단으로 쓸지는 뒤 단계가 정한다.
+- 랙(rack) 노드는 엔드이펙터 거치대다. 어떤 서브골의 container_id로도 쓰지 않는다.
+- target_ids / container_id / tool_candidate_ids / object_ids 에는 위 노드 id만 쓴다.
+- kind는 relocate(옮기기), sweep_collect(모아 담기), flatten(평평하게 펴기),
+  stack(쌓기 — target_ids 순서가 곧 쌓는 순서, 아래→위), scoop_transfer(일부를 떠서 옮기기),
+  extract(좁은 틈에서 빼내기) 중 하나.
+- kind는 지시문의 동사 표현이 아니라 장면 구성과 물리적 제약을 근거로 고른다.
+  직전 계획 평가가 아래에 주어진 경우, 평가에서 실행 불가로 드러난 제약을
+  해소하지 못하는 분해는 무효다. 단 지시문이 요구하는 최종 상태(펴기, 담기, 쌓기,
+  꺼내기)는 재분해에서도 바뀌면 안 된다. 바꾸는 것은 수행 방식, 도구 후보, 순서다.
+- kind와 무관하게, 같은 목적지로 가는 대상 전체를 서브골 하나의 target_ids에 담는다.
+  대상별로 쪼개지 않는다. 몇 그룹으로 나눠 처리할지는 뒤 모듈이 측정값을 보고 정한다.
+- goal은 한국어 한 문장으로 쓴다.
+
+선택 규칙:
+- object_ids에는 이 서브골에서 물리·기하 추론이 필요한 객체만 담는다.
+  장면 노드를 전부 나열하는 것은 선택이 아니다.
+- 도구 후보(tool_candidate_ids)는 kind와 무관하게 항상 낸다. 대상(target_ids)도
+  목적지(container_id)도 아닌 장면 물체는 전부 담는 것이 기본이다 (object_ids에도 포함).
+  빼려면 uncertain_about에 그 물체를 뺀 이유를 적어라. 이유를 못 적겠으면 담아라.
+  용도 이름으로 판단하지 않는다. 접시/쟁반/뚜껑처럼 평소 용기로 쓰는 물체도 넓고
+  평평하면 쓸어 담는 도구가 되고, 병처럼 담는 물체도 원통이면 펴는 도구가 된다.
+  판단 근거는 이름이 아니라 형상이다.
+  단 로봇 설비는 후보가 아니다. 랙(rack), 영역/구역(zone), 거치대는 장면의 고정
+  설비라 집어서 쓸 수 없으므로 tool_candidate_ids 에 넣지 않는다.
+  너에게는 물체의 크기·질량 정보가 없다. 어느 것을 쓸지, 도구를 쓸지 말지의
+  최종 선택은 뒤 모듈이 측정값을 보고 한다.
+- kind가 relocate나 stack이면 대상과 목적지(받침)를 object_ids에 담는다 (들어가는지·놓이는지 판정에 필요).
+- reason에 선택 이유를 한국어 한 문장으로 쓴다.
+- confidence: 분해와 객체 선택 각각의 확신을 0.0~1.0으로 매긴다. 지금은 물체의
+  질량·재질·파지 가능 여부 등 측정값이 없는 상태다. 근거 없이 후하게 주지 말 것.
+  (0.9 이상 = 거의 확실 / 0.7 = 대체로 확신 / 0.5 = 반반 / 0.3 = 실패 가능성 높음)
+- uncertain_about: 지금 가장 불확실한 요소 1~2개를 구체적으로 적는다.
+- JSON 배열만 출력한다.
+
+출력 형식:
+[{{"subgoal_id":"SG1","goal":"...","kind":"relocate","target_ids":["..."],"container_id":"...",
+  "object_ids":["..."],"tool_candidate_ids":[],"reason":"...",
+  "confidence":{{"decomposition":0.0,"object_selection":0.0}},"uncertain_about":["..."]}}]"""
+
+
+PROMPT_ORDER = """이미지는 로봇 작업대를 카메라로 본 장면이다.
+지시문: {task}
+
+지시문이 요구하는 처리 순서대로 아래 물체들을 나열하라. 물체는 이미지에서 종류(class)로
+식별한다. 방향(왼쪽, 오른쪽, 앞, 뒤)은 이 이미지 기준이다.
+물체 (id: class):
+{nodes}
+
+규칙:
+- 위 id를 전부 정확히 한 번씩 포함한 배열을 낸다. 새 id를 만들지 않는다.
+- reason에 어떤 기준으로 정렬했는지 한국어 한 문장.
+- JSON 객체만 출력한다.
+
+출력 형식:
+{{"order": ["..."], "reason": "..."}}"""
+
+
+def _image_part(path: str) -> dict:
+    """frame.png → OpenAI 호환 image_url 파트 (Gemini 호환 엔드포인트도 같은 형식)."""
+    import base64
+    with open(path, "rb") as f:
+        b64 = base64.b64encode(f.read()).decode()
+    return {"type": "image_url", "image_url": {"url": f"data:image/png;base64,{b64}"}}
+
+
+def track_usage(acc: dict, stage: str, response, seconds: float = 0.0) -> None:
+    """OpenAI 응답의 usage와 소요 시간을 단계별로 누적한다. usage가 없으면 무시."""
+    u = getattr(response, "usage", None)
+    if u is None:
+        return
+    e = acc.setdefault(stage, {"calls": 0, "prompt_tokens": 0,
+                               "completion_tokens": 0, "tokens": 0, "seconds": 0.0})
+    e["calls"] += 1
+    e["prompt_tokens"] += getattr(u, "prompt_tokens", 0) or 0
+    e["completion_tokens"] += getattr(u, "completion_tokens", 0) or 0
+    e["tokens"] += getattr(u, "total_tokens", 0) or 0
+    e["seconds"] = round(e.get("seconds", 0.0) + seconds, 2)
+
+
+def _check_conf(v, where: str):
+    """자기보고 신뢰도 검문 — 0.0~1.0 숫자여야 한다."""
+    if not isinstance(v, (int, float)) or isinstance(v, bool) or not 0.0 <= v <= 1.0:
+        raise ValueError(f"{where}: confidence가 0~1 숫자가 아님 ({v!r})")
+
+
+def validate_subgoals(subs: list[dict], ids: list[str], task: str = "") -> list[dict]:
+    """LLM 출력 검문 + 정규화. 프롬프트는 지시, 여기는 검문 — 둘 다 있어야 안전하다.
+
+    검사: 장면에 없는 id / sweep_collect의 빈 도구 후보 → ValueError (호출부가 재시도)
+    정규화: 태스크 단서 기반 목적지 보정(약한 모델 보정) 후 같은 (kind, 목적지) 병합,
+            subgoal_id 재부여
+    (0828: relocate 물체당 강제 분리 제거 — 분할은 측정 후 regroup이 한다)
+    """
+    known = set(ids)
+    for s in subs:
+        bad = [x for x in s.get("target_ids", []) if x not in known]
+        cid = s.get("container_id")
+        if cid is not None and cid not in known:
+            bad.append(cid)
+        bad += [x for x in s.get("tool_candidate_ids", []) if x not in known]
+        if bad:
+            raise ValueError(f"장면에 없는 id: {bad}")
+        _check_conf(s.get("confidence"), f"{s.get('subgoal_id')} 분해")
+
+    out = []
+    for s in subs:
+        s.setdefault("container_id", None)
+        s.setdefault("tool_candidate_ids", [])
+        # 0908: 순서 요구 여부 (VLM 순서 판정 게이트). stack은 프롬프트가 이미
+        # "target_ids 순서가 곧 쌓는 순서"로 정의하므로 순서가 없을 수 없다.
+        s["ordered"] = bool(s.get("ordered", False)) or s.get("kind") == "stack"
+        out.append(s)   # 0828: relocate 물체당 강제 분리 제거 — 분할은 측정 후 regroup이 한다
+
+    # mini 등이 목적지/kind를 자주 틀리므로, 태스크 문구가 분명할 때만 교정한다.
+    # 병합 전에 고쳐서 (kind, container) 키가 올바른 단위로 묶이게 한다.
+    _repair_destination_bindings(out, ids, task)
+
+    # 같은 (kind, 목적지) 서브골은 하나로 합친다. 분해 시점에는 목적지 단위로만 묶고,
+    # 몇 그룹으로 나눠 처리할지는 측정(batch 질의) 후 regroup이 정한다 (0828 결정).
+    merged, by_dst = [], {}
+    for s in out:
+        key = (s.get("kind"), s.get("container_id"))
+        if key in by_dst:
+            t = by_dst[key]
+            t["target_ids"] += [x for x in s["target_ids"] if x not in t["target_ids"]]
+            t["tool_candidate_ids"] += [x for x in s["tool_candidate_ids"]
+                                        if x not in t["tool_candidate_ids"]]
+            t["ordered"] = t.get("ordered", False) or s.get("ordered", False)
+            verb = {"sweep_collect": "쓸어 담는다", "flatten": "평평하게 편다",
+                    "stack": "쌓는다", "scoop_transfer": "떠서 옮긴다",
+                    "extract": "빼낸다"}.get(s.get("kind"), "옮긴다")
+            t["goal"] = f"대상 {len(t['target_ids'])}개를 {t['container_id']}로 {verb}"
+            continue
+        by_dst[key] = s
+        merged.append(s)
+    out = merged
+
+    for i, s in enumerate(out, 1):                  # 분리·병합 후 id 재부여 (중복 방지)
+        s["subgoal_id"] = f"SG{i}"
+    return out
+
+
+def validate_selection(sel: list[dict], subgoals: list[dict], ids: list[str]) -> dict:
+    """2차(객체 선택) 출력 검문. 통과 시 {subgoal_id: 선택 항목} 반환, 위반 시 ValueError.
+
+    tool_candidate_ids ⊆ object_ids 는 스키마 요구사항이지만, LLM이 후보만 내고
+    object_ids 표기를 빠뜨리는 경우가 있어 누락분은 object_ids에 합친다
+    (장면 id 여부는 아래에서 그대로 검문).
+    """
+    known = set(ids)
+    by_id = {}
+    for e in sel:
+        sid = e.get("subgoal_id")
+        objects = list(e.get("object_ids") or [])
+        tools = list(e.get("tool_candidate_ids") or [])
+        # Keep LLM order for object_ids; append any omitted tool candidates.
+        seen = set(objects)
+        for t in tools:
+            if t not in seen:
+                objects.append(t)
+                seen.add(t)
+        e["object_ids"] = objects
+        e["tool_candidate_ids"] = tools
+        bad = [x for x in objects + tools if x not in known]
+        if bad:
+            raise ValueError(f"{sid}: 장면에 없는 id {bad}")
+        _check_conf(e.get("confidence"), f"{sid} 객체 선택")
+        by_id[sid] = e
+    for s in subgoals:
+        e = by_id.get(s["subgoal_id"])
+        if e is None:
+            raise ValueError(f"{s['subgoal_id']}의 선택 항목이 없다. 서브골마다 하나씩 출력하라")
+        if s["kind"] in TOOL_KINDS:
+            cands = e.get("tool_candidate_ids", [])
+            if not cands:
+                raise ValueError(f"{s['subgoal_id']}({s['kind']}): 도구로 쓸 물체를 "
+                                 "tool_candidate_ids에 1개 이상 골라라")
+            if len(cands) == 1:
+                # 의미만으로 후보를 하나로 좁히는 것 방지 (0831 — 국자 단독 후보 사례):
+                # target/container/zone/rack을 뺀 물체가 장면에 남아 있으면 후보 확장을 요구한다.
+                # 확장된 후보의 적합성은 어차피 M3 측정(batch 그룹 수 등)이 가른다.
+                used = set(s.get("target_ids", [])) | {s.get("container_id")} | set(cands)
+                pool = sorted(i for i in known if i not in used
+                              and not i.startswith(("obj_zone_", "obj_rack_")))
+                if pool:
+                    raise ValueError(
+                        f"{s['subgoal_id']}({s['kind']}): 도구 후보가 {cands[0]} 하나뿐이다. "
+                        "너에게는 크기·질량 정보가 없으므로 이름의 의미만으로 후보를 좁히지 마라. "
+                        f"도구 가능성을 배제할 수 없는 물체를 후보에 추가하라: {pool}")
+    return by_id
+
+
+# ── LLM 제공자 선택 (0903) ────────────────────────────────────────────────
+# 개발/디버그 실행은 Gemini, 논문 실험 표는 OpenAI. 두 경우 모두 OpenAI SDK의
+# chat.completions 인터페이스를 그대로 쓴다 (Gemini는 OpenAI 호환 엔드포인트 제공).
+# 호출부(rough, ingest.update_confidence, run_m2)는 client 객체만 받으므로 바꿀 것 없음.
+#   TUJ_LLM_PROVIDER = gemini (기본) | openai
+#   TUJ_M2_MODEL     = 모델 id 강제 지정 (미지정 시 제공자별 기본값)
+#   GEMINI_API_KEY / OPENAI_API_KEY
+_GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1beta/openai/"
+_DEFAULT_MODEL = {"gemini": "gemini-3.6-flash", "openai": "gpt-4o"}
+
+
+def llm_provider() -> str:
+    p = os.environ.get("TUJ_LLM_PROVIDER", "gemini").lower()
+    if p not in _DEFAULT_MODEL:
+        raise ValueError(f"TUJ_LLM_PROVIDER={p!r}: gemini 또는 openai 만 지원")
+    return p
+
+
+def default_model() -> str:
+    return os.environ.get("TUJ_M2_MODEL") or _DEFAULT_MODEL[llm_provider()]
+
+
+def make_llm_client():
+    """제공자에 맞는 OpenAI SDK 클라이언트. 키가 없으면 어느 변수를 넣을지 바로 알려준다."""
+    from openai import OpenAI
+    if llm_provider() == "gemini":
+        key = os.environ.get("GEMINI_API_KEY")
+        if not key:
+            raise RuntimeError("GEMINI_API_KEY 가 없습니다 (TUJ_LLM_PROVIDER=openai 로 바꾸면 OPENAI_API_KEY 사용)")
+        return OpenAI(api_key=key, base_url=_GEMINI_BASE_URL)
+    if not os.environ.get("OPENAI_API_KEY"):
+        raise RuntimeError("OPENAI_API_KEY 가 없습니다")
+    return OpenAI()
+
+
+class LLMRough:
+    """LLM 2회 호출: 1차 서브골 분해 → 2차 서브골별 객체 선택 (0821 결정)."""
+
+    name = "llm"
+
+    def __init__(self, model: str | None = None):
+        self._client = None                     # 지연 생성 (테스트에서 키 없이 로드 가능)
+        self.model = model or default_model()
+        # 단계별 토큰 집계 (0828 — 랩미팅 지적: 호출 1회 통합 A/B의 비교 근거)
+        self.usage: dict[str, dict] = {}
+        # 직전 왕복의 측정 실패 요약 (0831 — 재분해 때 분해 프롬프트에 사실로 첨부.
+        # 호출 추가 없음: 어차피 불리는 2차 분해 호출의 입력만 풍부해진다)
+        self.feedback: str | None = None
+        # 0908: 순서 판정용 장면 이미지 경로 (run_m2가 output/<task>/frame.png 를 넣어준다).
+        # 순서를 요구하는 서브골(ordered)이 있을 때만 VLM 1회 호출. 없으면 VLM 0회.
+        self.frame_path: str | None = None
+
+    def _order_targets(self, task: str, s: dict, m1: dict) -> None:
+        """ordered 서브골의 target_ids를 VLM(frame.png)으로 지시문 순서에 맞게 정렬한다."""
+        ids = list(s.get("target_ids", []))
+        if len(ids) < 2 or not self.frame_path or not os.path.exists(self.frame_path):
+            return
+        cls = {n["id"]: n.get("class", "?") for n in m1["nodes"]}
+        node_lines = "\n".join(f"  {i}: {cls.get(i, '?')}" for i in ids)
+        prompt = PROMPT_ORDER.format(task=task, nodes=node_lines)
+        if self._client is None:
+            self._client = make_llm_client()
+        err = None
+        for attempt in (1, 2):
+            msg = prompt if attempt == 1 else prompt + f"\n\n이전 출력의 문제: {err}. 고쳐서 JSON 객체만 다시 출력하라."
+            t0 = time.monotonic()
+            r = self._client.chat.completions.create(
+                model=self.model, temperature=0,
+                messages=[{"role": "user", "content": [{"type": "text", "text": msg},
+                                                       _image_part(self.frame_path)]}])
+            track_usage(self.usage, "순서(VLM)", r, seconds=time.monotonic() - t0)
+            text = r.choices[0].message.content.strip()
+            try:
+                obj = json.loads(text[text.find("{"): text.rfind("}") + 1])
+                order = obj.get("order")
+                if not isinstance(order, list) or sorted(order) != sorted(ids):
+                    raise ValueError(f"order가 target_ids의 순열이 아님: {order!r} (기대 집합 {ids})")
+                s["target_ids"] = list(order)
+                s["target_order"] = {"source": "vlm", "reason": obj.get("reason", "")}
+                return
+            except (ValueError, json.JSONDecodeError) as e:
+                err = str(e)
+        # 실패해도 계획은 계속 — 순서 없이 진행하고 기록만 남긴다
+        s["target_order"] = {"source": "vlm_failed", "reason": err}
+
+    def _json_call(self, prompt: str, validate, stage: str):
+        """호출 → JSON 파싱 → 검문. 실패 시 오류를 붙여 1회 재시도."""
+        if self._client is None:
+            self._client = make_llm_client()
+        err = None
+        for attempt in (1, 2):
+            msg = prompt if attempt == 1 else prompt + f"\n\n이전 출력의 문제: {err}. 고쳐서 JSON 배열만 다시 출력하라."
+            t0 = time.monotonic()
+            r = self._client.chat.completions.create(
+                model=self.model, temperature=0,
+                messages=[{"role": "user", "content": msg}])
+            track_usage(self.usage, stage, r, seconds=time.monotonic() - t0)
+            text = r.choices[0].message.content.strip()
+            try:
+                parsed = json.loads(text[text.find("["): text.rfind("]") + 1])
+                return validate(parsed)
+            except (ValueError, json.JSONDecodeError) as e:
+                err = str(e)
+        raise ValueError(f"LLM {stage} 2회 실패: {err}")
+
+    def generate(self, task, m1):
+        ids = [n["id"] for n in m1["nodes"]]
+        node_lines = "\n".join(f"  {n['id']}: {n.get('class', '?')}" for n in m1["nodes"])
+        # 0908: M1의 on/inside 관계를 프롬프트에 넣는다. 없으면 LLM이 밑에 깔린 물체를
+        # 바닥으로 고르는 등(c2_2: bread_b 아래의 bread_a를 1층으로) 장면 상태를 모른다.
+        # near/overlaps는 노이즈라 제외.
+        rel_lines = "\n".join(f"  {e['type']}({e['from']}, {e['to']})"
+                              for e in m1.get("edges", []) if e.get("type") in ("on", "inside"))
+        self._relations = rel_lines or "  (없음)"
+
+        # ── 실험 모드 (0828, 랩미팅 지적): TUJ_M2_SINGLE_CALL=1 이면
+        #    분해+선택을 1회 호출로 통합. 검문은 기존 2단 검문을 그대로 재사용.
+        if os.environ.get("TUJ_M2_SINGLE_CALL") == "1":
+            subgoals = self._generate_single(task, ids, node_lines)
+            self._apply_order(task, subgoals, m1)
+            return subgoals
+
+        # 1차 — 서브골 분해 (직전 측정 피드백이 있으면 사실로 첨부)
+        base = PROMPT.format(task=task, ids=", ".join(ids), relations=self._relations)
+        if self.feedback:
+            base += "\n\n" + self.feedback
+        subgoals = self._json_call(
+            base, lambda subs: validate_subgoals(subs, ids, task=task), "서브골 분해")
+
+        # 2차 — 서브골별 객체 선택 (도구로 쓸 물체 선별 포함)
+        brief = [{"subgoal_id": s["subgoal_id"], "goal": s["goal"], "kind": s["kind"],
+                  "target_ids": s["target_ids"], "container_id": s["container_id"]}
+                 for s in subgoals]
+        sel = self._json_call(
+            PROMPT_SELECT.format(task=task, nodes=node_lines, relations=self._relations,
+                                 subgoals=json.dumps(brief, ensure_ascii=False, indent=2)),
+            lambda x: validate_selection(x, subgoals, ids), "객체 선택")
+
+        for s in subgoals:
+            e = sel[s["subgoal_id"]]
+            s["object_ids"] = e["object_ids"]
+            s["tool_candidate_ids"] = e.get("tool_candidate_ids", [])
+            s["selection_reason"] = e.get("reason", "")
+            # 생성 시점 자기보고 신뢰도 (측정값 없는 상태). M3 반영 후 갱신은 ingest가 채운다.
+            s["confidence"] = {
+                "before": {"decomposition": s.pop("confidence", None),
+                           "object_selection": e.get("confidence"),
+                           "uncertain_about": e.get("uncertain_about", [])},
+            }
+        self._apply_order(task, subgoals, m1)
+        return subgoals
+
+    def _apply_order(self, task, subgoals, m1):
+        # 0908: 순서 요구가 있는 relocate 서브골만 VLM으로 정렬 (도희 0905 요청 —
+        # M1 좌→우 정렬 규칙 대신 frame.png를 보고 판단, 순서 없는 태스크는 VLM 미호출).
+        for s in subgoals:
+            if s.get("ordered") and s.get("kind") in {"relocate", "stack"}:
+                self._order_targets(task, s, m1)
+
+    def _generate_single(self, task, ids, node_lines):
+        """실험: 분해+선택 통합 1회 호출. 출력 구조는 2회 호출과 동일하게 맞춘다."""
+        def validate(parsed):
+            for e in parsed:
+                conf = e.get("confidence") or {}
+                if not isinstance(conf, dict):
+                    raise ValueError(f"{e.get('subgoal_id')}: confidence는 "
+                                     "{decomposition, object_selection} 객체여야 한다")
+                _check_conf(conf.get("decomposition"), f"{e.get('subgoal_id')} 분해")
+                _check_conf(conf.get("object_selection"), f"{e.get('subgoal_id')} 객체 선택")
+            # 기존 1차 검문 재사용 (confidence는 분해값을 숫자로 실어 통과시킨다)
+            subs = [dict(e, _conf=e.get("confidence") or {},
+                         confidence=(e.get("confidence") or {}).get("decomposition"))
+                    for e in parsed]
+            subs = validate_subgoals(subs, ids, task=task)
+            # 기존 2차 검문 재사용
+            sel = [{"subgoal_id": s["subgoal_id"],
+                    "object_ids": s.get("object_ids", []),
+                    "tool_candidate_ids": s.get("tool_candidate_ids", []),
+                    "reason": s.get("reason", ""),
+                    "confidence": s.get("_conf", {}).get("object_selection"),
+                    "uncertain_about": s.get("uncertain_about", [])}
+                   for s in subs]
+            validate_selection(sel, subs, ids)
+            return subs
+
+        subgoals = self._json_call(
+            PROMPT_COMBINED.format(task=task, nodes=node_lines,
+                                   relations=getattr(self, "_relations", "  (없음)"))
+            + ("\n\n" + self.feedback if self.feedback else ""),
+            validate, "통합(분해+선택)")
+        for s in subgoals:
+            conf = s.pop("_conf", {})
+            s["object_ids"] = s.get("object_ids", [])
+            s["selection_reason"] = s.pop("reason", "")
+            s.pop("confidence", None)
+            s["confidence"] = {
+                "before": {"decomposition": conf.get("decomposition"),
+                           "object_selection": conf.get("object_selection"),
+                           "uncertain_about": s.pop("uncertain_about", [])},
+            }
+        return subgoals

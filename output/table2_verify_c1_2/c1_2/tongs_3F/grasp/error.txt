@@ -1,0 +1,22 @@
+Traceback (most recent call last):
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 428, in execute_object
+    acquired,hold_opening,q=self._close_fingers_until_ready(q,opening,recipe)
+                            ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 287, in _close_fingers_until_ready
+    row=self.step(q,-1.);self.engage_feedback(row)
+        ^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 68, in step
+    if self.recipe.ee_id!='vac':return super().step(q,opening)
+                                       ^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\spoon_runtime.py", line 561, in step
+    self.player._advance_controller(action)
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\tool_use_journal_runtime.py", line 5207, in _advance_controller
+    self.runtime.finish_attachment_step()
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\context.py", line 180, in finish_audited
+    audit()
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\catalog_runtime.py", line 63, in audit_hand_range
+    if len(self.hand_joint_ids):return super().audit_hand_range()
+                                       ^^^^^^^^^^^^^^^^^^^^^^^^^^
+  File "C:\Users\user\Tool-Use-Journal\src\tuj\m5_motion\scripted_grasps\spoon_runtime.py", line 413, in audit_hand_range
+    raise GraspFailure(
+tuj.m5_motion.scripted_grasps.runtime.GraspFailure: GRIPPER_JOINT_LIMIT_EXCEEDED: physics substep 0.010124 rad (stage=CLOSE joint=gripper0_right_joint_index_distal lower q=-0.010124 range=[0.000000,2.000000] command=[-0.1593, -0.1791, -0.195] aperture_m=None)

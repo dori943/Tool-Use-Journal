@@ -44,12 +44,25 @@ def configure_environment(env, environment, ee):
     from tuj.m5_motion.tool_use_journal_runtime import tool_use_journal_joint_position_controller_config
 
     kitchen = environment != "C1_1_LegoSweep"
-    if not kitchen and ee not in {"3F", "vac"}:
+    # 2026-11-05 experiment: C1_1 2F also takes the corrected 2F linkage path
+    # (XML repair + joints zeroed after reset). The native early return left the
+    # Robotiq inner knuckle at -0.196 rad, outside [0, 0.876], so every C1_1 2F
+    # catalog grasp failed at PRESHAPE before touching the object.
+    # Undo without editing code: TUJ_C1_1_2F_LINKAGE_INIT=0 (backup and notes:
+    # backups/20261105_c1_1_2f_linkage/).
+    import os
+    c1_1_2f_linkage = os.environ.get("TUJ_C1_1_2F_LINKAGE_INIT", "1") != "0"
+    rebuilt_ees = {"3F", "vac"} | ({"2F"} if c1_1_2f_linkage else set())
+    if not kitchen and ee not in rebuilt_ees:
         # C1_1 already accepts the M5 joint controller during construction.
         # Reloading its robot model changes the calibrated hand/controller
         # initialization, so the native plate profile needs no rebuild.
+        correction = {"policy": "NATIVE_HAND", "source_assets_changed": False}
         env.scripted_grasp_profile = {"environment": environment, "ee": ee,
-            "correction": {"policy": "NATIVE_HAND", "source_assets_changed": False}}
+            "correction": correction}
+        # Catalog recipes (validator probes) read this in their result record;
+        # without it a C1_1 2F catalog grasp ends in AttributeError, not a verdict.
+        env.catalog_hand_correction = env.spoon_hand_correction = correction
         return env
     # 0911 충돌 해결: bare -> EE 랙 경로 캐시는 tabletop(ee_rack)과 부엌
     # (ee_rack_kitchen) 모두 BARE_HOME 에서 녹화돼 있다. 그래서 맨손으로
