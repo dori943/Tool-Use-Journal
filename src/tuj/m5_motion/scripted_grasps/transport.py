@@ -1232,20 +1232,31 @@ def _clear_finger_overhang(g, desired_xy):
     The object footprint can clear an occupant while the jaws, parked beside
     the payload, still reach that occupant. Shift away by the shortfall and
     stay inside the region.
+
+    Soft co-region platforms (plate/mug) are packing partners: M2 may seat a
+    utensil against their AABB, and seat search already treats them as soft.
+    Requiring full fingertip reach against those soft AABBs declares packed
+    trays exhausted even when only a plate is nearby. Lateral finger clearance
+    is enforced against hard (thin-strip) occupants; soft-partner misses stay
+    with collision-feedback lift/inset.
     """
 
     from tuj.m5_motion.grasp_geometry import multi_finger_finger_below_tcp_m
 
     if not _grip_beside_payload(g):
         return desired_xy
-    occupants = g._occupants()
-    if not occupants:
+    hard_occupants = [
+        (center, half, top, soft)
+        for center, half, top, soft in g._occupants()
+        if not soft
+    ]
+    if not hard_occupants:
         return desired_xy
     mine = np.asarray(g.half[:2], dtype=float)
     seat = np.asarray(desired_xy, dtype=float).reshape(2)
     nearest = None
     nearest_gap = None
-    for center, half, _top, _soft in occupants:
+    for center, half, _top, _soft in hard_occupants:
         gap = float(np.max(np.abs(seat - center) - (np.asarray(half, dtype=float) + mine)))
         if nearest_gap is None or gap < nearest_gap:
             nearest_gap = gap
@@ -1261,8 +1272,11 @@ def _clear_finger_overhang(g, desired_xy):
         current_xy=seat,
     )
     def fingers_clear(xy):
-        return all(float(np.max(np.abs(xy - center) - (np.asarray(half) + mine)))
-                   >= reach + margin - 1e-9 for center, half, _top, _soft in occupants)
+        return all(
+            float(np.max(np.abs(xy - center) - (np.asarray(half) + mine)))
+            >= reach + margin - 1e-9
+            for center, half, _top, _soft in hard_occupants
+        )
 
     if shifted is not None and g.seat_clear_of_occupants(shifted) and fingers_clear(shifted):
         return shifted

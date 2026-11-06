@@ -186,3 +186,24 @@ def test_finger_adjustment_cannot_fall_back_onto_another_occupant(monkeypatch):
         seat_clear_of_occupants=lambda xy: False)
     with pytest.raises(ValueError, match='PLACEMENT_FINGER_SPACE_EXHAUSTED'):
         transport._clear_finger_overhang(g, np.zeros(2))
+
+
+def test_finger_adjustment_ignores_soft_platform_aabb(monkeypatch):
+    """Packed M2 seats may overlap a soft plate; that must not exhaust finger space."""
+    import numpy as np
+    from tuj.m5_motion.scripted_grasps import transport
+    monkeypatch.setattr(transport, '_grip_beside_payload', lambda _: True)
+    seat = np.array([.04, -.06])
+    soft_plate = (np.array([0., 0.]), np.array([.083, .083]), .1, True)
+    g = SimpleNamespace(
+        half=np.array([.013, .077, .01]),
+        region_world=np.zeros(3),
+        request=SimpleNamespace(constraints=SimpleNamespace(collision_margin_m=.005)),
+        _occupants=lambda: [soft_plate],
+        usable_half_xy=lambda: np.array([.1, .15]),
+        place_xy_away_from=lambda *a, **kw: (_ for _ in ()).throw(
+            AssertionError('soft platforms must not trigger finger flee')),
+        seat_clear_of_occupants=lambda xy: True,
+    )
+    np.testing.assert_array_equal(
+        transport._clear_finger_overhang(g, seat), seat)
