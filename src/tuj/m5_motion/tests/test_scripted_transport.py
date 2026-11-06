@@ -1029,6 +1029,73 @@ def test_reground_held_place_moves_away_from_held_neighbor_margin_partner():
         np.linalg.norm(first - neighbor_xy)
     ) - 1e-9
     assert feedback['reground_place_partner_id'] == 'neighbor'
+    assert feedback['avoid_place_partner_xy_m']
+
+
+def test_reground_held_place_keeps_prior_partner_distance_on_second_repair():
+    """A later soft-partner miss must not walk back into the first partner."""
+    from tuj.m5_motion.scripted_grasps.transport import (
+        reground_held_place_from_collision_feedback,
+    )
+    request, slot_xy, neighbor_xy = _crowded_place_request()
+    object_id = ENTRIES[4].object_id
+    # Second soft body on the opposite side of the slot.
+    other_xy = np.asarray(slot_xy, dtype=float) - np.array([.03, .0])
+    request.world.objects['other'] = {
+        'object_id': 'other',
+        'free_joint_name': 'other_free',
+        'pose': {
+            'frame_id': 'world',
+            'position_m': [float(other_xy[0]), float(other_xy[1]), float(REGION_POSITION[2])],
+            'orientation_xyzw': [0., 0., 0., 1.],
+        },
+        'dimensions_m': [.04, .04, .02],
+        'anchors': {'center': [0., 0., 0.]},
+    }
+    first = np.asarray(
+        request.task.metadata['held_place_goal']['destination_center_xy_m'],
+        dtype=float,
+    )
+    feedback = {
+        'failed_strategies': [{
+            'collision_observations': [{
+                'geometry_a': f'{object_id}_g0',
+                'geometry_b': 'neighbor_g0',
+                'measured_clearance_m': 0.001,
+                'required_clearance_m': 0.005,
+            }],
+        }],
+    }
+    assert reground_held_place_from_collision_feedback(request, feedback) is True
+    second = np.asarray(
+        request.task.metadata['held_place_goal']['destination_center_xy_m'],
+        dtype=float,
+    )
+    neighbor_dist = float(np.linalg.norm(second - neighbor_xy))
+    feedback2 = {
+        'rejected_place_xy_m': list(feedback['rejected_place_xy_m']),
+        'avoid_place_partner_xy_m': list(feedback['avoid_place_partner_xy_m']),
+        'failed_strategies': [{
+            'collision_observations': [{
+                'geometry_a': f'{object_id}_g0',
+                'geometry_b': 'other_g0',
+                'measured_clearance_m': 0.001,
+                'required_clearance_m': 0.005,
+            }],
+        }],
+    }
+    assert reground_held_place_from_collision_feedback(request, feedback2) is True
+    third = np.asarray(
+        request.task.metadata['held_place_goal']['destination_center_xy_m'],
+        dtype=float,
+    )
+    assert float(np.linalg.norm(third - second)) >= 0.005 - 1e-9
+    # Prior-partner distance may shrink by the repair avoid slack (4*margin).
+    assert float(np.linalg.norm(third - neighbor_xy)) + 1e-9 >= neighbor_dist - 0.02
+    assert float(np.linalg.norm(third - other_xy)) > float(
+        np.linalg.norm(second - other_xy)
+    ) - 1e-9
+    assert first is not None
 
 
 def test_reground_held_place_ignores_unrelated_scene_margin_observations():

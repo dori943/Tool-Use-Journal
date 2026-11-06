@@ -476,7 +476,7 @@ def test_pipeline_uses_structured_collision_feedback_repair_batch() -> None:
     feedback = provider.calls[1]
     assert feedback["contract_version"] == "COLLISION_REPAIR_V1"
     assert feedback["repair_attempt"] == 1
-    assert feedback["maximum_repair_attempts"] == 2
+    assert feedback["maximum_repair_attempts"] == 3
     assert feedback["required_collision_margin_m"] == pytest.approx(0.005)
     assert feedback["failed_strategies"]
     observation = feedback["failed_strategies"][0][
@@ -660,7 +660,7 @@ def test_pipeline_second_repair_uses_bounded_cumulative_feedback() -> None:
     assert len(provider.calls) == 3
     second_feedback = provider.calls[2]
     assert second_feedback["repair_attempt"] == 2
-    assert second_feedback["maximum_repair_attempts"] == 2
+    assert second_feedback["maximum_repair_attempts"] == 3
     assert len(second_feedback["failed_strategies"]) == 4
     assert {
         strategy["source_repair_attempt"]
@@ -683,7 +683,7 @@ def test_pipeline_collision_feedback_retry_exhaustion_combines_batches() -> None
 
     with pytest.raises(
         MotionPlanningPipelineError,
-        match="collision-feedback repair exhausted after 2 additional batch",
+        match="collision-feedback repair exhausted after 3 additional batch",
     ) as caught:
         pipeline.plan(
             _request(),
@@ -693,9 +693,9 @@ def test_pipeline_collision_feedback_retry_exhaustion_combines_batches() -> None
             final_segment_validator=lambda waypoints, selected_context: True,
         )
 
-    assert len(provider.calls) == 3
+    assert len(provider.calls) == 4
     assert caught.value.compilation is not None
-    assert len(caught.value.compilation.attempts) == 6
+    assert len(caught.value.compilation.attempts) == 8
     assert all(
         attempt.failure_code == "COLLISION_FILTERED_ALL"
         for attempt in caught.value.compilation.attempts

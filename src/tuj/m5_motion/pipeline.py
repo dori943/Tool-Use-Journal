@@ -232,7 +232,7 @@ class MotionPlanningResult:
 
 _COLLISION_REPAIR_FEEDBACK_KEY = "collision_repair_feedback"
 _COLLISION_REPAIR_CONTRACT = "COLLISION_REPAIR_V1"
-_MAX_COLLISION_REPAIR_BATCHES = 2
+_MAX_COLLISION_REPAIR_BATCHES = 3
 _MAX_COLLISION_STRATEGIES_PER_BATCH = 4
 _MAX_COLLISION_HISTORY_STRATEGIES = 8
 _COLLISION_OBSERVATION = re.compile(
@@ -971,8 +971,9 @@ class MotionPlanningPipeline:
                 request,
                 compilation,
             )
-            # Carry prior rejected place seats across repair batches so the
-            # deterministic reground cannot republish the same XY.
+            # Carry prior rejected place seats and flee partners across repair
+            # batches so reground cannot republish the same XY or walk back
+            # into a partner the previous batch already cleared.
             previous_feedback = request.task.metadata.get(
                 _COLLISION_REPAIR_FEEDBACK_KEY
             )
@@ -981,6 +982,12 @@ class MotionPlanningPipeline:
                 if isinstance(prior_rejected, list) and prior_rejected:
                     repair_feedback["rejected_place_xy_m"] = [
                         item for item in prior_rejected
+                        if isinstance(item, (list, tuple)) and len(item) >= 2
+                    ]
+                prior_avoid = previous_feedback.get("avoid_place_partner_xy_m")
+                if isinstance(prior_avoid, list) and prior_avoid:
+                    repair_feedback["avoid_place_partner_xy_m"] = [
+                        item for item in prior_avoid
                         if isinstance(item, (list, tuple)) and len(item) >= 2
                     ]
             retry_request.task.metadata = {

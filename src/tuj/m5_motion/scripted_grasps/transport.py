@@ -844,15 +844,21 @@ class _Grounding:
         min_shift_m=0.0,
         current_xy=None,
         toward_partner=False,
+        avoid_partner_xys=(),
     ):
-        """Next in-region place XY farther from ``partner_xy`` than rejected seats.
+        """Next in-region place XY that clears a measured collision partner.
 
         Used by collision-feedback repair when an EE/hand/held-payload margin
         violation is measured against a region occupant: stay inside the
-        interior, clear hard (thin-strip) blockers and the measured partner,
-        and do not reuse prior place seats. Other soft platforms (plate/mug)
-        keep the M2 packing rule — their inflated AABB must not void a seat
-        that physics already asked us to shift off the colliding partner.
+        interior, clear hard (thin-strip) blockers, satisfy ``min_shift_m``
+        relative to the measured partner, keep prior flee partners from
+        collapsing back onto the held object, and do not reuse prior seats.
+
+        Soft co-region platforms (plate/mug) keep the M2 packing rule — their
+        inflated AABB must not void a repair seat. Physics already supplied the
+        partner and deficit; maximizing center distance alone would drive the
+        seat into the next soft body, so candidates prefer the nearest seat
+        that still meets the shift while staying far from other soft bodies.
 
         When ``toward_partner`` is set (destination region itself is the
         collision partner), move toward the region center instead of away from
@@ -864,7 +870,19 @@ class _Grounding:
             for item in rejected_xys
             if item is not None
         ]
+        avoid = [
+            np.asarray(item, dtype=float).reshape(2)
+            for item in avoid_partner_xys
+            if item is not None
+        ]
         margin = max(.01, float(self.request.constraints.collision_margin_m) * 2.)
+        # Packed trays often need a later repair to step slightly back toward a
+        # prior soft partner (apple) to leave the next one (plate). Allow a
+        # small collapse of that prior distance without undoing the flee.
+        avoid_slack = max(
+            4.0 * float(self.request.constraints.collision_margin_m),
+            2.0 * REJECTED_PLACE_EPS_M,
+        )
         mine = self.half[:2]
         min_shift = max(0.0, float(min_shift_m))
         anchor = (
@@ -875,32 +893,29 @@ class _Grounding:
         # A repair must not trade a hand-margin miss for the EE-rack sweep,
         # unless the seat it repairs was already inside it (no clear seat).
         keep_sweep_clear = self.ee_path_clearance(anchor) >= 0.
+        occupants = self._occupants()
+
+        def other_soft_separation(xy):
+            best = None
+            for c, _h, _t, soft in occupants:
+                if not soft:
+                    continue
+                if float(np.linalg.norm(c - partner)) < REJECTED_PLACE_EPS_M:
+                    continue
+                dist = float(np.linalg.norm(xy - c))
+                if best is None or dist < best:
+                    best = dist
+            return 0.0 if best is None else best
 
         def occupants_acceptable(xy):
-            occupants = self._occupants()
             if not occupants:
                 return True
-            # Fleeing a scene occupant: ``partner`` is that body's center.
-            # Match it only (not every soft footprint that reaches the XY).
-            # Region-rim repairs (``toward_partner``) have no soft partner.
-            partner_idx = (
-                None
-                if toward_partner
-                else min(
-                    range(len(occupants)),
-                    key=lambda i: float(
-                        np.linalg.norm(occupants[i][0] - partner)
-                    ),
-                )
-            )
-            for i, (c, h, _t, soft) in enumerate(occupants):
-                # Soft co-region platforms other than the measured partner do
-                # not void repair seats (same rationale as honouring M2 slots).
-                if soft and i != partner_idx:
+            for c, h, _t, soft in occupants:
+                # Soft footprints are advisory only; thin strips stay hard.
+                if soft:
                     continue
                 gap = float(np.max(np.abs(xy - c) - (h + mine + margin)))
-                limit = -OCCUPANT_CONTACT_TOLERANCE_M if soft else 0.
-                if gap < limit:
+                if gap < 0.:
                     return False
             return True
 
@@ -917,6 +932,12 @@ class _Grounding:
             for prior in rejected:
                 if float(np.linalg.norm(xy - prior)) < REJECTED_PLACE_EPS_M:
                     return False
+            for prior_partner in avoid:
+                if (
+                    float(np.linalg.norm(xy - prior_partner)) + 1e-9
+                    < float(np.linalg.norm(anchor - prior_partner)) - avoid_slack
+                ):
+                    return False
             anchor_dist = float(np.linalg.norm(anchor - partner))
             cand_dist = float(np.linalg.norm(xy - partner))
             if toward_partner:
@@ -926,6 +947,20 @@ class _Grounding:
             elif cand_dist + 1e-9 < anchor_dist + min_shift:
                 return False
             return True
+
+        def candidate_key(xy):
+            if toward_partner:
+                return (
+                    float(np.linalg.norm(xy - partner)),
+                    float(np.linalg.norm(xy - anchor)),
+                )
+            # Prefer a short move that still meets min_shift, and among those
+            # stay far from other soft co-region bodies (avoid apple→plate).
+            return (
+                float(np.linalg.norm(xy - anchor)),
+                -other_soft_separation(xy),
+                -float(np.linalg.norm(xy - partner)),
+            )
 
         if toward_partner:
             away = partner - anchor
@@ -949,37 +984,33 @@ class _Grounding:
             r += step
         angles = (0.0, 0.35, -0.35, 0.7, -0.7, 1.05, -1.05, 1.57, -1.57)
         for radius in radii:
+            best_xy = None
+            best_key = None
             for angle in angles:
                 c, s = math.cos(angle), math.sin(angle)
                 direction = np.array(
                     [away[0] * c - away[1] * s, away[0] * s + away[1] * c]
                 )
                 xy = anchor + direction * radius
-                if usable(xy):
-                    return xy
-        # Fall back to a full interior grid ranked by distance from the partner.
+                if not usable(xy):
+                    continue
+                key = candidate_key(xy)
+                if best_key is None or key < best_key:
+                    best_xy = xy
+                    best_key = key
+            if best_xy is not None:
+                return best_xy
+        # Fall back to a full interior grid with the same ranking.
         limit = self.region_half[:2] - REGION_WALL_ALLOWANCE_M - mine
         if np.any(limit <= 0.):
             return None
         center_xy = self.region_world[:2]
         xs = np.arange(-limit[0], limit[0] + 1e-9, FREE_SPOT_GRID_M)
         ys = np.arange(-limit[1], limit[1] + 1e-9, FREE_SPOT_GRID_M)
-        if toward_partner:
-            ranked = sorted(
-                (center_xy + np.array([dx, dy]) for dx in xs for dy in ys),
-                key=lambda xy: (
-                    float(np.linalg.norm(xy - partner)),
-                    float(np.linalg.norm(xy - anchor)),
-                ),
-            )
-        else:
-            ranked = sorted(
-                (center_xy + np.array([dx, dy]) for dx in xs for dy in ys),
-                key=lambda xy: (
-                    -float(np.linalg.norm(xy - partner)),
-                    float(np.linalg.norm(xy - anchor)),
-                ),
-            )
+        ranked = sorted(
+            (center_xy + np.array([dx, dy]) for dx in xs for dy in ys),
+            key=candidate_key,
+        )
         for xy in ranked:
             if usable(xy):
                 return xy
@@ -1657,6 +1688,14 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
         for item in raw_rejected:
             if isinstance(item, (list, tuple)) and len(item) >= 2:
                 rejected.append([float(item[0]), float(item[1])])
+    avoid = []
+    raw_avoid = (
+        feedback.get("avoid_place_partner_xy_m") if isinstance(feedback, dict) else None
+    )
+    if isinstance(raw_avoid, list):
+        for item in raw_avoid:
+            if isinstance(item, (list, tuple)) and len(item) >= 2:
+                avoid.append([float(item[0]), float(item[1])])
     current = _held_place_center_xy(request)
     if current is not None:
         rejected.append([float(current[0]), float(current[1])])
@@ -1675,6 +1714,7 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
         min_shift_m=min_shift,
         current_xy=current,
         toward_partner=toward_region,
+        avoid_partner_xys=avoid,
     )
     if next_xy is None:
         return False
@@ -1684,6 +1724,18 @@ def reground_held_place_from_collision_feedback(request, feedback) -> bool:
         feedback["rejected_place_xy_m"] = rejected
         feedback["reground_place_partner_id"] = partner["partner_id"]
         feedback["reground_place_xy_m"] = [float(seated[0]), float(seated[1])]
+        # Remember this partner so the next repair batch cannot walk back into it.
+        partner_xy = [
+            float(partner["partner_xy"][0]),
+            float(partner["partner_xy"][1]),
+        ]
+        if not any(
+            float(np.linalg.norm(np.asarray(prior, dtype=float) - partner["partner_xy"]))
+            < REJECTED_PLACE_EPS_M
+            for prior in avoid
+        ):
+            avoid.append(partner_xy)
+        feedback["avoid_place_partner_xy_m"] = avoid
     return True
 
 
