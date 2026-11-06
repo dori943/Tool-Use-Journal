@@ -1386,6 +1386,76 @@ def test_m2_layout_slot_keeps_seat_despite_co_region_occupant_aabb_overlap():
     assert g._free_destination_xy(None) is None
 
 
+def test_m2_slot_past_physical_limit_clips_instead_of_exhausting():
+    """M2 UV a few mm past measured footprint clips on; wall-double-inset must not exhaust."""
+    from tuj.m5_motion.scripted_grasps.transport import (
+        REGION_WALL_ALLOWANCE_M, _Grounding)
+
+    request, oid = _occupied_tray_for_yaw_search()
+    request.world.objects.pop('plate')
+    # Broad plate: physical_limit still admits a seat, but another WALL
+    # allowance on interior_half leaves a negative free-grid domain (c3_2).
+    request.world.objects[oid]['dimensions_m'] = [.1675, .1671, .0102]
+    request.task.metadata['action_parameters'] = {
+        'placement_slot': {
+            'uv': [0., -.95],
+            'frame': 'world_xy',
+            'source': 'm2_container_layout',
+        },
+    }
+    g = _Grounding(request, None, oid)
+    g._initialize_seat_yaw()
+    region_half = g.interior_half_xy_local()
+    footprint = (np.abs((g.T_WR[:3, :3].T @ g.destination_rotation)[:2, :])
+                 @ g.local_size / 2.)
+    physical_limit = (region_half - footprint
+                      - float(request.constraints.collision_margin_m))
+    wall_limit = (np.maximum(region_half - REGION_WALL_ALLOWANCE_M, 0.)
+                  - footprint)
+    anchor = g._slot_xy()
+    relative = np.linalg.solve(g.T_WR[:2, :2], anchor - g.region_world[:2])
+    assert np.all(physical_limit > 0.)
+    assert np.any(wall_limit < 0.)
+    assert np.any(np.abs(relative) > physical_limit + 1e-9)
+    selected = g._free_destination_xy(None)
+    assert selected is not None
+    selected_rel = np.linalg.solve(
+        g.T_WR[:2, :2], selected - g.region_world[:2])
+    np.testing.assert_allclose(
+        selected_rel, np.clip(relative, -physical_limit, physical_limit),
+        atol=1e-9)
+
+
+def test_wall_inset_empty_grid_falls_back_to_physical_limit():
+    """Preferred slot outside phys + empty wall grid still finds a measured seat."""
+    from tuj.m5_motion.scripted_grasps.transport import (
+        REGION_WALL_ALLOWANCE_M, _Grounding)
+
+    request, oid = _occupied_tray_for_yaw_search()
+    request.world.objects.pop('plate')
+    request.world.objects[oid]['dimensions_m'] = [.1675, .1671, .0102]
+    # No M2 source: exercise free-grid physical_limit fallback, not M2 clip.
+    request.task.metadata['action_parameters'] = {
+        'placement_slot': {'uv': [0., -.95], 'frame': 'world_xy'},
+    }
+    g = _Grounding(request, None, oid)
+    g._initialize_seat_yaw()
+    region_half = g.interior_half_xy_local()
+    footprint = (np.abs((g.T_WR[:3, :3].T @ g.destination_rotation)[:2, :])
+                 @ g.local_size / 2.)
+    physical_limit = (region_half - footprint
+                      - float(request.constraints.collision_margin_m))
+    wall_limit = (np.maximum(region_half - REGION_WALL_ALLOWANCE_M, 0.)
+                  - footprint)
+    assert np.any(wall_limit < 0.)
+    assert np.all(physical_limit > 0.)
+    selected = g._free_destination_xy(None)
+    assert selected is not None
+    selected_rel = np.linalg.solve(
+        g.T_WR[:2, :2], selected - g.region_world[:2])
+    assert np.all(np.abs(selected_rel) <= physical_limit + 1e-9)
+
+
 def test_oversize_object_cannot_bypass_interior_at_clear_center():
     from tuj.m5_motion.scripted_grasps.transport import _Grounding
     request, oid = _occupied_tray_for_yaw_search()

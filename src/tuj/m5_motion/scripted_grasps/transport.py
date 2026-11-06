@@ -819,13 +819,24 @@ class _Grounding:
         # AABBs of already-placed co-region objects (plate, utensils) often
         # still overlap those seats. Honour the planned seat inside the
         # measured interior; free-grid search keeps full occupant blocking.
-        if self._m2_layout_slot() is not None and acceptable(
-                anchor, ignore_occupants=True):
-            return anchor
+        # When M2's normalized offset sits a few millimetres past the measured
+        # footprint (different AABB scale), clip onto the physical limit so a
+        # still-valid plate/tray seat is not discarded as exhausted.
+        if self._m2_layout_slot() is not None:
+            relative = np.linalg.solve(seat_axes, anchor - seat_origin)
+            clipped = np.clip(relative, -physical_limit, physical_limit)
+            clipped_xy = seat_origin + seat_axes @ clipped
+            if acceptable(clipped_xy, ignore_occupants=True):
+                return clipped_xy
         limit = (physical_limit if on_support else
                  np.maximum(region_half - REGION_WALL_ALLOWANCE_M, 0.) - footprint)
+        # interior_half already insets the wall; another WALL allowance can
+        # leave a negative search domain even though physical_limit still
+        # admits the footprint (wide plate in a narrow tray).
         if np.any(limit < -1e-9):
-            return None
+            if np.any(physical_limit <= 1e-9):
+                return None
+            limit = physical_limit
         limit = np.maximum(limit, 0.)
         xs = np.arange(-limit[0], limit[0] + 1e-9, FREE_SPOT_GRID_M)
         ys = np.arange(-limit[1], limit[1] + 1e-9, FREE_SPOT_GRID_M)
