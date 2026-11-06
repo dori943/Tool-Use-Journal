@@ -3155,19 +3155,33 @@ class ToolUseJournalEERuntime:
             local_pos = np.asarray(model.geom_pos[geom_id], dtype=float)
             world_offset = rot @ local_pos
             center_xy = np.asarray(tool_position[:2], dtype=float) + world_offset[:2]
+            # Project the local box through the live attitude. Using only
+            # size[2] for world-z (and omitting rot[:,2] in XY) treats a
+            # tilted thin paddle as if it were still axis-aligned, so the
+            # underside is reported ~cm too high and kinematic drag never
+            # engages (AUTO sweep with a modest VLM tilt).
             half_xy = np.maximum(
                 half_xy,
                 np.array(
                     [
-                        abs(rot[0, 0]) * size[0] + abs(rot[0, 1]) * size[1],
-                        abs(rot[1, 0]) * size[0] + abs(rot[1, 1]) * size[1],
+                        abs(rot[0, 0]) * size[0]
+                        + abs(rot[0, 1]) * size[1]
+                        + abs(rot[0, 2]) * size[2],
+                        abs(rot[1, 0]) * size[0]
+                        + abs(rot[1, 1]) * size[1]
+                        + abs(rot[1, 2]) * size[2],
                     ],
                     dtype=float,
                 ),
             )
+            half_z = (
+                abs(rot[2, 0]) * size[0]
+                + abs(rot[2, 1]) * size[1]
+                + abs(rot[2, 2]) * size[2]
+            )
             paddle_bottom_z = min(
                 paddle_bottom_z,
-                float(tool_position[2] + world_offset[2] - size[2]),
+                float(tool_position[2] + world_offset[2] - half_z),
             )
         if float(np.max(half_xy)) < 1e-4:
             return

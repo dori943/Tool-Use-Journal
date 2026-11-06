@@ -804,6 +804,51 @@ def test_held_tool_kinematic_push_assist_moves_tabletop_partner() -> None:
     runtime.close()
 
 
+def test_held_tool_kinematic_push_assist_uses_rotated_paddle_aabb() -> None:
+    """A tilted thin paddle still drags partners under its projected underside."""
+
+    from scipy.spatial.transform import Rotation
+
+    runtime = ToolUseJournalEERuntime(_fake_env("2F"), _fake_env)
+    model = runtime.env.sim.model._model
+    data = runtime.env.sim.data._data
+    apple_joint = mujoco.mj_name2id(
+        model, mujoco.mjtObj.mjOBJ_JOINT, "apple_joint"
+    )
+    apple_qpos = int(model.jnt_qposadr[apple_joint])
+    data.qpos[apple_qpos : apple_qpos + 3] = [0.0, 0.0, 0.80]
+    data.qpos[apple_qpos + 3 : apple_qpos + 7] = [1.0, 0.0, 0.0, 0.0]
+    mujoco.mj_forward(model, data)
+
+    box_geom = next(
+        geom_id
+        for geom_id in range(int(model.ngeom))
+        if int(model.geom_type[geom_id]) == int(mujoco.mjtGeom.mjGEOM_BOX)
+    )
+    runtime._held_tool_fill_geom_backup[box_geom] = (
+        0,
+        0,
+        np.asarray(model.geom_size[box_geom], dtype=float).copy(),
+        np.asarray(model.geom_pos[box_geom], dtype=float).copy(),
+    )
+    # Thin wide paddle: axis-aligned size[2] alone under-reports world-z extent
+    # once the plate normal tilts ~27° off vertical (live AUTO sweep failure).
+    model.geom_size[box_geom] = np.asarray([0.10, 0.10, 0.0025], dtype=float)
+    model.geom_pos[box_geom] = np.asarray([0.0, 0.0, 0.0], dtype=float)
+    runtime._held_tool_push_partner_ids = frozenset({"apple"})
+
+    tilt = Rotation.from_euler("y", 27.0, degrees=True).as_matrix()
+    before = data.qpos[apple_qpos : apple_qpos + 2].copy()
+    runtime._apply_held_tool_kinematic_push_assist(
+        delta_xy=np.asarray([-0.05, 0.01], dtype=float),
+        tool_position=np.asarray([0.0, 0.0, 0.8335], dtype=float),
+        tool_rotation=tilt,
+    )
+    after = data.qpos[apple_qpos : apple_qpos + 2]
+    assert after == pytest.approx(before + np.asarray([-0.05, 0.01]), abs=1e-9)
+    runtime.close()
+
+
 def test_kinematic_push_assist_separates_z_with_zero_xy_delta() -> None:
     """Stationary paddle still pushes partners down out of its volume."""
 

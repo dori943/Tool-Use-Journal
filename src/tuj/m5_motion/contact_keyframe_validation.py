@@ -1289,9 +1289,13 @@ def canonicalize_sweep_lateral_toward_region(
     contact_z = (
         float(engagement) if engagement is not None else float(start_z)
     )
-    # Prefer the already-canonicalized CONTACT_START height when it is near
-    # engagement (start may include shallow press).
-    if abs(float(start_z) - contact_z) <= 0.02:
+    # Prefer CONTACT_START when it is a shallow press at/below engagement.
+    # Never float above engagement: a start only ~1 cm high still exceeds the
+    # runtime push-assist contact band and leaves targets unmoved.
+    if (
+        float(start_z) <= float(contact_z) + 1e-6
+        and abs(float(start_z) - contact_z) <= 0.02
+    ):
         contact_z = float(start_z)
 
     if float(np.linalg.norm(end_xy - path_end)) <= _SWEEP_CORRIDOR_DEVIATION_M:
