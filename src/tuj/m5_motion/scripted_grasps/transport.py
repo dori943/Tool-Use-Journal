@@ -1271,6 +1271,17 @@ def _clear_finger_overhang(g, desired_xy):
         min_shift_m=shortfall,
         current_xy=seat,
     )
+
+    def hard_seat_clear(xy):
+        # Match place_xy_away_from: soft platforms do not void a flee seat.
+        # seat_clear_of_occupants still applies the soft contact tolerance and
+        # would discard a spoon-clear seat that still grazes a packed plate.
+        for center, half, _top, _soft in hard_occupants:
+            if float(np.max(np.abs(xy - center) - (
+                    np.asarray(half, dtype=float) + mine))) < 0.:
+                return False
+        return True
+
     def fingers_clear(xy):
         return all(
             float(np.max(np.abs(xy - center) - (np.asarray(half) + mine)))
@@ -1278,7 +1289,7 @@ def _clear_finger_overhang(g, desired_xy):
             for center, half, _top, _soft in hard_occupants
         )
 
-    if shifted is not None and g.seat_clear_of_occupants(shifted) and fingers_clear(shifted):
+    if shifted is not None and hard_seat_clear(shifted) and fingers_clear(shifted):
         return shifted
     away = seat - nearest
     norm = float(np.linalg.norm(away))
@@ -1294,7 +1305,7 @@ def _clear_finger_overhang(g, desired_xy):
         candidate = seat + direction * shortfall
         offset = candidate - g.region_world[:2]
         if (np.all(np.abs(offset) <= limit + 1e-9)
-                and g.seat_clear_of_occupants(candidate)
+                and hard_seat_clear(candidate)
                 and fingers_clear(candidate)):
             return candidate
     raise ValueError("PLACEMENT_FINGER_SPACE_EXHAUSTED")

@@ -178,12 +178,17 @@ def test_finger_adjustment_cannot_fall_back_onto_another_occupant(monkeypatch):
     import numpy as np
     from tuj.m5_motion.scripted_grasps import transport
     monkeypatch.setattr(transport, '_grip_beside_payload', lambda _: True)
-    g = SimpleNamespace(half=np.array([.02, .02, .02]),
-        region_world=np.zeros(3), request=SimpleNamespace(
-            constraints=SimpleNamespace(collision_margin_m=.005)),
-        _occupants=lambda: [(np.array([.05, 0.]), np.array([.02, .02]), .1, False)],
-        usable_half_xy=lambda: np.ones(2), place_xy_away_from=lambda *a, **kw: None,
-        seat_clear_of_occupants=lambda xy: False)
+    # Hard blocker fills the usable domain; no flee seat clears fingertip reach.
+    hard = (np.array([.02, 0.]), np.array([.08, .08]), .1, False)
+    g = SimpleNamespace(
+        half=np.array([.05, .05, .02]),
+        region_world=np.zeros(3),
+        request=SimpleNamespace(constraints=SimpleNamespace(collision_margin_m=.005)),
+        _occupants=lambda: [hard],
+        usable_half_xy=lambda: np.array([.06, .06]),
+        place_xy_away_from=lambda *a, **kw: None,
+        seat_clear_of_occupants=lambda xy: False,
+    )
     with pytest.raises(ValueError, match='PLACEMENT_FINGER_SPACE_EXHAUSTED'):
         transport._clear_finger_overhang(g, np.zeros(2))
 
@@ -207,3 +212,30 @@ def test_finger_adjustment_ignores_soft_platform_aabb(monkeypatch):
     )
     np.testing.assert_array_equal(
         transport._clear_finger_overhang(g, seat), seat)
+
+
+def test_finger_flee_accepts_hard_clear_seat_despite_soft_plate(monkeypatch):
+    """Spoon-clear flee must not be voided because the seat still grazes a plate."""
+    import numpy as np
+    from tuj.m5_motion.scripted_grasps import transport
+    monkeypatch.setattr(transport, '_grip_beside_payload', lambda _: True)
+    seat = np.zeros(2)
+    soft_plate = (np.array([0., -.05]), np.array([.08, .08]), .1, True)
+    hard_spoon = (np.array([.04, 0.]), np.array([.05, .07]), .1, False)
+    fled = np.array([-.08, -.02])
+
+    def place_xy_away_from(*_a, **_k):
+        return fled
+
+    g = SimpleNamespace(
+        half=np.array([.013, .077, .01]),
+        region_world=np.zeros(3),
+        request=SimpleNamespace(constraints=SimpleNamespace(collision_margin_m=.005)),
+        _occupants=lambda: [soft_plate, hard_spoon],
+        usable_half_xy=lambda: np.array([.12, .15]),
+        place_xy_away_from=place_xy_away_from,
+        # Soft plate still fails the generic seat check (packed M2 graze).
+        seat_clear_of_occupants=lambda xy: False,
+    )
+    np.testing.assert_array_equal(
+        transport._clear_finger_overhang(g, seat), fled)
