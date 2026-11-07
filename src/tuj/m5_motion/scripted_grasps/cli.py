@@ -109,11 +109,16 @@ def execute_selected_plan_live(args, selected, initial_world, constraints, optio
         initial_world = execution_initial_world(runtime, preview,
             externally_supplied=args.initial_world is not None)
         report = validate_selected_plan(selected, initial_world, constraints, options)
-        (output / "preview_world.json").write_text(preview.model_dump_json(indent=2), encoding="utf-8")
-        (output / "initial_world.json").write_text(initial_world.model_dump_json(indent=2), encoding="utf-8")
+        from tuj.m5_motion.artifact_io import world_snapshot_json, write_text_atomic
+        write_text_atomic(output / "preview_world.json", world_snapshot_json(preview))
+        write_text_atomic(
+            output / "initial_world.json", world_snapshot_json(initial_world))
         report.update(world_source="LIVE_EXECUTION_RUNTIME",
                       initial_world=str((output / "initial_world.json").resolve()))
-        (output / "m5_input_validation.json").write_text(json.dumps(report, indent=2), encoding="utf-8")
+        write_text_atomic(
+            output / "m5_input_validation.json",
+            json.dumps(report, indent=2),
+        )
         runtime.scripted_render = not args.headless or args.video is not None
         runtime.scripted_realtime_factor = args.realtime_factor if args.realtime_factor is not None else (1. if not args.headless and args.video is None else 0.)
         if args.video is not None:

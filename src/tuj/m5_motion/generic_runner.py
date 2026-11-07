@@ -1417,8 +1417,9 @@ def main(
             encoding="utf-8",
         )
         report["geometry_alignment_report"] = str(geometry_report_path)
+    from tuj.m5_motion.artifact_io import world_snapshot_json, write_text_atomic
     initial_world_path = output_dir / "initial_world.json"
-    initial_world_path.write_text(world.model_dump_json(indent=2), encoding="utf-8")
+    write_text_atomic(initial_world_path, world_snapshot_json(world))
     report["initial_world"] = str(initial_world_path)
     report["grasp_execution_mode"] = resolved_grasp_mode
     validation_path = output_dir / "m5_input_validation.json"
