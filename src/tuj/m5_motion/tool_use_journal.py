@@ -1336,9 +1336,10 @@ class ToolUseJournalCollisionModelCompiler:
             ee: f"tool-use-journal-{environment_tag}-{ee}-attached-{revision_tag}-v1"
             for ee in sorted(_EXPECTED_EES)
         }
-        # Instance-local only.  with_reference_environment() constructs a new
-        # compiler, so refreshed reference joint state never reuses stale
-        # compiled baselines.  MjData is not cached here.
+        # Instance-local MjModel cache. with_reference_environment() keeps these
+        # models and only refreshes baseline_qpos so long live runs do not
+        # re-parse MJCF / re-allocate native models every request. MjData is
+        # not cached (make_validator always builds a fresh one).
         self._compiled_models: dict[
             str | None, CompiledToolUseJournalCollisionModel
         ] = {}
@@ -1446,6 +1447,17 @@ class ToolUseJournalCollisionModelCompiler:
                 f"unknown EE {active_ee!r}"
             ) from error
 
+    def _baseline_qpos_for(
+        self, active_ee: str | None, model: mujoco.MjModel
+    ) -> tuple[float, ...]:
+        """Bake capture + live reference joints into a model-sized qpos vector."""
+
+        baseline = np.asarray(model.qpos0, dtype=float).copy()
+        capture = self._captures[active_ee]
+        _apply_joint_states(model, baseline, capture.source_joint_states)
+        _apply_joint_states(model, baseline, self._reference_joint_states)
+        return tuple(float(value) for value in baseline)
+
     def with_reference_environment(
         self, reference_env: object
     ) -> "ToolUseJournalCollisionModelCompiler":
@@ -1454,8 +1466,12 @@ class ToolUseJournalCollisionModelCompiler:
         Constructing the four EE variants is intentionally expensive.  A
         receding-horizon planner only needs to refresh the common arm and
         free-object joint states between replans, while the underlying MJCF
-        variants remain unchanged.
+        variants remain unchanged. Already-compiled ``MjModel`` instances are
+        kept; only ``baseline_qpos`` is rewritten so planners see the live
+        free-object layout without another native allocation.
         """
+        from dataclasses import replace
+
         reference_adapter = ToolUseJournalEnvironmentAdapter(
             reference_env, source_revision=self.source_revision
         )
@@ -1473,7 +1489,7 @@ class ToolUseJournalCollisionModelCompiler:
                 "reference environment robot joint order does not match "
                 "captured collision models"
             )
-        return type(self)(
+        refreshed = type(self)(
             self._captures,
             reference_joint_states=_joint_state_map(
                 reference_adapter.model, reference_adapter.data
@@ -1481,6 +1497,14 @@ class ToolUseJournalCollisionModelCompiler:
             source_revision=self.source_revision,
             reference_active_ee=reference_adapter.physical_active_ee,
         )
+        for active_ee, compiled in self._compiled_models.items():
+            refreshed._compiled_models[active_ee] = replace(
+                compiled,
+                baseline_qpos=refreshed._baseline_qpos_for(
+                    active_ee, compiled.model
+                ),
+            )
+        return refreshed
 
     def initial_static_support_contacts(self, world, target, primary):
         """Measure only current upward contacts on coplanar fixed surfaces."""
@@ -1548,11 +1572,9 @@ class ToolUseJournalCollisionModelCompiler:
             raise ToolUseJournalCompatibilityError(
                 f"MuJoCo failed to compile {version!r}: {error}"
             ) from error
-        baseline = np.asarray(model.qpos0, dtype=float).copy()
-        _apply_joint_states(model, baseline, capture.source_joint_states)
         # Reference state wins for common arm and free-object joints.  Gripper
         # joints that do not exist in the live variant keep their reset state.
-        _apply_joint_states(model, baseline, self._reference_joint_states)
+        baseline = self._baseline_qpos_for(active_ee, model)
 
         entity_candidates: dict[str, tuple[str, ...]] = {
             "qc_master": (capture.qc_collision_body_name,),
@@ -1637,15 +1659,15 @@ class ToolUseJournalCollisionModelCompiler:
         if include_all_models:
             required = {None, *_EXPECTED_EES}
         compiled = [self.compile(active_ee) for active_ee in required]
-        validators = {
-            item.collision_model_version: item.make_validator(
-                collision_margin_m=collision_margin_m,
-                collision_contexts=collision_contexts,
-                allowed_collision_pairs=allowed_collision_pairs,
-            )
-            for item in compiled
-        }
         try:
+            validators = {
+                item.collision_model_version: item.make_validator(
+                    collision_margin_m=collision_margin_m,
+                    collision_contexts=collision_contexts,
+                    allowed_collision_pairs=allowed_collision_pairs,
+                )
+                for item in compiled
+            }
             return MuJoCoCollisionModelRegistry(
                 validators,
                 collision_contexts=collision_contexts,

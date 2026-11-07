@@ -449,7 +449,7 @@ def test_compiler_compile_caches_distinct_active_ee_entries() -> None:
     assert "3F" in compiler._compiled_models
 
 
-def test_with_reference_environment_starts_with_empty_compile_cache() -> None:
+def test_with_reference_environment_reuses_compiled_models_with_fresh_baselines() -> None:
     variants = {
         active_ee: _fake_env(active_ee)
         for active_ee in (None, "2F", "3F", "vac")
@@ -459,10 +459,11 @@ def test_with_reference_environment_starts_with_empty_compile_cache() -> None:
     )
     original = compiler.compile("vac")
     refreshed = compiler.with_reference_environment(variants["2F"])
-    assert refreshed._compiled_models == {}
+    assert "vac" in refreshed._compiled_models
     rebuilt = refreshed.compile("vac")
-    assert rebuilt is not original
-    assert rebuilt.model is not original.model
+    # Keep the expensive MjModel; only baseline_qpos tracks live joints.
+    assert rebuilt.model is original.model
+    assert rebuilt is refreshed._compiled_models["vac"]
 
 
 def test_make_validator_creates_fresh_mjdata_for_cached_model() -> None:

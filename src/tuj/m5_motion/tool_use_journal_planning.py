@@ -1969,7 +1969,8 @@ class ToolUseJournalCollisionContextFactory:
             raise
         except Exception as error:  # noqa: BLE001
             raise ToolUseJournalCollisionBindingError(
-                "failed to build MOVE_TO_WORKSPACE collision registry"
+                "failed to build MOVE_TO_WORKSPACE collision registry: "
+                f"{type(error).__name__}: {error}"
             ) from error
         return contexts, registry
 
